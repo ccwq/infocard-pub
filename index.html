@@ -167,6 +167,7 @@
   <span>客户端筛选 · 无后端</span>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 <script>
 (async () => {
   const cardsList = document.getElementById('cards-list');
@@ -181,31 +182,8 @@
   try {
     const resp = await fetch('./_index.yaml');
     const text = await resp.text();
-
-    // Minimal YAML parser (just for our format)
-    const cards = [];
-    let inCards = false;
-    let lines = text.split('\n');
-    let card = {};
-    for (const line of lines) {
-      if (line.trim() === 'cards:') { inCards = true; continue; }
-      if (inCards) {
-        if (line.match(/^  -$/)) {
-          if (Object.keys(card).length) cards.push(card);
-          card = {};
-        } else if (line.startsWith('    slug:')) card.slug = line.replace('    slug:', '').trim().replace(/^["']|["']$/g, '');
-        else if (line.startsWith('    title:')) card.title = line.replace('    title:', '').trim().replace(/^["']|["']$/g, '');
-        else if (line.startsWith('    category:')) card.category = line.replace('    category:', '').trim().replace(/^["']|["']$/g, '');
-        else if (line.startsWith('    date:')) card.date = line.replace('    date:', '').trim().replace(/^["']|["']$/g, '');
-        else if (line.startsWith('    tags:')) { /* open tags block */ }
-        else if (line.trim().startsWith('- ') && !line.includes(':')) {
-          if (!card.tags) card.tags = [];
-          card.tags.push(line.trim().substring(2).trim().replace(/^["']|["']$/g, ''));
-        }
-      }
-    }
-    if (Object.keys(card).length) cards.push(card);
-    allCards = cards;
+    const index = jsyaml.load(text);
+    allCards = index.cards || [];
   } catch (e) {
     cardsList.innerHTML = `<div class="empty">加载索引失败，请稍后刷新</div>`;
     return;
@@ -242,25 +220,32 @@
       return matchTag && matchSearch;
     });
 
-    countLabel.textContent = `共 ${allCards.length} 张信息卡 · 显示 ${filtered.length} 张`;
+    const total = allCards.length;
+    const shown = filtered.length;
+    countLabel.textContent = `共 ${total} 张信息卡 · 显示 ${shown} 张`;
 
     if (!filtered.length) {
       cardsList.innerHTML = `<div class="empty">无匹配结果</div>`;
       return;
     }
 
-    cardsList.innerHTML = filtered.map(c => `
+    cardsList.innerHTML = filtered.map(c => {
+      const displayDate = (c.date || '').replace(/^"|"$/g, '').split('-').slice(1).join('/');
+      const displayTitle = c.title || c.slug;
+      const displayCat = (c.category || 'misc').toUpperCase();
+      const displayTags = (c.tags || []).map(t => `<span class="tags"><span>${t}</span></span>`).join('');
+      return `
       <div class="card-row">
-        <div class="card-date">${(c.date || '').replace(/^"|"$/g, '')}</div>
+        <div class="card-date">${displayDate}</div>
         <div class="card-body">
-          <h2><a href="${c.slug}.html">${c.title || c.slug}</a></h2>
+          <h2><a href="${c.slug}.html">${displayTitle}</a></h2>
           <div class="meta">
-            <span class="cat">${c.category || 'misc'}</span>
-            ${(c.tags || []).map(t => `<span class="tags"><span>${t}</span></span>`).join('')}
+            <span class="cat">${displayCat}</span>
+            ${displayTags}
           </div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   searchInput.addEventListener('input', renderCards);
