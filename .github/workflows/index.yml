@@ -17,17 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find all .meta.yaml files
-        id: files
-        run: |
-          META_FILES=$(find . -name '*.meta.yaml' -not -path './.git/*' | sort)
-          echo "files=$META_FILES" >> $GITHUB_OUTPUT
-          echo "count=$(echo $META_FILES | wc -w)" >> $GITHUB_OUTPUT
-
       - name: Build _index.yaml
         run: |
           python3 << 'PY'
           import os, glob, yaml
+          from datetime import datetime
 
           entries = []
           for f in sorted(glob.glob('**/*.meta.yaml', recursive=True)):
@@ -35,13 +29,11 @@ jobs:
                   continue
               with open(f) as fp:
                   data = yaml.safe_load(fp)
-              # derive url from meta file path
-              html = f.replace('.meta.yaml', '')
               entries.append(data)
 
           index = {
               '_count': len(entries),
-              '_updated': __import__('datetime').datetime.now().isoformat(),
+              '_updated': datetime.utcnow().isoformat(),
               'cards': sorted(entries, key=lambda x: x.get('date', ''), reverse=True)
           }
 
@@ -51,10 +43,9 @@ jobs:
           print(f'Index written: {len(entries)} cards')
           PY
 
-      - name: Commit and push index
-        run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add _index.yaml
-          git diff --cached --quiet && echo "No index changes" || \
-            (git commit -m "chore: auto-regenerate _index.yaml [skip ci]" && git push)
+      - name: Upload _index.yaml as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: infocard-index
+          path: _index.yaml
+          retention-days: 1
