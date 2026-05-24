@@ -1,0 +1,60 @@
+name: Build Infocard Index
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.meta.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find all .meta.yaml files
+        id: files
+        run: |
+          META_FILES=$(find . -name '*.meta.yaml' -not -path './.git/*' | sort)
+          echo "files=$META_FILES" >> $GITHUB_OUTPUT
+          echo "count=$(echo $META_FILES | wc -w)" >> $GITHUB_OUTPUT
+
+      - name: Build _index.yaml
+        run: |
+          python3 << 'PY'
+          import os, glob, yaml
+
+          entries = []
+          for f in sorted(glob.glob('**/*.meta.yaml', recursive=True)):
+              if '.git' in f:
+                  continue
+              with open(f) as fp:
+                  data = yaml.safe_load(fp)
+              # derive url from meta file path
+              html = f.replace('.meta.yaml', '')
+              entries.append(data)
+
+          index = {
+              '_count': len(entries),
+              '_updated': __import__('datetime').datetime.now().isoformat(),
+              'cards': sorted(entries, key=lambda x: x.get('date', ''), reverse=True)
+          }
+
+          with open('_index.yaml', 'w') as fp:
+              yaml.safe_dump(index, fp, allow_unicode=True, sort_keys=False)
+
+          print(f'Index written: {len(entries)} cards')
+          PY
+
+      - name: Commit and push index
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add _index.yaml
+          git diff --cached --quiet && echo "No index changes" || \
+            (git commit -m "chore: auto-regenerate _index.yaml [skip ci]" && git push)
