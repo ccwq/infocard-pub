@@ -20,8 +20,21 @@ jobs:
       - name: Build _index.yaml
         run: |
           python3 << 'PY'
-          import os, glob, yaml
-          from datetime import datetime
+          import glob
+          import os
+          import subprocess
+          import yaml
+          from datetime import datetime, timezone
+
+          def git_commit_ts(path: str) -> int:
+              try:
+                  out = subprocess.check_output(
+                      ['git', 'log', '-1', '--format=%ct', '--', path],
+                      text=True,
+                  ).strip()
+                  return int(out) if out else 0
+              except Exception:
+                  return 0
 
           entries = []
           for f in sorted(glob.glob('**/*.meta.yaml', recursive=True)):
@@ -29,12 +42,13 @@ jobs:
                   continue
               with open(f) as fp:
                   data = yaml.safe_load(fp)
+              data['_sort_ts'] = git_commit_ts(f)
               entries.append(data)
 
           index = {
               '_count': len(entries),
-              '_updated': datetime.utcnow().isoformat(),
-              'cards': sorted(entries, key=lambda x: x.get('date', ''), reverse=True)
+              '_updated': datetime.now(timezone.utc).isoformat(),
+              'cards': sorted(entries, key=lambda x: (x.get('_sort_ts', 0), x.get('date', '')), reverse=True)
           }
 
           with open('_index.yaml', 'w') as fp:
