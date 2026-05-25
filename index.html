@@ -199,7 +199,8 @@
       margin-bottom: 20px;
     }
     .search-row,
-    .tag-row {
+    .tag-row,
+    .tag-toolbar {
       width: 100%;
     }
     .controls input {
@@ -213,10 +214,65 @@
     }
     .controls input:focus { border-color: #444; }
 
+    .tag-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-top: 2px;
+    }
+    .current-filter {
+      min-height: 20px;
+      font-size: 12px;
+      color: #666;
+      line-height: 1.5;
+    }
+    .current-filter .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1.5px solid #111;
+      background: #fff;
+      color: #111;
+      padding: 2px 8px;
+      margin-left: 6px;
+      font-weight: 700;
+    }
+    .current-filter .pill button {
+      border: 0;
+      background: transparent;
+      font: inherit;
+      cursor: pointer;
+      padding: 0;
+      color: #E60012;
+      font-weight: 900;
+    }
+    .tag-toggle {
+      flex: 0 0 auto;
+      border: 2px solid #111;
+      background: #fff;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .tag-toggle.active {
+      background: #111;
+      color: #fff;
+    }
+    .tag-viewport {
+      overflow: hidden;
+      transition: max-height 220ms ease;
+      will-change: max-height;
+    }
     .tag-filter {
       display: flex;
       gap: 6px;
       flex-wrap: wrap;
+      padding-bottom: 2px;
     }
     .tag-filter button {
       padding: 6px 12px;
@@ -343,8 +399,14 @@
         <div class="search-row">
           <input id="search-input" type="search" placeholder="搜索标题 / 标签…" autocomplete="off">
         </div>
+        <div class="tag-toolbar">
+          <div class="current-filter" id="current-filter"></div>
+          <button class="tag-toggle" id="tag-toggle" type="button">展开全部</button>
+        </div>
         <div class="tag-row">
-          <div class="tag-filter" id="tag-filter"></div>
+          <div class="tag-viewport" id="tag-viewport">
+            <div class="tag-filter" id="tag-filter"></div>
+          </div>
         </div>
       </div>
 
@@ -371,6 +433,12 @@
 
   let allCards = [];
   let activeTag = '';
+  let tagsExpanded = false;
+  const MAX_COLLAPSED_ROWS = 2;
+  const tagFilterEl = document.getElementById('tag-filter');
+  const tagViewport = document.getElementById('tag-viewport');
+  const tagToggle = document.getElementById('tag-toggle');
+  const currentFilterEl = document.getElementById('current-filter');
 
   // Load index
   try {
@@ -391,6 +459,55 @@
   allCards.forEach(c => (c.tags || []).forEach(t => tagSet.add(t)));
   const tags = [...tagSet].sort();
 
+  function setTagCollapseState(forceExpand) {
+    const buttons = Array.from(tagFilter.querySelectorAll('button'));
+    if (!buttons.length) return;
+
+    const rows = [];
+    let currentTop = null;
+    buttons.forEach(btn => {
+      const top = btn.offsetTop;
+      if (currentTop === null || top !== currentTop) {
+        rows.push(top);
+        currentTop = top;
+      }
+    });
+
+    const activeBtn = tagFilter.querySelector('button.active');
+    const shouldExpand = forceExpand || tagsExpanded || (activeBtn && rows.indexOf(activeBtn.offsetTop) >= MAX_COLLAPSED_ROWS);
+
+    if (shouldExpand || rows.length <= MAX_COLLAPSED_ROWS) {
+      tagViewport.style.maxHeight = tagFilter.scrollHeight + 'px';
+      tagToggle.textContent = '收起标签';
+      tagToggle.classList.add('active');
+    } else {
+      const targetRows = new Set(rows.slice(0, MAX_COLLAPSED_ROWS));
+      let lastBottom = 0;
+      buttons.forEach(btn => {
+        if (targetRows.has(btn.offsetTop)) {
+          lastBottom = Math.max(lastBottom, btn.offsetTop + btn.offsetHeight);
+        }
+      });
+      tagViewport.style.maxHeight = (lastBottom + 4) + 'px';
+      tagToggle.textContent = '展开全部';
+      tagToggle.classList.remove('active');
+    }
+  }
+
+  function updateCurrentFilter() {
+    if (!activeTag) {
+      currentFilterEl.innerHTML = '当前筛选：<span style="color:#111;font-weight:700;">全部</span>';
+      return;
+    }
+    currentFilterEl.innerHTML = `当前筛选：<span class="pill">${activeTag}<button id="clear-active-tag" type="button" aria-label="清除筛选">×</button></span>`;
+    const clearBtn = document.getElementById('clear-active-tag');
+    clearBtn && (clearBtn.onclick = () => {
+      activeTag = '';
+      renderTagFilter();
+      renderCards();
+    });
+  }
+
   function renderTagFilter() {
     tagFilter.innerHTML = '';
     ['全部'].concat(tags).forEach(tag => {
@@ -399,11 +516,14 @@
       if ((tag === '全部' && !activeTag) || tag === activeTag) btn.classList.add('active');
       btn.onclick = () => {
         activeTag = tag === '全部' ? '' : tag;
+        tagsExpanded = false;
         renderTagFilter();
         renderCards();
       };
       tagFilter.appendChild(btn);
     });
+    updateCurrentFilter();
+    requestAnimationFrame(() => setTagCollapseState(false));
   }
 
   function renderCards() {
@@ -453,6 +573,13 @@
   }
 
   searchInput.addEventListener('input', renderCards);
+  tagToggle.addEventListener('click', () => {
+    tagsExpanded = !tagsExpanded;
+    setTagCollapseState(tagsExpanded);
+    tagToggle.textContent = tagsExpanded ? '收起标签' : '展开全部';
+    tagToggle.classList.toggle('active', tagsExpanded);
+  });
+  window.addEventListener('resize', () => requestAnimationFrame(() => setTagCollapseState(tagsExpanded)));
   renderTagFilter();
   renderCards();
 })();
