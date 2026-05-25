@@ -42,4 +42,4 @@ tags:
 2. Agent 同步创建 `卡名.html.meta.yaml`
 3. `git push` 到 `main`
 4. GitHub Actions 检测新的 `.meta.yaml` → 更新 `_index.yaml`
-5. GitHub Pages 自动更新
+5. GitHub Pages 自动更新# temp
