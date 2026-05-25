@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=780">
+<title>delegate_task vs Kanban Worker vs cronjob 深度对比</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; font-family: -apple-system, 'Helvetica Neue', sans-serif; }
+.wrap { width: 780px; margin: 0 auto; background: #fff; }
+.wrap { font-size: 0; background: #0D0D0D; padding: 24px; }
+
+/* Header */
+.hdr { background: #C8001A; color: #fff; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }
+.hdrtitle { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+.hdrsub { font-size: 11px; opacity: 0.7; margin-top: 4px; }
+.hdrver { font-size: 11px; text-align: right; line-height: 1.6; opacity: 0.7; }
+
+/* Bar */
+.bar { display: flex; align-items: center; gap: 0; height: 40px; }
+.baritem { flex: 1; text-align: center; font-size: 13px; font-weight: 700; color: #fff; padding: 0 8px; line-height: 40px; }
+.b0 { background: #C8001A; }
+.b1 { background: #0D0D0D; border-left: 1px solid #333; border-right: 1px solid #333; }
+.b2 { background: #0D0D0D; }
+
+/* Table */
+.tbl { display: flex; flex-direction: column; border-top: 2px solid #fff; }
+.tr { display: flex; min-height: 44px; border-bottom: 1px solid #2A2A2A; }
+.td { padding: 10px 16px; font-size: 12px; line-height: 1.5; color: #222; display: flex; align-items: center; }
+.lbl { width: 160px; flex-shrink: 0; font-size: 11px; font-weight: 600; color: #888; background: #F5F5F5; border-right: 1px solid #DDD; text-transform: uppercase; letter-spacing: 0.5px; justify-content: flex-start; }
+.d0 { flex: 160px; flex-shrink: 0; background: #FFF5F5; border-right: 1px solid #F0D0D5; align-items: center; }
+.d1 { flex: 160px; flex-shrink: 0; background: #F0F0F0; border-right: 1px solid #DDD; }
+.d2 { flex: 160px; flex-shrink: 0; background: #F0F8F0; }
+.td span { font-size: 11px; color: #888; margin-left: 4px; font-weight: 400; }
+.td strong { font-size: 13px; color: #111; }
+
+/* Alternating rows */
+.tr:nth-child(even) .d0 { background: #FFF0F0; }
+.tr:nth-child(even) .d1 { background: #EBEBEB; }
+.tr:nth-child(even) .d2 { background: #E8F5E8; }
+
+/* Badge colors */
+.bd-red { background: #C8001A; color: #fff; padding: 1px 7px; border-radius: 2px; font-size: 10px; font-weight: 700; margin-right: 3px; }
+.bd-gray { background: #555; color: #fff; padding: 1px 7px; border-radius: 2px; font-size: 10px; font-weight: 700; margin-right: 3px; }
+.bd-green { background: #1A7A1A; color: #fff; padding: 1px 7px; border-radius: 2px; font-size: 10px; font-weight: 700; margin-right: 3px; }
+.bd-blue { background: #1A3A8C; color: #fff; padding: 1px 7px; border-radius: 2px; font-size: 10px; font-weight: 700; margin-right: 3px; }
+.bd-orange { background: #C85A00; color: #fff; padding: 1px 7px; border-radius: 2px; font-size: 10px; font-weight: 700; margin-right: 3px; }
+.bd-purple { background: #6B2D8C; color: #fff; padding: 1px 7px; border-radius: 2px; font-size: 10px; font-weight: 700; }
+
+/* Mono text */
+.mono { font-family: 'Courier New', monospace; font-size: 11px; background: #F0F0F0; padding: 1px 5px; border-radius: 2px; }
+
+/* Footer */
+.ftr { height: 28px; background: #0D0D0D; display: flex; align-items: center; padding: 0 16px; }
+.ftrtxt { font-size: 10px; color: #555; }
+.ftrline { flex: 1; height: 1px; background: #333; margin-left: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- Header -->
+<div class="hdr">
+  <div>
+    <div class="hdrtitle">delegate_task<br>vs Kanban Worker<br>vs cronjob</div>
+    <div class="hdrsub">Hermes SubAgent 三形态深度对比</div>
+  </div>
+  <div class="hdrver">HERMES AGENT<br>2026-05-25<br>SUBAGENT MATRIX</div>
+</div>
+
+<!-- Bar -->
+<div class="bar">
+  <div class="baritem b0">delegate_task</div>
+  <div class="baritem b1">Kanban Worker</div>
+  <div class="baritem b2">cronjob</div>
+</div>
+
+<!-- Table -->
+<div class="tbl">
+
+<!-- 本质 -->
+<div class="tr">
+  <div class="lbl">本质</div>
+  <div class="d0"><strong>临时会话</strong><span> — 单次任务</span></div>
+  <div class="d1"><strong>持久进程</strong><span> — 长期运行</span></div>
+  <div class="d2"><strong>定时调度</strong><span> — 周期触发</span></div>
+</div>
+
+<!-- 持久性 -->
+<div class="tr">
+  <div class="lbl">生命周期</div>
+  <div class="d0"><strong>会话级</strong><span> — 本次完成即销毁</span></div>
+  <div class="d1"><strong>持久</strong><span> — 进程常驻，崩溃可恢复</span></div>
+  <div class="d2"><strong>按需触发</strong><span> — 调度器唤醒，任务完成后停止</span></div>
+</div>
+
+<!-- 通信机制 -->
+<div class="tr">
+  <div class="lbl">通信方式</div>
+  <div class="d0"><span class="bd-red">结果聚合</span><strong>共享上下文</strong><span> — 直接返回给父 Agent</span></div>
+  <div class="d1"><span class="bd-blue">Kanban Board</span><strong>SQLite 协调</strong><span> — 任务卡片式解耦</span></div>
+  <div class="d2"><span class="bd-purple">静默运行</span><strong>无会话</strong><span> — 无法与用户实时交互</span></div>
+</div>
+
+<!-- 上下文 -->
+<div class="tr">
+  <div class="lbl">上下文隔离</div>
+  <div class="d0"><strong>共享</strong><span> — 共享主 Agent 历史</span></div>
+  <div class="d1"><strong>隔离</strong><span> — 独立 session，有 Kanban 状态</span></div>
+  <div class="d2"><strong>独立</strong><span> — 无当前会话上下文，需自包含 prompt</span></div>
+</div>
+
+<!-- 并行能力 -->
+<div class="tr">
+  <div class="lbl">并行方式</div>
+  <div class="d0"><span class="bd-orange">tasks=[A,B,C]</span><strong>最多 3 个</strong><span> — 同会话并行</span></div>
+  <div class="d1"><strong>多 Worker</strong><span> — Kanban 队列解耦，无上限</span></div>
+  <div class="d2"><strong>多 Job</strong><span> — 独立调度，time-based 并行</span></div>
+</div>
+
+<!-- 结果聚合 -->
+<div class="tr">
+  <div class="lbl">结果聚合</div>
+  <div class="d0"><span class="bd-red">✅ 直接</span><strong>父子同一会话</strong><span> — 结果直接进入父回复</span></div>
+  <div class="d1"><span class="bd-blue">✅ 间接</span><strong>Board → 父读</strong><span> — 父需主动读 Board 或等待推送</span></div>
+  <div class="d2"><span class="bd-purple">❌ 无</span><strong>静默产出</strong><span> — 需设置 deliver 参数推送</span></div>
+</div>
+
+<!-- 任务依赖 -->
+<div class="tr">
+  <div class="lbl">任务依赖</div>
+  <div class="d0"><span class="bd-orange">max_spawn_depth</span><strong>层级限制</strong><span> — 可配置孙 Agent</span></div>
+  <div class="d1"><span class="bd-blue">parents=[ID]</span><strong>显式依赖</strong><span> — 子任务等父完成才就绪</span></div>
+  <div class="d2"><span class="bd-purple">无</span><strong>独立运行</strong><span> — 仅时间触发，无依赖</span></div>
+</div>
+
+<!-- 适用场景 -->
+<div class="tr">
+  <div class="lbl">最佳场景</div>
+  <div class="d0"><strong>SDD / 临时并行</strong><br><span>多子任务并行，结果需汇总</span></div>
+  <div class="d1"><strong>长任务 / 多角色编排</strong><br><span>跨时间、易中断、需要人工介入</span></div>
+  <div class="d2"><strong>定时任务 / 监控</strong><br><span>周期推送、数据采集、定时报送</span></div>
+</div>
+
+<!-- 崩溃恢复 -->
+<div class="tr">
+  <div class="lbl">崩溃恢复</div>
+  <div class="d0"><span class="bd-gray">❌ 无</span><strong>会话丢失</strong><span> — 任务无法恢复</span></div>
+  <div class="d1"><span class="bd-blue">✅ 有</span><strong>Board 持久</strong><span> — Worker 重启后接续</span></div>
+  <div class="d2"><span class="bd-purple">❌ 无</span><strong>下次触发</strong><span> — 仅下次周期重跑</span></div>
+</div>
+
+<!-- 费用模式 -->
+<div class="tr">
+  <div class="lbl">Token 费用</div>
+  <div class="d0"><strong>共享预算</strong><span> — 主 Agent max_iterations</span></div>
+  <div class="d1"><strong>独立预算</strong><span> — Worker 有独立 budget</span></div>
+  <div class="d2"><strong>按次计费</strong><span> — 每次触发独立消耗</span></div>
+</div>
+
+<!-- Profile 关系 -->
+<div class="tr">
+  <div class="lbl">与 Profile</div>
+  <div class="d0"><span class="bd-gray">可指定</span><strong>profile 参数</strong><span> — 在指定 Profile 中运行</span></div>
+  <div class="d1"><span class="bd-blue">独立进程</span><strong>Worker Profile</strong><span> — 常驻监听 Kanban 队列</span></div>
+  <div class="d2"><span class="bd-purple">可指定</span><strong>profile 参数</strong><span> — 在指定 Profile 中运行</span></div>
+</div>
+
+<!-- 复杂度 -->
+<div class="tr">
+  <div class="lbl">配置复杂度</div>
+  <div class="d0"><span class="bd-red">低</span><strong>一行代码</strong><span> — 最简单直接</span></div>
+  <div class="d1"><span class="bd-orange">中</span><strong>需建 Board</strong><span> — kanban_create/list/start/done</span></div>
+  <div class="d2"><span class="bd-green">低</span><strong>声明式</strong><span> — schedule + prompt</span></div>
+</div>
+
+</div>
+
+<!-- Footer -->
+<div class="ftr">
+  <div class="ftrtxt">HERMES AGENT — SUBAGENT MATRIX — 2026-05-25</div>
+  <div class="ftrline"></div>
+</div>
+
+</div>
+</body>
+</html>
