@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>fact_store · Holographic 外挂记忆实战手册 v2.0</title>
+  <title>fact_store · Holographic 外挂记忆完整使用与配置实录 v3.0</title>
   <style>
     :root{
       --bg:#ffffff; --fg:#111111; --muted:#444; --line:#111; --red:#c8102e; --red2:#8f0e21;
@@ -70,18 +70,18 @@
   </style>
 </head>
 <body>
-  <article class="card" role="img" aria-label="fact_store Holographic 外挂记忆实战手册 v2.0">
+  <article class="card" role="img" aria-label="fact_store Holographic 外挂记忆完整使用与配置实录 v3.0">
     <header class="top">
       <div class="hero">
-        <div class="kicker">HERMES · MEMORY PROVIDER · V2.0</div>
-        <h1>fact_store<br/>Holographic 外挂记忆实战手册</h1>
-        <p class="sub">把零散事实变成可检索、可推理、可纠错的本地知识层。三条写入路径（手动 + 自动镜像 + 可选抽取），SQLite + FTS5 + trust score + 跨会话持久化。</p>
+        <div class="kicker">HERMES · MEMORY PROVIDER · V3.0</div>
+        <h1>fact_store<br/>Holographic 外挂记忆完整使用与配置实录</h1>
+        <p class="sub">不只解释 fact_store 是什么，还把“到底怎么用、当前机器到底怎么配、数据库里现在是什么状态、推荐怎么维护”一次讲透。三条写入路径 + 实机配置 + SQLite 实况 + 推荐工作流。</p>
       </div>
       <aside class="meta">
         <div class="pill">写入：手动 + 自动镜像 + auto_extract</div>
         <div class="pill">检索：FTS5 + 实体 + 组合推理</div>
         <div class="pill">信任：trust score + fact_feedback</div>
-        <div class="pill">配置：plugins.hermes-memory-store</div>
+        <div class="pill">配置：plugins.hermes-memory-store + 实机核对</div>
       </aside>
     </header>
 
@@ -268,10 +268,207 @@
           <li>最后检查 trust 门槛与检索词是否合理。</li>
         </ul>
       </section>
+    
+      <section>
+        <h2>一句话结论</h2>
+        <div class="highlight-box">
+          <p><strong>你现在已经在用 Holographic fact_store 了。</strong></p>
+          <ul>
+            <li>外部记忆 provider：<code>已启用</code></li>
+            <li>provider 类型：<code>holographic</code></li>
+            <li>数据库：<code>本地 SQLite</code></li>
+            <li>数据库文件：<code>/home/ccwq/hehome/hermes-data/memory_store.db</code></li>
+            <li>auto_extract：<code>当前未显式开启，等价于默认关闭</code></li>
+            <li>built-in memory：<code>仍同时启用</code>（MEMORY / USER PROFILE 继续注入 system prompt）</li>
+          </ul>
+        </div>
+        <p class="mini">这不是“装了但没用”，而是已经落地：外挂 Holographic + 内置 memory 双层并行，只是当前配置偏保守、事实数量还少、实体层尚未充分喂起来。</p>
+      </section>
+
+      <section>
+        <h2>两层记忆怎么分工</h2>
+        <h3>Layer A · 内置 Memory</h3>
+        <ul>
+          <li><code>MEMORY</code>：环境事实、工具约定、项目规则</li>
+          <li><code>USER PROFILE</code>：用户偏好、输出风格、长期要求</li>
+          <li>特点：小、常驻、会话启动时冻结注入 prompt</li>
+        </ul>
+        <h3>Layer B · fact_store / Holographic</h3>
+        <ul>
+          <li>定位：按需调用的深层事实库，不把所有内容塞进 prompt</li>
+          <li>能力：全文搜索、实体召回、组合推理、冲突检测、trust 管理</li>
+          <li>存储：本地 SQLite，跨会话持久化</li>
+        </ul>
+        <div class="callout"><strong>分工原则：</strong>内置 memory = 必须常驻的高价值摘要；fact_store = 可检索、可纠错、可推理的长期事实库。</div>
+      </section>
+
+      <section>
+        <h2>到底该怎么用</h2>
+        <h3>日常写入</h3>
+        <ul>
+          <li>最重要、必须常驻的事实 → 写内置 <code>memory</code></li>
+          <li>深层、专题、要反复检索的事实 → 写 <code>fact_store</code></li>
+          <li>已验证的长期约定：优先一条事实只表达一件稳定结论</li>
+        </ul>
+        <h3>查询顺序</h3>
+        <div class="workflow">
+          <div class="step"><div class="stepnum">1</div><div><b>主题找回</b> → <code>search</code></div></div>
+          <div class="step"><div class="stepnum">2</div><div><b>查对象全貌</b> → <code>probe(entity=...)</code></div></div>
+          <div class="step"><div class="stepnum">3</div><div><b>看周边关系</b> → <code>related(entity=...)</code></div></div>
+          <div class="step"><div class="stepnum">4</div><div><b>找交集事实</b> → <code>reason(entities=[...])</code></div></div>
+          <div class="step"><div class="stepnum">5</div><div><b>做记忆清洁</b> → <code>contradict</code> / <code>update</code> / <code>remove</code></div></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>你现在的真实配置</h2>
+        <table class="table">
+          <tr><th>配置项</th><th>当前值</th><th>含义</th></tr>
+          <tr><td><code>memory.memory_enabled</code></td><td><code>true</code></td><td>内置 MEMORY 开启</td></tr>
+          <tr><td><code>memory.user_profile_enabled</code></td><td><code>true</code></td><td>内置 USER PROFILE 开启</td></tr>
+          <tr><td><code>memory.provider</code></td><td><code>holographic</code></td><td>当前外挂 provider 已切到 Holographic</td></tr>
+          <tr><td><code>memory.memory_char_limit</code></td><td><code>2200</code></td><td>MEMORY 容量上限</td></tr>
+          <tr><td><code>memory.user_char_limit</code></td><td><code>1375</code></td><td>USER PROFILE 容量上限</td></tr>
+          <tr><td><code>plugins.hermes-memory-store.db_path</code></td><td><code>/home/ccwq/hehome/hermes-data/memory_store.db</code></td><td>fact_store 数据库落盘路径</td></tr>
+        </table>
+        <p>也就是说：<b>built-in memory 没被替换，外挂 fact_store 也已经启用</b>。当前是标准双层架构，而不是二选一。</p>
+      </section>
+
+      <section>
+        <h2>当前默认值推导</h2>
+        <p>你当前配置里只显式写了 <code>db_path</code>，其余值按 provider 源码默认值生效，等价于：</p>
+        <div class="sample"><div class="label">effective config</div><p><code>memory.provider: holographic</code><br><code>db_path: /home/ccwq/hehome/hermes-data/memory_store.db</code><br><code>auto_extract: false</code><br><code>default_trust: 0.5</code><br><code>min_trust_threshold: 0.3</code><br><code>temporal_decay_half_life: 0</code><br><code>hrr_dim: 1024</code><br><code>hrr_weight: 0.3</code></p></div>
+        <ul>
+          <li><code>auto_extract: false</code>：没开会话结束自动抽取</li>
+          <li><code>default_trust: 0.5</code>：新事实默认半可信</li>
+          <li><code>min_trust_threshold: 0.3</code>：低于门槛的事实默认不优先出现在检索结果里</li>
+          <li><code>temporal_decay_half_life: 0</code>：当前不做时间衰减</li>
+          <li><code>hrr_dim: 1024</code>：组合推理向量维度</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>数据库实况（已核对）</h2>
+        <table class="table">
+          <tr><th>对象</th><th>当前数量</th><th>说明</th></tr>
+          <tr><td><code>facts</code></td><td><b>4</b></td><td>已有 4 条事实写入 SQLite</td></tr>
+          <tr><td><code>entities</code></td><td><b>0</b></td><td>当前事实未抽出结构化实体</td></tr>
+          <tr><td><code>memory_banks</code></td><td><b>0</b></td><td>尚未形成有实体支撑的组合记忆银行</td></tr>
+        </table>
+        <p class="mini">表存在、库存在、数据已落盘：<code>entities=0</code> 与 <code>memory_banks=0</code> 不表示 provider 未工作，只表示当前更多在用“事实存储 + FTS 检索”，还没把实体/HRR 结构层喂活。</p>
+      </section>
+
+      <section>
+        <h2>当前库里已有的事实</h2>
+        <h3>general</h3>
+        <ul>
+          <li><code>Holographic memory provider is now active and operational on this machine.</code></li>
+          <li><code>test fact</code></li>
+          <li>通知策略：重要/异常情况才发通知；默认通道是 Telegram，不主动发企业微信</li>
+        </ul>
+        <h3>user_pref</h3>
+        <ul>
+          <li>用户要求发布信息卡的标准流程：将卡片放入 infocard-pub，加入 infocard-list 索引，并在发布成功后返回 GitHub Pages 可访问地址。</li>
+        </ul>
+        <h3>project</h3>
+        <ul>
+          <li>当前 <b>0 条</b></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>为什么 entities / memory_banks 还是 0</h2>
+        <p>源码里的实体抽取并不激进，主要吃：</p>
+        <ul>
+          <li>大写英文专名短语</li>
+          <li>双引号 / 单引号中的文本</li>
+          <li><code>aka</code> / <code>also known as</code> 别名模式</li>
+        </ul>
+        <p>而当前库里的几条事实，基本是中文句子、测试句、普通英文描述，不足以触发稳定的实体抽取。</p>
+        <div class="callout"><strong>实际含义：</strong>你现在已经能用 fact_store，但主要在用“SQLite + FTS5 的事实库”；还没进入它最强的“实体召回 + 组合推理”阶段。</div>
+      </section>
+
+      <section>
+        <h2>当前最适合你的工作方式</h2>
+        <div class="do-dont">
+          <div class="block"><div class="label ok">推荐</div>
+            <ul class="small-list">
+              <li>最关键的长期偏好 / 约定 → 继续写内置 memory</li>
+              <li>专题知识、历史规则、工具 workaround → 写 fact_store</li>
+              <li>需要深查时优先 <code>search → probe → related → reason</code></li>
+              <li>验证过的事实要做 <code>fact_feedback(helpful)</code></li>
+              <li>错误或过期事实用 <code>update/remove</code> 清理</li>
+            </ul>
+          </div>
+          <div class="block"><div class="label bad">不建议</div>
+            <ul class="small-list">
+              <li>把 auto_extract 直接打开后不管</li>
+              <li>把临时聊天、调试输出、大段原文塞进 fact_store</li>
+              <li>长期放任冲突事实共存</li>
+              <li>把它当短期 TODO 备忘录</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>关于 auto_extract：开还是不开</h2>
+        <p>从技术上讲，你可以开启 <code>auto_extract: true</code>，让 provider 在会话结束时自动抽偏好 / 决策 / 项目约定。</p>
+        <h3>优点</h3>
+        <ul>
+          <li>省手动写入</li>
+          <li>适合英文、结构化表达较多的会话</li>
+        </ul>
+        <h3>缺点</h3>
+        <ul>
+          <li>容易把噪音和半成品表达写进库</li>
+          <li>中文自然对话不一定适合 regex 抽取</li>
+          <li>长期会把 fact_store 污染成“半自动垃圾场”</li>
+        </ul>
+        <div class="highlight-box"><strong>就你当前工作流而言：</strong>维持 <code>auto_extract: false</code> 是合理的。你偏好高密度、可控、低噪音，这和保守配置一致。</div>
+      </section>
+
+      <section>
+        <h2>源码核对出的真实细节</h2>
+        <ul>
+          <li><code>on_memory_write()</code> 确实存在，built-in memory 的 <code>add</code> 会镜像进 fact_store。</li>
+          <li>镜像规则：<code>target=user → category=user_pref</code>；其他 target → <code>general</code>。</li>
+          <li><code>sync_turn()</code> 在 Holographic 中是空实现：它不是每轮自动把整段对话塞进库，而是更偏向“显式事实存储”。</li>
+          <li><code>contradict</code> 当前实现更像“全库冲突巡检”，不是严格按某个 entity 过滤。</li>
+          <li>HRR / compositional retrieval 依赖更结构化的事实与实体；不是只开了 provider 就自然变强。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>推荐的维护节奏</h2>
+        <div class="workflow">
+          <div class="step"><div class="stepnum">A</div><div><b>每次出现长期规则</b>：优先决定写 memory 还是 fact_store</div></div>
+          <div class="step"><div class="stepnum">B</div><div><b>每次查到事实并确认有用</b>：做 <code>fact_feedback(helpful)</code></div></div>
+          <div class="step"><div class="stepnum">C</div><div><b>发现过时/错误</b>：立即 <code>update</code> 或 <code>remove</code></div></div>
+          <div class="step"><div class="stepnum">D</div><div><b>想增强组合推理</b>：把事实写得更结构化，给实体更统一的命名</div></div>
+          <div class="step"><div class="stepnum">E</div><div><b>季度体检</b>：<code>list</code> 全库，清理噪音、冲突和低价值项</div></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>最终判断</h2>
+        <p><strong>你现在不是“还没配”，而是“已经配上且能用”。</strong></p>
+        <p>只是现阶段这套系统还处在：</p>
+        <ul>
+          <li>外挂 provider 已启用</li>
+          <li>SQLite 已落盘</li>
+          <li>自动镜像已生效</li>
+          <li>fact 数量还少</li>
+          <li>auto_extract 保守关闭</li>
+          <li>实体/组合推理层尚未充分发挥</li>
+        </ul>
+        <div class="callout"><strong>最准确的描述：</strong>你正在使用“built-in memory + Holographic SQLite fact_store”的双层记忆架构。当前状态健康、保守、可用，下一阶段提升点不是“再安装”，而是“如何持续写入更结构化、更高价值的事实”。</div>
+      </section>
+
     </div>
 
     <div class="note">
-      <div class="callout"><strong>一句话理解：</strong>fact_store 不是"聊天记录仓库"，而是把 Hermes 的长期事实做成可搜索、可推理、可修正的本地知识层。三条写入路径让"记住它"这件事几乎不需要额外操作。</div>
+      <div class="callout"><strong>一句话理解：</strong>fact_store 不是“聊天记录仓库”，而是把 Hermes 的长期事实做成可搜索、可推理、可修正的本地知识层；而这张 v3.0 卡片进一步把“如何使用 + 当前配置 + 数据库现状 + 推荐工作方式”全部实机落地化了。</div>
       <table class="table" aria-label="fact_store 速览表">
         <tr><th>项目</th><th>要点</th></tr>
         <tr><td>路径 1</td><td>手动调用 fact_store 工具（9 actions）</td></tr>
@@ -287,9 +484,9 @@
       <div class="bottomleft">
         <h2>发布级结构摘要</h2>
         <ul>
-          <li>顶部：三路径概览（手动/自动镜像/auto_extract）+ meta 标签。</li>
-          <li>中部 10 块：概念/接入/工作流/9actions/自动镜像/auto_extract/技巧/禁用/示例/上手排错。</li>
-          <li>底部：一句话定义 + 配置速览表（三路径 + 存储 + 检索 + 信任）。</li>
+          <li>顶部：三路径概览 + meta 标签 + v3.0 结论前置。</li>
+          <li>中部：原理说明 + 实机配置 + SQLite 实况 + 数据库内容 + 使用建议 + 源码核查。</li>
+          <li>底部：一句话定义 + 速览表 + 长卡化结构总结。</li>
         </ul>
       </div>
       <div class="bottomright">
@@ -300,9 +497,9 @@
           <span class="tag">硬边框</span>
           <span class="tag">高密度</span>
           <span class="tag">手机可读</span>
-          <span class="tag">v2.0 新增三路径</span>
+          <span class="tag">v3.0 实机配置版</span>
         </div>
-        <p class="mini" style="margin-top:8px">单文件静态 HTML，适合直接发布或二次截屏；新增路径 2 自动镜像机制说明（源码验证）。</p>
+        <p class="mini" style="margin-top:8px">单文件静态 HTML，适合直接发布或二次截屏；在原三路径说明之上，补齐了当前机器配置、数据库现状、默认值推导与实际推荐工作流。</p>
       </div>
     </footer>
   </article>
