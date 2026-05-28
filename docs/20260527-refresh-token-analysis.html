@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <title>Refresh Token 策略问题分析结论</title>
+  <style>
+    :root {
+      --bg: #eef2f8;
+      --card: #ffffff;
+      --ink: #0f172a;
+      --muted: #5b6475;
+      --line: #d9e1ee;
+      --soft: #f8f8f8;
+      --red: #e60012;
+      --black: #000000;
+    }
+    * { box-sizing: border-box; }
+    html { font-size: 16px; background: var(--bg); }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at top left, rgba(230,0,18,.07), transparent 28%), linear-gradient(180deg, #f6f8fd 0%, #eef2f8 100%);
+      min-height: 100vh;
+    }
+
+    .page { max-width: 780px; margin: 0 auto; padding: .75rem .7rem 4.8rem; }
+    .card { background: var(--card); overflow: hidden; }
+
+    /* Banner */
+    .banner { background: var(--black); padding: .85rem 2.8rem; }
+    .banner-title { font-size: clamp(1.8rem, 5.2vw, 3.2rem); font-weight: 900; color: #fff; letter-spacing: -.04em; line-height: 1.02; }
+    .banner-sub { margin-top: .22rem; color: var(--red); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+
+    /* Red bar */
+    .bar { height: .3rem; background: var(--red); }
+
+    /* Grid */
+    .grid { display: grid; gap: .75rem; padding: 1rem 1.1rem 1.1rem; }
+
+    /* Section header */
+    .h { display: flex; align-items: center; gap: .45rem; margin-bottom: .55rem; color: var(--red); font-size: .88rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .h::before { content: ''; width: .26rem; height: .88rem; background: var(--red); flex-shrink: 0; }
+
+    /* Stats row */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: .55rem; }
+    .stat { border: 2px solid var(--black); padding: .5rem; text-align: center; background: #fff; }
+    .stat-num { font-size: 1.35rem; font-weight: 900; color: var(--red); line-height: 1; }
+    .stat-lab { font-size: .6rem; line-height: 1.25; margin-top: .22rem; color: var(--muted); }
+
+    /* Priority cards: P1 red, P2 yellow, P3 gray */
+    .priority-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .55rem; }
+    .priority-card { border: 2px solid var(--black); padding: .6rem; background: #fff; }
+    .priority-card.p1 { border-color: var(--red); }
+    .priority-tag { display: inline-block; font-size: .6rem; font-weight: 900; padding: .08rem .3rem; margin-bottom: .3rem; }
+    .priority-tag.p1 { background: var(--red); color: #fff; }
+    .priority-tag.p2 { background: #f5a623; color: #fff; }
+    .priority-tag.p3 { background: #e8e8e8; color: var(--muted); }
+    .priority-title { font-size: .82rem; font-weight: 900; line-height: 1.25; margin-bottom: .2rem; }
+    .priority-text { font-size: .7rem; line-height: 1.42; color: #333; }
+    .priority-text p { margin-bottom: .18rem; }
+    .priority-text p:last-child { margin-bottom: 0; }
+
+    /* Issue list */
+    .issue-list { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .issue-item { border: 2px solid var(--black); background: #fafafa; padding: .55rem .65rem; }
+    .issue-item.highlight { background: #fff5f5; border-color: var(--red); }
+    .issue-num { display: inline-block; background: var(--red); color: #fff; font-size: .58rem; font-weight: 900; padding: .05rem .22rem; margin-bottom: .2rem; }
+    .issue-item.highlight .issue-num { background: var(--black); }
+    .issue-name { font-size: .78rem; font-weight: 900; line-height: 1.2; margin-bottom: .15rem; }
+    .issue-desc { font-size: .68rem; line-height: 1.4; color: #555; }
+    .issue-icon { font-size: .6rem; color: var(--muted); margin-top: .12rem; }
+
+    /* Quote */
+    .quote-box { border-left: .38rem solid var(--red); padding: .6rem .9rem; margin: .4rem 0; background: #f8f8f8; }
+    .quote-box p { font-size: .88rem; line-height: 1.55; color: #222; font-style: italic; }
+    .quote-src { font-size: .68rem; color: var(--muted); margin-top: .3rem; }
+
+    /* Solution cards */
+    .solution-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; }
+    .solution-item { border: 2px solid var(--black); padding: .65rem; background: #fff; }
+    .solution-item.highlight { border-color: var(--red); }
+    .sol-tag { display: inline-block; background: var(--red); color: #fff; font-size: .58rem; font-weight: 900; padding: .05rem .22rem; margin-bottom: .25rem; }
+    .solution-item.highlight .sol-tag { background: var(--black); }
+    .sol-title { font-size: .85rem; font-weight: 900; margin-bottom: .25rem; line-height: 1.2; }
+    .sol-body { font-size: .72rem; line-height: 1.48; color: #333; }
+    .sol-body p { margin-bottom: .2rem; }
+    .sol-body p:last-child { margin-bottom: 0; }
+
+    /* Tags */
+    .tag { display: inline-block; font-size: .62rem; font-weight: 800; padding: .08rem .35rem; margin: .12rem .18rem .12rem 0; border-radius: 2px; }
+    .tag.red { background: var(--red); color: #fff; }
+    .tag.green { background: #d4edda; color: #155724; }
+    .tag.gray { background: var(--line); color: var(--muted); }
+    .tag.black { background: var(--black); color: #fff; }
+
+    /* Footer */
+    .footer { background: #f4f4f4; padding: .85rem 2.8rem; font-size: .75rem; color: var(--muted); border-top: 2px solid var(--black); }
+
+    /* Save bar */
+    .save-bar { margin: .8rem auto 0; width: min(780px, calc(100vw - 1.4rem)); }
+    .save-btn { width: 100%; border: 0; border-radius: 999px; padding: .9rem 1rem; background: linear-gradient(135deg, var(--red), #b3000f); color: #fff; font-size: .98rem; font-weight: 900; letter-spacing: .04em; cursor: pointer; }
+
+    /* Responsive */
+    @media (min-width: 760px) {
+      .page { padding-left: 1.2rem; padding-right: 1.2rem; }
+      .banner, .grid, .footer { padding-left: 2.8rem; padding-right: 2.8rem; }
+      .stats { gap: .45rem; }
+      .stat { padding: .45rem .3rem; }
+      .stat-num { font-size: 1.4rem; }
+    }
+    @media (max-width: 720px) {
+      .banner, .grid, .footer { padding-left: 2.2rem; padding-right: 2.2rem; }
+      .priority-row, .solution-grid { grid-template-columns: 1fr; }
+      .issue-list { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <article class="card">
+      <div class="banner">
+        <div class="banner-title">Refresh Token 策略问题分析</div>
+        <div class="banner-sub">错误模型不统一 · 职责交叉 · 网络异常耦合 · 2026-05-27</div>
+      </div>
+      <div class="bar"></div>
+
+      <div class="grid">
+        <!-- Stats overview -->
+        <div>
+          <div class="h">总体判断</div>
+          <div class="stats">
+            <div class="stat">
+              <div class="stat-num">9</div>
+              <div class="stat-lab">关键问题识别</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">P1</div>
+              <div class="stat-lab">优先修复 3 项</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">P2</div>
+              <div class="stat-lab">次优先级 3 项</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">P3</div>
+              <div class="stat-lab">维护优化 3 项</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Priority row -->
+        <div>
+          <div class="h">优先级视图</div>
+          <div class="priority-row">
+            <div class="priority-card p1">
+              <div class="priority-tag p1">P1 — 优先修复</div>
+              <div class="priority-title">统一认证错误模型</div>
+              <div class="priority-text">
+                <p>route 层和 request 层对同一次失败可能做出相反判断 — 这是误放行与误登出的共同根源。</p>
+              </div>
+            </div>
+            <div class="priority-card p1">
+              <div class="priority-tag p1">P1 — 优先修复</div>
+              <div class="priority-title">拆开网络错误与认证失效</div>
+              <div class="priority-text">
+                <p>普通网络抖动被当成登录过期处理，容易误踢正常用户下线。</p>
+              </div>
+            </div>
+            <div class="priority-card p1">
+              <div class="priority-tag p1">P1 — 优先修复</div>
+              <div class="priority-title">统一 route/request 恢复职责</div>
+              <div class="priority-text">
+                <p>"能进页面，但首个请求就掉线" — 恢复触发条件不同导致体验割裂。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Issue list P1+P2 -->
+        <div>
+          <div class="h">9 项关键问题一览</div>
+          <div class="issue-list">
+            <div class="issue-item highlight">
+              <div class="issue-num">1</div>
+              <div class="issue-name">错误对象与分类不统一</div>
+              <div class="issue-desc">认证链路可能抛对象也可能抛字符串，导致 route 层识别不出认证失败。</div>
+              <div class="issue-icon">→ P1 根因</div>
+            </div>
+            <div class="issue-item highlight">
+              <div class="issue-num">2</div>
+              <div class="issue-name">双轨恢复职责不一致</div>
+              <div class="issue-desc">route 层与 request 层各行其是，同一 token 状态在不同入口得到不同处理。</div>
+              <div class="issue-icon">→ P1 根因</div>
+            </div>
+            <div class="issue-item highlight">
+              <div class="issue-num">3</div>
+              <div class="issue-name">20秒缓存存在错误放行窗口</div>
+              <div class="issue-desc">缓存期间 token 被清空或失效，路由守卫仍直接放行，用户感知极差。</div>
+              <div class="issue-icon">→ P2 调整缓存条件</div>
+            </div>
+            <div class="issue-item">
+              <div class="issue-num">4</div>
+              <div class="issue-name">route 层将协议错误当可放行</div>
+              <div class="issue-desc">refresh/check-refresh 协议异常也被静默放行，问题被推迟暴露，排查成本更高。</div>
+              <div class="issue-icon">→ P2 细化错误分类</div>
+            </div>
+            <div class="issue-item">
+              <div class="issue-num">5</div>
+              <div class="issue-name">request 层对 refresh 失败过于激进</div>
+              <div class="issue-desc">token过期/后端不可达/网关抖动/接口结构异常全被压成"请重新登录"。</div>
+              <div class="issue-icon">→ P2 区分失败类型</div>
+            </div>
+            <div class="issue-item">
+              <div class="issue-num">6</div>
+              <div class="issue-name">网络错误与认证失效耦合</div>
+              <div class="issue-desc">普通网络错误（如断网/网关抖动）也会清理登录态并跳首页。</div>
+              <div class="issue-icon">→ P1 拆开处理</div>
+            </div>
+            <div class="issue-item">
+              <div class="issue-num">7</div>
+              <div class="issue-name">tokenInvalid 职责不清</div>
+              <div class="issue-desc">route 层已允许通过，request 层却立即认定不可用，最终刚进页面就被打回首页。</div>
+              <div class="issue-icon">→ P2 收敛判断职责</div>
+            </div>
+            <div class="issue-item">
+              <div class="issue-num">8</div>
+              <div class="issue-name">白名单匹配策略模糊</div>
+              <div class="issue-desc">startsWith(prefix) 和 url.includes(item) 容易因巧合导致错误放行或错误豁免。</div>
+              <div class="issue-icon">→ P3 精确匹配</div>
+            </div>
+            <div class="issue-item">
+              <div class="issue-num">9</div>
+              <div class="issue-name">文档与实现已出现不一致</div>
+              <div class="issue-desc">refresh-poli.md 描述的行为与实际代码逻辑多处不符，会误导后续维护者。</div>
+              <div class="issue-icon">→ P3 同步修正文档</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quote -->
+        <div>
+          <div class="quote-box">
+            <p>"当前这套 refresh token 策略最大的问题不是'有没有 refresh'，而是 refresh 成功/失败的语义边界不稳定，route 层与 request 层职责交叉，网络异常与认证过期混在一起。"</p>
+            <div class="quote-src">— 核心判断 · 原文第三节</div>
+          </div>
+        </div>
+
+        <!-- Recommended transformation -->
+        <div>
+          <div class="h">建议改造方向</div>
+          <div class="solution-grid">
+            <div class="solution-item">
+              <div class="sol-tag">Route 层</div>
+              <div class="sol-title">只做进入前最小会话判定</div>
+              <div class="sol-body">
+                <p>是否有 refresh token → 当前 access token 是否可直接用 → 是否需要一次受控恢复。</p>
+                <p>不再做完整的 refresh 尝试，不在进页前等待网络请求。</p>
+              </div>
+            </div>
+            <div class="solution-item">
+              <div class="sol-tag">Request 层</div>
+              <div class="sol-title">唯一 refresh single-flight + 重试</div>
+              <div class="sol-body">
+                <p>首个失败请求触发 refresh，并发请求共享同一 refresh promise。</p>
+                <p>refresh 成功后统一回放，失败后再统一登出。</p>
+              </div>
+            </div>
+            <div class="solution-item">
+              <div class="sol-tag">错误模型</div>
+              <div class="sol-title">统一鉴权错误对象</div>
+              <div class="sol-body">
+                <p>结构化对象：{code: 'AUTH_EXPIRED'|'AUTH_NETWORK_ERROR'|'AUTH_PROTOCOL_ERROR', message, source}。</p>
+                <p>不再让 refresh/check-refresh 抛裸字符串，route 和 request 各猜各的。</p>
+              </div>
+            </div>
+            <div class="solution-item highlight">
+              <div class="sol-tag" style="background: var(--black);">关键约束</div>
+              <div class="sol-title">网络错误 ≠ 认证失效</div>
+              <div class="sol-body">
+                <p>网络抖动时保留登录态，仅做网络错误提示，不清 token，不跳首页。</p>
+                <p>协议异常提示"系统异常"并记录日志，避免静默清退。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Related files -->
+        <div>
+          <div class="h">相关文件清单</div>
+          <div style="display:flex; flex-wrap:wrap; gap:.4rem;">
+            <span class="tag gray">src/router/router.js</span>
+            <span class="tag gray">src/utils/routeAuthCoordinator.js</span>
+            <span class="tag gray">src/utils/authSession.js</span>
+            <span class="tag gray">src/utils/authRefreshFlow.js</span>
+            <span class="tag gray">src/utils/request.js</span>
+            <span class="tag gray">src/utils/authToken.js</span>
+            <span class="tag gray">src/utils/authCircuit.js</span>
+            <span class="tag gray">src/stores/userStore.js</span>
+            <span class="tag red">docs/refresh-poli.md（需同步）</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        技术分析信息卡 · Refresh Token 策略问题结论 · 2026-05-27 · 内容完整保留
+      </div>
+    </article>
+  </div>
+
+  <div class="save-bar">
+    <button class="save-btn" id="save-btn" onclick="saveCard()">保存为 PNG</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+    async function saveCard() {
+      const btn = document.getElementById('save-btn');
+      const old = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '生成中…';
+      try {
+        const c = await html2canvas(document.querySelector('.card'), { scale: 2, backgroundColor: '#eef2f8', useCORS: true, scrollY: -window.scrollY });
+        const a = document.createElement('a');
+        a.download = 'refresh-token-analysis.png';
+        a.href = c.toDataURL('image/png');
+        a.click();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    }
+  </script>
+</body>
+</html>

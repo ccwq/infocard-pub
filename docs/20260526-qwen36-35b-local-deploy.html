@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Qwen3.6-35B 本地部署配置指南</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: calc(100vw / 72); }
+    html, body {
+      width: 100%;
+      max-width: 780px;
+      margin: 0 auto;
+      background: #FFFFFF;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      overflow: visible;
+    }
+    @media (min-width: 780px) {
+      html { font-size: 16px; }
+      .banner { padding: 0.6rem 4rem; min-height: auto; }
+      .banner-icon { width: 2.2rem; height: 2.2rem; font-size: 1.2rem; }
+      .banner-title { font-size: 1.8rem; line-height: 1.1; }
+      .banner-sub { font-size: 0.75rem; }
+      .divider { height: 0.25rem; }
+      .section { padding: 0.6rem 4rem; border-bottom: 0.1rem solid #E8E8E8; }
+      .section-title { font-size: 0.9rem; margin-bottom: 0.4rem; }
+      .card { padding: 0.5rem; }
+      .card-grid { gap: 0.4rem; }
+      .card-title { font-size: 0.95rem; margin-bottom: 0.3rem; }
+      .card-body { font-size: 0.875rem; line-height: 1.45; }
+      .tag-grid { gap: 0.3rem; }
+      .config-row { padding: 0.5rem 0.4rem; }
+      .config-name { font-size: 0.85rem; }
+      .config-vram { font-size: 0.85rem; }
+      .config-speed { font-size: 0.75rem; }
+      .config-note { font-size: 0.7rem; }
+      .footer { padding: 0.4rem 4rem; font-size: 0.65rem; }
+    }
+    @media (max-width: 720px) {
+      html { font-size: calc(100vw / 72); }
+      html, body {
+        max-width: 100vw !important;
+        width: 100vw !important;
+        margin: 0;
+      }
+      .section, .banner, .footer { padding-left: 3rem; padding-right: 3rem; }
+      .card-grid { grid-template-columns: 1fr; gap: 1.2rem; }
+      .banner { padding: 1.6rem 0; gap: 1rem; }
+      .banner-title { font-size: 2rem; }
+      .section { padding: 1.6rem 0; }
+      .footer { padding: 1.2rem 0; flex-direction: column; gap: 0.4rem; }
+    }
+
+    .banner {
+      background: #000000;
+      padding: 2.2rem 4rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+    .banner-title {
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: #FFF;
+      letter-spacing: -0.5px;
+    }
+    .banner-sub {
+      font-size: 1.2rem;
+      color: #E60012;
+      text-transform: uppercase;
+      margin-top: 0.4rem;
+      font-weight: 700;
+    }
+    .divider { height: 0.5rem; background: #E60012; }
+
+    .section {
+      padding: 2.4rem 4rem;
+      border-bottom: 0.2rem solid #E8E8E8;
+    }
+    .section-title {
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: #E60012;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 1.8rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .section-title::before {
+      content: '';
+      width: 0.5rem;
+      height: 1.6rem;
+      background: #E60012;
+      display: inline-block;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+    .card {
+      border: 0.3rem solid #000;
+      padding: 2rem;
+      background: #FFF;
+    }
+    .card-title {
+      font-size: 1.4rem;
+      font-weight: 900;
+      margin-bottom: 1.2rem;
+      padding-bottom: 1rem;
+      border-bottom: 0.3rem solid #E60012;
+    }
+    .card-body {
+      font-size: 1.2rem;
+      line-height: 1.75;
+      color: #333;
+    }
+
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .spec-table th {
+      background: #000;
+      color: #FFF;
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .spec-table td {
+      padding: 0.4rem 0.6rem;
+      border-bottom: 0.05rem solid #E8E8E8;
+      vertical-align: top;
+    }
+    .spec-table tr:last-child td { border-bottom: none; }
+    .spec-table .vram { color: #E60012; font-weight: 700; }
+    .spec-table .speed { color: #000; font-weight: 600; }
+    .spec-table .note { color: #888; font-size: 0.7rem; }
+
+    .tag-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .tag {
+      background: #000;
+      color: #FFF;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 0.1rem solid #000;
+    }
+    .tag.red { background: #E60012; border-color: #E60012; }
+    .tag.gray { background: #555; border-color: #555; }
+
+    .highlight-box {
+      background: #FFF5F5;
+      border-left: 0.4rem solid #E60012;
+      padding: 0.8rem 1rem;
+      margin: 0.8rem 0;
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+
+    .config-tier {
+      border: 0.2rem solid #000;
+      margin-bottom: 0.6rem;
+      background: #FFF;
+    }
+    .config-tier-header {
+      background: #000;
+      color: #FFF;
+      padding: 0.4rem 0.6rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .config-tier-name {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .config-tier-badge {
+      font-size: 0.65rem;
+      background: #E60012;
+      padding: 0.15rem 0.4rem;
+      font-weight: 700;
+    }
+    .config-row { padding: 0.5rem 0.6rem; border-bottom: 0.05rem solid #E8E8E8; display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+    .config-row:last-child { border-bottom: none; }
+    .config-row-label { font-size: 0.75rem; color: #888; flex-shrink: 0; width: 3.5rem; }
+    .config-row-value { font-size: 0.8rem; color: #000; text-align: right; font-weight: 600; }
+    .config-row-note { font-size: 0.7rem; color: #888; text-align: right; }
+
+    .deploy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+    }
+    .deploy-card {
+      border: 0.2rem solid #000;
+      background: #FFF;
+    }
+    .deploy-header {
+      background: #000;
+      color: #FFF;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .deploy-body { padding: 0.6rem; }
+    .deploy-row { display: flex; justify-content: space-between; padding: 0.2rem 0; font-size: 0.8rem; border-bottom: 0.05rem solid #F0F0F0; }
+    .deploy-row:last-child { border-bottom: none; }
+    .deploy-row-lbl { color: #888; font-size: 0.7rem; }
+    .deploy-row-val { font-weight: 700; color: #000; }
+    .deploy-row-val.red { color: #E60012; }
+
+    .footer {
+      background: #F4F4F4;
+      padding: 1.4rem 4rem;
+      font-size: 1rem;
+      color: #666;
+      display: flex;
+      justify-content: space-between;
+      border-top: 0.2rem solid #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <div class="banner-title">Qwen3.6-35B</div>
+    <div class="banner-sub">本地部署配置指南 · 2026.05.26</div>
+  </div>
+  <div class="divider"></div>
+
+  <!-- 模型概述 -->
+  <div class="section">
+    <div class="section-title">模型概述</div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">架构</div>
+        <div class="card-body">
+          <p style="margin-bottom:0.4rem;"><strong style="color:#E60012;">MoE 稀疏架构</strong> · 总参350亿 · 激活仅30亿</p>
+          <p>Gated DeltaNet + 256专家路由 · Top-8激活机制 · 全局共享专家层</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">核心优势</div>
+        <div class="card-body">
+          <p style="margin-bottom:0.4rem;">🏆 Agent编程超越Qwen3.5-35B · 可比肩Gemma4-31B</p>
+          <p>📌 上下文~190K tokens · GSM8K 95.62%准确率</p>
+        </div>
+      </div>
+    </div>
+    <div class="tag-grid" style="margin-top:1.2rem;">
+      <span class="tag red">MoE稀疏</span>
+      <span class="tag">350B参数</span>
+      <span class="tag">30B激活</span>
+      <span class="tag">190K上下文</span>
+      <span class="tag">开源</span>
+      <span class="tag gray">vLLM / llama.cpp</span>
+      <span class="tag gray">AWQ / GGUF</span>
+    </div>
+    <div class="highlight-box">
+      ⚡ MoE核心优势：总参数350B，但推理只激活30B——显存需求≈30B稠密模型，而非350B。这意味着用消费级显卡跑35B成为可能。
+    </div>
+  </div>
+
+  <!-- 硬件配置分级 -->
+  <div class="section">
+    <div class="section-title">硬件配置分级</div>
+
+    <!-- 入门级 -->
+    <div class="config-tier">
+      <div class="config-tier-header">
+        <span class="config-tier-name">🚩 极限入门 / 6GB VRAM</span>
+        <span class="config-tier-badge">最低配置</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">GPU</span>
+        <span class="config-row-value">RTX 2060 / 3050 / 4050 / 2080Ti 22GB</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">量化</span>
+        <span class="config-row-value">Q2_K（2-bit GGUF）</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">显存</span>
+        <span class="config-row-value">~6GB</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">速度</span>
+        <span class="config-row-value red">10-15 tok/s</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">方案</span>
+        <span class="config-row-note">llama.cpp + Q2_K · 部分层offload CPU</span>
+      </div>
+    </div>
+
+    <!-- 主流级 -->
+    <div class="config-tier">
+      <div class="config-tier-header">
+        <span class="config-tier-name">🔥 主流游戏卡 / 8-12GB VRAM</span>
+        <span class="config-tier-badge">推荐入门</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">GPU</span>
+        <span class="config-row-value">RTX 3070 / 3060 Ti / 4060 Ti / 2080Ti 22GB</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">量化</span>
+        <span class="config-row-value">Q4_K_M（4-bit GGUF，推荐）</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">显存</span>
+        <span class="config-row-value">8-12GB</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">速度</span>
+        <span class="config-row-value red">10-33 tok/s</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">方案</span>
+        <span class="config-row-note">llama.cpp Q4_K_M · 2080Ti实测33tok/s Win11</span>
+      </div>
+    </div>
+
+    <!-- 推荐级 -->
+    <div class="config-tier">
+      <div class="config-tier-header">
+        <span class="config-tier-name">⭐ 推荐配置 / 24GB VRAM</span>
+        <span class="config-tier-badge">推荐</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">GPU</span>
+        <span class="config-row-value">RTX 4090 / 3090 · 单卡24GB</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">量化</span>
+        <span class="config-row-value">Q4_K_XL / AWQ 4-bit / Unsloth Dynamic Q4</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">显存</span>
+        <span class="config-row-value">12-18GB</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">速度</span>
+        <span class="config-row-value red">25-55 tok/s</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">方案</span>
+        <span class="config-row-note">llama.cpp / Ollama / Unsloth · vLLM需量化版</span>
+      </div>
+    </div>
+
+    <!-- 专业级 -->
+    <div class="config-tier">
+      <div class="config-tier-header">
+        <span class="config-tier-name">🚀 专业双卡 / 24GB×2</span>
+        <span class="config-tier-badge">高性能</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">GPU</span>
+        <span class="config-row-value">双RTX 4090 · GCP L4×1 · DGX Spark</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">量化</span>
+        <span class="config-row-value">AWQ 4-bit / NVFP4 (Red Hat)</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">显存</span>
+        <span class="config-row-value">12-18GB</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">速度</span>
+        <span class="config-row-value red">50-148 tok/s</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">方案</span>
+        <span class="config-row-note">vLLM + DFlash推测解码 · tensor-parallel=2</span>
+      </div>
+    </div>
+
+    <!-- 服务器级 -->
+    <div class="config-tier">
+      <div class="config-tier-header">
+        <span class="config-tier-name">⚡ 服务器级 / 80GB+</span>
+        <span class="config-tier-badge">全精度</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">GPU</span>
+        <span class="config-row-value">A100 80GB / H100</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">精度</span>
+        <span class="config-row-value">BF16 全精度</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">显存</span>
+        <span class="config-row-value">~70GB</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">速度</span>
+        <span class="config-row-value red">极速 · 满血性能</span>
+      </div>
+      <div class="config-row">
+        <span class="config-row-label">方案</span>
+        <span class="config-row-note">vLLM 原生 BF16 · 原始权重</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 量化对照表 -->
+  <div class="section">
+    <div class="section-title">量化规格对照</div>
+    <table class="spec-table">
+      <thead>
+        <tr>
+          <th>量化方式</th>
+          <th>内存需求</th>
+          <th>速度</th>
+          <th>推荐场景</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Q2_K（2-bit）</td>
+          <td class="vram">~6GB VRAM</td>
+          <td class="speed">快</td>
+          <td>6GB老卡 · RTX 2060/3050/4050</td>
+        </tr>
+        <tr>
+          <td>Q4_K_M（4-bit）</td>
+          <td class="vram">8-12GB VRAM</td>
+          <td class="speed">中快</td>
+          <td>主流游戏卡 · RTX 3070/4060 Ti</td>
+        </tr>
+        <tr>
+          <td>Q4_K_XL（4-bit）</td>
+          <td class="vram">12-15GB VRAM</td>
+          <td class="speed">中快</td>
+          <td>RTX 4090 / 3090 单卡</td>
+        </tr>
+        <tr>
+          <td>AWQ 4-bit</td>
+          <td class="vram">~20GB</td>
+          <td class="speed">快</td>
+          <td>vLLM部署 · 性能最佳</td>
+        </tr>
+        <tr>
+          <td>PrismQuant混合精度</td>
+          <td class="vram">~12GB VRAM</td>
+          <td class="speed">25 tok/s</td>
+          <td>GCP L4 · 精度损失最小</td>
+        </tr>
+        <tr>
+          <td>NVFP4 (Red Hat)</td>
+          <td class="vram">~18GB VRAM</td>
+          <td class="speed">极速</td>
+          <td>双4090 · GSM8K恢复率100.69%</td>
+        </tr>
+        <tr>
+          <td>6-bit量化</td>
+          <td class="vram">~30GB</td>
+          <td class="speed">快</td>
+          <td>专业工作站</td>
+        </tr>
+        <tr>
+          <td>8-bit量化</td>
+          <td class="vram">~38GB</td>
+          <td class="speed">快</td>
+          <td>高配工作站</td>
+        </tr>
+        <tr>
+          <td>BF16全精度</td>
+          <td class="vram">~70GB</td>
+          <td class="speed">满血</td>
+          <td>A100/H100服务器</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 部署方案 -->
+  <div class="section">
+    <div class="section-title">三种部署方案</div>
+    <div class="deploy-grid">
+      <div class="deploy-card">
+        <div class="deploy-header">方案一 · llama.cpp</div>
+        <div class="deploy-body">
+          <div class="deploy-row"><span class="deploy-row-lbl">难度</span><span class="deploy-row-val">⭐ 最低</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">推荐GPU</span><span class="deploy-row-val">RTX 3070+</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">量化</span><span class="deploy-row-val">Q4_K_XL GGUF</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">并发</span><span class="deploy-row-val">单用户</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">速度</span><span class="deploy-row-val red">10-33 tok/s</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">适用</span><span class="deploy-row-val">本地对话 · 个人使用</span></div>
+        </div>
+      </div>
+      <div class="deploy-card">
+        <div class="deploy-header">方案二 · vLLM</div>
+        <div class="deploy-body">
+          <div class="deploy-row"><span class="deploy-row-lbl">难度</span><span class="deploy-row-val">⭐⭐ 中等</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">推荐GPU</span><span class="deploy-row-val">双4090 / L4</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">量化</span><span class="deploy-row-val">AWQ / NVFP4</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">并发</span><span class="deploy-row-val">多用户 · 高吞吐</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">速度</span><span class="deploy-row-val red">50-148 tok/s</span></div>
+          <div class="deploy-row"><span class="deploy-row-lbl">适用</span><span class="deploy-row-val">API服务 · 团队共享</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="highlight-box" style="margin-top:1.2rem;">
+      🔑 选型原则：个人本地对话 → llama.cpp；API服务/多并发 → vLLM；显存受限 → Unsloth Dynamic量化。
+    </div>
+  </div>
+
+  <!-- 软件依赖 -->
+  <div class="section">
+    <div class="section-title">软件依赖</div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">llama.cpp / Ollama</div>
+        <div class="card-body">
+          <p style="margin-bottom:0.3rem;">CUDA 12.x + cuDNN</p>
+          <p>ollama run qwen3.6:35b-a3b（一条命令跑起来）</p>
+          <p style="margin-top:0.3rem;color:#888;">✅ 最简单 · 无需配置</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">vLLM（推荐）</div>
+        <div class="card-body">
+          <p style="margin-bottom:0.3rem;">CUDA 12.1+ · Docker</p>
+          <p>vLLM ≥ 0.17（官方建议 ≥ 0.19）</p>
+          <p style="margin-top:0.3rem;color:#888;">✅ 速度最快 · 并发最优 · 支持HF兼容API</p>
+        </div>
+      </div>
+    </div>
+    <div class="tag-grid" style="margin-top:1rem;">
+      <span class="tag red">CUDA 12.x</span>
+      <span class="tag">Docker</span>
+      <span class="tag">vLLM ≥ 0.19</span>
+      <span class="tag">llama.cpp</span>
+      <span class="tag">Ollama</span>
+      <span class="tag">Unsloth</span>
+    </div>
+  </div>
+
+  <!-- 关键结论 -->
+  <div class="section">
+    <div class="section-title">关键结论</div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">显存需求真相</div>
+        <div class="card-body">
+          <p style="font-size:1.4rem;color:#E60012;font-weight:900;margin-bottom:0.4rem;">~6GB起</p>
+          <p>MoE架构只激活30B，显存需求≈30B稠密模型。消费级显卡6GB即可运行Q2_K量化版。</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">最佳性价比配置</div>
+        <div class="card-body">
+          <p style="font-size:1.4rem;color:#E60012;font-weight:900;margin-bottom:0.4rem;">RTX 3070 + Q4</p>
+          <p>8GB显存，~10 tok/s，千元级显卡+免费模型，本地AI完全可行。</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">性能天花板</div>
+        <div class="card-body">
+          <p style="font-size:1.4rem;color:#E60012;font-weight:900;margin-bottom:0.4rem;">148 tok/s</p>
+          <p>vLLM + AWQ4-bit + DFlash + 双4090，关闭思考模式下单并发可达148 token/s。</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">量化精度损失</div>
+        <div class="card-body">
+          <p style="font-size:1.4rem;color:#E60012;font-weight:900;margin-bottom:0.4rem;">可忽略</p>
+          <p>Red Hat NVFP4版GSM8K恢复率100.69%，超越原版BF16（统计波动范围内）。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>INVESTIGATIVE JOURNALIST · 2026.05.26</span>
+    <span>来源: CSDN/腾讯云/HuggingFace/RedHat/GitHub QwenLM</span>
+  </div>
+</body>
+</html>
