@@ -4,7 +4,8 @@ const ASSETS = [
   './index.html',
   './_index.yaml',
   './docs/icon.svg',
-  './docs/manifest.json'
+  './docs/manifest.json',
+  './docs/version.json'
 ];
 
 // Install
