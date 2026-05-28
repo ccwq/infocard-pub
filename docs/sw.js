@@ -1,11 +1,10 @@
-const CACHE_NAME = 'infocard-pub-v1';
+const CACHE_NAME = 'infocard-pub-v2';
 const ASSETS = [
   './',
   './index.html',
   './_index.yaml',
   './docs/icon.svg',
-  './docs/manifest.json',
-  './docs/version.json'
+  './docs/manifest.json'
 ];
 
 // Install
