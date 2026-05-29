@@ -1,11 +1,9 @@
-const CACHE_NAME = 'infocard-pub-v3';
+const CACHE_NAME = 'infocard-pub-v4';
 const ASSETS = [
   '/infocard-pub/',
   '/infocard-pub/index.html',
-  '/infocard-pub/_index.yaml',
   '/infocard-pub/manifest.json',
-  '/infocard-pub/docs/icon.svg',
-  '/infocard-pub/docs/version.json'
+  '/infocard-pub/docs/icon.svg'
 ];
 
 self.addEventListener('install', event => {
@@ -23,8 +21,16 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  if (url.pathname.endsWith('/docs/version.json')) {
+  // The index manifest and version must always be network-first/no-store.
+  // Otherwise installed PWA clients can keep showing stale card counts (e.g. 24/25 while live is 26).
+  if (url.pathname.endsWith('/_index.yaml') || url.pathname.endsWith('/docs/version.json')) {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
+
+  // HTML shell should prefer network so users pick up cache-busting fixes quickly.
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/infocard-pub/')) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 
