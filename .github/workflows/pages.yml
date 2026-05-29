@@ -25,6 +25,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Rebuild _index.yaml for deploy artifact
+        run: python scripts/rebuild_index.py
+
+      - name: Verify _index.yaml before deploy
+        run: python scripts/verify_index.py
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
@@ -36,3 +50,42 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Smoke test deployed index
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python - <<'PY'
+          import os
+          import time
+          import urllib.request
+          import yaml
+
+          page_url = os.environ['PAGE_URL'].rstrip('/')
+          index_url = page_url + '/_index.yaml'
+
+          with open('_index.yaml', 'r', encoding='utf-8') as fp:
+              local = yaml.safe_load(fp)
+          local_count = local.get('_count')
+          local_cards = local.get('cards') or []
+          local_top = local_cards[0]['slug'] if local_cards else None
+
+          last_err = None
+          for attempt in range(1, 11):
+              try:
+                  with urllib.request.urlopen(index_url, timeout=20) as resp:
+                      remote = yaml.safe_load(resp.read().decode('utf-8'))
+                  remote_count = remote.get('_count')
+                  remote_cards = remote.get('cards') or []
+                  remote_top = remote_cards[0]['slug'] if remote_cards else None
+                  if remote_count == local_count and remote_top == local_top:
+                      print(f'Smoke test OK on attempt {attempt}: count={remote_count} top={remote_top}')
+                      raise SystemExit(0)
+                  last_err = f'mismatch attempt {attempt}: local_count={local_count}, remote_count={remote_count}, local_top={local_top}, remote_top={remote_top}'
+              except Exception as exc:
+                  last_err = f'attempt {attempt} failed: {exc}'
+              print(last_err)
+              time.sleep(15)
+
+          raise SystemExit(f'Deployed index smoke test failed: {last_err}')
+          PY

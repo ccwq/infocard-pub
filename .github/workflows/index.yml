@@ -15,47 +15,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml
+
       - name: Build _index.yaml
-        run: |
-          python3 << 'PY'
-          import glob
-          import os
-          import subprocess
-          import yaml
-          from datetime import datetime, timezone
+        run: python scripts/rebuild_index.py
 
-          def git_commit_ts(path: str) -> int:
-              try:
-                  out = subprocess.check_output(
-                      ['git', 'log', '-1', '--format=%ct', '--', path],
-                      text=True,
-                  ).strip()
-                  return int(out) if out else 0
-              except Exception:
-                  return 0
-
-          entries = []
-          for f in sorted(glob.glob('**/*.meta.yaml', recursive=True)):
-              if '.git' in f:
-                  continue
-              with open(f) as fp:
-                  data = yaml.safe_load(fp)
-              if 'slug' not in data:
-                  continue
-              data['_sort_ts'] = git_commit_ts(f)
-              entries.append(data)
-
-          index = {
-              '_count': len(entries),
-              '_updated': datetime.now(timezone.utc).isoformat(),
-              'cards': sorted(entries, key=lambda x: (x.get('_sort_ts', 0), x.get('date', '')), reverse=True)
-          }
-
-          with open('_index.yaml', 'w') as fp:
-              yaml.safe_dump(index, fp, allow_unicode=True, sort_keys=False)
-
-          print(f'Index written: {len(entries)} cards')
-          PY
+      - name: Verify _index.yaml
+        run: python scripts/verify_index.py
 
       - name: Upload _index.yaml as artifact
         uses: actions/upload-artifact@v4
