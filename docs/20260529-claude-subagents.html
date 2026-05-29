@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Claude Sub-Agents — 实施手册</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#c8102e;--black:#0a0a0a;--white:#f5f2ec;--gray-1:#171717;--gray-2:#2b2b2b;--gray-3:#666;--gray-4:#aaa;--gray-5:#ddd;--accent:#0036a3;--green:#006b3c;--yellow:#e8c200;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;background:var(--black);color:var(--white);width:min(780px,100vw);margin:0 auto;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.card{width:100%;max-width:100vw;border:3px solid var(--red);background:var(--white);color:var(--black)}
+.header{display:grid;grid-template-columns:1.15fr 1.4fr .8fr;gap:10px;align-items:end;padding:16px 16px 12px;background:linear-gradient(180deg,var(--red),#a90f27);color:#fff}
+.kicker{display:inline-block;background:#fff;color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.12em;padding:3px 8px;margin-bottom:8px;text-transform:uppercase}
+.header h1{font-size:25px;line-height:1.08;font-weight:700;letter-spacing:-.03em}
+.header h1 span{color:#fff;display:block}
+.header .sub{margin-top:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.88)}
+.meta{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;line-height:1.5;color:rgba(255,255,255,.78)}
+.meta .rev{display:inline-block;margin-top:6px;background:#fff;color:var(--red);padding:2px 6px;font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:2px solid var(--red);border-bottom:1px solid #222;background:#121212}
+.stat{padding:10px 8px;text-align:center;border-right:1px solid #2d2d2d}
+.stat:last-child{border-right:none}
+.stat .num{display:block;font-size:24px;line-height:1;font-weight:700;color:var(--red)}
+.stat .lab{display:block;margin-top:4px;font-size:10px;color:#9a9a9a;line-height:1.2}
+.warn{padding:10px 14px;border-top:1px solid #2b0f12;border-bottom:1px solid #2b0f12;background:#1a0a0a;color:#f2c6cc;font-size:11px;line-height:1.5}
+.warn strong{color:#fff}
+.section{padding:12px 14px;border-bottom:1px solid #e6e0d8}
+.sec-title{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sec-title .label{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:700;white-space:nowrap}
+.sec-title .line{height:1px;background:var(--red);flex:1;opacity:.9}
+.sec-title .small{font-family:'IBM Plex Mono',monospace;font-size:8px;color:#777;white-space:nowrap}
+.lead{background:var(--black);color:#fff;padding:12px 12px 11px;border-left:3px solid var(--red);margin-bottom:10px}
+.lead .t{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.18em;color:#ff7f8e;margin-bottom:5px;text-transform:uppercase}
+.lead p{font-size:10.5px;line-height:1.55;color:#e2e2e2}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.box{border:1px solid var(--gray-5);background:#f0ede6;padding:10px}
+.box.dark{background:#151515;color:#f3f3f3;border-color:#2b2b2b}
+.box.red{border-left:3px solid var(--red)}
+.box.green{border-left:3px solid var(--green)}
+.box.blue{border-left:3px solid var(--accent)}
+.box.yellow{border-left:3px solid var(--yellow)}
+.h2{font-size:17px;line-height:1.15;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
+.p{font-size:10.5px;line-height:1.52;color:#444}
+.p.light{color:#d7d7d7}
+.kv{display:grid;grid-template-columns:88px 1fr;gap:6px;font-size:9.5px;padding:3px 0;border-bottom:1px solid #ddd;align-items:start}
+.k{font-family:'IBM Plex Mono',monospace;color:var(--accent);white-space:nowrap}
+.v{color:#444;text-align:right}
+.badges{display:flex;flex-wrap:wrap;gap:4px}
+.badge{font-family:'IBM Plex Mono',monospace;font-size:7.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border:1px solid currentColor}
+.b-read{color:var(--green)}.b-write{color:var(--red)}.b-exec{color:var(--accent)}.b-net{color:#555}
+.arch{border:1px solid var(--gray-5);padding:10px;background:#faf8f3;font-family:'IBM Plex Mono',monospace;margin-bottom:10px}
+.node{display:flex;justify-content:space-between;align-items:center;padding:7px 9px;margin-bottom:2px;font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:#dedad2}
+.node.dark{background:var(--black);color:#fff}.node.dark .tag{background:var(--red);color:#fff}.tag{font-size:7px;padding:1px 4px;background:#bcbcbc}
+.arrow{text-align:center;color:#777;font-size:8px;padding:2px 0}
+.children{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:2px}
+.child{background:var(--accent);color:#fff;padding:5px 4px;text-align:center;font-size:7.5px;font-weight:700;letter-spacing:.04em}
+.code{background:#171717;color:#c7f1c7;font-family:'IBM Plex Mono',monospace;font-size:8.5px;line-height:1.55;padding:10px 11px;overflow-x:auto;border:1px solid #222}
+.code .cm{color:#a8a8a8}.code .kw{color:#ffb347}.code .str{color:#a8d8ff}.code .key{color:#ff5f73}.code .val{color:#d7ffd7}
+.table{width:100%;border-collapse:collapse}
+.table th{font-family:'IBM Plex Mono',monospace;font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:#777;border-bottom:1px solid #111;padding:5px 0;text-align:left}
+.table td{font-size:9.5px;color:#444;border-bottom:1px solid #ddd;padding:5px 0;vertical-align:top}
+.table td:first-child{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:9px;padding-right:10px;white-space:nowrap}
+.note{border-left:3px solid var(--yellow);background:#fff6cf;padding:8px 10px;font-size:9.5px;line-height:1.45;color:#222;margin-top:8px}
+.note .nl{display:block;font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.1em;color:#8b6800;margin-bottom:3px;text-transform:uppercase}
+.warn2{border-left:3px solid var(--red);background:#fff0f0;padding:8px 10px;font-size:9.5px;line-height:1.45;color:#222;margin-top:8px}
+.warn2 .nl{color:var(--red)}
+.list{display:grid;gap:7px}
+.item{display:grid;grid-template-columns:22px 1fr;gap:7px;align-items:start}
+.num{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--red);padding-top:1px}
+.it-title{font-size:10px;font-weight:700;color:var(--black);display:block}
+.it-desc{font-size:9px;color:#666;line-height:1.45}
+.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.flow .s{background:#ddd8cf;padding:8px 6px;text-align:center;position:relative;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;font-size:8px;font-weight:700;letter-spacing:.04em}
+.flow .s:not(:last-child)::after{content:'→';position:absolute;right:-7px;top:50%;transform:translateY(-50%);color:#888;font-size:10px}
+.flow .n{display:block;font-size:14px;color:var(--red);line-height:1;margin-bottom:2px}
+.flow .sub{display:block;font-size:7px;color:#777;text-transform:none;letter-spacing:.05em;margin-top:2px}
+.footer{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 14px;border-top:1px solid #111;background:#faf8f3}
+.foot{font-family:'IBM Plex Mono',monospace;font-size:8px;color:#666;line-height:1.55}
+.center{text-align:center}.right{text-align:right}
+.pill{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:7.5px;padding:2px 6px;letter-spacing:.08em;text-transform:uppercase;background:var(--black);color:#fff;margin:1px}
+.pill.red{background:var(--red)}.pill.blue{background:var(--accent)}.pill.green{background:var(--green)}.pill.out{background:transparent;color:#111;border:1px solid #111}
+.bigq{font-size:22px;line-height:1.18;font-weight:300;letter-spacing:-.02em;color:#111;border-left:4px solid var(--red);padding-left:12px;margin-bottom:10px}
+.bigq em{font-style:italic;color:#666;font-size:16px}
+.mt12{margin-top:12px}
+.tight{margin-bottom:8px}
+@media (max-width:760px){
+  body{width:100vw}
+  .header{grid-template-columns:1fr;align-items:start}
+  .meta{text-align:left}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .grid2,.grid3,.children,.footer,.flow{grid-template-columns:1fr}
+  .footer{text-align:left}
+  .right,.center{text-align:left}
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div>
+      <div class="kicker">ANTHROPIC REFERENCE · VOL.2 · NO.7</div>
+      <h1>CLAUDE<br><span>SUB-AGENTS</span></h1>
+      <div class="sub">子智能体架构 · 创建 · 部署 · 编排</div>
+    </div>
+    <div></div>
+    <div class="meta">
+      <div>2026.05.27</div>
+      <div>CLAUDE CODE · API · SKILLS</div>
+      <div class="rev">REV. 4.6</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span class="num">4</span><span class="lab">存储位置<br>优先级层级</span></div>
+    <div class="stat"><span class="num">∞</span><span class="lab">可同时<br>并行数量</span></div>
+    <div class="stat"><span class="num">3</span><span class="lab">主模型<br>选择层级</span></div>
+    <div class="stat"><span class="num">5</span><span class="lab">创建流程<br>速查步骤</span></div>
+  </div>
+
+  <div class="warn"><strong>注意：</strong>子 Agent 每次调用都是全新实例，无前序记忆。需要持久上下文时，优先通过文件（PLAN.md / ISSUE.md）传递，或启用 memory 功能。</div>
+
+  <section class="section">
+    <div class="sec-title"><span class="label">01 · 什么是子智能体</span><div class="line"></div><span class="small">Core Concept</span></div>
+    <div class="lead"><div class="t">核心定义</div><p>子智能体是一个<strong>命名的、隔离的 Claude 实例</strong>，拥有独立的系统提示、独立上下文窗口、独立工具访问列表和独立权限模式。父 Agent 将任务委托给子 Agent，子 Agent 独立运行并只将最终结果返回给父级。</p></div>
+    <div class="grid2">
+      <div class="box red">
+        <div class="h2">核心价值</div>
+        <div class="p">上下文隔离、并行执行、权限最小化、成本优化。</div>
+      </div>
+      <div class="box dark blue">
+        <div class="h2">工作原则</div>
+        <div class="p light">子任务噪音停留在子 Agent 上下文中，不污染主会话；主 Agent 只汇总结果，不追踪中间过程。</div>
+      </div>
+    </div>
+    <div class="grid2 mt12">
+      <div class="box"><div class="kv"><span class="k">隔离</span><span class="v">独立上下文 / 独立权限</span></div><div class="kv"><span class="k">并行</span><span class="v">多个子任务同时处理</span></div><div class="kv"><span class="k">最小权限</span><span class="v">tools 字段硬约束</span></div><div class="kv"><span class="k">成本</span><span class="v">按任务选 haiku / sonnet / opus</span></div></div>
+      <div class="box"><div class="badges"><span class="badge b-read">Read</span><span class="badge b-read">Glob</span><span class="badge b-read">Grep</span><span class="badge b-write">Write</span><span class="badge b-write">Edit</span><span class="badge b-exec">Bash</span><span class="badge b-net">WebSearch</span><span class="badge b-net">mcp__*</span></div><div class="note"><span class="nl">⚠ 注意</span>子 Agent 每次调用都是全新实例，无前序记忆。需要持久上下文时，优先通过文件传递或启用 memory。</div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-title"><span class="label">02 · 系统架构 & 文件格式</span><div class="line"></div><span class="small">Architecture</span></div>
+    <div class="grid2">
+      <div class="arch">
+        <div style="font-size:8px;color:#777;letter-spacing:.1em;margin-bottom:8px;text-transform:uppercase;">ORCHESTRATOR / SUB-AGENT 架构</div>
+        <div class="node dark"><span>ORCHESTRATOR<br><span style="font-size:7.5px;font-weight:400;color:#bbb">主 Agent · 规划 · 委托 · 汇总</span></span><span class="tag">OPUS/SONNET</span></div>
+        <div class="arrow">↓ Task 工具调用 · 传递目标 + 上下文</div>
+        <div class="children">
+          <div class="child" style="background:var(--green)">RESEARCHER<br><span style="font-size:7px;opacity:.8">web_search</span></div>
+          <div class="child">CODE-REVIEWER<br><span style="font-size:7px;opacity:.8">read-only</span></div>
+          <div class="child" style="background:var(--red)">TEST-RUNNER<br><span style="font-size:7px;opacity:.8">bash</span></div>
+        </div>
+        <div class="arrow" style="margin-top:2px;">↑ 仅返回最终摘要 · 中间过程不上传</div>
+        <div class="node" style="background:#bcbcbc;color:#111">RESULT AGGREGATION · 主 Agent 综合结论</div>
+      </div>
+      <div>
+        <table class="table">
+          <tr><th>字段</th><th>说明</th><th>默认</th></tr>
+          <tr><td>name</td><td style="color:var(--red)">必填 · 唯一标识符</td><td>—</td></tr>
+          <tr><td>description</td><td style="color:var(--red)">必填 · 路由依据</td><td>—</td></tr>
+          <tr><td>tools</td><td>工具列表（硬约束）</td><td>继承全部</td></tr>
+          <tr><td>model</td><td>模型选择</td><td>inherit</td></tr>
+          <tr><td>permissionMode</td><td>权限模式</td><td>default</td></tr>
+        </table>
+        <div class="mt12 code">&lt;!-- .claude/agents/code-reviewer.md --&gt;<br><span class="cm">---</span><br><span class="key">name</span>: <span class="val">code-reviewer</span><br><span class="key">description</span>: <span class="str">"staged 后立即调用。检查代码质量、安全性和最佳实践。"</span><br><span class="key">tools</span>: <span class="val">Read, Glob, Grep</span> <span class="cm"># 硬权限</span><br><span class="key">model</span>: <span class="val">sonnet</span><br><span class="key">permissionMode</span>: <span class="val">default</span><br><span class="cm">---</span><br><span class="str">你是高级代码审查员。按顺序执行：1. 识别当前分支变更文件 2. 读取每个变更文件及其测试 3. 按文件和行号标记问题 4. 输出 Markdown 报告，含 BLOCKER/MAJOR/NIT 标签。禁止修改文件——只读设计。</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-title"><span class="label">03 · 创建步骤（两种方式）</span><div class="line"></div><span class="small">Create Flow</span></div>
+    <div class="grid2">
+      <div>
+        <div class="box red tight"><div class="h2">方式 A：交互式 UI（推荐）</div><div class="list"><div class="item"><span class="num">01</span><div><span class="it-title">启动 Claude Code，输入 /agents</span><span class="it-desc">打开 Agent 管理界面。Library 标签列出所有内置/项目/用户级 Agent；Running 标签显示正在运行的实例。</span></div></div><div class="item"><span class="num">02</span><div><span class="it-title">选择作用域</span><span class="it-desc"><strong>Project</strong> → 提交到 Git，团队共享；<strong>User</strong> → 跨所有项目个人使用。</span></div></div><div class="item"><span class="num">03</span><div><span class="it-title">描述 Agent 功能</span><span class="it-desc">Claude 询问该 Agent 的职责，自动生成 frontmatter 和系统提示草稿。</span></div></div><div class="item"><span class="num">04</span><div><span class="it-title">审查并保存</span><span class="it-desc">检查工具列表和模型选择，确认后写入 .claude/agents/。</span></div></div></div></div>
+      </div>
+      <div>
+        <div class="box"><div class="h2">方式 B：手动创建文件</div><div class="code" style="margin-top:8px"># 创建项目级 Agent<br>mkdir -p .claude/agents<br>touch .claude/agents/my-agent.md<br><br># 创建用户级 Agent（跨项目）<br>mkdir -p ~/.claude/agents<br>touch ~/.claude/agents/my-agent.md<br><br># 列出所有已配置的 Agent<br>claude agents</div></div>
+        <div class="box mt12"><div class="h2">作用域优先级（高→低）</div><div class="list"><div class="item"><span class="num">①</span><div class="it-desc"><strong>managed settings</strong> — 企业/托管环境设置</div></div><div class="item"><span class="num">②</span><div class="it-desc"><span class="pill out">--agents</span> CLI 标志 — 运行时指定</div></div><div class="item"><span class="num">③</span><div class="it-desc"><span class="pill out">.claude/agents/</span> — 项目级（提交 Git）</div></div><div class="item"><span class="num">④</span><div class="it-desc"><span class="pill out">~/.claude/agents/</span> — 用户级（跨项目）</div></div><div class="item"><span class="num">⑤</span><div class="it-desc"><span class="pill out">plugin/agents/</span> — 插件提供的 Agent</div></div></div><div class="warn2"><span class="nl">⚡ DESCRIPTION 字段是路由键</span>父 Agent 通过 description 决定是否委托。写法关键：以 “Use this agent when…” 或 “MUST BE USED for…” 开头，触发自动委托更可靠。</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-title"><span class="label">04 · SKILL 角色如何转化为 SUB-AGENT</span><div class="line"></div><span class="small">Skill → Agent</span></div>
+    <div class="grid3">
+      <div class="box"><div class="h2">Skill 是什么</div><div class="p">Skill 是基于文件系统的可复用资源，提供领域专属知识：工作流、上下文、最佳实践。它是对 Claude 说“先读这份文档再行动”的机制。</div><div class="code mt12"># SKILL.md 典型结构<br><span class="key">---</span><br><span class="key">name</span>: <span class="val">docx</span><br><span class="key">description</span>: <span class="str">当用户需要创建 Word 文档时使用此技能...</span><br><span class="key">---</span><br><span class="str">## 操作流程<br>1. 先 view SKILL.md<br>2. 安装依赖 python-docx<br>3. 按规范生成文档...</span></div></div>
+      <div class="box"><div class="h2">映射对照</div><div class="kv"><span class="k">SKILL.md</span><span class="v">name: docx / description / body</span></div><div class="kv"><span class="k">Agent</span><span class="v">name: docx-specialist / tools / model</span></div><div class="kv"><span class="k">关键差异</span><span class="v">Skill 是被动文档；Sub-Agent 是主动执行者</span></div><div class="note"><span class="nl">💡 关键差异</span>转化后 Agent 自带工具权限和独立上下文，父 Agent 只需委托指令无需读取文档。</div></div>
+      <div class="box"><div class="h2">实际转换步骤</div><div class="list"><div class="item"><span class="num">①</span><div><span class="it-title">提取 SKILL.md 的领域知识</span><span class="it-desc">将操作流程、约束规则、输出格式要求直接复制到新 Agent 的系统提示中。</span></div></div><div class="item"><span class="num">②</span><div><span class="it-title">强化 description 为触发短语</span><span class="it-desc">将 Skill 的触发描述改写为以 “MUST BE USED for…” 或 “Use proactively when…” 开头的委托指令。</span></div></div><div class="item"><span class="num">③</span><div><span class="it-title">根据任务性质限定工具</span><span class="it-desc">文档生成类：<span class="pill out">Bash</span><span class="pill out">Write</span><span class="pill out">Read</span>；代码审查类：<span class="pill out">Read</span><span class="pill out">Grep</span>。</span></div></div><div class="item"><span class="num">④</span><div><span class="it-title">定义输出格式</span><span class="it-desc">明确 Agent 返回内容的结构，让父 Agent 能直接使用而无需解析。</span></div></div></div></div>
+    </div>
+    <div class="box mt12"><div class="h2">完整转换示例：docx-specialist</div><div class="code">--- # .claude/agents/docx-specialist.md<br><span class="key">name</span>: <span class="val">docx-specialist</span><br><span class="key">description</span>: <span class="str">"MUST BE USED when user asks to create Word (.docx) documents, reports, memos, or letters. Use proactively for any document generation task requiring professional formatting."</span><br><span class="key">tools</span>: <span class="val">Bash, Read, Write, Edit</span><br><span class="key">model</span>: <span class="val">sonnet</span><br>---<br><span class="str">你是 Word 文档专家。执行前先运行：pip install python-docx<br><br>## 标准流程<br>1. 分析用户需求和文档类型<br>2. 使用 python-docx 生成文件<br>3. 输出到 /mnt/user-data/outputs/<br>4. 返回：文件路径 + 内容摘要</span></div></div>
+  </section>
+
+  <section class="section">
+    <div class="sec-title"><span class="label">05 · 模型选择矩阵</span><div class="line"></div><span class="small">Models</span></div>
+    <div class="grid2">
+      <div>
+        <table class="table">
+          <tr><th>模型</th><th>适用场景</th><th>成本</th></tr>
+          <tr><td>haiku</td><td>快速检索、格式转换、简单分类、代码搜索</td><td style="color:var(--green)">最低</td></tr>
+          <tr><td>sonnet</td><td>代码生成、文档写作、中等复杂推理</td><td style="color:var(--yellow)">中等</td></tr>
+          <tr><td>opus</td><td>架构设计、复杂分析、跨系统编排决策</td><td style="color:var(--red)">最高</td></tr>
+        </table>
+        <div class="bigq mt12">子 Agent<br>不让 Claude<br>更聪明<br><em>——只让工作更整洁</em></div>
+      </div>
+      <div>
+        <div class="box"><div class="h2">内置 Agent 类型</div><div class="grid2 tight" style="grid-template-columns:1fr;gap:6px"><div class="box green"><div style="font-size:10px;font-weight:700">Explore（探索）</div><div class="p">model: haiku · tools: Read（只读）</div><div class="p">快速代码库搜索分析，thoroughness: quick/medium/thorough</div></div><div class="box"><div style="font-size:10px;font-weight:700">Plan（规划）</div><div class="p">model: inherit · tools: Read（只读）</div><div class="p">Plan 模式下收集代码库上下文，不嵌套无限递归</div></div><div class="box red"><div style="font-size:10px;font-weight:700">General（通用）</div><div class="p">model: inherit · tools: 继承全部</div><div class="p">无专家匹配时的兜底，处理复杂多步骤任务</div></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-title"><span class="label">06 · 核心编排模式</span><div class="line"></div><span class="small">Patterns</span></div>
+    <div class="grid2">
+      <div class="box"><div class="list"><div class="item"><span class="num">S</span><div><span class="it-title">串行管道（Sequential Pipeline）</span><span class="it-desc">pm-spec → architect → builder → validator → documenter。每步输出作为下步输入，通过 PLAN.md 传递状态。</span></div></div><div class="item"><span class="num">P</span><div><span class="it-title">并行扇出（Parallel Fan-out）</span><span class="it-desc">主 Agent 同时派发多个子任务（研究 A/B/C），等待结果后聚合。适合研究、批量分析。</span></div></div><div class="item"><span class="num">C</span><div><span class="it-title">审核循环（Checker Loop）</span><span class="it-desc">Builder 生成代码 → Validator 审查 → 若失败重新委托 Builder 修复，直至通过。</span></div></div><div class="item"><span class="num">A</span><div><span class="it-title">异步委托（Async Delegation）</span><span class="it-desc">派发子 Agent 后主会话继续其他工作，子 Agent 完成后返回更新。适合长时间任务。</span></div></div></div></div>
+      <div class="box"><div class="h2">团队工作流：典型 4-Agent 系统</div><div class="grid2 mt12"><div class="box"><div style="font-size:10px;font-weight:700">📋 PM-Spec</div><div class="p">tools: Read, Write · model: opus</div><div class="p">读取需求 → 生成详细 spec → 写入 PLAN.md</div></div><div class="box red"><div style="font-size:10px;font-weight:700">🏗 Architect</div><div class="p">tools: Read, Write · model: sonnet</div><div class="p">读取 spec → 设计方案 → 写入技术文档</div></div><div class="box green"><div style="font-size:10px;font-weight:700">⚙ Builder</div><div class="p">tools: all · model: sonnet</div><div class="p">按方案实现功能，每个功能独立 worktree</div></div><div class="box yellow"><div style="font-size:10px;font-weight:700">🧪 Validator</div><div class="p">tools: Read, Bash · model: haiku</div><div class="p">运行测试 → 代码审查 → 标记 READY/BLOCKED</div></div></div><div class="code mt12"># PLAN.md — Agent 间共享状态文件<br><span class="key">## 当前任务</span>: <span class="val">实现用户认证模块</span><br><span class="key">## 状态</span>: <span class="val">READY_FOR_BUILD</span><br><span class="key">## Spec</span>: <span class="str">JWT + Refresh Token 方案</span><br><span class="key">## Validator结果</span>: <span class="val">BLOCKED (line 42 SQL注入)</span></div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-title"><span class="label">07 · 安全最佳实践</span><div class="line"></div><span class="small">Safety</span></div>
+    <div class="grid2">
+      <div class="box red"><div class="h2">最小权限原则</div><div class="p">每个 Agent 的 tools 字段只包含完成任务所需的最少工具。审查员不需要 Bash；研究员不需要 Write。</div><div class="list mt12"><div class="item"><span class="num">✓</span><div class="it-desc">Reviewer Agent 仅含 Read, Grep, Glob</div></div><div class="item"><span class="num">✓</span><div class="it-desc">生产部署 Agent 用 permissionMode: default</div></div><div class="item"><span class="num">✓</span><div class="it-desc">机密用环境变量，不写入 PLAN.md</div></div><div class="item"><span class="num">✓</span><div class="it-desc">并行 Agent 使用 Git worktree 隔离</div></div><div class="item"><span class="num">✓</span><div class="it-desc">项目 Agent 提交 Git 前团队 review</div></div></div></div>
+      <div><div class="warn2"><span class="nl">⚠ 常见问题</span><table class="table"><tr><th>症状</th><th>原因 & 解法</th></tr><tr><td>Agent 未被自动调用</td><td>description 不够明确。在开头加 “MUST BE USED for…”</td></tr><tr><td>同名 Agent 行为异常</td><td>检查优先级冲突，项目级会覆盖用户级同名 Agent</td></tr><tr><td>Agent 重复读取相同文件</td><td>子 Agent 无记忆。将上下文通过参数传入或写入共享文件</td></tr><tr><td>工具调用被拒绝</td><td>tools 字段缺少该工具；检查 permissionMode 设置</td></tr><tr><td>并行 Agent 冲突</td><td>为每个 Agent 创建独立 Git worktree：git worktree add</td></tr></table></div><div class="mt12"><div class="sec-title" style="margin-bottom:8px"><span class="label">08 · 调试 & 常见问题</span><div class="line"></div><span class="small">FAQ</span></div><div class="flow"><div class="s"><span class="n">1</span>定义职责<span class="sub">单一功能</span></div><div class="s"><span class="n">2</span>选择作用域<span class="sub">project/user</span></div><div class="s"><span class="n">3</span>写 frontmatter<span class="sub">name+desc+tools</span></div><div class="s"><span class="n">4</span>写系统提示<span class="sub">任务+输出格式</span></div><div class="s"><span class="n">5</span>测试委托<span class="sub">/agents 验证</span></div></div></div></div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <div class="foot">参考来源<br><span style="color:var(--accent)">docs.anthropic.com</span> · <span style="color:var(--accent)">tembo.io/blog</span> · <span style="color:var(--accent)">builder.io/blog</span><br>数据截止 2026.05 · 信息可能随版本更新变化</div>
+    <div class="foot center"><span style="font-size:16px;font-weight:700;letter-spacing:-.02em;color:#111">CLAUDE SUB-AGENTS</span><br><span style="color:var(--red)">实施参考手册</span><br>v2026.05 · Claude Code 4.6</div>
+    <div class="foot right"><span class="pill red">Claude Code</span><span class="pill blue">API</span><span class="pill green">Skills</span><span class="pill">MCP</span><br><br><span style="color:#777">Swiss International Typographic Style</span><br><span style="color:#777">High-Density Information Design</span></div>
+  </div>
+</div>
+</body>
+</html>
