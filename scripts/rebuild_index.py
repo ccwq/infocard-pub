@@ -20,6 +20,17 @@ def git_commit_ts(path: str) -> int:
         return 0
 
 
+def latest_commit_ts(*paths: str) -> int:
+    ts_values = [git_commit_ts(path) for path in paths if path]
+    return max(ts_values) if ts_values else 0
+
+
+def fmt_date(ts: int) -> str:
+    if not ts:
+        return ""
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
 def load_entries():
     entries = []
     errors = []
@@ -40,7 +51,9 @@ def load_entries():
             errors.append(f"{meta_path}: target path missing -> {card_path}")
             continue
         item = dict(data)
-        item["_sort_ts"] = git_commit_ts(meta_path)
+        sort_ts = latest_commit_ts(meta_path, card_path)
+        item["_sort_ts"] = sort_ts
+        item["_modified_date"] = fmt_date(sort_ts)
         entries.append(item)
     return entries, errors
 
@@ -55,7 +68,12 @@ def main():
 
     cards = sorted(
         entries,
-        key=lambda x: (x.get("_sort_ts", 0), x.get("date", "")),
+        key=lambda x: (
+            x.get("_sort_ts", 0),
+            x.get("date", ""),
+            x.get("title", ""),
+            x.get("slug", ""),
+        ),
         reverse=True,
     )
     index = {
