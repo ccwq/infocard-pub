@@ -1,9 +1,13 @@
-const CACHE_NAME = 'infocard-pub-v4';
+const CACHE_NAME = 'infocard-pub-v5';
 const ASSETS = [
   '/infocard-pub/',
   '/infocard-pub/index.html',
   '/infocard-pub/manifest.json',
-  '/infocard-pub/docs/icon.svg'
+  '/infocard-pub/docs/icon.svg',
+  '/infocard-pub/assets/home/index.css',
+  '/infocard-pub/assets/home/index.js',
+  '/infocard-pub/assets/home/vendor/vue.global.prod.js',
+  '/infocard-pub/assets/home/vendor/js-yaml.min.js'
 ];
 
 self.addEventListener('install', event => {
