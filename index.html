@@ -41,30 +41,6 @@
       width: 100%;
     }
 
-    .hero-card {
-      margin-bottom: 0;
-    }
-
-    .subhead {
-      margin: 0;
-    }
-
-    .controls {
-      margin-bottom: 0;
-    }
-
-    .count-line {
-      margin: 0;
-    }
-
-    .cards {
-      margin-top: 0;
-    }
-
-    .footer {
-      margin-top: 6px;
-    }
-
     @media (max-width: 640px) {
       .page { padding: 18px 16px 36px; }
     }
@@ -177,25 +153,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* 顶部 */
-    .hero {
-      display: flex;
-      align-items: baseline;
-      gap: 16px;
-      margin-bottom: 28px;
-      border-bottom: 3px solid #111;
-      padding-bottom: 18px;
-    }
-    .hero h1 {
-      font-size: 32px;
-      font-weight: 900;
-      letter-spacing: -0.03em;
-    }
-    .hero .count {
-      font-size: 13px;
-      color: #666;
-      font-weight: 400;
-    }
     #count-total, #count-shown { font-variant-numeric: tabular-nums; }
 
     /* 搜索 + 筛选 */
@@ -243,6 +200,10 @@
       color: #111;
       padding: 2px 8px;
       margin-left: 6px;
+      font-weight: 700;
+    }
+    .current-filter .all {
+      color: #111;
       font-weight: 700;
     }
     .current-filter .pill button {
@@ -378,11 +339,11 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .card-body .tags span {
+    .tag-chip {
       font-size: 11px;
       color: #888;
     }
-    .card-body .tags span::before { content: '#'; }
+    .tag-chip::before { content: '#'; }
 
     .empty {
       padding: 40px 0;
@@ -446,11 +407,11 @@
       <div class="cards" id="cards-list"></div>
       <div class="empty" id="empty-state" style="display:none;">无匹配结果</div>
 
-  <div class="footer">
-    <span>infocard-pub · ccwq.github.io · <span id="ver">加载中…</span></span>
-    <span>客户端筛选 · 居中</span>
-  </div>
-</div>
+      <div class="footer">
+        <span>infocard-pub · ccwq.github.io · <span id="ver">加载中…</span></span>
+        <span>客户端筛选 · 居中</span>
+      </div>
+    </div>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
@@ -477,15 +438,27 @@
   const countLine = document.getElementById('count-line');
   const countTotal = document.getElementById('count-total');
   const countShown = document.getElementById('count-shown');
+  const emptyState = document.getElementById('empty-state');
 
   let allCards = [];
   let activeTag = '';
   let tagsExpanded = false;
   const MAX_COLLAPSED_ROWS = 2;
-  const tagFilterEl = document.getElementById('tag-filter');
   const tagViewport = document.getElementById('tag-viewport');
   const tagToggle = document.getElementById('tag-toggle');
   const currentFilterEl = document.getElementById('current-filter');
+
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+
+  const renderTags = (tags = []) => tags
+    .map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`)
+    .join('');
 
   // Load index
   try {
@@ -493,17 +466,15 @@
     const resp = await fetch(`./_index.yaml?t=${Date.now()}`, { cache: 'no-store' });
     const text = await resp.text();
     const index = jsyaml.load(text);
-    allCards = (index.cards || []).slice().sort((a, b) => {
+    const indexedCards = (Array.isArray(index.cards) ? index.cards : [])
+      .map((card, order) => ({ ...card, __order: order }));
+
+    allCards = indexedCards.sort((a, b) => {
       const ta = Number(a._sort_ts || 0);
       const tb = Number(b._sort_ts || 0);
       if (tb !== ta) return tb - ta;
-      const da = String(a.date || '');
-      const db = String(b.date || '');
-      if (db !== da) return db.localeCompare(da);
-      const titleA = String(a.title || a.slug || '');
-      const titleB = String(b.title || b.slug || '');
-      return titleB.localeCompare(titleA);
-    });
+      return a.__order - b.__order;
+    }).map(({ __order, ...card }) => card);
   } catch (e) {
     countLine.textContent = '索引加载失败，请稍后刷新';
     countTotal.textContent = '—';
@@ -556,10 +527,10 @@
 
   function updateCurrentFilter() {
     if (!activeTag) {
-      currentFilterEl.innerHTML = '当前筛选：<span style="color:#111;font-weight:700;">全部</span>';
+      currentFilterEl.innerHTML = '当前筛选：<span class="all">全部</span>';
       return;
     }
-    currentFilterEl.innerHTML = `当前筛选：<span class="pill">${activeTag}<button id="clear-active-tag" type="button" aria-label="清除筛选">×</button></span>`;
+    currentFilterEl.innerHTML = `当前筛选：<span class="pill">${escapeHtml(activeTag)}<button id="clear-active-tag" type="button" aria-label="清除筛选">×</button></span>`;
     const clearBtn = document.getElementById('clear-active-tag');
     clearBtn && (clearBtn.onclick = () => {
       activeTag = '';
@@ -589,9 +560,6 @@
   function compactDate(value) {
     const raw = String(value || '').replace(/^"|"$/g, '').trim();
     if (!raw) return '—';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-      return raw.slice(5).replace('-', '/');
-    }
     return raw;
   }
 
@@ -614,19 +582,19 @@
 
     if (!filtered.length) {
       cardsList.innerHTML = '';
-      document.getElementById('empty-state').style.display = 'block';
+      emptyState.style.display = 'block';
       return;
     }
 
-    document.getElementById('empty-state').style.display = 'none';
+    emptyState.style.display = 'none';
     cardsList.innerHTML = filtered.map(c => {
       const createdDate = compactDate(c.date);
       const updatedDate = compactDate(c._modified_date || c.updated || c.date);
-      const displayTitle = c.title || c.slug;
-      const displayCat = (c.category || 'misc').toUpperCase();
-      const displayTags = (c.tags || []).map(t => `<span class="tags"><span>${t}</span></span>`).join('');
-      const href = (c.path || (c.slug || '') + '.html');
-      const desc = c.desc || '';
+      const displayTitle = escapeHtml(c.title || c.slug);
+      const displayCat = escapeHtml((c.category || 'misc').toUpperCase());
+      const displayTags = renderTags(c.tags || []);
+      const href = escapeHtml(c.path || (c.slug || '') + '.html');
+      const desc = escapeHtml(c.desc || '');
       return `
       <div class="card-row">
         <div class="card-date">

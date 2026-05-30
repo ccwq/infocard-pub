@@ -1,43 +1,37 @@
 #!/usr/bin/env python3
-import glob
-import os
-import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 import yaml
 
 REQUIRED_FIELDS = ["slug", "path", "category", "title", "date", "tags"]
 
 
-def git_commit_ts(path: str) -> int:
+def file_mtime_ns(path: str) -> int:
     try:
-        out = subprocess.check_output(
-            ["git", "log", "-1", "--format=%ct", "--", path],
-            text=True,
-        ).strip()
-        return int(out) if out else 0
+        return Path(path).stat().st_mtime_ns
     except Exception:
         return 0
 
 
-def latest_commit_ts(*paths: str) -> int:
-    ts_values = [git_commit_ts(path) for path in paths if path]
+def latest_source_mtime_ns(*paths: str) -> int:
+    ts_values = [file_mtime_ns(path) for path in paths if path]
     return max(ts_values) if ts_values else 0
 
 
-def fmt_date(ts: int) -> str:
-    if not ts:
+def fmt_date(ts_ns: int) -> str:
+    if not ts_ns:
         return ""
-    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(ts_ns / 1_000_000_000, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
 def load_entries():
     entries = []
     errors = []
-    for meta_path in sorted(glob.glob("**/*.meta.yaml", recursive=True)):
-        if ".git" in meta_path:
+    for meta_path in sorted(Path('docs').glob('**/*.meta.yaml')):
+        if '.git' in str(meta_path):
             continue
-        with open(meta_path, "r", encoding="utf-8") as fp:
+        with meta_path.open('r', encoding='utf-8') as fp:
             data = yaml.safe_load(fp)
         if not isinstance(data, dict):
             errors.append(f"{meta_path}: not a YAML object")
@@ -46,14 +40,14 @@ def load_entries():
         if missing:
             errors.append(f"{meta_path}: missing fields {', '.join(missing)}")
             continue
-        card_path = data["path"]
-        if not os.path.exists(card_path):
+        card_path = data['path']
+        if not Path(card_path).exists():
             errors.append(f"{meta_path}: target path missing -> {card_path}")
             continue
         item = dict(data)
-        sort_ts = latest_commit_ts(meta_path, card_path)
-        item["_sort_ts"] = sort_ts
-        item["_modified_date"] = fmt_date(sort_ts)
+        sort_ts = latest_source_mtime_ns(str(meta_path), card_path)
+        item['_sort_ts'] = sort_ts
+        item['_modified_date'] = fmt_date(sort_ts)
         entries.append(item)
     return entries, errors
 
@@ -61,30 +55,28 @@ def load_entries():
 def main():
     entries, errors = load_entries()
     if errors:
-        print("Index build failed:")
+        print('Index build failed:')
         for err in errors:
-            print(f"- {err}")
+            print(f'- {err}')
         raise SystemExit(1)
 
     cards = sorted(
         entries,
         key=lambda x: (
-            x.get("_sort_ts", 0),
-            x.get("date", ""),
-            x.get("title", ""),
-            x.get("slug", ""),
+            -int(x.get('_sort_ts', 0)),
+            str(x.get('title', '')),
+            str(x.get('slug', '')),
         ),
-        reverse=True,
     )
     index = {
-        "_count": len(cards),
-        "_updated": datetime.now(timezone.utc).isoformat(),
-        "cards": cards,
+        '_count': len(cards),
+        '_updated': datetime.now(timezone.utc).isoformat(),
+        'cards': cards,
     }
-    with open("_index.yaml", "w", encoding="utf-8") as fp:
+    with open('_index.yaml', 'w', encoding='utf-8') as fp:
         yaml.safe_dump(index, fp, allow_unicode=True, sort_keys=False)
-    print(f"Index written: {len(cards)} cards")
+    print(f'Index written: {len(cards)} cards')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
