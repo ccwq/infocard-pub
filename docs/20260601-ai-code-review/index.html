@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>我是怎样使用 AI 来做 Code Review 的</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; word-break: break-word; }
+:root {
+  --black: #1a1a1a;
+  --white: #f5f3ee;
+  --red: #c0392b;
+  --red-light: #e74c3c;
+  --gray: #8a8a8a;
+  --gray-light: #b0b0b0;
+  --text: #1a1a1a;
+  --text-secondary: #555;
+  --border: #d0c8b8;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+  background: var(--white);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.page {
+  max-width: 780px;
+  margin: 0 auto;
+  background: var(--white);
+  min-height: 100vh;
+}
+
+/* Banner */
+.banner {
+  background: var(--black);
+  padding: 1.2rem 1.5rem;
+  color: var(--white);
+}
+.banner-label {
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--red-light);
+  margin-bottom: .25rem;
+}
+.banner-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: .4rem;
+}
+.banner-sub {
+  font-size: .88rem;
+  color: var(--gray-light);
+  line-height: 1.5;
+}
+.banner-meta {
+  font-size: .75rem;
+  color: var(--gray);
+  margin-top: .5rem;
+  display: flex;
+  gap: .8rem;
+  flex-wrap: wrap;
+}
+
+/* Stats */
+.stats {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--red);
+  background: var(--black);
+  color: var(--white);
+}
+.stat {
+  flex: 1;
+  text-align: center;
+  padding: .6rem .3rem;
+  border-right: 1px solid #333;
+}
+.stat:last-child { border-right: none; }
+.stat-label {
+  font-size: .65rem;
+  color: var(--gray-light);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.stat-text {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--red-light);
+}
+
+/* Flowchart */
+.flowchart-wrap {
+  background: var(--black);
+  padding: .8rem;
+}
+.flowchart-wrap svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--black);
+}
+
+/* Content */
+.content {
+  padding: 1rem 1.2rem 2rem;
+}
+
+/* Warning */
+.warning {
+  background: #fff3cd;
+  border-left: 4px solid #e67e22;
+  padding: .6rem .8rem;
+  font-size: .82rem;
+  margin-bottom: 1rem;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Section */
+.section {
+  margin-bottom: 1.2rem;
+}
+.section-number {
+  display: inline-block;
+  background: var(--red);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .1rem .4rem;
+  border-radius: 2px;
+  margin-bottom: .4rem;
+  letter-spacing: .05em;
+}
+.section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: .4rem;
+  color: var(--black);
+}
+.section p {
+  font-size: .85rem;
+  color: var(--text-secondary);
+  margin-bottom: .35rem;
+}
+.section ul, .section ol {
+  padding-left: 1.2rem;
+  margin-bottom: .4rem;
+}
+.section li {
+  font-size: .83rem;
+  color: var(--text-secondary);
+  margin-bottom: .15rem;
+}
+
+/* Code */
+.code-block {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  font-size: .75rem;
+  padding: .6rem .8rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: .5rem 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Quote */
+.quote-block {
+  background: #f0ece4;
+  border-left: 3px solid var(--red);
+  padding: .6rem .8rem;
+  margin: .6rem 0;
+  font-size: .85rem;
+  font-style: italic;
+  color: var(--text);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 1rem 0;
+}
+
+/* Pill */
+.pill {
+  display: inline-block;
+  font-size: .68rem;
+  padding: .1rem .4rem;
+  border-radius: 3px;
+  margin-right: .25rem;
+  font-weight: 600;
+}
+.pill-gpt { background: #6c5ce7; color: #fff; }
+.pill-claude { background: #d97706; color: #fff; }
+.pill-deepseek { background: #059669; color: #fff; }
+.pill-codex { background: #2563eb; color: #fff; }
+.pill-human { background: var(--red); color: #fff; }
+
+/* Link card */
+.link-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: .7rem .8rem;
+  margin-bottom: .5rem;
+}
+.link-card .link-name {
+  font-weight: 600;
+  font-size: .85rem;
+  color: var(--black);
+  margin-bottom: .15rem;
+}
+.link-card .link-name a {
+  color: var(--red);
+  text-decoration: none;
+}
+.link-card .link-url {
+  font-size: .72rem;
+  color: var(--gray);
+  word-break: break-all;
+  font-family: "SF Mono", "Cascadia Code", monospace;
+}
+.link-card .link-desc {
+  font-size: .78rem;
+  color: var(--text-secondary);
+  margin-top: .15rem;
+}
+
+/* Footer */
+.footer {
+  background: var(--black);
+  color: var(--gray-light);
+  padding: .8rem 1.2rem;
+  font-size: .7rem;
+  text-align: center;
+}
+.footer a {
+  color: var(--red-light);
+  text-decoration: none;
+}
+
+/* Save button */
+.save-btn {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: .8rem;
+  font-family: "SF Mono", "Cascadia Code", monospace;
+  cursor: pointer;
+  z-index: 999;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  transition: transform .15s;
+}
+.save-btn:hover { transform: scale(1.05); }
+
+@media (min-width: 760px) {
+  .banner { padding: 1.5rem 2.8rem; }
+  .banner-title { font-size: 2rem; }
+  .content { padding: 1.5rem 2.8rem 3rem; }
+  .footer { padding: 1rem 2.8rem; }
+}
+@media (max-width: 400px) {
+  .banner { padding: .85rem .7rem; }
+  .banner-title { font-size: 1.3rem; }
+  .content { padding: .8rem .7rem 1.5rem; }
+  .stat { padding: .4rem .15rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="page" id="card">
+  <!-- Banner -->
+  <div class="banner">
+    <div class="banner-label">AI Code Review · 实战方法论</div>
+    <div class="banner-title">我是怎样使用 AI 来做 Code Review 的</div>
+    <div class="banner-sub">多模型独立审 → 合并去重 → 人工筛选 → 异模型修复验证 — 针对 1000+ 行大变更的 Code Review 工程化方案</div>
+    <div class="banner-meta">
+      <span>✍️ Viking @vikingmute</span>
+      <span>📅 2026</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-text">review-forge</div>
+      <div class="stat-label">Tool</div>
+    </div>
+    <div class="stat">
+      <div class="stat-text">3~5 模型</div>
+      <div class="stat-label">Multi-Review</div>
+    </div>
+    <div class="stat">
+      <div class="stat-text">Synthesize</div>
+      <div class="stat-label">Auto Merge</div>
+    </div>
+    <div class="stat">
+      <div class="stat-text">手动筛选</div>
+      <div class="stat-label">Human Gate</div>
+    </div>
+  </div>
+
+  <!-- Flowchart: Mermaid inline SVG -->
+  <div class="flowchart-wrap">
+    <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto;">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#e74c3c"/></marker>
+        <marker id="arrow-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#888"/></marker>
+      </defs>
+      <!-- Background -->
+      <rect width="720" height="360" fill="#1a1a1a" rx="6"/>
+
+      <!-- Title -->
+      <text x="360" y="28" fill="#e74c3c" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="2">REVIEW FORGE WORKFLOW</text>
+
+      <!-- Step 1: PR Submitted -->
+      <rect x="290" y="42" width="140" height="32" rx="4" fill="#c0392b" stroke="#e74c3c" stroke-width="1.5"/>
+      <text x="360" y="63" fill="#fff" font-size="11" font-weight="600" text-anchor="middle">PR / Feature 提交</text>
+
+      <line x1="360" y1="74" x2="360" y2="92" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Step 2: Multi-Model Review -->
+      <rect x="120" y="94" width="140" height="32" rx="4" fill="#333" stroke="#6c5ce7" stroke-width="1.5"/>
+      <text x="190" y="115" fill="#a78bfa" font-size="11" font-weight="600" text-anchor="middle">GPT-5.5 Review</text>
+
+      <rect x="290" y="94" width="140" height="32" rx="4" fill="#333" stroke="#d97706" stroke-width="1.5"/>
+      <text x="360" y="115" fill="#fbbf24" font-size="11" font-weight="600" text-anchor="middle">Composer 2.5 Review</text>
+
+      <rect x="460" y="94" width="140" height="32" rx="4" fill="#333" stroke="#059669" stroke-width="1.5"/>
+      <text x="530" y="115" fill="#34d399" font-size="11" font-weight="600" text-anchor="middle">DeepSeek V4 Review</text>
+
+      <text x="360" y="86" fill="#888" font-size="9" text-anchor="middle">独立运行，各出一份报告</text>
+
+      <line x1="190" y1="126" x2="190" y2="140" stroke="#6c5ce7" stroke-width="1" marker-end="url(#arrow)"/>
+      <line x1="360" y1="126" x2="360" y2="140" stroke="#d97706" stroke-width="1" marker-end="url(#arrow)"/>
+      <line x1="530" y1="126" x2="530" y2="140" stroke="#059669" stroke-width="1" marker-end="url(#arrow)"/>
+
+      <line x1="190" y1="140" x2="530" y2="140" stroke="#888" stroke-width="1"/>
+      <line x1="360" y1="140" x2="360" y2="155" stroke="#888" stroke-width="1.5" marker-end="url(#arrow-g)"/>
+
+      <!-- Step 3: Synthesize -->
+      <rect x="290" y="157" width="140" height="40" rx="4" fill="#333" stroke="#e74c3c" stroke-width="1.5"/>
+      <text x="360" y="176" fill="#fff" font-size="10" font-weight="600" text-anchor="middle">Synthesize</text>
+      <text x="360" y="189" fill="#aaa" font-size="8" text-anchor="middle">去重 → 按共识排序 → 生成 Checklist</text>
+
+      <line x1="360" y1="197" x2="360" y2="215" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Step 4: Human Gate -->
+      <polygon points="310,220 410,220 430,240 410,260 310,260 290,240" fill="#333" stroke="#e67e22" stroke-width="1.5"/>
+      <text x="360" y="244" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">人工筛选</text>
+
+      <line x1="360" y1="260" x2="360" y2="278" stroke="#e67e22" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Step 5: Fix + Verify -->
+      <rect x="170" y="280" width="140" height="32" rx="4" fill="#333" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="240" y="301" fill="#60a5fa" font-size="11" font-weight="600" text-anchor="middle">Fix Agent (Claude)</text>
+
+      <rect x="410" y="280" width="140" height="32" rx="4" fill="#333" stroke="#dc2626" stroke-width="1.5"/>
+      <text x="480" y="301" fill="#fca5a5" font-size="11" font-weight="600" text-anchor="middle">Verify Agent (Codex)</text>
+
+      <line x1="360" y1="312" x2="360" y2="330" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Output -->
+      <rect x="290" y="332" width="140" height="24" rx="4" fill="#c0392b"/>
+      <text x="360" y="348" fill="#fff" font-size="11" font-weight="600" text-anchor="middle">✅ Review 完成</text>
+    </svg>
+  </div>
+
+  <div class="content">
+    <div class="warning">
+      <strong>⚡ 核心洞察：</strong>AI 一分钟能吐几百行跨七八个文件，人根本不可能逐行看完。但 AI 和人的分工可以这样切——<strong>AI 擅长找问题，人不擅长；人擅长决策取舍，AI 不擅长。</strong>
+    </div>
+
+    <!-- Section 1: Background -->
+    <div class="section">
+      <div class="section-number">01</div>
+      <div class="section-title">背景：为什么需要这套流程</div>
+      <p>Viking 的 <strong>TinyShip</strong> 是一个 monorepo 模板产品，包含 Next.js、Nuxt.js、TanStack Start 三个 app，同时支持 PG 和 SQLite 两种数据库。任何一个改动都可能影响另外两个。每次 feature 提交 1000+ 行时，无法逐行 review。</p>
+      <p>于是他将 Code Review 流程做成了一个可复用的 Skill：<strong>review-forge</strong>（<a href="https://github.com/vikingmute/review-forge" style="color:var(--red);">GitHub</a>）。</p>
+    </div>
+
+    <!-- Section 2: Overview -->
+    <div class="section">
+      <div class="section-number">02</div>
+      <div class="section-title">总览：五步流程</div>
+      <ol>
+        <li><strong>Review</strong> — 多模型独立审同一份代码，各出一份报告</li>
+        <li><strong>Synthesize</strong> — 合并报告，去重排序，生成带优先级的 Checklist</li>
+        <li><strong>Human Gate</strong> — 人工逐条判断：这个 bug 真的会出事吗？值得修吗？</li>
+        <li><strong>Fix</strong> — 用 <span class="pill pill-claude">Claude</span> 作为 fix agent 执行修复</li>
+        <li><strong>Verify</strong> — 用 <span class="pill pill-codex">Codex</span> 作为 verify agent 验证修复</li>
+      </ol>
+      <div class="code-block"># 启动一个 feature 的 review
+/review-forge review feature: checkout-refactor</div>
+    </div>
+
+    <!-- Section 3: Multi-Model Review -->
+    <div class="section">
+      <div class="section-number">03</div>
+      <div class="section-title">为什么需要多 Agent Review</div>
+      <p>一开始 Viking 只用单一服务（Bugbot / CodeRabbit / Codex review mode），效果还行但有两个问题：</p>
+      <ul>
+        <li>单个模型审同一份代码存在<strong>注意力盲区</strong>——边界条件、异常路径、跨文件副作用不一定全覆盖</li>
+        <li>单模型发现的问题需要额外验证"这真的是 bug 还是理解偏了"</li>
+      </ul>
+      <p>改用多个模型独立审查后，发现很有意思的结果：</p>
+      <ul>
+        <li><strong>重叠的问题</strong> — 直接看，不需判断"是不是真的 bug"</li>
+        <li><strong>独有的发现</strong> — 每个模型捕捉到自己特有的问题，互补性好</li>
+        <li><strong>高优先级重叠项</strong> — 不纠结，直接修</li>
+      </ul>
+      <p>多模型审查的价值有两层：<strong>覆盖率更高</strong>（多个视角互补）、<strong>信任度更高</strong>（重叠项无需二次验证）。</p>
+      <p style="margin-top:.2rem;font-size:.8rem;color:#888;">常用模型组合：<span class="pill pill-gpt">GPT-5.5</span> <span class="pill pill-claude">Composer 2.5</span> <span class="pill pill-deepseek">DeepSeek Pro V4</span></p>
+    </div>
+
+    <!-- Section 4: Synthesize -->
+    <div class="section">
+      <div class="section-number">04</div>
+      <div class="section-title">Synthesize：合并报告生成 Checklist</div>
+      <p>将不同模型的 review 报告交给 AI 分析和提取排序，生成一个带 checkbox 的 checklist。重合的问题按优先级排在前面，每条附带共识度指标：</p>
+      <div class="code-block">- [ ] `RF-002`
+  - severity: high
+  - reviewer_agreement: 2/3 (composer, codex)</div>
+      <p>文件结构示例：</p>
+      <div class="code-block">code_review/checkout-refactor/
+  gpt5.md       ← GPT-5.5 的报告
+  composer.md   ← Composer 的报告
+  deepseek.md   ← DeepSeek 的报告
+  summary.md    ← Synthesize 生成的 Checklist
+  fix-plan.md   ← 修复计划
+  status.md     ← 进度跟踪
+  verify.md     ← 验证报告</div>
+    </div>
+
+    <!-- Section 5: Human Gate -->
+    <div class="section">
+      <div class="section-number">05</div>
+      <div class="section-title">人工筛选：最重要的一步</div>
+      <p>AI review 完会给一个长长的列表，按严重程度标签排列。但实际情况是：<strong>AI 缺乏项目上下文和取舍判断力</strong>，倾向于把所有发现当成重要问题去修复，过度优化。</p>
+      <p>Viking 的做法——逐条回答两个问题：</p>
+      <ol>
+        <li><strong>这个问题真的会导致用户出 Bug 吗？</strong></li>
+        <li><strong>修复的性价比高吗？</strong></li>
+      </ol>
+      <div class="quote-block">
+        "大多数 AI 标记的问题，第一个问题答案就是<strong>不会</strong>。它只是在理论上不完美。真正要修的是那种要出事的——用户会看到错误页面、数据会被写坏、支付会失败，这种二话不说修。"
+      </div>
+      <p>AI 列十几条，真正动手修的通常就三四条。这不是 AI 不行，是 <strong>review 和修代码是两件完全不同的事</strong>。AI 擅长找问题，不擅长决策。</p>
+    </div>
+
+    <!-- Section 6: Fix + Verify -->
+    <div class="section">
+      <div class="section-number">06</div>
+      <div class="section-title">Fix / Verify：不同模型各司其职</div>
+      <p>筛选完后进入修复验证阶段，用<strong>两个不同 agent</strong>：</p>
+      <ul>
+        <li><span class="pill pill-claude">Fix Agent (Claude)</span> — 执行修复，创建 fix-plan.md，跑测试</li>
+        <li><span class="pill pill-codex">Verify Agent (Codex GPT-5.5)</span> — 验证修复是否正确</li>
+      </ul>
+      <div class="code-block"># Fix agent（Claude）
+/review-forge fix feature: checkout-refactor
+
+# Verify agent（Codex GPT-5.5）
+/review-forge verify feature: checkout-refactor</div>
+      <p><strong>关键原则：不能用同一个模型既 fix 又 review。</strong> 自己修的自己审，天然存在 confirmation bias——会顺着自己的思路验证，很难发现新问题。</p>
+    </div>
+
+    <!-- Section 7: Summary -->
+    <div class="section">
+      <div class="section-number">07</div>
+      <div class="section-title">总结：给 AI Code Review 的实战建议</div>
+      <ul>
+        <li><strong>大改动走全套流程</strong>（十几个文件以上的功能），小修小补用一个模型就够了</li>
+        <li><strong>多模型独立审</strong>比单模型 coverage 高 2~3 倍，重叠项无需二次验证</li>
+        <li><strong>AI 出清单，人做决策</strong>——AI 找问题，人判断值不值得修</li>
+        <li><strong>Fix 和 Verify 必须用不同模型</strong>，避免 confirmation bias</li>
+        <li><strong>参考文章</strong>：<a href="https://vikingz.me/ai-code-review/" style="color:var(--red);">原文</a> · <a href="https://github.com/vikingmute/review-forge" style="color:var(--red);">review-forge 仓库</a> · <a href="https://rkive.substack.com/p/using-ai-to-write-better-code-more" style="color:var(--red);">"Using AI to write better code more slowly"</a></li>
+      </ul>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Quote -->
+    <div class="quote-block">
+      "AI 一分钟能给我吐出几百行，跨七八个文件，我根本不可能逐行看完。所以我把 review 拆成两步：AI 负责找问题，人负责决策取舍。"
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>来源：<a href="https://vikingz.me/ai-code-review/" target="_blank">Viking @vikingmute</a> · <a href="https://github.com/vikingmute/review-forge" target="_blank">review-forge</a></p>
+    <p style="margin-top:.2rem;opacity:.6">信息卡由 Hermes Agent 生成 · 内容忠实原文</p>
+  </div>
+</div>
+
+<button class="save-btn" onclick="savePNG()">💾 保存 PNG</button>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+async function savePNG() {
+  const btn = document.querySelector('.save-btn');
+  btn.style.display = 'none';
+  try {
+    const canvas = await html2canvas(document.getElementById('card'), {
+      scale: 2, useCORS: true, backgroundColor: '#f5f3ee', logging: false
+    });
+    const link = document.createElement('a');
+    link.download = 'ai-code-review-viking.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('保存失败: ' + e.message);
+  } finally {
+    btn.style.display = '';
+  }
+}
+</script>
+
+</body>
+</html>
