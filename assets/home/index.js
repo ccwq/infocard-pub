@@ -376,6 +376,7 @@
       };
 
       onMounted(async () => {
+        document.body.classList.add('is-loading-index');
         window.addEventListener('resize', onResize);
         await fetchVersion();
         try {
@@ -386,6 +387,7 @@
           loadError.value = '加载索引失败，请稍后刷新';
         } finally {
           loading.value = false;
+          document.body.classList.remove('is-loading-index');
         }
         await nextTick();
         measureTagCollapse();
@@ -559,7 +561,10 @@
           </section>
 
           <section v-if="loadError" class="empty-state">{{ loadError }}</section>
-          <section v-else-if="loading" class="empty-state">加载索引中…</section>
+          <section v-else-if="loading" class="empty-state loading-state" aria-live="polite" aria-busy="true">
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <span class="loading-text">加载索引中…</span>
+          </section>
           <section v-else-if="!shownCount" class="empty-state">无匹配结果</section>
           <section v-else class="cards premium-cards">
             <article v-for="card in visibleCards" :key="card.slug || card.__order" class="card-row premium-row">
