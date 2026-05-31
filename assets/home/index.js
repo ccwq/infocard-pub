@@ -5,6 +5,9 @@
   const INTERSECTION_ROOT_MARGIN = '0px 0px 480px 0px';
   const COLLAPSED_FULL_ROWS = 3;
   const COLLAPSED_EXTRA_PX = 24;
+  const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const DATETIME_MINUTE_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?:Z|[+-]\d{2}:?\d{2})?$/;
+  const DATETIME_SECOND_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/;
 
   const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -12,9 +15,26 @@
     if (!value) return null;
     const raw = String(value).trim().replace(/^"|"$/g, '');
     if (!raw) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(`${raw}T12:00:00`);
+    if (DATE_ONLY_RE.test(raw)) {
+      const d = new Date(`${raw}T12:00:00`);
+      d.__precision = 'date';
+      return d;
+    }
+    let precision = 'minute';
+    if (DATETIME_SECOND_RE.test(raw)) {
+      precision = 'second';
+    } else if (DATETIME_MINUTE_RE.test(raw)) {
+      precision = 'minute';
+    }
     const d = new Date(raw.replace(' ', 'T'));
-    return Number.isNaN(d.getTime()) ? null : d;
+    if (Number.isNaN(d.getTime())) return null;
+    d.__precision = precision;
+    return d;
+  };
+
+  const getDatePrecision = (dateValue) => {
+    if (!(dateValue instanceof Date)) return 'date';
+    return dateValue.__precision || 'date';
   };
 
   const formatDate = (dateValue) => {
@@ -26,12 +46,18 @@
   const formatClock = (dateValue) => {
     const d = dateValue instanceof Date ? dateValue : parseLooseDate(dateValue);
     if (!d) return '—';
+    const precision = getDatePrecision(d);
+    if (precision === 'date') return '';
+    if (precision === 'second') {
+      return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    }
     return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   };
 
   const formatDateTime = (dateValue) => {
     const d = dateValue instanceof Date ? dateValue : parseLooseDate(dateValue);
     if (!d) return '—';
+    if (getDatePrecision(d) === 'date') return formatDate(d);
     return `${formatDate(d)} ${formatClock(d)}`;
   };
 
@@ -44,15 +70,21 @@
   };
 
   const buildTimeMeta = (card) => {
+    const cardDate = parseLooseDate(card.date);
     const submitted = pickFirstDate(card._submitted_at, card._created_at, card.created_at, card.date, card.created);
     const modified = pickFirstDate(card._effective_at, card._modified_at, card.modified_at, card._modified_date, card.updated_at, card.updated, card.date, card._created_at, card.created_at);
-    const effective = modified || submitted;
+    const hasExplicitCardTime = cardDate && getDatePrecision(cardDate) !== 'date';
+    const effective = hasExplicitCardTime ? cardDate : (modified || submitted);
     const sortTs = Number(card._sort_ts);
     const fallbackTs = effective ? effective.getTime() : 0;
-    const normalizedSortTs = Number.isFinite(sortTs) && sortTs > 0
-      ? (sortTs > 1e15 ? Math.floor(sortTs / 1e6) : sortTs)
-      : fallbackTs;
-    const label = modified && submitted && modified.getTime() > submitted.getTime() ? '修改' : '提交';
+    const normalizedSortTs = hasExplicitCardTime
+      ? fallbackTs
+      : (Number.isFinite(sortTs) && sortTs > 0
+        ? (sortTs > 1e15 ? Math.floor(sortTs / 1e6) : sortTs)
+        : fallbackTs);
+    const label = hasExplicitCardTime
+      ? '提交'
+      : (modified && submitted && modified.getTime() > submitted.getTime() ? '修改' : '提交');
     return {
       label,
       date: formatDate(effective),
@@ -123,6 +155,8 @@
           return String(a.__title).localeCompare(String(b.__title), 'zh-Hans-CN');
         }));
 
+      const totalCountLabel = computed(() => String(totalCount.value).padStart(2, '0'));
+
       const categoryCount = computed(() => {
         const set = new Set(normalizedCards.value.map((card) => card.__category));
         return set.size;
@@ -192,6 +226,10 @@
         });
       };
 
+      const collapseTagPanel = () => {
+        tagsExpanded.value = false;
+      };
+
       const toggleTag = (tag) => {
         if (!tag) {
           selectedTags.value = [];
@@ -200,6 +238,7 @@
         } else {
           selectedTags.value = [...selectedTags.value, tag];
         }
+        collapseTagPanel();
         resetVisibleCount();
         nextTick(() => {
           measureTagCollapse();
@@ -209,6 +248,7 @@
 
       const clearSelectedTags = () => {
         selectedTags.value = [];
+        collapseTagPanel();
         resetVisibleCount();
         nextTick(() => {
           measureTagCollapse();
@@ -252,9 +292,7 @@
           }
         });
 
-        const activeButtons = buttons.filter((button) => button.classList.contains('active'));
-        const hasHiddenActive = activeButtons.some((button) => rows.indexOf(button.offsetTop) >= COLLAPSED_FULL_ROWS);
-        const shouldExpand = tagsExpanded.value || hasHiddenActive;
+        const shouldExpand = tagsExpanded.value;
         tagNeedsCollapse.value = rows.length > COLLAPSED_FULL_ROWS;
 
         if (!tagNeedsCollapse.value || shouldExpand) {
@@ -361,16 +399,17 @@
         version,
         loading,
         loadError,
+        totalCount,
+        shownCount,
+        renderedCount,
+        hasMore,
         searchQuery,
         selectedTags,
         tagsExpanded,
         visibleCards,
         sortedTags,
         hotTags,
-        totalCount,
-        shownCount,
-        renderedCount,
-        hasMore,
+        totalCountLabel,
         latestTimeLabel,
         categoryCount,
         posterSummary,
@@ -407,33 +446,28 @@
               <div class="strip-right">INDEXED / FILTERABLE / CHRONOLOGICAL</div>
             </div>
 
-            <div class="poster-band compact">
-              <div class="poster-title-zone compact">
-                <div class="poster-index">01 / ARCHIVE POSTER</div>
-                <h1>INFOCARD<br>ARCHIVE</h1>
-                <p class="poster-copy compact">公开信息卡索引，按最新时间优先排列，支持标签并集筛选与增量浏览。</p>
-              </div>
+              <div class="poster-band compact">
+                <div class="poster-title-zone compact">
+                  <div class="poster-index">01 / ARCHIVE POSTER</div>
+                  <h1>INFOCARD<br>ARCHIVE</h1>
+                  <p class="poster-copy compact">公开信息卡索引，按最新时间优先排列，支持标签并集筛选与增量浏览。</p>
+                </div>
 
-              <div class="poster-search-zone compact">
-                <div class="poster-note">{{ posterSummary }}</div>
-                <div class="poster-hotline compact">
-                  <span class="hotline-label">HOT TAGS</span>
-                  <span v-for="tag in hotTags" :key="tag.tag" class="hotline-pill">{{ tag.tag }}</span>
+                <div class="poster-info-zone compact">
+                  <div class="poster-stat-card compact">
+                    <div class="poster-stat-item highlight">
+                      <span class="poster-stat-label">LAST UPDATE</span>
+                      <span class="poster-stat-value">{{ latestTimeLabel }}</span>
+                    </div>
+                    <div class="poster-stat-divider"></div>
+                    <div class="poster-stat-item">
+                      <span class="poster-stat-label">CARDS</span>
+                      <span class="poster-stat-value">{{ totalCountLabel }}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div class="poster-info-zone compact">
-                <div class="info-card accent compact">
-                  <div class="info-card-index">02 INDEX</div>
-                  <div class="info-card-value">{{ loadError ? 'INDEX ERROR' : 'PUBLIC BUILD' }}</div>
-                </div>
-                <div class="info-card compact">
-                  <div class="info-card-index">03 SORT</div>
-                  <div class="info-card-value">LATEST MODIFIED FIRST</div>
-                </div>
-              </div>
-            </div>
-          </section>
+            </section>
 
           <section class="controls controls-standalone">
             <label class="search-inline">
@@ -496,12 +530,17 @@
                   class="tag-toggle-mini"
                   :class="{ active: tagsExpanded }"
                   type="button"
-                  @click="toggleTagsExpanded"
+                  @click.stop="toggleTagsExpanded"
                   :aria-label="tagsExpanded ? '收起标签' : '展开标签'"
                 >
                   {{ tagsExpanded ? '−' : '+' }}
                 </button>
-                <div v-if="tagNeedsCollapse && !tagsExpanded" class="tag-fade"></div>
+                <div
+                  v-if="tagNeedsCollapse && !tagsExpanded"
+                  class="tag-fade"
+                  aria-hidden="true"
+                  @click.stop.prevent
+                ></div>
               </div>
             </div>
           </section>
