@@ -1,12 +1,12 @@
-# Scrapling 调查报告
+# Scrapling 调研报告
 
 **调查对象**：D4Vinci/Scrapling  
-**调查时间**：2026-05-30  
-**结论一句话**：Scrapling 是一个完整的 Python Web Scraping 框架，不只是 HTML 选择器库；在这台机器上，**直接安装与核心解析已验证可用**，带 `fetchers` 的完整安装也可用；**容器化是官方支持路径**，但当前本机 Podman 因存储配置冲突无法直接 build，因而“容器化更稳”只在修好容器运行时后成立。
+**调查时间**：2026-05-30 13:06  
+**结论一句话**：Scrapling 是一个完整的 Python Web Scraping 框架，不只是 HTML 选择器库；基础安装与核心解析能力已验证可用，带 `fetchers` 的完整安装也可用；官方提供了容器化路径，但容器运行时如果存在存储配置冲突，构建仍会受阻。
 
 ## 一、核心判断
 
-- Scrapling 的定位不是“单点 parser”，而是 **parser + fetchers + spiders + CLI + MCP** 的一体化抓取框架。
+- Scrapling 的定位不是“单点 parser”，而是 **parser + fetchers + spiders + CLI + MCP** 一体化抓取框架。
 - 官方 README 和 `pyproject.toml` 显示：
   - 基础包只要求 `lxml / cssselect / orjson / tld / w3lib / typing_extensions`
   - `fetchers` extra 才把 Playwright、patchright、browserforge 等浏览器/反爬能力拉进来
@@ -43,14 +43,14 @@
 - MCP：可用 `uvx scrapling mcp` 这类方式运行（`server.json` 也写明了 stdio transport）
 - Docker：仓库内有官方 `Dockerfile`
 
-## 三、本机实测结果
+## 三、验证结果
 
 ### 1) 直接安装：成功
 
-我在本机创建了独立 venv 后实测：
+在独立 Python 环境中实测：
 
-- `pip install -e /home/ccwq/workspace/Scrapling` ✅
-- `pip install -e /home/ccwq/workspace/Scrapling[fetchers]` ✅
+- `pip install -e ./Scrapling` ✅
+- `pip install -e './Scrapling[fetchers]'` ✅
 - `from scrapling import Selector, Fetcher, DynamicFetcher, StealthyFetcher` ✅
 
 ### 2) 解析能力：成功
@@ -61,9 +61,9 @@
 - `.css('.product h2::text').get()` ✅ 返回 `Demo`
 - `.css('.price::text').get()` ✅ 返回 `$9`
 
-这说明核心选择器层在当前机器上可以正常工作，不只是“装上了而已”。
+这说明核心选择器层可以正常工作，不只是“装上了而已”。
 
-### 3) 容器化：概念上支持，但本机当前阻塞
+### 3) 容器化：概念上支持，但构建依赖可用的运行时
 
 官方 `Dockerfile` 路径清晰，流程也完整：
 
@@ -73,52 +73,43 @@
 - `playwright install chromium`
 - 最终入口：`uv run scrapling`
 
-但我在本机用 Podman 实测 `podman build` 时，直接遇到：
-
-- `database static dir "" does not match our static dir ...`
-
-这不是 Scrapling 的问题，而是**本机容器运行时存储配置冲突**。因此当前这台机器上，容器路线是“官方支持，但本机不可直接跑通”。
+但如果容器运行时的存储配置存在冲突，`podman build` / `docker build` 这类步骤仍可能卡住。也就是说，**容器路线是官方支持的，但前提是运行时本身先正常**。
 
 ## 四、直接安装 vs 容器化
 
 ### 直接安装更适合：
 
-- 你主要用的是：
+- 主要用的是：
   - `Selector` / `parser`
   - `Fetcher` / `AsyncFetcher`
   - 轻量 HTTP 抓取
-- 你想要最快开发闭环
-- 你不想先处理容器 runtime、镜像缓存、浏览器层依赖
-- 你要把库嵌入现有 Python 工程
-
-**本机结论**：这台机器上直接安装已经验证通过，所以这是当前最省事的方案。
+- 想要最快开发闭环
+- 不想先处理容器 runtime、镜像缓存、浏览器层依赖
+- 需要把库嵌入现有 Python 工程
 
 ### 容器化更适合：
 
-- 你要跑 `DynamicFetcher` / `StealthyFetcher`
-- 你需要可复现环境
-- 你要把 MCP server、Playwright、Chromium 以及系统依赖一起封装
-- 你想避免本机 Python 环境污染
+- 要跑 `DynamicFetcher` / `StealthyFetcher`
+- 需要可复现环境
+- 要把 MCP server、Playwright、Chromium 以及系统依赖一起封装
+- 想避免本机 Python 环境污染
 
-**但前提**：容器 runtime 必须先正常。当前本机 Podman 有存储配置冲突，所以容器路线需要先修环境。
+**但前提**：容器 runtime 必须可用。只要运行时存储配置冲突没有解决，容器路线就还不能算“开箱即用”。
 
 ## 五、推荐结论
 
 - **只做解析 / 轻量抓取**：直接安装优先。
-- **要浏览器自动化 / 反检测 / MCP 服务化**：容器化更稳，但要先修好 Podman 或换可用的 Docker runtime。
-- **就这台机器现在的状态**：
-  1. 先用直接安装开始开发和验证；
-  2. 需要浏览器栈时再考虑容器；
-  3. 如果你想长期稳定跑动态抓取，建议把容器存储问题修掉后再切到容器。
+- **要浏览器自动化 / 反检测 / MCP 服务化**：容器化更稳，但要先确保容器运行时正常。
+- **落地建议**：先用直接安装完成开发和验证；需要浏览器栈时再切到容器；若要长期稳定跑动态抓取，建议把容器运行时问题修掉后再切换。
 
 ## 六、可复现命令
 
 ```bash
-# 直接安装（已验证）
+# 直接安装（推荐的起步方式）
 python3 -m venv .venv-scrapling-test
 source .venv-scrapling-test/bin/activate
-pip install -e /home/ccwq/workspace/Scrapling
-pip install -e '/home/ccwq/workspace/Scrapling[fetchers]'
+pip install -e ./Scrapling
+pip install -e './Scrapling[fetchers]'
 
 # 最小解析验证
 python - <<'PY'
@@ -129,8 +120,8 @@ print(sel.css('.product h2::text').get())
 print(sel.css('.price::text').get())
 PY
 
-# 容器化（官方支持，但本机当前 podman 有冲突）
-podman build -t scrapling-local /home/ccwq/workspace/Scrapling
+# 容器化（官方支持，但前提是容器运行时可用）
+podman build -t scrapling-local ./Scrapling
 ```
 
 ## 七、证据来源
@@ -141,5 +132,5 @@ podman build -t scrapling-local /home/ccwq/workspace/Scrapling
 - `pyproject.toml`：依赖与 extras
 - `Dockerfile`：官方容器路线
 - `server.json`：MCP server 运行方式
-- 本机 venv 实测：安装、导入、HTML 解析
-- 本机 Podman 实测：容器构建阻塞点
+- 独立环境实测：安装、导入、HTML 解析
+- 容器构建测试：运行时存储冲突会阻塞 build
