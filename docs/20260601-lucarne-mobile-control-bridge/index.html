@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#e60012">
+  <title>Lucarne：本地 AI Agent 的微信/Telegram 移动控制桥</title>
+  <style>
+    :root {
+      --red:#e60012;
+      --black:#0b0b0b;
+      --ink:#111;
+      --muted:#5f6368;
+      --line:#e5e7eb;
+      --soft:#fff7f7;
+      --page:#fff;
+    }
+    * { box-sizing:border-box; }
+    html { font-size: clamp(16px, calc(100vw / 76), 18px); overflow-x:hidden; }
+    body { margin:0; background:linear-gradient(180deg,#fff 0%,#f7f7f7 100%); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Noto Sans SC",sans-serif; overflow-x:hidden; }
+    img { max-width:100%; display:block; }
+    .page { width:min(780px,100vw); margin:0 auto; min-height:100vh; background:var(--page); }
+    .hero { background:var(--black); color:#fff; padding:1.08rem 1rem .96rem; border-bottom:4px solid var(--red); }
+    .eyebrow { display:flex; flex-wrap:wrap; gap:.35rem; align-items:center; margin-bottom:.6rem; font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:#ffbfc4; font-weight:800; }
+    .badge { display:inline-flex; align-items:center; padding:.2rem .45rem; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); border-radius:999px; }
+    .title { margin:0 0 .48rem; font-size:clamp(1.82rem, 5.7vw, 3.08rem); line-height:1.04; letter-spacing:-.04em; font-weight:900; }
+    .subtitle { margin:0; max-width:52rem; color:#d7d7d7; font-size:.96rem; line-height:1.65; }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.45rem; margin-top:.92rem; }
+    .stat { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); padding:.54rem .5rem; min-height:3.2rem; }
+    .stat .k { display:block; font-size:.64rem; letter-spacing:.12em; text-transform:uppercase; color:#ffb3b9; margin-bottom:.12rem; }
+    .stat .v { display:block; font-size:.92rem; line-height:1.14; font-weight:800; color:#fff; word-break:break-word; }
+
+    .section { padding:1rem 1rem 1.08rem; border-bottom:1px solid var(--line); }
+    .section-hd { display:flex; justify-content:space-between; align-items:baseline; gap:.8rem; margin-bottom:.72rem; }
+    .section-title { margin:0; font-size:1rem; font-weight:900; letter-spacing:.02em; }
+    .section-tag { font-size:.7rem; color:var(--red); font-weight:800; letter-spacing:.12em; text-transform:uppercase; white-space:nowrap; }
+    .lead { border:2px solid var(--red); background:var(--soft); padding:.82rem; display:grid; gap:.3rem; }
+    .lead strong { color:var(--red); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; }
+    .lead p { margin:0; font-size:.92rem; line-height:1.62; }
+
+    .img-shell { border:2px solid #111; background:#fff; overflow:hidden; }
+    .img-shell img { width:100%; height:auto; display:block; }
+    .grid-2 { display:grid; grid-template-columns:1.25fr .75fr; gap:.7rem; margin-top:.72rem; }
+    .panel { border:2px solid #111; background:#fff; padding:.72rem; }
+    .panel.red { border-color:var(--red); background:#fffafa; }
+    .panel h3 { margin:0 0 .35rem; font-size:.98rem; line-height:1.16; font-weight:900; }
+    .panel p { margin:0; font-size:.86rem; line-height:1.58; color:#222; }
+
+    .cap-table-wrap { overflow-x:auto; border:2px solid #111; background:#fff; }
+    table.cap-table { width:100%; border-collapse:collapse; min-width:760px; }
+    .cap-table thead th { background:var(--black); color:#fff; font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; padding:.7rem .65rem; border-bottom:3px solid var(--red); text-align:left; }
+    .cap-table tbody td { padding:.72rem .65rem; border-top:1px solid var(--line); vertical-align:top; font-size:.86rem; line-height:1.58; }
+    .cap-table tbody tr:nth-child(odd) td { background:#fffafa; }
+    .cap-table .c1 { color:var(--red); font-weight:900; white-space:nowrap; }
+    .cap-table .muted { color:var(--muted); }
+
+    .mini-grid { display:grid; grid-template-columns:1fr 1fr; gap:.65rem; margin-top:.72rem; }
+    .mini { border:1px solid #d7d7d7; background:#fff; padding:.66rem .68rem .72rem; }
+    .mini b { color:var(--red); }
+    .mini p { margin:.2rem 0 0; font-size:.83rem; line-height:1.55; color:#222; }
+
+    .qr-box { display:grid; gap:.4rem; justify-items:center; align-content:start; text-align:center; }
+    .qr-box img { width:100%; max-width:170px; border:2px solid #111; background:#fff; }
+    .qr-box .cap { font-size:.76rem; line-height:1.45; color:#444; }
+
+    .footer { background:#101010; color:#d6d6d6; padding:.92rem 1rem 1.02rem; font-size:.72rem; line-height:1.6; }
+    .footer b { color:#fff; }
+    .save-btn { position:fixed; right:18px; bottom:18px; z-index:999; border:0; border-radius:8px; padding:.8rem .95rem; background:linear-gradient(135deg,var(--red),#b3000f); color:#fff; font-weight:800; font-size:.82rem; cursor:pointer; box-shadow:0 12px 28px rgba(230,0,18,.28); }
+    .save-btn:disabled { opacity:.72; cursor:progress; }
+
+    @media (max-width:720px) {
+      html { font-size:18px; }
+      .page { width:100%; }
+      .hero,.section,.footer { padding-left:.82rem; padding-right:.82rem; }
+      .stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .grid-2, .mini-grid { grid-template-columns:1fr; }
+      .title { font-size:1.9rem; }
+      .save-btn { right:10px; bottom:10px; font-size:.9rem; }
+      .qr-box img { max-width:140px; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+  <main class="page" id="card">
+    <header class="hero">
+      <div class="eyebrow">
+        <span class="badge">Lucarne</span>
+        <span class="badge">本地 AI Agent</span>
+        <span class="badge">微信 / Telegram</span>
+      </div>
+      <h1 class="title">Lucarne：本地 AI Agent 的微信/Telegram 移动控制桥</h1>
+      <p class="subtitle">Lucarne 不改你的 agent 工程，不加 hooks、skills 或 MCP；它把通知、审批、续接上下文和会话控制，接到手机上的微信 / Telegram 里。</p>
+      <div class="stats">
+        <div class="stat"><span class="k">Channels</span><span class="v">2</span></div>
+        <div class="stat"><span class="k">Agents</span><span class="v">5</span></div>
+        <div class="stat"><span class="k">Journeys</span><span class="v">67/67</span></div>
+        <div class="stat"><span class="k">Intrusion</span><span class="v">0</span></div>
+      </div>
+    </header>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">01 / 核心判断</h2><div class="section-tag">takeaway</div></div>
+      <div class="lead">
+        <strong>一句话结论</strong>
+        <p>Lucarne 不是一个新聊天工具，而是把本地 AI agent 的“盯进度、批命令、接上下文”搬到移动端的事件桥。你依然在本机跑 Claude / Codex / Gemini / Copilot / Pi，只是把关键控制放到微信或 Telegram 里做。</p>
+      </div>
+      <div class="grid-2">
+        <div class="img-shell"><img src="../assets/images/20260601-lucarne-poster.png" alt="Lucarne AI Poster"></div>
+        <div class="panel red">
+          <h3>这张海报在说什么</h3>
+          <p><b>Stop babysitting local AI agents.</b> 这是它的产品主张：不再守着电脑盯 agent，而是通过手机通知、审批和回复来接管关键节点。</p>
+          <p style="margin-top:.55rem;"><b>适合谁：</b>已经在本地跑 agent、但不想一直守着终端的人。</p>
+          <p style="margin-top:.35rem;"><b>不适合谁：</b>想把它当成通用 IM、或想完全替代 agent CLI 的人。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">02 / 能力表格</h2><div class="section-tag">capabilities</div></div>
+      <div class="cap-table-wrap">
+        <table class="cap-table">
+          <thead>
+            <tr>
+              <th>能力</th>
+              <th>它做什么</th>
+              <th>第一步</th>
+              <th>边界</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="c1">通知</td>
+              <td>把完成、卡住、失败、需要介入的关键事件推到手机。</td>
+              <td><code>lucarned init</code></td>
+              <td class="muted">只推关键事件，不是全天候流水账。</td>
+            </tr>
+            <tr>
+              <td class="c1">审批</td>
+              <td>在手机上对命令做 <code>Approve</code> / <code>Deny</code>。</td>
+              <td><code>/panel</code></td>
+              <td class="muted">入口 chat 需要 Topics / thread mode。</td>
+            </tr>
+            <tr>
+              <td class="c1">续接上下文</td>
+              <td>引用通知即可恢复对应的 agent session。</td>
+              <td>直接回复那条通知</td>
+              <td class="muted">依赖 <code>message_id</code> 或引用文本 hash。</td>
+            </tr>
+            <tr>
+              <td class="c1">会话控制</td>
+              <td>查看状态、打断、分支会话，继续在原上下文里工作。</td>
+              <td><code>/status</code> / <code>/interrupt</code> / <code>/fork</code></td>
+              <td class="muted">一个 topic 对应一个 live session。</td>
+            </tr>
+            <tr>
+              <td class="c1">双通道接入</td>
+              <td>同时面向 Telegram 和 WeChat，保留你已有的通讯习惯。</td>
+              <td>先选一个入口开始</td>
+              <td class="muted">更多渠道在 roadmap 里，不是当前主线。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mini-grid">
+        <div class="mini">
+          <b>Agent 兼容矩阵摘要</b>
+          <p>Claude / Codex / Gemini / Copilot / Pi 都可接入；其中 Claude、Codex、Gemini 的结构化审批和 Resume 支持更完整，Copilot 偏轻量，Pi 偏基础但可用。</p>
+        </div>
+        <div class="mini">
+          <b>关键判断</b>
+          <p>Lucarne 的价值不在“多一个 UI”，而在把 agent 工作流里的关键动作变成可移动、可审批、可续接的事件流。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">03 / 入口与证据</h2><div class="section-tag">onboarding</div></div>
+      <div class="grid-2">
+        <div class="panel">
+          <h3>使用顺序</h3>
+          <p>1. 安装 <code>lucarned</code>；2. 跑 <code>lucarned init</code> 配好 agent 和入口 chat；3. 执行 <code>lucarned autostart install --start</code>；4. 在 Telegram / WeChat 中打开面板并接收通知。</p>
+          <p style="margin-top:.55rem;">最先试的不是新命令，而是先让“通知 → 审批 → 续接”这一条链跑通。</p>
+        </div>
+        <div class="qr-box">
+          <img src="../assets/images/20260601-lucarne-qr.png" alt="Lucarne GitHub QR code">
+          <div class="cap">仓库里原本就提供了二维码入口。  
+          如果要快速给别人演示，二维码比长链接更适合传播。</div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <b>Source</b>: tuchg/Lucarne · README.cn.md / README.md · mobile control bridge for local AI agents.<br>
+      <b>Note</b>: 这页把“通知、审批、续接上下文、会话控制”收敛成一张可读的能力卡，适合直接发给想把本地 agent 变成手机可控事件流的人。
+    </footer>
+  </main>
+
+  <button class="save-btn" id="saveBtn">保存 PNG</button>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js', { scope: '/infocard-pub/' }).catch(() => {});
+    }
+
+    async function savePNG() {
+      const btn = document.getElementById('saveBtn');
+      const card = document.getElementById('card');
+      if (!window.html2canvas) { alert('导出组件未加载'); return; }
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.textContent = '导出中…';
+      try {
+        const canvas = await html2canvas(card, {
+          backgroundColor: '#ffffff',
+          scale: Math.max(2, window.devicePixelRatio || 2),
+          useCORS: true,
+          allowTaint: true,
+          scrollX: 0,
+          scrollY: -window.scrollY,
+          windowWidth: card.scrollWidth,
+          windowHeight: card.scrollHeight
+        });
+        const link = document.createElement('a');
+        link.download = '20260601-lucarne-mobile-control-bridge.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (e) {
+        console.error(e);
+        alert('PNG 导出失败');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    }
+    document.getElementById('saveBtn').addEventListener('click', savePNG);
+  </script>
+</body>
+</html>
