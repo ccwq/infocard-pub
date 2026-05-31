@@ -73,7 +73,7 @@ python scripts/verify_index.py
 - `path`
 - `category`
 - `title`
-- `date`
+- `date`：支持 `YYYY-MM-DD`，也支持 `YYYY-MM-DD HH:MM:SS`
 - `tags`
 
 常见可选字段还包括：
@@ -85,9 +85,11 @@ python scripts/verify_index.py
 `rebuild_index.py` 会把元数据复制进索引项，并额外补充：
 
 - `_sort_ts`：由 HTML 文件和对应 `.meta.yaml` 的最新 mtime 推导
-- `_modified_date`：由 `_sort_ts` 格式化出的日期
+- `_modified_date`：由 `_sort_ts` 格式化出的 UTC 日期时间字符串，格式 `YYYY-MM-DD HH:MM:SS`
 
 首页 `index.html` 依赖这些衍生字段做“按修改时间倒序”的展示逻辑，因此如果你改了索引生成规则，也要同步考虑首页时间显示行为。
+
+如果 `date` 带有时分秒，首页会按原始精度展示到秒，不会再强制截断成日期。
 
 ### Homepage behavior
 

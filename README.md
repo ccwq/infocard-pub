@@ -16,11 +16,13 @@
 slug: 20260524-hermes-basics
 category: docs
 title: Hermes Agent 基本概念
-date: "2026-05-24"
+date: "2026-05-24 23:15:29"
 tags:
   - hermes
   - basics
 ```
+
+`date` 支持 `YYYY-MM-DD`，也支持 `YYYY-MM-DD HH:MM:SS`，建议继续用引号包起来，避免 YAML 把时间误解析成别的类型。
 
 ## 索引
 
