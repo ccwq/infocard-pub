@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>从同步 Agent 到异步 Agent 的演进</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; word-break: break-word; }
+:root {
+  --black: #1a1a1a;
+  --white: #f5f3ee;
+  --red: #c0392b;
+  --red-light: #e74c3c;
+  --gray: #8a8a8a;
+  --gray-light: #b0b0b0;
+  --bg: #f5f3ee;
+  --text: #1a1a1a;
+  --text-secondary: #555;
+  --border: #d0c8b8;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+  background: var(--white);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0;
+  background: var(--white);
+  min-height: 100vh;
+}
+
+/* Banner */
+.banner {
+  background: var(--black);
+  padding: 1.2rem 1.5rem;
+  color: var(--white);
+}
+.banner-label {
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--red-light);
+  margin-bottom: .25rem;
+}
+.banner-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: .4rem;
+}
+.banner-sub {
+  font-size: .9rem;
+  color: var(--gray-light);
+}
+.banner-meta {
+  font-size: .75rem;
+  color: var(--gray);
+  margin-top: .5rem;
+  display: flex;
+  gap: .8rem;
+  flex-wrap: wrap;
+}
+
+/* Stats strip */
+.stats {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--red);
+  background: var(--black);
+  color: var(--white);
+}
+.stat {
+  flex: 1;
+  text-align: center;
+  padding: .6rem .3rem;
+  border-right: 1px solid #333;
+}
+.stat:last-child { border-right: none; }
+.stat-num {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--red-light);
+}
+.stat-label {
+  font-size: .65rem;
+  color: var(--gray-light);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Hero image */
+.hero-image {
+  width: 100%;
+  display: block;
+  border-bottom: 3px solid var(--red);
+}
+.hero-image img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Content section */
+.content {
+  padding: 1rem 1.2rem 2rem;
+}
+
+/* Warning */
+.warning {
+  background: #fff3cd;
+  border-left: 4px solid #e67e22;
+  padding: .6rem .8rem;
+  font-size: .82rem;
+  margin-bottom: 1rem;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Section */
+.section {
+  margin-bottom: 1.2rem;
+}
+.section-number {
+  display: inline-block;
+  background: var(--red);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .1rem .4rem;
+  border-radius: 2px;
+  margin-bottom: .4rem;
+  letter-spacing: .05em;
+}
+.section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: .4rem;
+  color: var(--black);
+}
+.section p {
+  font-size: .85rem;
+  color: var(--text-secondary);
+  margin-bottom: .35rem;
+}
+.section ul, .section ol {
+  padding-left: 1.2rem;
+  margin-bottom: .4rem;
+}
+.section li {
+  font-size: .83rem;
+  color: var(--text-secondary);
+  margin-bottom: .15rem;
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 1rem 0;
+}
+
+/* Link card */
+.link-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: .7rem .8rem;
+  margin-bottom: .5rem;
+  transition: border-color .15s;
+}
+.link-card:hover {
+  border-color: var(--red-light);
+}
+.link-card .link-name {
+  font-weight: 600;
+  font-size: .85rem;
+  color: var(--black);
+  margin-bottom: .15rem;
+}
+.link-card .link-name a {
+  color: var(--red);
+  text-decoration: none;
+}
+.link-card .link-name a:hover {
+  text-decoration: underline;
+}
+.link-card .link-url {
+  font-size: .72rem;
+  color: var(--gray);
+  word-break: break-all;
+  font-family: "SF Mono", "Cascadia Code", monospace;
+}
+.link-card .link-desc {
+  font-size: .78rem;
+  color: var(--text-secondary);
+  margin-top: .15rem;
+}
+
+/* Quote */
+.quote-block {
+  background: #f0ece4;
+  border-left: 3px solid var(--red);
+  padding: .6rem .8rem;
+  margin: .6rem 0;
+  font-size: .85rem;
+  font-style: italic;
+  color: var(--text);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Milestone flow */
+.flow-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin: .5rem 0;
+}
+.flow-item {
+  background: var(--black);
+  color: var(--white);
+  font-size: .7rem;
+  padding: .2rem .5rem;
+  border-radius: 2px;
+  letter-spacing: .02em;
+}
+.flow-arrow {
+  color: var(--red);
+  font-weight: 700;
+  font-size: .8rem;
+  padding: 0 .1rem;
+}
+
+/* Footer */
+.footer {
+  background: var(--black);
+  color: var(--gray-light);
+  padding: .8rem 1.2rem;
+  font-size: .7rem;
+  text-align: center;
+}
+.footer a {
+  color: var(--red-light);
+  text-decoration: none;
+}
+
+/* Save button */
+.save-btn {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: .8rem;
+  font-family: "SF Mono", "Cascadia Code", monospace;
+  cursor: pointer;
+  z-index: 999;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  transition: transform .15s;
+}
+.save-btn:hover { transform: scale(1.05); }
+.save-btn:active { transform: scale(.95); }
+
+/* Responsive */
+@media (min-width: 760px) {
+  .banner { padding: 1.5rem 2.8rem; }
+  .banner-title { font-size: 2rem; }
+  .content { padding: 1.5rem 2.8rem 3rem; }
+  .footer { padding: 1rem 2.8rem; }
+}
+
+@media (max-width: 400px) {
+  .page { padding: 0 0 4.8rem; }
+  .banner { padding: .85rem .7rem; }
+  .banner-title { font-size: 1.3rem; }
+  .content { padding: .8rem .7rem 1.5rem; }
+  .stat { padding: .4rem .15rem; }
+  .stat-num { font-size: .95rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="page" id="card">
+  <!-- Banner -->
+  <div class="banner">
+    <div class="banner-label">Async Agent · 架构演进</div>
+    <div class="banner-title">从同步 Agent 到异步 Agent 的演进</div>
+    <div class="banner-sub">Async Agent 是 Agent 从 chat interface 进入 software production runtime 的过渡形态</div>
+    <div class="banner-meta">
+      <span>✍️ 烟花老师 @teach_fireworks</span>
+      <span>📅 2026-05-31</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num">2,718</div>
+      <div class="stat-label">Views</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">12</div>
+      <div class="stat-label">Reposts</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">54</div>
+      <div class="stat-label">Likes</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">12</div>
+      <div class="stat-label">Replies</div>
+    </div>
+  </div>
+
+  <!-- Hero Image -->
+  <div class="hero-image">
+    <img src="../assets/images/async-agent-architecture.jpg" alt="Async Agent Runtime 架构图">
+  </div>
+
+  <!-- Warning -->
+  <div class="content">
+    <div class="warning">
+      <strong>⚡ 核心洞察：</strong>模型能力提升后，单步生成的边际差距会缩小。真正拉开差距的地方，会转到 runtime engineering，而不是 prompt engineering。
+    </div>
+
+    <!-- Section 1: Core thesis -->
+    <div class="section">
+      <div class="section-number">01</div>
+      <div class="section-title">分水岭在哪</div>
+      <p>Async Agent 和普通 Agent 的分水岭，不在"会不会调用工具"，而在它能不能离开当前对话窗口，<strong>持续接任务、保留状态、跑验证、回到 review，再把结果交还给人</strong>。</p>
+    </div>
+
+    <!-- Section 2: Evolution -->
+    <div class="section">
+      <div class="section-number">02</div>
+      <div class="section-title">演进路径</div>
+      <ul>
+        <li><strong>早期 Copilot — 同步补全：</strong>人写主线，模型补局部</li>
+        <li><strong>Tool Agent — 单次调用：</strong>能查资料、跑命令、调 API，但多数还停在一个 turn 或一个 session 内</li>
+        <li><strong>Coding Agent — 任务闭环：</strong>进入 repo、改文件、跑测试、提 PR</li>
+        <li><strong>Async Agent — 生命周期：</strong>处理"任务在接下来几十分钟、几小时甚至几天里怎么被托管"</li>
+      </ul>
+    </div>
+
+    <!-- Section 3: Task Timeline -->
+    <div class="section">
+      <div class="section-number">03</div>
+      <div class="section-title">Async Agent 的完整工作流</div>
+      <div class="flow-strip">
+        <span class="flow-item">Context</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-item">Plan</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-item">Tool Use</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-item">Code</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-item">Test</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-item">Review</span>
+      </div>
+      <p style="margin-top:.4rem;">Task Timeline：<strong>Spec → Triage → PR → Review → Merge</strong>。Async Agent 面向的是软件生命周期，不是单次代码生成。</p>
+    </div>
+
+    <!-- Section 4: Key Architecture Components -->
+    <div class="section">
+      <div class="section-number">04</div>
+      <div class="section-title">核心架构组件</div>
+      <ul>
+        <li><strong>Orchestrator / Scheduler：</strong>什么时候启动 worker，什么时候暂停、重试、交还结果。多 agent 跑久后，坏掉的经常不是 reasoning，而是 registry、stream state、conversation state</li>
+        <li><strong>Brain / Hands / Session 分离：</strong>Anthropic 提出的底层结构框架</li>
+        <li><strong>Knowledge：</strong>解决进入项目时的局部先验</li>
+        <li><strong>Playbooks：</strong>把团队反复出现的操作沉淀成执行策略</li>
+        <li><strong>Checkpoint：</strong>让长任务可以恢复，而不是靠模型"记得"</li>
+        <li><strong>Scoped Secrets：</strong>决定 agent 能碰什么资源</li>
+        <li><strong>VM Sandbox：</strong>可隔离、可销毁、可复现的执行环境</li>
+      </ul>
+    </div>
+
+    <!-- Section 5: Observability -->
+    <div class="section">
+      <div class="section-number">05</div>
+      <div class="section-title">可观测性：失败常因中间状态写歪</div>
+      <p>Async Agent 越长，越需要把"它做过什么"变成可回放证据。很多失败不是最后一步错了，而是中间某个状态写歪了，后面所有步骤都在错误轨道上继续推进。</p>
+      <p>方向：<strong>event-sourced agent runtime</strong> — 如果 log 成为 runtime 的状态来源，replay、fork、diff、lineage 才有机会变成原生能力。</p>
+    </div>
+
+    <!-- Section 6: Key Engineering Challenges -->
+    <div class="section">
+      <div class="section-number">06</div>
+      <div class="section-title">工程挑战清单</div>
+      <ul>
+        <li>长任务怎么保持 session continuity</li>
+        <li>memory 怎么写入、修订、遗忘，而不是无限堆积</li>
+        <li>harness 怎么把目标拆成可验证 trajectory</li>
+        <li>trace 怎么服务训练、回放和质量控制</li>
+        <li>review 怎么从人工兜底，变成 agent workflow 的一环</li>
+        <li>permission boundary 怎么防止 agent 把"能做"误解成"该做"</li>
+      </ul>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Quotes -->
+    <div class="quote-block">
+      "普通 Agent 解决的是一次交互里的智能。Async Agent 解决的是一段执行周期里的状态、验证、权限、回放和交付。"
+    </div>
+    <div class="quote-block">
+      "AI Coding 真正进入工程现场以后，竞争会越来越像 runtime engineering，而不是 prompt engineering。"
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Link Section -->
+    <div class="section">
+      <div class="section-number">📎</div>
+      <div class="section-title">原文引用链接</div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://openai.com/index/introducing-codex/" target="_blank">Introducing Codex</a></div>
+        <div class="link-url">https://openai.com/index/introducing-codex/</div>
+        <div class="link-desc">OpenAI Codex 官方介绍 — 云端隔离环境的典型形态</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://anthropic.com/engineering/effective-harnesses-for-long-running-agents" target="_blank">Effective harnesses for long-running agents</a></div>
+        <div class="link-url">https://anthropic.com/engineering/effective-harnesses-for-long-running-agents</div>
+        <div class="link-desc">Anthropic 关于长任务 agent 的 harness 机制，解决跨阶段推进问题</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://github.com/openai/codex/issues/24475" target="_blank">subagent tasks trigger reconnect loop and stream disconnect</a></div>
+        <div class="link-url">https://github.com/openai/codex/issues/24475</div>
+        <div class="link-desc">OpenAI Codex issue — 多 agent 场景下 registry、stream state 等 control plane 问题的真实工程病例</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://anthropic.com/engineering/managed-agents" target="_blank">Scaling Managed Agents</a></div>
+        <div class="link-url">https://anthropic.com/engineering/managed-agents</div>
+        <div class="link-desc">Anthropic 关于 brain / hands / session 分离的底层结构框架</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://docs.devin.ai/onboard-devin/knowledge-onboarding" target="_blank">Knowledge — Devin Docs</a></div>
+        <div class="link-url">https://docs.devin.ai/onboard-devin/knowledge-onboarding</div>
+        <div class="link-desc">Devin 的 Knowledge 设计，解决 agent 进入项目时的局部先验</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://docs.devin.ai/product-guides/creating-playbooks" target="_blank">Playbooks — Devin Docs</a></div>
+        <div class="link-url">https://docs.devin.ai/product-guides/creating-playbooks</div>
+        <div class="link-desc">Devin 的 Playbooks 设计，把团队反复操作沉淀为执行策略</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://docs.devin.ai/work-with-devin/devin-review" target="_blank">Review — Devin Docs</a></div>
+        <div class="link-url">https://docs.devin.ai/work-with-devin/devin-review</div>
+        <div class="link-desc">Devin Review 设计 — 人工兜底如何成为 agent workflow 的一环</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://arxiv.org/abs/2605.21997" target="_blank">The Log is the Agent</a></div>
+        <div class="link-url">https://arxiv.org/abs/2605.21997</div>
+        <div class="link-desc">Event-sourced agent runtime — log 作为 runtime 状态来源，原生支持 replay、fork、diff、lineage</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://arxiv.org/abs/2605.26252" target="_blank">Is Agent Memory a Database?</a></div>
+        <div class="link-url">https://arxiv.org/abs/2605.26252</div>
+        <div class="link-desc">Agent memory 设计：写入、修订、遗忘，而不是无限堆积</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name"><a href="https://arxiv.org/abs/2605.21516" target="_blank">Harnesses for Inference-Time Alignment over Execution Trajectories</a></div>
+        <div class="link-url">https://arxiv.org/abs/2605.21516</div>
+        <div class="link-desc">Harness 如何把目标拆成可验证 execution trajectory</div>
+      </div>
+
+      <div class="link-card">
+        <div class="link-name">Polar: Agentic RL on Any Harness at Scale</div>
+        <div class="link-url">（推文中链接未完整显示）</div>
+        <div class="link-desc">关于 trace 如何服务训练、回放和质量控制</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>来源：<a href="https://x.com/teach_fireworks/status/2060931350610485562" target="_blank">烟花老师 @teach_fireworks</a> 于 X · 2026-05-31</p>
+    <p style="margin-top:.2rem;opacity:.6">信息卡由 Hermes Agent 生成 · 内容忠实原文</p>
+  </div>
+</div>
+
+<button class="save-btn" onclick="savePNG()">💾 保存 PNG</button>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+async function savePNG() {
+  const btn = document.querySelector('.save-btn');
+  btn.style.display = 'none';
+  try {
+    const canvas = await html2canvas(document.getElementById('card'), {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#f5f3ee',
+      logging: false
+    });
+    const link = document.createElement('a');
+    link.download = 'async-agent-evolution.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('保存失败: ' + e.message);
+  } finally {
+    btn.style.display = '';
+  }
+}
+</script>
+
+</body>
+</html>
