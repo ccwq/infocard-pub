@@ -61,6 +61,12 @@
     return `${formatDate(d)} ${formatClock(d)}`;
   };
 
+  const formatDateMinute = (dateValue) => {
+    const d = dateValue instanceof Date ? dateValue : parseLooseDate(dateValue);
+    if (!d) return '鈥?';
+    return `${formatDate(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  };
+
   const pickFirstDate = (...values) => {
     for (const value of values) {
       const d = parseLooseDate(value);
@@ -90,6 +96,8 @@
       date: formatDate(effective),
       clock: formatClock(effective),
       full: formatDateTime(effective),
+      minuteFull: formatDateMinute(effective),
+      minuteClock: `${pad2(effective.getHours())}:${pad2(effective.getMinutes())}`,
       ts: normalizedSortTs,
       rawTs: fallbackTs
     };
@@ -555,29 +563,33 @@
           <section v-else-if="!shownCount" class="empty-state">无匹配结果</section>
           <section v-else class="cards premium-cards">
             <article v-for="card in visibleCards" :key="card.slug || card.__order" class="card-row premium-row">
+              <div class="card-timeline" aria-hidden="true">
+                <span class="timeline-line"></span>
+                <span class="timeline-node"></span>
+              </div>
+
               <div class="card-rail">
-                <div class="rail-top">
+                <a class="rail-number-block" :href="card.__href" :aria-label="card.__title">
                   <span class="rail-serial">{{ serialOf(card) }}</span>
-                  <span class="rail-glyph">{{ card.__glyph }}</span>
-                </div>
-                <div class="rail-middle">
-                  <span class="rail-kind">{{ card.__kind }}</span>
-                  <span class="rail-state">{{ card.__time.label }}</span>
-                </div>
-                <div class="rail-bottom">
-                  <span class="rail-line"></span>
-                  <span class="rail-tail">↗</span>
+                  <span class="rail-category">{{ card.__category }}</span>
+                  <span class="rail-time">{{ card.__time.minuteFull }}</span>
+                  <span class="rail-time-stack">
+                    <span class="rail-date">{{ card.__time.date }}</span>
+                    <span class="rail-clock">{{ card.__time.minuteClock }}</span>
+                  </span>
+                </a>
+                <div class="rail-file-mark" aria-hidden="true">
+                  <span class="rail-file-icon">{{ card.__glyph }}</span>
                 </div>
               </div>
+
               <div class="card-body premium-body">
-                <div class="entry-topline">
-                  <span class="entry-time">{{ card.__time.full }}</span>
-                  <span class="entry-cat">{{ card.__category }}</span>
-                </div>
-                <h2><a :href="card.__href">{{ card.__title }}</a></h2>
-                <div v-if="card.__desc" class="desc">{{ card.__desc }}</div>
-                <div class="card-meta premium-meta">
-                  <span v-for="tag in card.__tags" :key="tag" class="tag-chip">{{ tag }}</span>
+                <div class="entry-copy">
+                  <h2><a :href="card.__href">{{ card.__title }}</a></h2>
+                  <div v-if="card.__desc" class="desc">{{ card.__desc }}</div>
+                  <div class="card-meta premium-meta">
+                    <span v-for="tag in card.__tags" :key="tag" class="tag-chip">{{ tag }}</span>
+                  </div>
                 </div>
               </div>
             </article>
