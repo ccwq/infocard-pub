@@ -2,6 +2,25 @@
   const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
   const BATCH_SIZE = 12;
+  const SESSION_KEY = 'infocard_archive_state';
+
+  const loadPersistedState = () => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  };
+
+  const persistState = (state) => {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+    } catch {}
+  };
+
+  const clearPersistedState = () => {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+  };
   const INTERSECTION_ROOT_MARGIN = '0px 0px 480px 0px';
   const COLLAPSED_FULL_ROWS = 3;
   const COLLAPSED_EXTRA_PX = 24;
@@ -144,6 +163,7 @@
       const selectedTags = ref([]);
       const tagsExpanded = ref(false);
       const visibleCount = ref(BATCH_SIZE);
+      const scrollTop = ref(0);
       const isAutoLoading = ref(false);
       const sentinelRef = ref(null);
       const tagViewportRef = ref(null);
@@ -375,12 +395,40 @@
         });
       };
 
+      // Restore persisted session state (scroll, filters, visibleCount)
+      const restoreSessionState = () => {
+        const saved = loadPersistedState();
+        if (!saved) return;
+        if (typeof saved.visibleCount === 'number') visibleCount.value = saved.visibleCount;
+        if (Array.isArray(saved.selectedTags)) selectedTags.value = saved.selectedTags;
+        if (saved.tagsExpanded === true) tagsExpanded.value = true;
+        if (typeof saved.searchQuery === 'string') searchQuery.value = saved.searchQuery;
+        if (typeof saved.scrollTop === 'number') scrollTop.value = saved.scrollTop;
+      };
+
+      // Persist state to sessionStorage on key interactions
+      const saveSessionState = () => {
+        persistState({
+          visibleCount: visibleCount.value,
+          selectedTags: selectedTags.value.slice(),
+          tagsExpanded: tagsExpanded.value,
+          searchQuery: searchQuery.value,
+          scrollTop: scrollTop.value
+        });
+      };
+
+      const onScroll = () => {
+        scrollTop.value = window.scrollY || document.documentElement.scrollTop;
+      };
+
       onMounted(async () => {
         document.body.classList.add('is-loading-index');
         window.addEventListener('resize', onResize);
+        window.addEventListener('scroll', onScroll, { passive: true });
         await fetchVersion();
         try {
           await fetchIndex();
+          restoreSessionState(); // restore filters + visibleCount from sessionStorage
           resetVisibleCount();
         } catch (error) {
           console.error(error);
@@ -391,15 +439,22 @@
         }
         await nextTick();
         measureTagCollapse();
+        // Restore scroll AFTER DOM + visibleCards are ready
+        const savedScroll = scrollTop.value;
+        if (savedScroll > 0) {
+          window.scrollTo(0, savedScroll);
+        }
         ensureAutoFill();
         setupObserver();
       });
 
-      Vue.watch([filteredCards, tagsExpanded, selectedTags], async () => {
+      // Watch state changes and persist
+      Vue.watch([filteredCards, tagsExpanded, selectedTags, searchQuery, visibleCount], async () => {
         await nextTick();
         measureTagCollapse();
         ensureAutoFill();
         setupObserver();
+        saveSessionState();
       }, { deep: true });
 
       const renderTagLabel = (tag) => `${tag.tag} (${tag.count})`;
