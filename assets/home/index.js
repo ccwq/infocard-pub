@@ -18,9 +18,15 @@
     } catch {}
   };
 
-  const clearPersistedState = () => {
-    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+  const getNavigationType = () => {
+    const nav = performance.getEntriesByType?.('navigation')?.[0];
+    return nav?.type || 'navigate';
   };
+
+  const shouldRestoreFromHistory = () => getNavigationType() === 'back_forward';
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
   const INTERSECTION_ROOT_MARGIN = '0px 0px 480px 0px';
   const COLLAPSED_FULL_ROWS = 3;
   const COLLAPSED_EXTRA_PX = 24;
@@ -395,15 +401,18 @@
         });
       };
 
-      // Restore persisted session state (scroll, filters, visibleCount)
+      // Restore persisted session state only when returning via browser Back/Forward.
+      // A normal refresh must start from the top instead of replaying an old scroll offset.
       const restoreSessionState = () => {
+        if (!shouldRestoreFromHistory()) return false;
         const saved = loadPersistedState();
-        if (!saved) return;
+        if (!saved) return false;
         if (typeof saved.visibleCount === 'number') visibleCount.value = saved.visibleCount;
         if (Array.isArray(saved.selectedTags)) selectedTags.value = saved.selectedTags;
         if (saved.tagsExpanded === true) tagsExpanded.value = true;
         if (typeof saved.searchQuery === 'string') searchQuery.value = saved.searchQuery;
         if (typeof saved.scrollTop === 'number') scrollTop.value = saved.scrollTop;
+        return true;
       };
 
       // Persist state to sessionStorage on key interactions
@@ -421,15 +430,26 @@
         scrollTop.value = window.scrollY || document.documentElement.scrollTop;
       };
 
+      const persistLatestScrollState = () => {
+        onScroll();
+        saveSessionState();
+      };
+
       onMounted(async () => {
+        let restoredFromHistory = false;
         document.body.classList.add('is-loading-index');
         window.addEventListener('resize', onResize);
         window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('pagehide', persistLatestScrollState);
+        window.addEventListener('beforeunload', persistLatestScrollState);
         await fetchVersion();
         try {
           await fetchIndex();
-          restoreSessionState(); // restore filters + visibleCount from sessionStorage
-          resetVisibleCount();
+          restoredFromHistory = restoreSessionState(); // restore only for browser Back/Forward
+          if (!restoredFromHistory) {
+            resetVisibleCount();
+            scrollTop.value = 0;
+          }
         } catch (error) {
           console.error(error);
           loadError.value = '加载索引失败，请稍后刷新';
@@ -439,10 +459,12 @@
         }
         await nextTick();
         measureTagCollapse();
-        // Restore scroll AFTER DOM + visibleCards are ready
-        const savedScroll = scrollTop.value;
+        // Restore scroll AFTER DOM + visibleCards are ready, only for browser Back/Forward.
+        const savedScroll = restoredFromHistory ? scrollTop.value : 0;
         if (savedScroll > 0) {
-          window.scrollTo(0, savedScroll);
+          requestAnimationFrame(() => window.scrollTo(0, savedScroll));
+        } else {
+          window.scrollTo(0, 0);
         }
         ensureAutoFill();
         setupObserver();
