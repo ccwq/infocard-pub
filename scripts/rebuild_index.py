@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import re
 from pathlib import Path
 
@@ -10,6 +10,7 @@ DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATETIME_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$"
 )
+SHANGHAI_TZ = timezone(timedelta(hours=8))
 
 
 def file_mtime_ns(path: str) -> int:
@@ -29,14 +30,14 @@ def fmt_date(ts_ns: int) -> str:
         return ""
     return datetime.fromtimestamp(
         ts_ns / 1_000_000_000, tz=timezone.utc
-    ).strftime("%Y-%m-%d %H:%M:%S")
+    ).astimezone(SHANGHAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def normalize_date_value(value):
     if isinstance(value, datetime):
         if value.tzinfo is None:
             return value.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
-        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        return value.astimezone(SHANGHAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     if isinstance(value, date):
         return value.strftime("%Y-%m-%d")
     if isinstance(value, str):
@@ -48,7 +49,7 @@ def normalize_date_value(value):
             dt = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
             if dt.tzinfo is None:
                 return dt.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
-            return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            return dt.astimezone(SHANGHAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
         return raw
     return value
 
