@@ -402,22 +402,27 @@
       };
 
       // Restore persisted session state only when returning via browser Back/Forward.
-      // A normal refresh must start from the top instead of replaying an old scroll offset.
+      // A normal refresh must fetch a fresh index and start from the top.
       const restoreSessionState = () => {
         if (!shouldRestoreFromHistory()) return false;
         const saved = loadPersistedState();
         if (!saved) return false;
+        if (Array.isArray(saved.cards)) allCards.value = saved.cards;
+        if (typeof saved.version === 'string') version.value = saved.version;
         if (typeof saved.visibleCount === 'number') visibleCount.value = saved.visibleCount;
         if (Array.isArray(saved.selectedTags)) selectedTags.value = saved.selectedTags;
         if (saved.tagsExpanded === true) tagsExpanded.value = true;
         if (typeof saved.searchQuery === 'string') searchQuery.value = saved.searchQuery;
         if (typeof saved.scrollTop === 'number') scrollTop.value = saved.scrollTop;
-        return true;
+        return Array.isArray(saved.cards) && saved.cards.length > 0;
       };
 
       // Persist state to sessionStorage on key interactions
       const saveSessionState = () => {
         persistState({
+          cards: allCards.value,
+          version: version.value,
+          savedAt: Date.now(),
           visibleCount: visibleCount.value,
           selectedTags: selectedTags.value.slice(),
           tagsExpanded: tagsExpanded.value,
@@ -442,13 +447,14 @@
         window.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('pagehide', persistLatestScrollState);
         window.addEventListener('beforeunload', persistLatestScrollState);
-        await fetchVersion();
         try {
-          await fetchIndex();
-          restoredFromHistory = restoreSessionState(); // restore only for browser Back/Forward
+          restoredFromHistory = restoreSessionState(); // Back/Forward: render from sessionStorage, no network index fetch
           if (!restoredFromHistory) {
+            await fetchVersion();
+            await fetchIndex();
             resetVisibleCount();
             scrollTop.value = 0;
+            saveSessionState();
           }
         } catch (error) {
           console.error(error);
@@ -471,7 +477,7 @@
       });
 
       // Watch state changes and persist
-      Vue.watch([filteredCards, tagsExpanded, selectedTags, searchQuery, visibleCount], async () => {
+      Vue.watch([allCards, version, filteredCards, tagsExpanded, selectedTags, searchQuery, visibleCount], async () => {
         await nextTick();
         measureTagCollapse();
         ensureAutoFill();
