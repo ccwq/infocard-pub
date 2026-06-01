@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#e60012">
+  <meta name="description" content="Claude Code Prompt Improver：把澄清、路由和输出规范前置到 hook 层，提升首轮输出质量，减少返工。">
+  <title>Claude Code Prompt Improver：不是改写 prompt，而是把上下文注入到触发点</title>
+  <style>
+    :root {
+      --red:#e60012;
+      --black:#0a0a0a;
+      --ink:#111;
+      --muted:#5a6068;
+      --line:#e6e6e6;
+      --soft:#fff8f8;
+      --bg:#ffffff;
+    }
+    * { box-sizing:border-box; }
+    html { font-size:clamp(16px, calc(100vw / 76), 18px); overflow-x:hidden; }
+    body {
+      margin:0;
+      overflow-x:hidden;
+      background:linear-gradient(180deg,#fff 0%,#f6f6f6 100%);
+      color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Noto Sans SC',sans-serif;
+    }
+    a { color:var(--red); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    code, pre { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    img { max-width:100%; display:block; }
+    .page { width:min(780px,100vw); margin:0 auto; min-height:100vh; background:var(--bg); }
+    .hero { background:var(--black); color:#fff; padding:1rem 1rem .96rem; border-bottom:4px solid var(--red); }
+    .eyebrow { display:flex; flex-wrap:wrap; gap:.35rem; align-items:center; margin-bottom:.58rem; font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:#ffccd2; font-weight:800; }
+    .badge { display:inline-flex; align-items:center; padding:.2rem .45rem; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); border-radius:999px; }
+    .title { margin:0 0 .42rem; font-size:clamp(1.92rem, 6vw, 3.18rem); line-height:1.05; letter-spacing:-.04em; font-weight:900; }
+    .subtitle { margin:0; max-width:52rem; color:#d8d8d8; font-size:.96rem; line-height:1.68; }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.45rem; margin-top:.92rem; }
+    .stat { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); padding:.52rem .5rem; min-height:3.35rem; }
+    .k { display:block; font-size:.64rem; letter-spacing:.12em; text-transform:uppercase; color:#ffb9c1; margin-bottom:.12rem; }
+    .v { display:block; font-size:.92rem; line-height:1.16; font-weight:800; color:#fff; word-break:break-word; }
+    .section { padding:1rem 1rem 1.08rem; border-bottom:1px solid var(--line); }
+    .section-hd { display:flex; justify-content:space-between; align-items:baseline; gap:.8rem; margin-bottom:.72rem; }
+    .section-title { margin:0; font-size:1rem; font-weight:900; letter-spacing:.02em; }
+    .section-tag { font-size:.7rem; color:var(--red); font-weight:800; letter-spacing:.12em; text-transform:uppercase; white-space:nowrap; }
+    .lead { border:2px solid var(--red); background:var(--soft); padding:.84rem .84rem .88rem; display:grid; gap:.35rem; }
+    .lead strong { color:var(--red); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; }
+    .lead p { margin:0; font-size:.94rem; line-height:1.7; }
+    .grid-2 { display:grid; grid-template-columns:1.05fr .95fr; gap:.72rem; margin-top:.75rem; }
+    .panel { border:2px solid #111; background:#fff; padding:.72rem; }
+    .panel.red { border-color:var(--red); background:#fffafa; }
+    .panel h3 { margin:0 0 .42rem; font-size:.98rem; line-height:1.18; font-weight:900; }
+    .panel p { margin:0; font-size:.88rem; line-height:1.58; color:#222; }
+    .bullets, .steps { margin:.1rem 0 0; padding-left:1.15rem; }
+    .bullets li, .steps li { margin:.35rem 0; font-size:.9rem; line-height:1.66; color:#1b1b1b; }
+    .bullets li strong, .steps li strong { font-weight:900; }
+    .summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; margin-top:.72rem; }
+    .summary { border:1px solid #d7d7d7; background:#fff; padding:.66rem .68rem .72rem; }
+    .summary b { color:var(--red); }
+    .summary p { margin:.25rem 0 0; font-size:.83rem; line-height:1.55; color:#222; }
+    .figure { margin:0; border:2px solid #111; background:#fff; overflow:hidden; }
+    .figure img { width:100%; display:block; }
+    .figure figcaption { padding:.5rem .58rem .64rem; font-size:.82rem; line-height:1.45; color:#222; border-top:1px solid #eee; }
+    .demo-wrap { display:grid; grid-template-columns:1fr; gap:.6rem; }
+    .flow { display:flex; gap:.38rem; align-items:stretch; flex-wrap:wrap; }
+    .flow .node { flex:1 1 140px; border:2px solid #111; background:#fff; padding:.62rem .64rem .66rem; min-height:3.2rem; }
+    .flow .node.red { border-color:var(--red); background:#fffafa; }
+    .flow .node b { display:block; margin-bottom:.2rem; color:var(--red); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; }
+    .flow .node span { display:block; font-size:.88rem; line-height:1.45; color:#191919; }
+    .flow .arrow { flex:0 0 auto; align-self:center; color:var(--red); font-weight:900; font-size:1.1rem; }
+    .callout { border-left:4px solid var(--red); background:#fffafa; padding:.72rem .84rem; font-size:.88rem; line-height:1.64; color:#222; }
+    .callout b { color:var(--red); }
+    .nudge-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.56rem; }
+    .nudge { border:1px solid #dedede; background:#fff; padding:.64rem .68rem .7rem; }
+    .nudge h3 { margin:0 0 .32rem; font-size:.93rem; font-weight:900; line-height:1.22; }
+    .nudge p { margin:0; font-size:.84rem; line-height:1.55; color:#222; }
+    .route-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.58rem; }
+    .route { border:1px solid #ddd; background:#fff; padding:.66rem .7rem .72rem; }
+    .route h3 { margin:0 0 .34rem; font-size:.92rem; line-height:1.18; font-weight:900; }
+    .route p { margin:0; font-size:.84rem; line-height:1.56; color:#222; }
+    .route pre { margin:.42rem 0 0; padding:.52rem .56rem; overflow-x:auto; background:#0d0d0d; color:#f3f3f3; border-radius:6px; font-size:.74rem; line-height:1.5; }
+    .list { margin:.15rem 0 0; padding-left:1.2rem; }
+    .list li { margin:.32rem 0; font-size:.9rem; line-height:1.65; }
+    .link-list { display:grid; gap:.45rem; margin:.2rem 0 0; padding:0; list-style:none; }
+    .link-list li { font-size:.9rem; line-height:1.6; }
+    .link-list a { word-break:break-all; }
+    .footnote { padding:.95rem 1rem 1.05rem; background:#101010; color:#d6d6d6; font-size:.76rem; line-height:1.62; }
+    .footnote b { color:#fff; }
+    .save-btn { position:fixed; right:18px; bottom:18px; z-index:999; border:0; border-radius:8px; padding:.82rem .98rem; background:linear-gradient(135deg,var(--red),#b3000f); color:#fff; font-weight:800; font-size:.86rem; cursor:pointer; box-shadow:0 12px 28px rgba(230,0,18,.28); }
+    .save-btn:disabled { opacity:.72; cursor:progress; }
+    @media (max-width:720px) {
+      html { font-size:18px; }
+      .page { width:100%; }
+      .hero,.section,.footnote { padding-left:.82rem; padding-right:.82rem; }
+      .stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .grid-2,.summary-grid,.nudge-grid,.route-grid { grid-template-columns:1fr; }
+      .title { font-size:1.98rem; }
+      .save-btn { right:10px; bottom:10px; font-size:.9rem; }
+      .flow { display:grid; gap:.45rem; }
+      .flow .arrow { text-align:center; transform:rotate(90deg); }
+    }
+    @media (max-width:400px) {
+      .hero,.section,.footnote { padding-left:.72rem; padding-right:.72rem; }
+      .title { font-size:1.84rem; }
+      .stat { padding:.46rem .4rem; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+  <main class="page" id="capture-root">
+    <header class="hero">
+      <div class="eyebrow">
+        <span class="badge">Claude Code</span>
+        <span class="badge">Hook / Plugin</span>
+        <span class="badge">Prompt Quality</span>
+        <span class="badge">高密度信息卡</span>
+      </div>
+      <h1 class="title">Claude Code Prompt Improver：不是改写 prompt，而是把上下文注入到触发点</h1>
+      <p class="subtitle">它把 prompt 优化前置到 hook 层：在 prompt submit、tool use、subagent start 这些时机，按需注入澄清、路由和输出规范，让 Claude Code 更少返工、更多一次过。</p>
+      <div class="stats">
+        <div class="stat"><span class="k">Hook 入口</span><span class="v">3 个事件</span></div>
+        <div class="stat"><span class="k">Nudges</span><span class="v">7 个规则</span></div>
+        <div class="stat"><span class="k">安装路径</span><span class="v">Marketplace / Local / Manual</span></div>
+        <div class="stat"><span class="k">兼容性</span><span class="v">Claude Code 2.0.22+</span></div>
+      </div>
+    </header>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">01 / 一句话判断</h2><div class="section-tag">结论</div></div>
+      <div class="lead"><strong>核心结论</strong><p>这是一个把“提示词优化”从文本层挪到<b>触发点层</b>的系统：clear prompt 直接放行，vague prompt 才介入；复杂任务先选方法，再把需要的上下文补齐；长交付物先定结构，再输出内容。</p></div>
+      <div class="grid-2">
+        <div class="panel red">
+          <h3>它在解决什么</h3>
+          <ul class="bullets">
+            <li><strong>澄清：</strong>在用户还没走歪之前就问对问题。</li>
+            <li><strong>路由：</strong>先决定 plan / subagent / orchestration / 直接做。</li>
+            <li><strong>输出：</strong>让长 deliverable 先有结构、再有内容。</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>为什么不是“改写 prompt”</h3>
+          <p>README 的定义是“improving the whole path from prompt to output”。它不只重写你输入的字句，而是把缺失的约束、上下文和任务判断，在正确时机自动补到 Claude 眼前。</p>
+        </div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary"><b>主张</b><p>更好的 first output，减少纠错轮次。</p></div>
+        <div class="summary"><b>机制</b><p>高召回、低打扰、误报可自取消。</p></div>
+        <div class="summary"><b>效果</b><p>README 声称 v0.4.0 约 31% token reduction。</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">02 / 架构总览</h2><div class="section-tag">architecture</div></div>
+      <div class="flow">
+        <div class="node red"><b>1 / User</b><span>输入 prompt、发起工具调用、进入 subagent。</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>2 / Hook Engine</b><span>统一事件分发，按事件执行规则。</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>3 / Nudge Registry</b><span>nudges/*.json 里定义每个触发条件和注入内容。</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>4 / Skill / Questions / Execution</b><span>要么问澄清问题，要么给计划、路由或输出规范。</span></div>
+      </div>
+      <div class="callout" style="margin-top:.72rem"><b>设计哲学：</b>rarely intervene、fire wide then self-cancel cheap、trust user intent、最多 1–6 个 grounded questions。也就是说，false positive 尽量便宜，missing a good nudge 才是更贵的错误。</div>
+      <div class="summary-grid">
+        <div class="summary"><b>Engine</b><p>`scripts/engine.py` 负责事件分发，缺事件/坏事件都视为 no-op。</p></div>
+        <div class="summary"><b>Rules</b><p>`scripts/rules.py` 校验规则，坏行直接跳过，不会拖垮引擎。</p></div>
+        <div class="summary"><b>Builtins</b><p>`scripts/nudge_builtins.py` 只允许命名 handler，不允许任意 import/eval。</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">03 / 7 个 nudges 怎么分工</h2><div class="section-tag">matrix</div></div>
+      <div class="nudge-grid">
+        <div class="nudge"><h3><code>improve</code></h3><p>覆盖所有 prompt；只有 genuinely vague 才问 1–6 个 grounded questions，是旗舰入口。</p></div>
+        <div class="nudge"><h3><code>approach-assessment</code></h3><p>实现 / 重构 / 迁移 / multi-file 时，先选 plan、subagent、orchestration 还是直接做。</p></div>
+        <div class="nudge"><h3><code>workflow</code></h3><p>多步骤任务先规划，再按阶段路由；适合把任务拆成可执行工作流。</p></div>
+        <div class="nudge"><h3><code>output-readability</code></h3><p>长交付物先保证结论、章节和简洁度，避免大段低信噪比输出。</p></div>
+        <div class="nudge"><h3><code>plan</code></h3><p>进入 plan mode 时输出短、清、可复核的计划，文件路径锚点优先。</p></div>
+        <div class="nudge"><h3><code>background-exec</code></h3><p>长运行命令（dev server / watcher / tail）要后台执行，主线程只看关键信号。</p></div>
+        <div class="nudge"><h3><code>subagent-routing</code></h3><p>研究或规划子代理启动时，强调 breadth over depth，返回结论而不是 raw dump。</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">04 / 安装方式</h2><div class="section-tag">install</div></div>
+      <div class="route-grid">
+        <div class="route">
+          <h3>Marketplace</h3>
+          <p>最省事的安装路径，适合日常使用。</p>
+          <pre>claude plugin marketplace add severity1/severity1-marketplace
+claude plugin install prompt-improver@severity1-marketplace</pre>
+        </div>
+        <div class="route">
+          <h3>Local plugin</h3>
+          <p>适合开发和调试，便于直接看源码和规则。</p>
+          <pre>git clone https://github.com/severity1/claude-code-prompt-improver.git
+claude plugin marketplace add /path/to/.dev-marketplace/.claude-plugin/marketplace.json
+claude plugin install prompt-improver@local-dev</pre>
+        </div>
+        <div class="route">
+          <h3>Manual</h3>
+          <p>把 engine / rules / nudges 复制到 `~/.claude/hooks/prompt-improver`，再挂到 settings.json。</p>
+          <pre>cp scripts/engine.py scripts/rules.py scripts/nudge_builtins.py ~/.claude/hooks/prompt-improver/scripts/
+cp -r nudges ~/.claude/hooks/prompt-improver/nudges</pre>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:.72rem"><b>验证入口：</b>安装后用 `/plugin` 检查。README 明确要求 Claude Code 2.0.22+，因为它依赖 AskUserQuestion 这类定向澄清能力。</div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">05 / 现场预览</h2><div class="section-tag">demo</div></div>
+      <figure class="figure">
+        <img src="../assets/images/20260602-claude-code-prompt-improver/demo.gif" alt="README 中的 Demo 动图，展示 prompt improver 的交互效果" loading="eager">
+        <figcaption>README 的 Demo 动图；配合 hook 注入、澄清问题和路由分发，说明它不是单纯的 prompt rewrite，而是链路级优化。</figcaption>
+      </figure>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">06 / 使用信号</h2><div class="section-tag">usage</div></div>
+      <div class="grid-2">
+        <div class="panel red">
+          <h3>Clear prompt vs vague prompt</h3>
+          <ol class="steps">
+            <li>清晰指令：直接执行，不额外加 skill overhead。</li>
+            <li>模糊指令：触发 improve，补问最少但关键的问题。</li>
+            <li>非平凡任务：先做 approach assessment。</li>
+            <li>研究/规划：子代理更偏 breadth，减少 raw dump。</li>
+          </ol>
+        </div>
+        <div class="panel">
+          <h3>实用的 bypass 机制</h3>
+          <p>README 提供了三类 bypass 前缀：`*` 跳过评估、`/` 让 slash command 绕过、`#` 作为 memorize bypass。也就是说，这套系统不是强制门禁，而是默认帮助、可被显式绕过的辅助层。</p>
+        </div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary"><b>适合</b><p>bugfix、tests、refactor、migrate、多文件任务、研究型子代理。</p></div>
+        <div class="summary"><b>不适合</b><p>只想要“改文案更顺”的轻量 prompt 工具用户。</p></div>
+        <div class="summary"><b>边界</b><p>它优化的是 prompt-to-output path，不是单次措辞润色。</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">07 / 来源与证据</h2><div class="section-tag">source</div></div>
+      <ul class="link-list">
+        <li>仓库主页：<a href="https://github.com/severity1/claude-code-prompt-improver" target="_blank" rel="noreferrer">https://github.com/severity1/claude-code-prompt-improver</a></li>
+        <li>README 原文：<a href="https://raw.githubusercontent.com/severity1/claude-code-prompt-improver/main/README.md" target="_blank" rel="noreferrer">https://raw.githubusercontent.com/severity1/claude-code-prompt-improver/main/README.md</a></li>
+        <li>关键信号：`hooks/`、`nudges/*.json`、`skills/prompt-improver/`、MIT license、7 个 issue、v0.4.0 的 31% token reduction 叙述。</li>
+      </ul>
+      <div class="summary-grid">
+        <div class="summary"><b>一句话价值</b><p>把 prompt 优化从“文字润色”变成“事件驱动的上下文注入”。</p></div>
+        <div class="summary"><b>技术分层</b><p>Hook / Rule / Nudge / Skill 四层拆开，便于扩展和维护。</p></div>
+        <div class="summary"><b>发布定位</b><p>适合做成 Claude Code 重度用户的工作流基础设施卡。</p></div>
+      </div>
+    </section>
+
+    <footer class="footnote"><b>备注：</b>这张卡按“技术手册红黑”组织，重点是触发点、组件、安装路径和使用边界，而不是只讲仓库名。<br><b>验收点：</b>正文可读、Demo 可见、安装路线清楚、7 个 nudges 一眼能分工。</footer>
+  </main>
+
+  <button class="save-btn" id="saveBtn">保存 PNG</button>
+  <script>
+    (function(){
+      const btn = document.getElementById('saveBtn');
+      const root = document.getElementById('capture-root');
+      if (!btn || !root || typeof html2canvas !== 'function') return;
+      btn.addEventListener('click', async () => {
+        const oldText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '导出中…';
+        try {
+          const canvas = await html2canvas(root, { scale: Math.min(2, window.devicePixelRatio || 1), backgroundColor: '#ffffff', useCORS: true, scrollY: -window.scrollY });
+          const a = document.createElement('a');
+          a.download = 'claude-code-prompt-improver.png';
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+        } catch (err) {
+          console.error(err);
+          alert('保存失败，请稍后重试');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = oldText;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
