@@ -1,250 +1,282 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#e60012">
-  <meta name="description" content="Pejman John 的 Agent Debt 文章：把特性契约和模型专用 fork 分开，避免今天的 prompt 绑死明天的模型。附原文 4 图与自绘结构图。">
-  <title>Agent Debt：把特性契约和模型补丁分开，别用今天的 prompt 绑死明天的模型</title>
-  <style>
-    :root {
-      --red: #e60012;
-      --black: #0b0b0b;
-      --ink: #111111;
-      --muted: #60646f;
-      --line: #e7e7e7;
-      --soft: #fff8f8;
-      --bg: #ffffff;
-    }
-    * { box-sizing: border-box; }
-    html { font-size: clamp(16px, calc(100vw / 76), 18px); overflow-x: hidden; }
-    body {
-      margin: 0;
-      overflow-x: hidden;
-      background: linear-gradient(180deg, #fff 0%, #f6f6f6 100%);
-      color: var(--ink);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
-    }
-    a { color: var(--red); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    img { display: block; max-width: 100%; }
-    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .page { width: min(780px, 100vw); margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 5.6rem; }
-    .hero { background: linear-gradient(180deg, #0b0b0b 0%, #111 100%); color: #fff; padding: 1rem 1rem .95rem; border-bottom: 4px solid var(--red); }
-    .eyebrow { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin-bottom: .58rem; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: #ffd7dc; font-weight: 800; }
-    .badge { display: inline-flex; align-items: center; padding: .2rem .45rem; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); border-radius: 999px; }
-    .title { margin: 0 0 .48rem; font-size: clamp(1.95rem, 6vw, 3.18rem); line-height: 1.04; letter-spacing: -.04em; font-weight: 900; }
-    .subtitle { margin: 0; max-width: 52rem; color: #dedede; font-size: .96rem; line-height: 1.68; }
-    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; margin-top: .9rem; }
-    .stat { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); padding: .52rem .5rem; min-height: 3.32rem; }
-    .k { display: block; font-size: .64rem; letter-spacing: .12em; text-transform: uppercase; color: #ffb9c1; margin-bottom: .12rem; }
-    .v { display: block; font-size: .92rem; line-height: 1.16; font-weight: 800; color: #fff; word-break: break-word; }
-    .section { padding: 1rem 1rem 1.08rem; border-bottom: 1px solid var(--line); }
-    .section-hd { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; margin-bottom: .72rem; }
-    .section-title { margin: 0; font-size: 1rem; font-weight: 900; letter-spacing: .02em; }
-    .section-tag { font-size: .7rem; color: var(--red); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
-    .lead { border: 2px solid var(--red); background: var(--soft); padding: .84rem .84rem .88rem; display: grid; gap: .35rem; }
-    .lead strong { color: var(--red); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; }
-    .lead p { margin: 0; font-size: .94rem; line-height: 1.7; }
-    .grid-2 { display: grid; grid-template-columns: 1.03fr .97fr; gap: .72rem; margin-top: .75rem; }
-    .panel { border: 2px solid #111; background: #fff; padding: .72rem; }
-    .panel.red { border-color: var(--red); background: #fffafa; }
-    .panel h3 { margin: 0 0 .42rem; font-size: .98rem; line-height: 1.18; font-weight: 900; }
-    .panel p { margin: 0; font-size: .88rem; line-height: 1.58; color: #222; }
-    .bullets, .steps { margin: .1rem 0 0; padding-left: 1.15rem; }
-    .bullets li, .steps li { margin: .35rem 0; font-size: .91rem; line-height: 1.66; color: #1b1b1b; }
-    .bullets li strong, .steps li strong { font-weight: 900; }
-    .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; margin-top: .72rem; }
-    .summary { border: 1px solid #d7d7d7; background: #fff; padding: .66rem .68rem .72rem; }
-    .summary b { color: var(--red); }
-    .summary p { margin: .25rem 0 0; font-size: .83rem; line-height: 1.55; color: #222; }
-    .gallery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
-    figure.card { margin: 0; border: 2px solid #111; background: #fff; overflow: hidden; }
-    figure.card.alt { border-color: var(--red); background: #fffafa; }
-    figure.card img { width: 100%; height: auto; }
-    figure.card figcaption { padding: .52rem .58rem .64rem; font-size: .82rem; line-height: 1.48; color: #222; border-top: 1px solid #eee; }
-    .callout { border-left: 4px solid var(--red); background: #fffafa; padding: .72rem .84rem; font-size: .88rem; line-height: 1.64; color: #222; }
-    .callout b { color: var(--red); }
-    .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
-    .mini { border: 1px solid #ddd; background: #fff; padding: .66rem .7rem .72rem; }
-    .mini h3 { margin: 0 0 .34rem; font-size: .94rem; line-height: 1.2; font-weight: 900; }
-    .mini p { margin: 0; font-size: .86rem; line-height: 1.6; color: #222; }
-    .list { margin: .15rem 0 0; padding-left: 1.2rem; }
-    .list li { margin: .32rem 0; font-size: .9rem; line-height: 1.65; }
-    .footnote { padding: .95rem 1rem 1.05rem; background: #101010; color: #d6d6d6; font-size: .76rem; line-height: 1.62; }
-    .footnote b { color: #fff; }
-    .save-btn { position: fixed; right: 18px; bottom: 18px; z-index: 999; border: 0; border-radius: 8px; padding: .82rem .98rem; background: linear-gradient(135deg, var(--red), #b3000f); color: #fff; font-weight: 800; font-size: .86rem; cursor: pointer; box-shadow: 0 12px 28px rgba(230,0,18,.28); }
-    .save-btn:disabled { opacity: .72; cursor: progress; }
-    @media (max-width: 720px) {
-      html { font-size: 18px; }
-      .page { width: 100%; padding-right: 8rem; }
-      .hero, .section, .footnote { padding-left: .82rem; padding-right: 7.5rem; }
-      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .grid-2, .summary-grid, .mini-grid, .gallery-grid { grid-template-columns: 1fr; }
-      .title { font-size: 1.98rem; }
-      .save-btn { right: 10px; bottom: 10px; font-size: .9rem; }
-    }
-    @media (max-width: 400px) {
-      .hero, .section, .footnote { padding-left: .72rem; padding-right: .72rem; }
-      .title { font-size: 1.84rem; }
-      .stat { padding: .46rem .4rem; }
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Agent Debt：把特性契约和模型补丁分开，别用今天的 prompt 绑死明天的模型</title>
+<meta name="description" content="Pejman John 的 Agent Debt：把特性契约和模型专用 fork 分开，避免今天的 prompt 绑死明天的模型。原文 4 图与自绘结构图。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#c8102e;--black:#0a0a0a;--white:#f5f2ec;--gray-1:#171717;--gray-2:#2b2b2b;--gray-3:#666;--gray-4:#aaa;--gray-5:#ddd;--accent:#0036a3;--green:#006b3c;--yellow:#e8c200;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;background:var(--black);color:var(--white);width:min(780px,100vw);margin:0 auto;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.card{width:100%;max-width:100vw;border:3px solid var(--red);background:var(--white);color:var(--black)}
+.header{display:grid;grid-template-columns:1.15fr .8fr;gap:10px;align-items:end;padding:16px 16px 12px;background:linear-gradient(180deg,var(--red),#a90f27);color:#fff}
+.kicker{display:inline-block;background:#fff;color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.12em;padding:3px 8px;margin-bottom:8px;text-transform:uppercase}
+.header h1{font-size:23px;line-height:1.06;font-weight:700;letter-spacing:-.03em}
+.header h1 span{display:block;font-size:15px;margin-top:2px}
+.header .sub{margin-top:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.88)}
+.hero-copy{min-width:0}
+.meta{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;line-height:1.5;color:rgba(255,255,255,.78);margin-top:8px}
+.meta .rev{display:inline-block;margin-top:6px;background:#fff;color:var(--red);padding:2px 6px;font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:2px solid var(--red);border-bottom:1px solid #222;background:#121212}
+.stat{padding:10px 8px;text-align:center;border-right:1px solid #2d2d2d}
+.stat:last-child{border-right:none}
+.stat .num{display:block;font-size:21px;line-height:1;font-weight:700;color:var(--red)}
+.stat .lab{display:block;margin-top:4px;font-size:10px;color:#9a9a9a;line-height:1.2}
+.warn{padding:10px 14px;border-top:1px solid #2b0f12;border-bottom:1px solid #2b0f12;background:#1a0a0a;color:#f2c6cc;font-size:11px;line-height:1.55}
+.warn strong{color:#fff}
+.section{padding:12px 14px;border-bottom:1px solid #e6e0d8}
+.sec-title{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sec-title .label{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:700;white-space:nowrap}
+.sec-title .line{height:1px;background:var(--red);flex:1;opacity:.9}
+.sec-title .small{font-family:'IBM Plex Mono',monospace;font-size:8px;color:#777;white-space:nowrap}
+.lead{background:var(--black);color:#fff;padding:12px 12px 11px;border-left:3px solid var(--red);margin-bottom:10px}
+.lead .t{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.18em;color:#ff7f8e;margin-bottom:5px;text-transform:uppercase}
+.lead p{font-size:10.5px;line-height:1.58;color:#e2e2e2}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.box{border:1px solid var(--gray-5);background:#f0ede6;padding:10px}
+.box.dark{background:#151515;color:#f3f3f3;border-color:#2b2b2b}
+.box.red{border-left:3px solid var(--red)}
+.box.green{border-left:3px solid var(--green)}
+.box.blue{border-left:3px solid var(--accent)}
+.box.yellow{border-left:3px solid var(--yellow)}
+.h2{font-size:14px;line-height:1.15;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
+.p{font-size:10.5px;line-height:1.52;color:#444}
+.p.light{color:#d7d7d7}
+.badges{display:flex;flex-wrap:wrap;gap:4px}
+.badge{font-family:'IBM Plex Mono',monospace;font-size:7.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border:1px solid currentColor}
+.b-read{color:var(--green)}.b-write{color:var(--red)}.b-exec{color:var(--accent)}.b-net{color:#555}
+.callout{border-left:3px solid var(--red);background:#fff0f0;padding:8px 10px;font-size:9.5px;line-height:1.45;color:#222;margin-top:8px}
+.callout strong{color:var(--red)}
+.note{border-left:3px solid var(--yellow);background:#fff6cf;padding:8px 10px;font-size:9.5px;line-height:1.45;color:#222;margin-top:8px}
+.note .nl{display:block;font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.1em;color:#8b6800;margin-bottom:3px;text-transform:uppercase}
+.list{display:grid;gap:7px}
+.item{display:grid;grid-template-columns:22px 1fr;gap:7px;align-items:start}
+.num{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--red);padding-top:1px}
+.it-title{font-size:10px;font-weight:700;color:var(--black);display:block}
+.it-desc{font-size:9px;color:#666;line-height:1.45}
+.gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.fig{border:2px solid #111;background:#fff;overflow:hidden}
+.fig.alt{border-color:var(--red);background:#fffafa}
+.fig img{width:100%;height:auto;display:block}
+.fig figcaption{padding:6px 8px 7px;font-size:8.5px;line-height:1.5;color:#222;border-top:1px solid #eee;font-family:'IBM Plex Mono',monospace}
+.fig.alt figcaption{border-top-color:#fdd}
+.step{display:grid;grid-template-columns:24px 1fr;gap:8px;align-items:start;padding:8px 0;border-bottom:1px solid #ddd}
+.step:last-child{border-bottom:none}
+.step-n{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--red);padding-top:1px}
+.step-title{font-size:10px;font-weight:700;color:#111;display:block}
+.step-desc{font-size:9px;color:#666;line-height:1.45;margin-top:2px}
+.footer{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 14px;border-top:1px solid #111;background:#faf8f3}
+.foot{font-family:'IBM Plex Mono',monospace;font-size:8px;color:#666;line-height:1.55}
+.center{text-align:center}.right{text-align:right}
+.pill{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:7.5px;padding:2px 6px;letter-spacing:.08em;text-transform:uppercase;background:var(--black);color:#fff;margin:1px}
+.pill.red{background:var(--red)}.pill.blue{background:var(--accent)}.pill.green{background:var(--green)}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.summary{border:1px solid var(--gray-5);background:#f0ede6;padding:8px}
+.summary strong{color:var(--red);font-size:9px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:4px}
+.summary p{font-size:9px;color:#444;line-height:1.45}
+.mt8{margin-top:8px}
+@media (max-width:760px){
+  body{width:100vw}
+  .header{grid-template-columns:1fr;align-items:start}
+  .meta{text-align:left}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .grid2,.grid3,.grid4,.gallery,.footer,.summary-grid{grid-template-columns:1fr}
+  .footer{text-align:left}
+  .right,.center{text-align:left}
+}
+</style>
 </head>
 <body>
-  <main class="page" id="capture-root">
-    <header class="hero">
-      <div class="eyebrow">
-        <span class="badge">X / AI product</span>
-        <span class="badge">prompt engineering</span>
-        <span class="badge">agent debt</span>
-        <span class="badge">article + 4 illustrations</span>
+<div class="card">
+  <div class="header">
+    <div class="hero-copy">
+      <div class="kicker">PEJMAN JOHN / AGENT DEBT · ARTICLE + 5 ILLUSTRATIONS</div>
+      <h1>Agent Debt<span>把特性契约和模型补丁分开</span></h1>
+      <div class="sub">别用今天的 prompt 绑死明天的模型</div>
+      <div class="meta">
+        <div>Pejman Pour-Moezzi</div>
+        <div>X 2026-05-31</div>
+        <div class="rev">feature contract</div>
       </div>
-      <h1 class="title">Agent Debt：把特性契约和模型补丁分开，别用今天的 prompt 绑死明天的模型</h1>
-      <p class="subtitle">这篇文章把一个常见痛点说得很准：个人工作流可以跟着模型变化随时改，但面向用户的 AI 功能不能靠临场补丁过日子。要把 <b>feature contract</b> 和 <b>model-specific fork</b> 分开，评测通过才发布。</p>
-      <div class="stats">
-        <div class="stat"><span class="k">作者</span><span class="v">Pejman Pour-Moezzi</span></div>
-        <div class="stat"><span class="k">X 帖时间</span><span class="v">2026-05-31 22:25:45 CST</span></div>
-        <div class="stat"><span class="k">文章时间</span><span class="v">2026-05-26</span></div>
-        <div class="stat"><span class="k">主题</span><span class="v">prompt debt / eval / fork</span></div>
-      </div>
-    </header>
+    </div>
+  </div>
 
-    <section class="section">
-      <div class="section-hd"><h2 class="section-title">01 / 文章在反对什么</h2><div class="section-tag">problem</div></div>
-      <div class="lead"><strong>一句话结论</strong><p>作者反对把长 prompt 当成万能答案。很多团队为了适配旧模型，堆出一堆绕路、限制、例外和补丁；这些 <b>scaffolding</b> 今天能提分，明天却会变成技术债。</p></div>
-      <div class="grid-2">
-        <div class="panel red">
-          <h3>三层痛点</h3>
-          <ul class="bullets">
-            <li><strong>模型每 6-8 周就会变：</strong>边界、可靠性和擅长任务会重新洗牌。</li>
-            <li><strong>长 prompt 会锁死今天的 workaround：</strong>为了旧模型写的补丁，可能阻碍新模型发挥。</li>
-            <li><strong>产品功能不能靠临场适配：</strong>用户侧功能需要 eval、测试和更高置信度。</li>
-          </ul>
-        </div>
-        <div class="panel">
-          <h3>一句原文核心判断</h3>
-          <p><b>“prompts are technical debt too.”</b><br><br>这不是在说 prompt 没用，而是在说：如果你把模型补丁写进产品承诺里，你就把未来的升级成本提前锁死了。</p>
-        </div>
-      </div>
-      <div class="summary-grid">
-        <div class="summary"><b>个人工作流</b><p>大体能随模型更新快速调整。</p></div>
-        <div class="summary"><b>产品功能</b><p>必须评测、测试、守住回归边界。</p></div>
-        <div class="summary"><b>风险本质</b><p>补丁越多，升级越难，债务越重。</p></div>
-      </div>
-    </section>
+  <div class="stats">
+    <div class="stat"><span class="num">05-26</span><span class="lab">文章发布时间</span></div>
+    <div class="stat"><span class="num">3</span><span class="lab">核心层<br>contract / fork / eval</span></div>
+    <div class="stat"><span class="num">4</span><span class="lab">原文图<br>+ 1 自绘结构图</span></div>
+    <div class="stat"><span class="num">1</span><span class="lab">核心判断<br>prompts are debt</span></div>
+  </div>
 
-    <section class="section">
-      <div class="section-hd"><h2 class="section-title">02 / 正确拆法：contract + fork</h2><div class="section-tag">solution</div></div>
-      <div class="grid-2">
-        <div class="panel">
-          <h3>feature contract</h3>
-          <ul class="bullets">
-            <li>写的是产品承诺：用户要完成什么。</li>
-            <li>描述成功标准、边界、证据和目标。</li>
-            <li>必须尽量保持模型无关，长期稳定。</li>
-          </ul>
-        </div>
-        <div class="panel red">
-          <h3>model-specific fork</h3>
-          <ul class="bullets">
-            <li>只在当前模型需要时加入最小脚手架。</li>
-            <li>内容来自：当前 prompt、eval failures、production issues、vendor guide。</li>
-            <li>原则是“最小必要改动”，不是继续堆补丁。</li>
-          </ul>
-        </div>
-      </div>
-      <div class="callout"><b>核心分界：</b>契约负责“做什么”，fork 负责“当前模型怎么更稳地做到”。二者分开，才能在新模型到来时从契约重新开始，而不是背着旧补丁升级。</div>
-      <div style="margin-top:.72rem">
-        <figure class="card alt" style="margin:0">
-          <img src="../assets/images/20260531-agent-debt-feature-contract-fork/feature-contract-fork.svg" alt="Feature contract vs model-specific fork diagram">
-          <figcaption>自绘图：左边是稳定的 feature contract，右边是按模型生成的最小 fork，中间由 eval loop 决定是否 ship。</figcaption>
-        </figure>
-      </div>
-    </section>
+  <div class="warn"><strong>先钉死边界：</strong>这篇文章最值钱的地方，是把 prompt 从"个人技巧"升级成<strong>可维护工程资产</strong>的组织方式：feature contract 负责产品承诺，model-specific fork 负责当前模型的适配补丁，eval 决定是否发布。</div>
 
-    <section class="section">
-      <div class="section-hd"><h2 class="section-title">03 / 工作流闭环</h2><div class="section-tag">workflow</div></div>
-      <div class="mini-grid">
-        <div class="mini">
-          <h3>1. 先测新模型</h3>
-          <p>直接拿 feature contract 跑新模型，不要默认带上旧补丁。</p>
-        </div>
-        <div class="mini">
-          <h3>2. 通过就直接 ship</h3>
-          <p>如果它已经达到质量门槛，说明 contract 足够好，不需要 fork。</p>
-        </div>
-        <div class="mini">
-          <h3>3. 不过就做最小 fork</h3>
-          <p>把旧 prompt 里有帮助的部分保留，删掉过时 scaffolding，只补新模型真的需要的东西。</p>
-        </div>
-        <div class="mini">
-          <h3>4. 再跑 evals</h3>
-          <p>把失败样例和 vendor guide 作为输入，验证 fork 是否真的提质。</p>
+  <section class="section">
+    <div class="sec-title"><span class="label">01 · 文章在反对什么</span><div class="line"></div><span class="small">Problem</span></div>
+    <div class="lead">
+      <div class="t">core quote</div>
+      <p>"prompts are technical debt too." —— 不是在说 prompt 没用，而是在说：如果你把模型补丁写进产品承诺里，你就把未来的升级成本提前锁死了。</p>
+    </div>
+    <div class="grid2">
+      <div class="box red">
+        <div class="h2">三层痛点</div>
+        <div class="list">
+          <div class="item"><span class="num">1</span><div><span class="it-title">模型每 6-8 周就会变</span><span class="it-desc">边界、可靠性和擅长任务会重新洗牌。</span></div></div>
+          <div class="item"><span class="num">2</span><div><span class="it-title">长 prompt 锁死今天的 workaround</span><span class="it-desc">为旧模型写的补丁，可能阻碍新模型发挥。</span></div></div>
+          <div class="item"><span class="num">3</span><div><span class="it-title">产品功能不能靠临场适配</span><span class="it-desc">用户侧功能需要 eval、测试和更高置信度。</span></div></div>
         </div>
       </div>
-      <div class="panel" style="margin-top:.72rem">
-        <h3>为什么这比“继续写长 prompt”更稳</h3>
-        <ul class="bullets">
-          <li>把产品承诺和模型适配拆开，能避免“一个 prompt 绑死两件事”。</li>
-          <li>评测成为唯一发布门槛，减少拍脑袋升级。</li>
-          <li>模型升级时先回到 contract，而不是在旧 fork 上打补丁。</li>
-        </ul>
+      <div class="box">
+        <div class="h2">个人工作流 vs 产品功能</div>
+        <div class="list">
+          <div class="item"><span class="num">✓</span><div><span class="it-title">个人工作流</span><span class="it-desc">大体能随模型更新快速调整。</span></div></div>
+          <div class="item"><span class="num">✗</span><div><span class="it-title">产品功能</span><span class="it-desc">必须评测、测试、守住回归边界。</span></div></div>
+          <div class="item"><span class="num">⚠</span><div><span class="it-title">风险本质</span><span class="it-desc">补丁越多，升级越难，债务越重。</span></div></div>
+        </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="section">
-      <div class="section-hd"><h2 class="section-title">04 / 原文 4 图</h2><div class="section-tag">illustrations</div></div>
-      <div class="gallery-grid">
-        <figure class="card"><img src="../assets/images/20260531-agent-debt-feature-contract-fork/Pasted image 20260522103455.png" alt="Shrink your scaffolding"><figcaption>图 1：Shrink your scaffolding —— 少写绕路，写意图，不要为上一代模型的弱点堆补丁。</figcaption></figure>
-        <figure class="card alt"><img src="../assets/images/20260531-agent-debt-feature-contract-fork/Pasted image 20260522123704.png" alt="Typical prompt littered with scaffolding"><figcaption>图 2：典型 prompt 里满是脚手架 —— 规则很多，但其中不少只是对旧模型缺点的临时补丁。</figcaption></figure>
-        <figure class="card"><img src="../assets/images/20260531-agent-debt-feature-contract-fork/Pasted image 20260523113624.png" alt="Prompt portability folder structure"><figcaption>图 3：Prompt portability folder structure —— 先有稳定 contract，再按模型放可选 scaffolding / migration draft。</figcaption></figure>
-        <figure class="card alt"><img src="../assets/images/20260531-agent-debt-feature-contract-fork/Pasted image 20260526133200.png" alt="Workflow diagram"><figcaption>图 4：workflow diagram —— contract → test → eval → fork → re-eval → ship，靠评测闭环决定是否发布。</figcaption></figure>
+  <section class="section">
+    <div class="sec-title"><span class="label">02 · 正确拆法：contract + fork</span><div class="line"></div><span class="small">Solution</span></div>
+    <div class="grid2">
+      <div class="box blue">
+        <div class="h2">feature contract</div>
+        <div class="list">
+          <div class="item"><span class="num">1</span><div><span class="it-title">写产品承诺</span><span class="it-desc">用户要完成什么，描述成功标准、边界、证据和目标。</span></div></div>
+          <div class="item"><span class="num">2</span><div><span class="it-title">尽量模型无关</span><span class="it-desc">必须长期稳定，不绑定特定模型的弱点。</span></div></div>
+          <div class="item"><span class="num">3</span><div><span class="it-title">可验证</span><span class="it-desc">有明确的 eval 通过条件。</span></div></div>
+        </div>
       </div>
-    </section>
-
-    <section class="section">
-      <div class="section-hd"><h2 class="section-title">05 / 一句话判断</h2><div class="section-tag">verdict</div></div>
-      <div class="lead"><strong>结论</strong><p><b>这篇文章最值钱的地方，是把 prompt 从“个人技巧”升级成了“可维护工程资产”的组织方式。</b> 先写 feature contract，再在需要时加 model-specific fork；用 eval 决定发布，而不是靠感觉决定要不要继续堆 prompt。</p></div>
-      <div class="summary-grid">
-        <div class="summary"><b>适合谁</b><p>AI 产品经理、Agent / Prompt 工程、频繁跟模型升级的团队。</p></div>
-        <div class="summary"><b>边界</b><p>不是完全消灭 scaffolding，而是不把 scaffolding 写进产品契约。</p></div>
-        <div class="summary"><b>记住一句</b><p>Keep the contract pure. Build the fork only when evals say you need it.</p></div>
+      <div class="box red">
+        <div class="h2">model-specific fork</div>
+        <div class="list">
+          <div class="item"><span class="num">1</span><div><span class="it-title">只在当前模型需要时加</span><span class="it-desc">最小脚手架，最小必要改动。</span></div></div>
+          <div class="item"><span class="num">2</span><div><span class="it-title">内容来源</span><span class="it-desc">当前 prompt、eval failures、production issues、vendor guide。</span></div></div>
+          <div class="item"><span class="num">3</span><div><span class="it-title">原则</span><span class="it-desc">不是继续堆补丁，而是补新模型真的需要的东西。</span></div></div>
+        </div>
       </div>
-    </section>
+    </div>
+    <div class="callout mt8"><strong>核心分界：</strong>契约负责"做什么"，fork 负责"当前模型怎么更稳地做到"。二者分开，才能在新模型到来时从契约重新开始，而不是背着旧补丁升级。</div>
+  </section>
 
-    <footer class="footnote">
-      <b>来源</b>：X 帖 <a href="https://x.com/pejmanjohn/status/2061091767030825003">@pejmanjohn / 2061091767030825003</a>；原文：<a href="https://pejmanjohn.com/agent-debt-don-t-trap-tomorrow-s-model-in-today-s-prompt">Agent Debt: Don’t Trap Tomorrow’s Model in Today’s Prompt</a>。<br>
-      <b>备注</b>：文章发布时间 2026-05-26；X 帖发布时间 2026-05-31 14:25:45Z（北京时间 2026-05-31 22:25:45）。
-    </footer>
-  </main>
+  <section class="section">
+    <div class="sec-title"><span class="label">03 · 工作流闭环</span><div class="line"></div><span class="small">Workflow</span></div>
+    <div class="grid4">
+      <div class="box" style="padding:8px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--red);margin-bottom:5px">1</div>
+        <div style="font-size:10px;font-weight:700;margin-bottom:3px">先测新模型</div>
+        <div class="p">直接拿 feature contract 跑新模型，不要默认带旧补丁。</div>
+      </div>
+      <div class="box" style="padding:8px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--red);margin-bottom:5px">2</div>
+        <div style="font-size:10px;font-weight:700;margin-bottom:3px">通过就直接 ship</div>
+        <div class="p">达到质量门槛，说明 contract 足够好，不需要 fork。</div>
+      </div>
+      <div class="box" style="padding:8px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--red);margin-bottom:5px">3</div>
+        <div style="font-size:10px;font-weight:700;margin-bottom:3px">不过就最小 fork</div>
+        <div class="p">保留有帮助的旧部分，删掉过时 scaffolding，只补需要的东西。</div>
+      </div>
+      <div class="box" style="padding:8px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--red);margin-bottom:5px">4</div>
+        <div style="font-size:10px;font-weight:700;margin-bottom:3px">再跑 evals</div>
+        <div class="p">把失败样例和 vendor guide 作为输入，验证 fork 是否真的提质。</div>
+      </div>
+    </div>
+    <div class="callout mt8"><strong>为什么这比"继续写长 prompt"更稳：</strong>评测成为唯一发布门槛，减少拍脑袋升级；模型升级时先回到 contract，而不是在旧 fork 上打补丁。</div>
+  </section>
 
-  <button class="save-btn" id="save-btn">保存 PNG</button>
-  <script>
-    if (window.html2canvas) {
-      document.getElementById('save-btn').addEventListener('click', async function () {
-        const btn = this;
-        btn.disabled = true;
-        const oldText = btn.textContent;
-        btn.textContent = '导出中…';
-        try {
-          const canvas = await window.html2canvas(document.getElementById('capture-root'), {
-            backgroundColor: '#ffffff',
-            scale: Math.min(2, window.devicePixelRatio || 1.5),
-            useCORS: true,
-            allowTaint: true,
-          });
-          const a = document.createElement('a');
-          a.download = '20260531-agent-debt-feature-contract-fork.png';
-          a.href = canvas.toDataURL('image/png');
-          a.click();
-        } finally {
-          btn.disabled = false;
-          btn.textContent = oldText;
-        }
+  <section class="section">
+    <div class="sec-title"><span class="label">04 · 原文 4 图</span><div class="line"></div><span class="small">Illustrations</span></div>
+    <div class="gallery">
+      <figure class="fig">
+        <img src="../assets/images/20260531-agent-debt-feature-contract-fork/Pasted image 20260522103455.png" alt="Shrink your scaffolding">
+        <figcaption>图 1：Shrink your scaffolding — 少写绕路，写意图，不要为上一代模型的弱点堆补丁。</figcaption>
+      </figure>
+      <figure class="fig alt">
+        <img src="../assets/images/20260531-agent-debt-feature-contract-fork/Pasted image 20260522123704.png" alt="Typical prompt littered with scaffolding">
+        <figcaption>图 2：典型 prompt 里满是脚手架 — 规则很多，不少只是对旧模型缺点的临时补丁。</figcaption>
+      </figure>
+      <figure class="fig alt">
+        <img src="../assets/images/20260531-agent-debt-feature-contract-fork/Pasted image 20260523113624.png" alt="Prompt portability folder structure">
+        <figcaption>图 3：Prompt portability folder structure — 先有稳定 contract，再按模型放可选 scaffolding / migration draft。</figcaption>
+      </figure>
+      <figure class="fig">
+        <img src="../assets/images/20260531-agent-debt-feature-contract-fork/Pasted image 20260526133200.png" alt="Workflow diagram">
+        <figcaption>图 4：workflow diagram — contract → test → eval → fork → re-eval → ship，靠评测闭环决定是否发布。</figcaption>
+      </figure>
+    </div>
+    <div class="gallery mt8">
+      <figure class="fig alt" style="grid-column:1/-1">
+        <img src="../assets/images/20260531-agent-debt-feature-contract-fork/feature-contract-fork.svg" alt="Feature contract vs model-specific fork diagram">
+        <figcaption>自绘图：左边是稳定的 feature contract，右边是按模型生成的最小 fork，中间由 eval loop 决定是否 ship。</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-title"><span class="label">05 · 一句话判断</span><div class="line"></div><span class="small">Verdict</span></div>
+    <div class="summary-grid">
+      <div class="summary">
+        <strong>适合谁</strong>
+        <p>AI 产品经理、Agent / Prompt 工程、频繁跟模型升级的团队。</p>
+      </div>
+      <div class="summary">
+        <strong>边界</strong>
+        <p>不是完全消灭 scaffolding，而是不把 scaffolding 写进产品契约。</p>
+      </div>
+      <div class="summary">
+        <strong>记住一句</strong>
+        <p>Keep the contract pure. Build the fork only when evals say you need it.</p>
+      </div>
+    </div>
+    <div class="note mt8"><span class="nl">原文金句</span>"prompts are technical debt too." 把这句话当成日常检查项：每次想往 prompt 里加规则时，先问这是"契约"还是"补丁"。</div>
+  </section>
+
+  <div class="footer">
+    <div class="foot">来源<br><span style="color:var(--accent)">x.com/pejmanjohn / 2061091767030825003</span><br><span style="color:var(--accent)">pejmanjohn.com/agent-debt</span></div>
+    <div class="foot center"><span style="font-size:14px;font-weight:700;letter-spacing:-.02em;color:#111">AGENT DEBT</span><br><span style="color:var(--red)">feature contract vs model fork</span><br>v2026.06 · 5 ILLUSTRATIONS</div>
+    <div class="foot right"><span class="pill red">Prompt Debt</span><span class="pill blue">Eval</span><span class="pill green">Feature Contract</span><br><br><span style="color:#777">Swiss International Typographic Style</span><br><span style="color:#777">High-Density Information Design</span></div>
+  </div>
+</div>
+
+<div style="position:sticky;bottom:0;z-index:20;padding:12px 14px;background:linear-gradient(180deg,rgba(10,10,10,0),rgba(10,10,10,.92) 35%,rgba(10,10,10,.98));display:flex;justify-content:center;">
+  <button id="save-btn" onclick="saveCard()" style="appearance:none;border:none;border-radius:999px;background:var(--red);color:#fff;font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;letter-spacing:.02em;padding:12px 18px;box-shadow:0 8px 24px rgba(0,0,0,.28);cursor:pointer;">下载图片</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+  async function saveCard() {
+    const btn = document.getElementById('save-btn');
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '生成中…';
+    try {
+      const c = await html2canvas(document.querySelector('.card'), {
+        scale: 2,
+        backgroundColor: '#0a0a0a',
+        useCORS: true,
+        scrollY: -window.scrollY
       });
+      const a = document.createElement('a');
+      a.download = '20260531-agent-debt.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+    } catch (e) {
+      alert('截图失败: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
     }
-  </script>
+  }
+</script>
 </body>
 </html>
