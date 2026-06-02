@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>FastClaw：Go 写的 AI Agent Runtime</title>
+  <meta name="description" content="FastClaw 是一个用 Go 编写的 AI Agent runtime：单二进制、LLM provider、sandbox、skills、memory、dashboard 一体化。">
+  <style>
+    :root {
+      --red: #e60012;
+      --black: #0b0b0b;
+      --white: #fffdf9;
+      --soft: #f5f2ec;
+      --line: #ded7ce;
+      --text: #111111;
+      --muted: #626262;
+      --note: #a10f1d;
+      --blue: #0f4c81;
+      --green: #0a6b3c;
+      --yellow: #af7a00;
+    }
+    * { box-sizing: border-box; }
+    html { font-size: clamp(15px, 1.7vw, 16px); }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #111 0%, #050505 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    a { color: inherit; }
+    .page {
+      width: min(780px, 100vw);
+      margin: 0 auto;
+      background: var(--white);
+      min-height: 100vh;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.05);
+      padding-bottom: 7.75rem;
+    }
+    .hero {
+      background: linear-gradient(180deg, var(--black), #151515 100%);
+      color: #fff;
+      padding: 1rem 1rem .95rem;
+      border-bottom: .38rem solid var(--red);
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: .45rem;
+      font-size: .72rem; letter-spacing: .13em; text-transform: uppercase;
+      color: #ffd5d8; margin-bottom: .55rem; font-weight: 700;
+    }
+    .dot { width: .48rem; height: .48rem; border-radius: 50%; background: var(--red); display: inline-block; flex: 0 0 auto; }
+    .title {
+      margin: 0 0 .5rem;
+      font-size: 2.08rem;
+      line-height: 1.05;
+      letter-spacing: -.04em;
+      font-weight: 900;
+    }
+    .subtitle {
+      margin: 0;
+      max-width: 44rem;
+      color: #e6e6e6;
+      font-size: .97rem;
+      line-height: 1.68;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: .48rem;
+      margin-top: .95rem;
+    }
+    .meta {
+      padding: .55rem .58rem .5rem;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      border-radius: .68rem;
+      min-height: 4.2rem;
+    }
+    .meta-k {
+      display: block;
+      font-size: .68rem;
+      color: #ffb5bd;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: .18rem;
+      font-weight: 700;
+    }
+    .meta-v {
+      display: block;
+      font-size: .83rem;
+      line-height: 1.22;
+      font-weight: 800;
+    }
+
+    .section {
+      padding: 1rem 1rem 1.05rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .section-hd {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: .8rem;
+      margin-bottom: .78rem;
+    }
+    .section-title {
+      margin: 0;
+      font-size: 1.02rem;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }
+    .section-tag {
+      font-size: .72rem;
+      color: var(--red);
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      flex: 0 0 auto;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap: .78rem;
+    }
+    .box {
+      border: 2px solid var(--black);
+      background: #fff;
+      padding: .78rem;
+    }
+    .summary .box {
+      padding-bottom: 2.15rem;
+    }
+    .summary .box.dark {
+      padding-bottom: 2rem;
+    }
+    .box.red { border-color: var(--red); background: #fff9f9; }
+    .box.dark { background: #0f0f0f; color: #f5f5f5; border-color: #0f0f0f; }
+    .box h3 {
+      margin: 0 0 .42rem;
+      font-size: .98rem;
+      line-height: 1.2;
+    }
+    .box p {
+      margin: 0;
+      font-size: .88rem;
+      line-height: 1.7;
+      color: #202020;
+    }
+    .box.dark p { color: #e5e5e5; }
+    .quote {
+      margin-top: .6rem;
+      border-left: 4px solid var(--red);
+      background: #fff1f2;
+      padding: .64rem .72rem;
+      font-size: .87rem;
+      line-height: 1.7;
+      color: #111;
+      font-weight: 700;
+    }
+    .quote strong { color: var(--red); }
+    .pill-row { display: flex; flex-wrap: wrap; gap: .42rem; margin-top: .55rem; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .28rem;
+      padding: .32rem .58rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: .74rem;
+      background: #fff;
+      white-space: nowrap;
+    }
+    .pill b { color: var(--red); }
+
+    .warn {
+      background: #140708;
+      color: #f5d6d9;
+      border: 1px solid #3f0d14;
+      padding: .74rem .82rem;
+      font-size: .87rem;
+      line-height: 1.66;
+      border-radius: .7rem;
+    }
+    .warn strong { color: #fff; }
+    .warn + .warn { margin-top: .55rem; }
+
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; }
+    .mini {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: .72rem;
+    }
+    .mini.red { border-left: 3px solid var(--red); }
+    .mini.blue { border-left: 3px solid var(--blue); }
+    .mini.green { border-left: 3px solid var(--green); }
+    .mini.yellow { border-left: 3px solid var(--yellow); }
+    .mini .kicker {
+      font-size: .68rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--red);
+      font-weight: 900;
+      margin-bottom: .32rem;
+    }
+    .mini h4 {
+      margin: 0 0 .35rem;
+      font-size: .96rem;
+      line-height: 1.18;
+    }
+    .mini p {
+      margin: 0;
+      font-size: .83rem;
+      line-height: 1.62;
+      color: #2c2c2c;
+    }
+
+    .arch {
+      border: 2px solid var(--black);
+      background: #faf8f4;
+      padding: .78rem;
+    }
+    .arch-head {
+      display: flex; justify-content: space-between; gap: .6rem; align-items: baseline;
+      margin-bottom: .6rem;
+      font-size: .72rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--red);
+      font-weight: 900;
+    }
+    .node {
+      border: 1px solid #222;
+      background: #fff;
+      padding: .58rem .62rem;
+      min-height: 3.6rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: .18rem;
+    }
+    .node.dark {
+      background: #111;
+      color: #fff;
+      border-color: #111;
+    }
+    .node .t {
+      font-size: .8rem;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+    .node .s {
+      font-size: .7rem;
+      color: #666;
+      line-height: 1.35;
+    }
+    .node.dark .s { color: #ddd; }
+    .arrow {
+      text-align: center;
+      color: #666;
+      font-size: .76rem;
+      padding: .28rem 0;
+      font-weight: 700;
+    }
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: .35rem;
+    }
+    .arch-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .35rem;
+    }
+    .arch-row {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: .35rem;
+    }
+    .arch-note {
+      margin-top: .65rem;
+      font-size: .81rem;
+      line-height: 1.62;
+      color: #444;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    .table th,
+    .table td {
+      border-bottom: 1px solid var(--line);
+      padding: .52rem .48rem;
+      vertical-align: top;
+      text-align: left;
+      font-size: .82rem;
+      line-height: 1.55;
+    }
+    .table th {
+      background: #f8f7f5;
+      font-size: .72rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #666;
+    }
+    .table td:first-child {
+      font-weight: 900;
+      color: var(--red);
+      white-space: nowrap;
+    }
+
+    .code {
+      background: #111;
+      color: #d7ffd6;
+      border: 1px solid #222;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: .77rem;
+      line-height: 1.58;
+      padding: .76rem .82rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+    }
+    .code .cm { color: #9aa0a6; }
+    .code .kw { color: #ffb347; }
+    .code .str { color: #a8d8ff; }
+    .code .key { color: #ff6278; }
+    .code .val { color: #d6ffd8; }
+
+    .list {
+      display: grid;
+      gap: .48rem;
+    }
+    .li {
+      display: grid;
+      grid-template-columns: 1.5rem 1fr;
+      gap: .55rem;
+      align-items: start;
+    }
+    .idx {
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: .35rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .72rem;
+      font-weight: 900;
+      color: #fff;
+      background: var(--black);
+      flex-shrink: 0;
+      margin-top: .05rem;
+    }
+    .li strong {
+      display: block;
+      margin-bottom: .1rem;
+      font-size: .88rem;
+    }
+    .li span {
+      display: block;
+      font-size: .81rem;
+      line-height: 1.58;
+      color: #404040;
+    }
+
+    .closing {
+      background: #0f0f0f;
+      color: #fff;
+      padding: 1rem 1rem 1.15rem;
+    }
+    .closing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .72rem; }
+    .closing-box {
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      padding: .74rem;
+    }
+    .closing-box h3 {
+      margin: 0 0 .35rem;
+      font-size: .92rem;
+      line-height: 1.18;
+    }
+    .closing-box p,
+    .closing-box li {
+      margin: 0;
+      font-size: .82rem;
+      line-height: 1.65;
+      color: #e5e7eb;
+    }
+    .closing-box ul {
+      margin: .3rem 0 0 1.05rem;
+      padding: 0;
+    }
+    .source {
+      margin-top: .82rem;
+      border-top: 1px solid rgba(255,255,255,.12);
+      padding-top: .65rem;
+      font-size: .72rem;
+      line-height: 1.58;
+      color: #d1d5db;
+      word-break: break-word;
+    }
+    .source a { color: #fff; }
+
+    .save-btn {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 999;
+      border: 0;
+      border-radius: 8px;
+      padding: .78rem .96rem;
+      background: linear-gradient(135deg, var(--red), #b30010);
+      color: #fff;
+      font-weight: 800;
+      font-size: .86rem;
+      letter-spacing: .02em;
+      box-shadow: 0 12px 28px rgba(230,0,18,.28);
+      cursor: pointer;
+    }
+    .save-btn:disabled { opacity: .72; cursor: progress; }
+
+    @media (min-width: 780px) {
+      .page { width: 780px; }
+      .hero, .section, .closing { padding-left: 4rem; padding-right: 4rem; }
+      .title { font-size: 2.2rem; }
+    }
+    @media (max-width: 720px) {
+      html { font-size: 16px; }
+      .page { width: 100%; }
+      .meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary, .grid2, .grid3, .closing-grid, .arch-pair, .arch-row { grid-template-columns: 1fr; }
+      .hero, .section, .closing { padding-left: .82rem; padding-right: .82rem; }
+      .title { font-size: 1.86rem; line-height: 1.06; }
+      .subtitle { font-size: .98rem; line-height: 1.62; }
+      .section-title { font-size: 1.05rem; }
+      .section-tag { font-size: .75rem; }
+      .box p, .quote, .mini p, .arch-note, .table td, .li span, .closing-box p, .closing-box li { font-size: .92rem; line-height: 1.68; }
+      .mini h4 { font-size: 1rem; }
+      .save-btn { right: 10px; bottom: 10px; font-size: .9rem; }
+    }
+    @media (max-width: 400px) {
+      .title { font-size: 1.68rem; }
+      .hero { padding-top: .94rem; }
+      .section, .closing { padding-top: .88rem; padding-bottom: .92rem; }
+      .meta-v { font-size: .8rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="eyebrow"><span class="dot"></span> github / go / agent runtime / sandbox / skills</div>
+      <h1 class="title">FastClaw：Go 写的 AI Agent Runtime</h1>
+      <p class="subtitle">这不是一个单纯的聊天壳，而是一套把 <strong>LLM provider、agent、skills、memory、sandbox、API、dashboard</strong> 连成闭环的运行时。它的核心价值在于：让“怎么跑 Agent”成为标准化基础设施，而不是每个项目都从零拼装。</p>
+      <div class="meta-grid">
+        <div class="meta"><span class="meta-k">语言</span><span class="meta-v">Go 1.25+</span></div>
+        <div class="meta"><span class="meta-k">许可</span><span class="meta-v">MIT</span></div>
+        <div class="meta"><span class="meta-k">入口</span><span class="meta-v">curl install.sh | bash</span></div>
+        <div class="meta"><span class="meta-k">默认端口</span><span class="meta-v">18953</span></div>
+        <div class="meta"><span class="meta-k">定位</span><span class="meta-v">Agent Factory / Runtime</span></div>
+      </div>
+    </header>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">一句话判断</h2><div class="section-tag">core take</div></div>
+      <div class="summary">
+        <div class="box red">
+          <h3>FastClaw 在解决什么</h3>
+          <p>它把 AI Agent 的常见底座能力统一起来：全局配置、agent 目录、skills、会话历史、模型适配、工具执行、沙箱隔离和 API 暴露。适合想做“自己的 Agent 平台”的团队，而不是只想写一个单独 prompt 的人。</p>
+          <div class="quote"><strong>关键判断：</strong>FastClaw 的卖点不是“更会推理”，而是“把 Agent 运行和管理做成一套可部署、可持久化、可扩展的系统”。</div>
+        </div>
+        <div class="box dark">
+          <h3>你可以怎么理解它</h3>
+          <p>更像 <strong>Agent Factory</strong>：创建 Agent、给它分配人格（SOUL.md）、记忆（MEMORY.md）、技能（skills）、模型、沙箱和工作区，然后由 gateway / dashboard / API 统一调度。它提供的是运行环境和编排能力，不是一个单独模型，也不是一个单一聊天页面。</p>
+          <div class="pill-row">
+            <span class="pill"><b>1</b> 单二进制</span>
+            <span class="pill"><b>∞</b> 多 agent</span>
+            <span class="pill"><b>✓</b> 沙箱</span>
+            <span class="pill"><b>✓</b> Skills</span>
+            <span class="pill"><b>✓</b> Memory</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">架构总览：它怎么把 Agent 跑起来</h2><div class="section-tag">architecture</div></div>
+      <div class="arch">
+        <div class="arch-head"><span>FastClaw Runtime</span><span>Gateway · Agents · Sandbox · Storage</span></div>
+        <div class="arch-grid">
+          <div class="node dark">
+            <div class="t">Gateway / Dashboard / API</div>
+            <div class="s">web chat、admin token、OpenAI-compatible /v1/chat/completions、agent CRUD、config/skills/session 管理</div>
+          </div>
+          <div class="arrow">↓ 统一入口</div>
+          <div class="arch-pair">
+            <div class="node">
+              <div class="t">Agent Workspace</div>
+              <div class="s">SOUL.md / MEMORY.md / agent.json / sessions / skills</div>
+            </div>
+            <div class="node">
+              <div class="t">LLM Providers</div>
+              <div class="s">OpenAI / Anthropic / Ollama / OpenRouter / Groq / DeepSeek / Mistral / OpenAI-compatible</div>
+            </div>
+          </div>
+          <div class="arrow">↓ 运行时分发</div>
+          <div class="arch-row">
+            <div class="node">
+              <div class="t">Tools + Sandbox</div>
+              <div class="s">exec / read_file / write_file / web_fetch / web_search / memory_search + E2B / Docker</div>
+            </div>
+            <div class="node">
+              <div class="t">Persistent Storage</div>
+              <div class="s">file 或 postgres；sessions、memory、skills、agent config 都能持久化</div>
+            </div>
+          </div>
+          <div class="arrow">↓ 结果回流</div>
+          <div class="node dark">
+            <div class="t">Outputs / Sessions / API Consumers</div>
+            <div class="s">你的应用、S3 / 文件系统、对话历史、外部系统调用结果</div>
+          </div>
+        </div>
+        <div class="arch-note">这套结构的重点是把“模型调用、工具执行、沙箱隔离、长期记忆、会话归档”都变成 runtime 能力；因此它适合作为上层产品（ChatClaw、内部助手、工作流平台）的 Agent 运行底座。</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">能力矩阵：四个最值钱的部件</h2><div class="section-tag">capabilities</div></div>
+      <div class="grid2">
+        <article class="mini red">
+          <div class="kicker">01 / providers</div>
+          <h4>多模型接入，不锁死单一厂商</h4>
+          <p>支持 OpenAI、Anthropic、Ollama、OpenRouter、Groq、DeepSeek、Mistral，以及任何 OpenAI-compatible API；还能给每个 agent 单独覆盖模型与参数。</p>
+        </article>
+        <article class="mini blue">
+          <div class="kicker">02 / tools & sandbox</div>
+          <h4>工具执行 + 隔离环境</h4>
+          <p>内置 exec、read_file、write_file、list_dir、web_fetch、web_search、memory_search；沙箱可选 E2B 云沙箱或 Docker 沙箱，并支持技能与工作区的自动 hydrate / 回写。</p>
+        </article>
+        <article class="mini green">
+          <div class="kicker">03 / skills</div>
+          <h4>共享技能与 agent 私有技能</h4>
+          <p>技能既可以来自 ClawHub / GitHub，也可以只挂在某个 agent 下；它让重复工作流、领域知识和最佳实践变成可安装资产。</p>
+        </article>
+        <article class="mini yellow">
+          <div class="kicker">04 / memory</div>
+          <h4>会话与长期记忆分层保存</h4>
+          <p>MEMORY.md、sessions、agent config 都会持久化；这意味着 agent 不只是“当场回答”，而是能跨会话续接。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">你实际会碰到的界面与入口</h2><div class="section-tag">surface</div></div>
+      <div class="grid2">
+        <div class="box">
+          <h3>Dashboard 里有什么</h3>
+          <p>FastClaw 的前台不是一个单一聊天页，而是分成 <strong>Agents / Skills / Models / Settings</strong> 四个核心区。进入某个 agent 后，还能继续看 Chat、Files、Skills、Models、Sessions，能直接编辑 SOUL.md、IDENTITY.md、MEMORY.md 等文件。</p>
+        </div>
+        <div class="box">
+          <h3>适合什么工作流</h3>
+          <p>更适合“要做成平台”的场景：给不同 agent 分模型、挂不同技能、隔离工作区、统一鉴权、统一 API，再由你的上层产品消费输出。它不是给单次对话做一个漂亮壳，而是给 Agent 系统做基础设施。</p>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:.7rem;">
+        <div class="box red">
+          <h3>API 面</h3>
+          <p>README 里明确列出了 OpenAI-compatible <code>/v1/chat/completions</code>、Web chat SSE、session 管理、agent CRUD、config 管理、skill 安装和 API key 管理，说明它已经把“可集成性”当成一等公民。</p>
+        </div>
+        <div class="box">
+          <h3>运维面</h3>
+          <p>有本地启动、Docker、Kubernetes 三种部署姿势；配置里又把 gateway、storage、sandbox、providers、agents defaults 分层拆开，方便真正落到服务环境里。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">存储与配置：哪些数据归 FastClaw</h2><div class="section-tag">storage map</div></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>数据</th>
+            <th>归属</th>
+            <th>存储</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SOUL.md / IDENTITY.md</td>
+            <td>Agent</td>
+            <td>FastClaw</td>
+            <td>人格与身份定义，决定 agent 的“说话方式”和角色边界。</td>
+          </tr>
+          <tr>
+            <td>MEMORY.md</td>
+            <td>Agent</td>
+            <td>FastClaw</td>
+            <td>长期事实与偏好，通常由 heartbeat 自动更新。</td>
+          </tr>
+          <tr>
+            <td>Skills</td>
+            <td>Agent / Global</td>
+            <td>FastClaw</td>
+            <td>共享或私有的工作流资产；适合复用。</td>
+          </tr>
+          <tr>
+            <td>Sessions</td>
+            <td>Agent</td>
+            <td>FastClaw</td>
+            <td>对话历史，支持续接与审计。</td>
+          </tr>
+          <tr>
+            <td>User accounts / billing</td>
+            <td>你的应用</td>
+            <td>Your app</td>
+            <td>README 明确提示：这部分不由 FastClaw 托管。</td>
+          </tr>
+          <tr>
+            <td>Output files</td>
+            <td>你的应用</td>
+            <td>你的应用 / S3</td>
+            <td>适合把结果交给外部业务系统做持久存储。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="warn" style="margin-top:.72rem;"><strong>边界要点：</strong>FastClaw 管的是 agent runtime 与基础设施，不负责替你的业务系统管理账户、计费和最终产物归档。把它看成“Agent 平台层”，不要把它误读成“整个产品后端”。</div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">快速上手：最短路径</h2><div class="section-tag">quick start</div></div>
+      <div class="grid2">
+        <div>
+          <div class="mini red" style="margin-bottom:.65rem;">
+            <div class="kicker">step 1</div>
+            <h4>安装并启动</h4>
+            <p>README 给出的路径很直接：先拉 install.sh，再跑 <code>fastclaw</code>，首次启动会打开 setup wizard。</p>
+          </div>
+          <pre class="code"># 安装并运行
+curl -fsSL https://raw.githubusercontent.com/fastclaw-ai/fastclaw/main/install.sh | bash
+fastclaw    # 打开 setup wizard</pre>
+        </div>
+        <div>
+          <div class="mini blue" style="margin-bottom:.65rem;">
+            <div class="kicker">step 2</div>
+            <h4>进入 Dashboard</h4>
+            <p>访问 <code>http://localhost:18953</code>，用安装过程生成的 admin token 登录，然后先配置 LLM provider，再创建默认 agent。</p>
+          </div>
+          <pre class="code"># 常见首次动作
+1. 配置 provider（OpenAI / Anthropic / Ollama / OpenRouter...）
+2. 创建 default agent
+3. 编辑 SOUL.md / MEMORY.md
+4. 安装 skills
+5. 进入 Chat / Files / Sessions 调试</pre>
+        </div>
+      </div>
+      <div class="mini green" style="margin-top:.7rem;">
+        <div class="kicker">step 3</div>
+        <h4>按任务给 agent 分层</h4>
+        <p>如果你要把它拿来做产品，建议把“对话、文件、技能、模型、会话”分开验证：先确认 provider 能通，再确认 tool / sandbox 能跑，再确认 sessions 和 memory 能持久化，最后再把它接到你的上层业务里。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">适合谁，不适合谁</h2><div class="section-tag">decision boundary</div></div>
+      <div class="grid2">
+        <div class="box red">
+          <h3>适合</h3>
+          <div class="list">
+            <div class="li"><span class="idx">1</span><div><strong>要做 Agent 平台 / 内部助手</strong><span>需要统一模型接入、权限、工具、沙箱、记忆和会话管理。</span></div></div>
+            <div class="li"><span class="idx">2</span><div><strong>要做多 Agent / 角色化系统</strong><span>每个 agent 都需要自己的 personality、skills 和模型覆盖。</span></div></div>
+            <div class="li"><span class="idx">3</span><div><strong>要把运行结果接入业务系统</strong><span>你希望输出文件和 API 都可被外部系统消费。</span></div></div>
+          </div>
+        </div>
+        <div class="box">
+          <h3>不适合</h3>
+          <div class="list">
+            <div class="li"><span class="idx">1</span><div><strong>只想做一个轻量聊天页</strong><span>FastClaw 的能力明显偏“平台底座”，不是最轻的聊天包装器。</span></div></div>
+            <div class="li"><span class="idx">2</span><div><strong>不需要持久化和沙箱</strong><span>如果你只是一次性 prompt 调用，它会显得偏重。</span></div></div>
+            <div class="li"><span class="idx">3</span><div><strong>把它当成业务计费后端</strong><span>README 已明确：账户、计费、输出归你的应用处理。</span></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-hd"><h2 class="section-title">发布时要盯住的三件事</h2><div class="section-tag">ops checklist</div></div>
+      <div class="grid3">
+        <div class="mini red">
+          <div class="kicker">01</div>
+          <h4>provider 是否先通</h4>
+          <p>没有模型接入，后面的 dashboard、skills、sessions 都只是壳；先跑通 provider 是第一步。</p>
+        </div>
+        <div class="mini blue">
+          <div class="kicker">02</div>
+          <h4>sandbox 是否真的隔离</h4>
+          <p>如果你要在生产里跑 agent，沙箱与工作区 hydrate / sync 的行为必须明确，不然工具执行会污染宿主环境。</p>
+        </div>
+        <div class="mini green">
+          <div class="kicker">03</div>
+          <h4>持久化边界是否清楚</h4>
+          <p>sessions、memory、skills、agent config 归 FastClaw，业务账户和输出归你自己的系统，这条线要先画清。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="closing">
+      <div class="closing-grid">
+        <div class="closing-box">
+          <h3>最终结论</h3>
+          <p>FastClaw 更像一套 <strong>AI Agent 运行底座</strong>，把 agent 的“创建、运行、记忆、技能、工具、沙箱、API”打包成一套可部署系统。它的价值在于降低搭建 Agent 平台的工程摩擦，而不是再发明一个模型。</p>
+        </div>
+        <div class="closing-box">
+          <h3>你可以怎么用它</h3>
+          <ul>
+            <li>做内部 AI 助手平台</li>
+            <li>做多角色 agent 系统</li>
+            <li>把技能和模型配置标准化</li>
+            <li>把 sessions / memory / tool sandbox 统一管理</li>
+          </ul>
+        </div>
+      </div>
+      <div class="source">
+        来源：<a href="https://github.com/fastclaw-ai/fastclaw" target="_blank" rel="noreferrer">GitHub / fastclaw-ai/fastclaw</a> · README（install / quick start / architecture / features / deployment）<br>
+        参考：repo README 中的 Agent Factory、storage、tools & sandbox、API、Kubernetes 配置示例；发布日期：2026-06-02 17:37 CST
+      </div>
+    </div>
+  </main>
+
+  <button id="save-btn" class="save-btn" onclick="saveCard()">保存 PNG</button>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+    async function saveCard() {
+      const btn = document.getElementById('save-btn');
+      const old = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '生成中…';
+      try {
+        const canvas = await html2canvas(document.querySelector('.page'), {
+          scale: 2,
+          backgroundColor: '#050505',
+          useCORS: true,
+          scrollY: -window.scrollY
+        });
+        const a = document.createElement('a');
+        a.download = '20260602-fastclaw-agent-runtime.png';
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      } catch (err) {
+        console.error(err);
+        alert('保存失败，请重试');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    }
+  </script>
+</body>
+</html>
