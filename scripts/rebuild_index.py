@@ -54,6 +54,36 @@ def normalize_date_value(value):
     return value
 
 
+def parse_sort_ts_ns(value):
+    normalized = normalize_date_value(value)
+    if not normalized:
+        return 0
+    if isinstance(normalized, str):
+        raw = normalized.strip()
+        if DATE_ONLY_RE.fullmatch(raw):
+            dt = datetime.strptime(raw, "%Y-%m-%d").replace(tzinfo=SHANGHAI_TZ)
+            return int(dt.astimezone(timezone.utc).timestamp() * 1_000_000_000)
+        if DATETIME_RE.fullmatch(raw):
+            candidate = raw.replace(" ", "T", 1)
+            dt = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=SHANGHAI_TZ)
+            else:
+                dt = dt.astimezone(SHANGHAI_TZ)
+            return int(dt.astimezone(timezone.utc).timestamp() * 1_000_000_000)
+    return 0
+
+
+def resolve_business_sort_ts_ns(item: dict, meta_path: str, card_path: str) -> int:
+    updated_ts = parse_sort_ts_ns(item.get("updated"))
+    if updated_ts:
+        return updated_ts
+    date_ts = parse_sort_ts_ns(item.get("date"))
+    if date_ts:
+        return date_ts
+    return latest_source_mtime_ns(meta_path, card_path)
+
+
 def load_entries():
     entries = []
     errors = []
@@ -75,7 +105,9 @@ def load_entries():
             continue
         item = dict(data)
         item["date"] = normalize_date_value(item["date"])
-        sort_ts = latest_source_mtime_ns(str(meta_path), card_path)
+        if "updated" in item:
+            item["updated"] = normalize_date_value(item["updated"])
+        sort_ts = resolve_business_sort_ts_ns(item, str(meta_path), card_path)
         item['_sort_ts'] = sort_ts
         item['_modified_date'] = fmt_date(sort_ts)
         entries.append(item)

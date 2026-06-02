@@ -101,28 +101,26 @@
   };
 
   const buildTimeMeta = (card) => {
+    const updatedDate = pickFirstDate(card.updated_at, card.updated);
     const cardDate = parseLooseDate(card.date);
+    const modified = pickFirstDate(card.updated_at, card.updated, card._effective_at, card._modified_at, card.modified_at, card._modified_date);
     const submitted = pickFirstDate(card._submitted_at, card._created_at, card.created_at, card.date, card.created);
-    const modified = pickFirstDate(card._effective_at, card._modified_at, card.modified_at, card._modified_date, card.updated_at, card.updated, card.date, card._created_at, card.created_at);
-    const hasExplicitCardTime = cardDate && getDatePrecision(cardDate) !== 'date';
-    const effective = hasExplicitCardTime ? cardDate : (modified || submitted);
+    const effective = updatedDate || cardDate || modified || submitted;
     const sortTs = Number(card._sort_ts);
     const fallbackTs = effective ? effective.getTime() : 0;
-    const normalizedSortTs = hasExplicitCardTime
-      ? fallbackTs
-      : (Number.isFinite(sortTs) && sortTs > 0
-        ? (sortTs > 1e15 ? Math.floor(sortTs / 1e6) : sortTs)
-        : fallbackTs);
-    const label = hasExplicitCardTime
-      ? '提交'
-      : (modified && submitted && modified.getTime() > submitted.getTime() ? '修改' : '提交');
+    const normalizedSortTs = Number.isFinite(sortTs) && sortTs > 0
+      ? (sortTs > 1e15 ? Math.floor(sortTs / 1e6) : sortTs)
+      : fallbackTs;
+    const label = updatedDate
+      ? '更新'
+      : (cardDate ? '提交' : (modified ? '修改' : '提交'));
     return {
       label,
       date: formatDate(effective),
       clock: formatClock(effective),
       full: formatDateTime(effective),
       minuteFull: formatDateMinute(effective),
-      minuteClock: `${pad2(effective.getHours())}:${pad2(effective.getMinutes())}`,
+      minuteClock: effective ? `${pad2(effective.getHours())}:${pad2(effective.getMinutes())}` : '—',
       ts: normalizedSortTs,
       rawTs: fallbackTs
     };
