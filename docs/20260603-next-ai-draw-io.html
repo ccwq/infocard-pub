@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Next AI Draw.io：AI 图表创建工具（开源 / Next.js / MCP）</title>
+<meta name="description" content="Next AI Draw.io 将自然语言命令与 draw.io 图表深度集成，支持多 AI 模型、MCP 协议接入、云架构图生成、PDF 文档图表化、版本历史追踪。">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f0;--card:#fff;--black:#000;--white:#fff;
+  --gray:#e8e8e3;--gray2:#d4d4cf;--gray3:#aaa;--gray4:#666;
+  --accent:#0d9488;--accent2:#115e59;--accent3:#d0f0ed;
+  --red:#e60012;--yellow:#f59e0b;
+  --font-sans:'IBM Plex Sans',Helvetica,Arial,sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+}
+body{font-family:var(--font-sans);background:var(--bg);color:var(--black);line-height:1.5;-webkit-font-smoothing:antialiased}
+.card{max-width:780px;margin:0 auto;background:var(--card);border:2px solid var(--black);min-height:100vh}
+
+/* Header */
+.header{border-bottom:3px solid var(--black);padding:20px 24px 0;background:var(--card);position:relative}
+.header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:10px}
+.kicker{display:inline-block;background:var(--black);color:var(--white);font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.14em;padding:3px 8px;text-transform:uppercase}
+.source{font-family:var(--font-mono);font-size:10.5px;color:var(--gray4);letter-spacing:.06em}
+.header-main{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;padding-bottom:16px}
+.hl-eyebrow{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gray4);margin-bottom:6px}
+.hl-en{font-size:clamp(32px,6vw,52px);font-weight:900;line-height:.92;color:var(--black);letter-spacing:-.025em;font-style:italic}
+.hl-zh{font-size:clamp(18px,3vw,26px);font-weight:700;line-height:1.1;color:var(--black);margin-top:4px;letter-spacing:-.01em}
+.hl-sub{margin-top:10px;font-size:13.3px;color:#333;line-height:1.55;max-width:520px}
+.hl-num{font-family:var(--font-mono);font-size:clamp(72px,13vw,108px);font-weight:900;line-height:.82;color:var(--accent);letter-spacing:-.04em;opacity:.85}
+.bar{border-top:2px solid var(--black);border-bottom:2px solid var(--black);padding:0;margin-top:0}
+.bar-inner{display:flex;flex-wrap:wrap}
+.bar-item{flex:0 0 auto;padding:7px 12px;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.06em;color:var(--gray4);border-right:1px solid var(--gray3)}
+.bar-item:first-child{background:var(--accent);color:var(--white);font-weight:700}
+.bar-item:last-child{border-right:none}
+
+/* Sections */
+.section{padding:18px 24px;border-bottom:1px solid var(--gray2)}
+.sec-title{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.label{font-family:var(--font-mono);font-size:11.2px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--black)}
+.line{flex:1;height:2px;background:var(--accent)}
+.small{font-family:var(--font-mono);font-size:10.5px;color:var(--gray4);letter-spacing:.08em}
+
+/* Feature grid */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fbox{border:1.5px solid var(--black);background:var(--card);padding:14px;position:relative;overflow:hidden}
+.fbox::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
+.fbox-num{font-family:var(--font-mono);font-size:clamp(26px,4.5vw,34px);font-weight:900;line-height:.82;color:var(--accent);opacity:.75;margin-bottom:3px}
+.fbox h2{font-size:13.3px;font-weight:700;color:var(--black);margin-bottom:7px;line-height:1.3}
+.fbox p{font-size:12.6px;color:#333;line-height:1.52}
+.fbox ul{margin:6px 0 0;padding:0 0 0 14px}
+.fbox li{font-size:12.6px;color:#222;line-height:1.55;margin-bottom:3px}
+.fbox .prac{font-family:var(--font-mono);font-size:10.5px;color:var(--accent2);font-weight:700;letter-spacing:.04em;margin-top:8px;padding-top:7px;border-top:1px solid var(--gray2)}
+
+/* Tech stack strip */
+.tech-strip{display:flex;flex-wrap:wrap;gap:7px;padding:12px 24px;border-bottom:1px solid var(--gray2);align-items:center}
+.tech-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border:1.5px solid var(--black);background:var(--card);font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--black)}
+.tech-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0}
+
+/* Flow diagram section */
+.arch-section{padding:18px 24px;border-bottom:1px solid var(--gray2)}
+.arch-label{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.arch-flow{display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:4px}
+.arch-step{display:flex;align-items:center;flex-shrink:0}
+.arch-node{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--black);background:var(--card);font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--black);white-space:nowrap}
+.arch-node.highlight{background:var(--accent);color:var(--white);border-color:var(--accent)}
+.arch-arrow{font-size:18px;color:var(--accent);flex-shrink:0;padding:0 4px}
+
+/* Model pills */
+.model-strip{display:flex;flex-wrap:wrap;gap:6px;padding:12px 24px;border-bottom:1px solid var(--gray2);align-items:center}
+.model-pill{display:inline-flex;align-items:center;padding:4px 10px;background:var(--black);color:var(--white);font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em}
+.model-pill.green{background:var(--accent)}
+.model-lbl{font-family:var(--font-mono);font-size:10.5px;color:var(--gray4);letter-spacing:.08em;margin-right:4px}
+
+/* Deployment cards */
+.dgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.dbox{border:1.5px solid var(--black);padding:12px 13px;position:relative;background:var(--card)}
+.dbox::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.dbox-title{font-family:var(--font-mono);font-size:11.2px;font-weight:700;color:var(--black);margin-bottom:5px;letter-spacing:.06em}
+.dbox p{font-size:12.6px;color:#333;line-height:1.5}
+.dbox code{display:block;margin-top:6px;font-family:var(--font-mono);font-size:10.5px;color:var(--accent2);background:var(--accent3);padding:4px 7px;border:1px solid var(--accent);letter-spacing:.04em;word-break:break-all}
+
+/* Quote block */
+.quote-block{margin:0 24px 0;padding:14px 16px;border:2px solid var(--accent);background:var(--accent3);position:relative}
+.quote-block::before{content:'❝';font-size:22px;color:var(--accent);position:absolute;top:-12px;left:14px;background:var(--card);padding:0 4px;line-height:1}
+.quote-block p{font-size:12.6px;color:#0d3d3a;line-height:1.6;padding-left:10px}
+.quote-src{font-family:var(--font-mono);font-size:10.5px;color:var(--accent2);margin-top:6px;letter-spacing:.06em}
+
+/* MCP config */
+.mcp-block{margin:0 24px;padding:14px 16px;border:2px solid var(--black);background:#f8f8f5}
+.mcp-title{font-family:var(--font-mono);font-size:11.2px;font-weight:700;color:var(--black);margin-bottom:8px;letter-spacing:.1em;text-transform:uppercase}
+.mcp-block pre{margin:0;font-family:var(--font-mono);font-size:11.2px;color:var(--black);line-height:1.7;background:transparent;padding:0;overflow-x:auto}
+.mcp-block .comment{color:var(--gray4)}
+
+/* Figure */
+.figure{margin:0;background:var(--card);border:2px solid var(--black);border-top:none;overflow:hidden}
+.figure img{display:block;width:100%;height:auto}
+.fig-cap{padding:8px 12px;font-family:var(--font-mono);font-size:10.5px;line-height:1.55;color:#444;border-top:1px solid var(--gray2);background:var(--bg)}
+
+/* Sub figures row */
+.sub-figures{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:2px solid var(--black)}
+.sub-figure{border-right:1px solid var(--gray2);overflow:hidden}
+.sub-figure:last-child{border-right:none}
+.sub-figure img{display:block;width:100%;height:auto}
+.sub-figure .fig-cap{font-size:10.5px}
+
+/* Footer */
+.footer{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:14px 24px 120px;border-top:1px solid var(--black);background:var(--bg)}
+.foot{font-family:var(--font-mono);font-size:10.5px;color:var(--gray4);line-height:1.6}
+.center{text-align:center}.right{text-align:right}
+
+/* Pill */
+.pill{display:inline-block;font-family:var(--font-mono);font-size:10.5px;padding:2px 6px;letter-spacing:.06em;background:var(--black);color:var(--white);margin:1px}
+.pill.teal{background:var(--accent)}
+.pill.outline{background:transparent;color:var(--black);border:1px solid var(--black)}
+
+/* Save button */
+.fab-save{position:fixed;right:16px;bottom:18px;z-index:30;display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border:none;border-radius:999px;background:rgba(13,148,136,.96);color:#fff;font-family:var(--font-sans);font-size:13.3px;font-weight:700;letter-spacing:.02em;box-shadow:0 10px 24px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.16) inset;cursor:pointer;backdrop-filter:blur(8px)}
+.fab-save:hover{background:#0d7c70}
+.fab-save .icon{font-size:15px;line-height:1}
+.fab-spacer{height:74px}
+
+/* Mobile */
+@media(max-width:720px){
+  body{width:100%;max-width:100%;overflow-x:hidden}
+  .card{width:100%;max-width:100%;border-width:1px}
+  .header{padding:14px 14px 0}
+  .header-top{flex-direction:column;gap:6px;margin-bottom:10px}
+  .source{font-size:9.8px}
+  .header-main{grid-template-columns:1fr;gap:10px;padding-bottom:12px}
+  .hl-num{display:none}
+  .hl-en{font-size:clamp(30px,10vw,42px)}
+  .hl-zh{font-size:clamp(18px,5vw,24px)}
+  .hl-sub{font-size:12.6px;max-width:none}
+  .bar-inner{flex-wrap:wrap}
+  .bar-item{flex:0 0 50%;font-size:9.8px;padding:6px 9px}
+  .fgrid{grid-template-columns:1fr}
+  .dgrid{grid-template-columns:1fr}
+  .sub-figures{grid-template-columns:1fr}
+  .sub-figure{border-right:none;border-bottom:1px solid var(--gray2)}
+  .sub-figure:last-child{border-bottom:none}
+  .tech-strip,.model-strip,.arch-section,.section{padding:14px 14px}
+  .arch-flow{overflow-x:auto}
+  .mcp-block{margin:0 14px}
+  .quote-block{margin:0 14px}
+  .footer{padding:12px 14px 116px}
+  .fab-save{right:12px;bottom:12px;padding:10px 12px;font-size:12.6px}
+  .fab-spacer{height:74px}
+}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <header class="header">
+    <div class="header-top">
+      <span class="kicker">AI Diagramming · Open Source</span>
+      <span class="source">DayuanJiang / next-ai-draw-io · Apache 2.0</span>
+    </div>
+    <div class="header-main">
+      <div>
+        <div class="hl-eyebrow">NEXT.JS × DRAW.IO × AI · MCP ENABLED</div>
+        <div class="hl-en">Next AI</div>
+        <div class="hl-zh">Draw.io</div>
+        <p class="hl-sub">用自然语言命令驱动 draw.io 图表创建。支持多 AI 模型（GLM-4.7 · GPT-4o · Claude · Gemini）、MCP 协议接入、云架构图生成、PDF 文档图表化、版本历史追踪。</p>
+      </div>
+      <div class="hl-num" aria-hidden="true">05</div>
+    </div>
+    <div class="bar">
+      <div class="bar-inner">
+        <div class="bar-item">LLM 图表生成</div>
+        <div class="bar-item">MCP 协议</div>
+        <div class="bar-item">多模型支持</div>
+        <div class="bar-item">PDF 图表化</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tech Stack -->
+  <div class="tech-strip">
+    <span class="model-lbl">技术栈</span>
+    <span class="tech-badge"><span class="dot"></span>Next.js 16</span>
+    <span class="tech-badge"><span class="dot"></span>React 19</span>
+    <span class="tech-badge"><span class="dot"></span>draw.io</span>
+    <span class="tech-badge"><span class="dot"></span>MCP Protocol</span>
+    <span class="tech-badge"><span class="dot"></span>TypeScript</span>
+    <span class="tech-badge"><span class="dot"></span>Docker Ready</span>
+    <span class="tech-badge"><span class="dot"></span>Vercel Deploy</span>
+    <span class="tech-badge"><span class="dot"></span>EdgeOne Pages</span>
+  </div>
+
+  <!-- Model Support -->
+  <div class="model-strip">
+    <span class="model-lbl">AI 模型</span>
+    <span class="model-pill green">GLM-4.7 ✦ 赞助</span>
+    <span class="model-pill">GPT-4o</span>
+    <span class="model-pill">Claude 3.5/4</span>
+    <span class="model-pill">Gemini Pro/Flash</span>
+    <span class="model-pill">Doubao</span>
+    <span class="model-pill outline">+20 模型</span>
+  </div>
+
+  <!-- Features 2×2 -->
+  <section class="section">
+    <div class="sec-title"><span class="label">核心功能</span><div class="line"></div><span class="small">Core Features</span></div>
+    <div class="fgrid">
+      <div class="fbox">
+        <div class="fbox-num">01</div>
+        <h2>自然语言图表生成</h2>
+        <p>直接用自然语言描述需求，AI 自动生成 draw.io 格式的图表。Transformer 架构、云架构、流程图、RAG 架构均可。</p>
+        <ul>
+          <li>支持英文 / 中文 / 日文 Prompt</li>
+          <li>输出标准 draw.io XML</li>
+          <li>可导出 SVG / PNG / PDF</li>
+        </ul>
+        <div class="prac">Prompt 示例：Transformer architecture with animated connectors</div>
+      </div>
+      <div class="fbox">
+        <div class="fbox-num">02</div>
+        <h2>MCP 协议接入</h2>
+        <p>作为 MCP Server 运行，支持 Claude Desktop / Cursor / VS Code 等主流 AI 开发工具直接调用图表生成能力。</p>
+        <ul>
+          <li>npx 一键安装</li>
+          <li>Claude Code CLI 直接集成</li>
+          <li>支持 MCP Tools 批量生成</li>
+        </ul>
+        <div class="prac">npx @next-ai-drawio/mcp-server@latest</div>
+      </div>
+      <div class="fbox">
+        <div class="fbox-num">03</div>
+        <h2>图像 → 图表复制</h2>
+        <p>上传现有图表或截图，AI 自动理解并重新生成 draw.io 格式文件。适用于旧图迁移和格式升级。</p>
+        <ul>
+          <li>支持 PNG / JPG / SVG 上传</li>
+          <li>保留原始布局和样式</li>
+          <li>批量转换多个文件</li>
+        </ul>
+        <div class="prac">适用场景：旧 Visio 图迁移 / 论文插图重绘</div>
+      </div>
+      <div class="fbox">
+        <div class="fbox-num">04</div>
+        <h2>PDF / 文档图表化</h2>
+        <p>上传 PDF 或文本文件，AI 自动提取内容并生成对应架构图、流程图、数据流图。</p>
+        <ul>
+          <li>自动解析 PDF 文本块</li>
+          <li>支持技术文档白皮书</li>
+          <li>保留引用关系和层级</li>
+        </ul>
+        <div class="prac">适用场景：方案评审 / 技术文档可视化</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Flow -->
+  <section class="arch-section">
+    <div class="arch-label">
+      <span class="label">工作原理</span><div class="line"></div><span class="small">How It Works</span>
+    </div>
+    <div class="arch-flow">
+      <div class="arch-step">
+        <span class="arch-node">自然语言 Prompt</span>
+        <span class="arch-arrow">→</span>
+      </div>
+      <div class="arch-step">
+        <span class="arch-node highlight">LLM 模型推理</span>
+        <span class="arch-arrow">→</span>
+      </div>
+      <div class="arch-step">
+        <span class="arch-node">GraphQL API</span>
+        <span class="arch-arrow">→</span>
+      </div>
+      <div class="arch-step">
+        <span class="arch-node">draw.io XML 渲染</span>
+        <span class="arch-arrow">→</span>
+      </div>
+      <div class="arch-step">
+        <span class="arch-node">SVG / PNG 输出</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Extended features row 2 -->
+  <section class="section">
+    <div class="fgrid">
+      <div class="fbox">
+        <div class="fbox-num">05</div>
+        <h2>云架构图专项</h2>
+        <p>专为 AWS / GCP / Azure 架构图设计，支持组件图标自动识别、连线标注、区域分组。</p>
+        <ul>
+          <li>AWS 组件库自动渲染</li>
+          <li>GCP BigQuery / Cloud Run 等</li>
+          <li>Azure 微软云全组件</li>
+          <li>多云混合架构支持</li>
+        </ul>
+        <div class="prac">Prompt 示例：Serverless architecture using AWS</div>
+      </div>
+      <div class="fbox">
+        <div class="fbox-num">06</div>
+        <h2>AI 推理过程可视化</h2>
+        <p>对于支持模型（GPT o1/o3、Gemini、Claude 等），可展示 AI 生成图表的推理思考过程。</p>
+        <ul>
+          <li>显示模型思考链路</li>
+          <li>便于审核图表生成逻辑</li>
+          <li>支持调试 Prompt 策略</li>
+        </ul>
+        <div class="prac">适用场景：模型评估 / Prompt 优化迭代</div>
+      </div>
+      <div class="fbox">
+        <div class="fbox-num">07</div>
+        <h2>版本历史追踪</h2>
+        <p>每次 AI 编辑自动生成版本快照，支持随时回滚到历史版本，避免误操作导致图表丢失。</p>
+        <ul>
+          <li>全量版本快照</li>
+          <li>一键恢复任意版本</li>
+          <li>版本对比差分显示</li>
+        </ul>
+        <div class="prac">适用场景：团队协作 / 多人编辑场景</div>
+      </div>
+      <div class="fbox">
+        <div class="fbox-num">08</div>
+        <h2>动画连接器</h2>
+        <p>支持在图表元素之间生成动态箭头和动画连线，让架构图、流程图具备动态演示效果。</p>
+        <ul>
+          <li>Transformer 数据流动画</li>
+          <li>时序图动画连线</li>
+          <li>导出 GIF / MP4</li>
+        </ul>
+        <div class="prac">Prompt 示例：Animated transformer connectors diagram</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MCP Config -->
+  <section class="section" style="padding-bottom:0">
+    <div class="sec-title"><span class="label">MCP 接入配置</span><div class="line"></div><span class="small">Claude Desktop / Claude Code</span></div>
+  </section>
+  <div class="mcp-block" style="margin:0 24px 16px">
+    <div class="mcp-title">mcpServers 配置</div>
+    <pre>{
+  <span class="comment">// Claude Desktop ~/Library/Application Support/Claude/claude_desktop_config.json</span>
+  "mcpServers": {
+    "drawio": {
+      "command": "npx",
+      "args": ["@next-ai-drawio/mcp-server@latest"]
+    }
+  }
+}</pre>
+  </div>
+  <div class="mcp-block" style="margin:0 24px 16px">
+    <div class="mcp-title">Claude Code CLI</div>
+    <pre>claude mcp add drawio -- npx @next-ai-drawio/mcp-server@latest</pre>
+  </div>
+
+  <!-- Quote -->
+  <section class="section">
+    <div class="quote-block">
+      <p>感谢字节跳动豆包（Doubao）赞助支持，本项目 Demo 现已接入强大的 <strong>GLM-4.7 模型</strong>，提供高质量图表生成服务。</p>
+      <div class="quote-src">— next-ai-drawio 官方 README · 字节跳动火山引擎方舟 Coding Plan</div>
+    </div>
+  </section>
+
+  <!-- Deployment -->
+  <section class="section">
+    <div class="sec-title"><span class="label">部署方式</span><div class="line"></div><span class="small">Deployment</span></div>
+    <div class="dgrid">
+      <div class="dbox">
+        <div class="dbox-title">腾讯云 EdgeOne Pages</div>
+        <p>官方推荐部署方式，国内访问速度快，支持自定义域名。</p>
+        <code>.pages.dev</code>
+      </div>
+      <div class="dbox">
+        <div class="dbox-title">Vercel</div>
+        <p>一行命令部署，全球 CDN，支持 Serverless Functions。</p>
+        <code>npx vercel</code>
+      </div>
+      <div class="dbox">
+        <div class="dbox-title">Docker 本地运行</div>
+        <p>完全自托管，数据不出本地，适合企业内部部署。</p>
+        <code>docker run -p 3000:3000 next-ai-drawio</code>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Diagram -->
+  <figure class="figure">
+    <img src="assets/images/20260603-next-ai-draw-io/animated_connectors.svg" alt="Transformer Architecture with Animated Connectors" loading="lazy">
+    <figcaption class="fig-cap">插图：Transformer 架构动画连接器图 — 由 Next AI Draw.io 生成。Prompt: "animated connector diagram of transformer's architecture" · 来源：DayuanJiang/next-ai-draw-io</figcaption>
+  </figure>
+
+  <!-- Sub diagrams -->
+  <div class="sub-figures">
+    <figure class="sub-figure">
+      <img src="assets/images/20260603-next-ai-draw-io/rag_prod.svg" alt="RAG 架构图" loading="lazy">
+      <figcaption class="fig-cap">RAG 架构图 — Prompt: "RAG architecture diagram for chat application"</figcaption>
+    </figure>
+    <figure class="sub-figure">
+      <img src="assets/images/20260603-next-ai-draw-io/auth.svg" alt="React+AWS 认证架构" loading="lazy">
+      <figcaption class="fig-cap">React + AWS 认证流程 — Prompt: "Serverless authentication with React and AWS"</figcaption>
+    </figure>
+  </div>
+
+  <!-- More sub figures -->
+  <div class="sub-figures">
+    <figure class="sub-figure">
+      <img src="assets/images/20260603-next-ai-draw-io/inno.svg" alt="开放式创新模型" loading="lazy">
+      <figcaption class="fig-cap">开放式创新模型 — Henry Chesbrough 模型可视化</figcaption>
+    </figure>
+    <figure class="sub-figure">
+      <img src="assets/images/20260603-next-ai-draw-io/cat_demo.svg" alt="AI 绘制猫咪草图" loading="lazy">
+      <figcaption class="fig-cap">AI 绘制猫咪草图 — Prompt: "Draw a cute cat for me"</figcaption>
+    </figure>
+  </div>
+
+  <footer class="footer">
+    <div class="foot left">next-ai-drawio.jiang.jp</div>
+    <div class="foot center">AI Diagramming · DayuanJiang</div>
+    <div class="foot right">SWISS TEAL · GREEN</div>
+  </footer>
+
+  <div class="fab-spacer" aria-hidden="true"></div>
+  <button class="fab-save save-btn" id="save-btn" onclick="saveCard()" aria-label="保存 PNG">
+    <span class="icon">💾</span>
+    <span>保存 PNG</span>
+  </button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+async function saveCard(){
+  const btn=document.getElementById('save-btn');
+  const card=document.querySelector('.card');
+  if(!card||!window.html2canvas)return;
+  const prev=btn?btn.style.visibility:'';
+  if(btn)btn.style.visibility='hidden';
+  const canvas=await html2canvas(card,{backgroundColor:'#ffffff',scale:Math.max(2,window.devicePixelRatio||1),useCORS:true,logging:false});
+  if(btn)btn.style.visibility=prev;
+  const link=document.createElement('a');
+  link.download='20260603-next-ai-draw-io.png';
+  link.href=canvas.toDataURL('image/png');
+  link.click();
+}
+</script>
+</body>
+</html>
