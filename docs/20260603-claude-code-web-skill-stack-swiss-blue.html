@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="description" content="这条 X 案例卡把 Claude Code 的网络访问能力拆成 Deep Research、Agent Reach、Scraping、Browser View、Chrome、Web Access 六层，并给出从 search 到 automate 的分层路线：从轻到重，够用就停。" />
+  <title>Claude Code 爬全网：6 个 Skill 的分层案例</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f5f2ea;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#5d574e;
+      --line:#111111;
+      --red:#d80018;
+      --blue:#1f63ff;
+      --soft-red:#fde9eb;
+      --soft-blue:#e8f1ff;
+      --soft-stone:#f6f4ef;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    html{scroll-behavior:smooth;overflow-x:hidden;font-size:clamp(16px,calc(100vw / 78),18px)}
+    body{
+      margin:0;overflow-x:hidden;color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.06;background-image:linear-gradient(135deg, rgba(17,17,17,.16) 25%, transparent 25%, transparent 50%, rgba(17,17,17,.16) 50%, rgba(17,17,17,.16) 75%, transparent 75%, transparent);background-size:20px 20px;mask-image:linear-gradient(to bottom, black, transparent 95%)}
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 84px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr);gap:14px;border:3px solid var(--line);background:var(--paper);box-shadow:none;overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:180px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:130px;background:var(--blue)}
+    .hero-copy{padding:22px;border-right:3px solid var(--line);display:grid;gap:14px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:6px 10px;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:11px}
+    h1{margin:0;max-width:820px;font-size:clamp(34px,6vw,70px);line-height:.95;letter-spacing:-.065em}
+    .subtitle{max-width:820px;margin:0;color:var(--muted);font-size:clamp(15px,1.84vw,18px)}
+    .badge-row{display:flex;flex-wrap:wrap;gap:8px}
+    .badge{display:inline-flex;align-items:center;min-height:33px;padding:6px 10px;border:2px solid var(--line);background:#fff;font-size:12.1px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .fact-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:2px}
+    .fact{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .fact .k{display:block;margin-bottom:6px;font-size:10.8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .fact .v{display:block;font-size:13.6px;line-height:1.34;font-weight:900}
+    .alert{border:3px solid var(--line);background:#111;color:#fff;padding:15px;display:grid;gap:10px}
+    .alert strong{display:block;font-size:15px;line-height:1.35}
+    .alert p{margin:0;font-size:14px;line-height:1.68;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{border-left:0;background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual img{width:100%;height:auto}
+    .hero-visual figcaption{border-top:3px solid var(--line);padding:13px 14px;background:#f7f6f2;font-size:13px;line-height:1.62;color:#222}
+    .hero-visual figcaption b{color:#111}
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+    .grid-3,.grid-4,.grid-2{display:grid;gap:12px}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .card,.step,.mini,.footer-block{border:2px solid var(--line);background:#fff;min-width:0;box-shadow:none}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4,.step h3,.footer-block h3{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p{margin:0;font-size:14px;color:#222;line-height:1.68}
+    .card ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li{margin:4px 0;font-size:14px;line-height:1.62;color:#222}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+    .workflow{display:grid;gap:12px}
+    .step{padding:14px;display:grid;gap:10px;position:relative;overflow:hidden}
+    .step::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .step-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .step-num{display:grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;flex:0 0 auto}
+    .step h3{font-size:16px;line-height:1.16;padding-top:7px}
+    .step p{margin:0;font-size:14px;line-height:1.66;color:#222}
+    .step small{display:block;color:var(--muted);font-size:12.4px;line-height:1.56}
+    .step[data-accent="red"]{--accent:var(--red)}
+    .step[data-accent="blue"]{--accent:var(--blue)}
+    .step[data-accent="dark"]{--accent:#111}
+    .codebox{border:2px solid var(--line);background:#111;color:#f5efe4;padding:12px;overflow:auto}
+    .codebox pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.6}
+    .meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini p,.mini li{font-size:13.5px;line-height:1.62;color:#222}
+    .mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .footer-block{margin-top:14px;padding:16px;display:grid;gap:10px}
+    .footer-block h3{font-size:18px;line-height:1.2}
+    .footer-block p,.footer-block li{font-size:14px;line-height:1.66;color:#222}
+    .links{display:flex;flex-wrap:wrap;gap:8px}
+    .source-note{margin-top:12px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);color:#111;font-weight:750;line-height:1.58}
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .fact-grid,.grid-4,.meta-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .grid-3,.grid-2{grid-template-columns:1fr}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 84px}
+      .hero{display:flex;flex-direction:column}
+      .hero-visual{order:-1}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .hero-visual figcaption{padding:11px 12px}
+      .fact-grid,.grid-4,.grid-3,.grid-2,.meta-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.step,.mini,.footer-block,.alert,.hero-visual figcaption{padding-left:12px;padding-right:12px}
+    }
+    @media (max-width:400px){
+      .page{width:min(100% - 12px,1040px)}
+      h1{font-size:1.9rem}
+      .hero-copy{padding:14px}
+      .card,.step,.mini,.footer-block,.alert{padding-top:12px;padding-bottom:12px}
+      .codebox{padding:10px}
+      .codebox pre{font-size:12.5px}
+    }
+    @media print{body{background:#fff}body::before{display:none}.page{width:100%;padding:0}.hero,.card,.step,.mini,.footer-block,.alert{break-inside:avoid;box-shadow:none}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">X CASE · CLAUDE CODE · SKILL STACK</div>
+        <h1>Claude Code 爬全网：6 个 Skill 的分层案例</h1>
+        <p class="subtitle">这条 X 帖的核心不是“再开一个浏览器”，而是把网络访问拆成六层：Deep Research、Agent Reach、Scraping、Browser View、Chrome、Web Access。它要表达的原则很明确：从轻到重，够用就停，能不开浏览器就别开。</p>
+        <div class="badge-row">
+          <span class="badge red">case card</span>
+          <span class="badge blue">web access</span>
+          <span class="badge">research</span>
+          <span class="badge">scraping</span>
+          <span class="badge dark">automation</span>
+        </div>
+        <div class="fact-grid" aria-label="source summary">
+          <div class="fact"><span class="k">Source</span><span class="v">X status 2062115773775229318</span></div>
+          <div class="fact"><span class="k">Author</span><span class="v">Echo ./ · @0xEcho99</span></div>
+          <div class="fact"><span class="k">Engagement</span><span class="v">498 likes · 120 reposts · 35 replies</span></div>
+          <div class="fact"><span class="k">Date</span><span class="v">2026-06-03 18:14:47 UTC+8</span></div>
+        </div>
+        <div class="alert">
+          <strong>这条帖的要点不是“万能爬虫”，而是分层能力栈。</strong>
+          <p>它把公开调研、社媒抓取、批量 scraping、登录页处理、真实浏览器操作和全自动流程，拆成不同层级的工具选择。真正有价值的是“用最轻的一层先完成任务”，而不是一上来就自动化到底。</p>
+          <div class="mini-row">
+            <span class="mini-tag">from light to heavy</span>
+            <span class="mini-tag">够用就停</span>
+            <span class="mini-tag">keep browser optional</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <img src="assets/images/20260603-claude-code-web-skill-stack-swiss-blue/hero.jpg" alt="Claude Code skills poster" />
+        <figcaption><b>图里真正强调的，是从调研到自动化的能力分层。</b> 这不是单一工具说明，而是一张“用哪层能力、解决哪类问题”的操作海报。</figcaption>
+      </figure>
+    </header>
+
+    <section class="section" aria-labelledby="sec1">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">Core claim</div>
+          <h2 id="sec1">它在主张什么：一套够用的 Claude Code 网络访问技能包</h2>
+          <p>这张海报并不是单纯展示功能清单，而是在建立一个分层操作系统：先用最轻的能力拿到结果，只有在公开资料不够、登录态必要、或者需要复杂流程时，才往更重的层级走。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">light</span><span class="tag blue">research</span></div>
+          <h3>先调研，再决定要不要进入抓取层</h3>
+          <p>Deep Research 代表的是多源公开资料的整合能力。它优先解决“先把事实摸清楚”的问题，不把浏览器当默认起点。</p>
+          <ul>
+            <li>适合公开资料、背景调查、主题扫描</li>
+            <li>目标是把问题定义准，而不是先跑工具</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">social</span><span class="tag red">reach</span></div>
+          <h3>Agent Reach 把社媒当成单独抓取层</h3>
+          <p>这里的意思不是“去抓所有网页”，而是面向小红书、X、抖音、YouTube、公众号、Reddit 等社媒平台做可达性处理。</p>
+          <ul>
+            <li>把平台差异显式化</li>
+            <li>先解决入口，再谈采样与聚合</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">heavy</span><span class="tag blue">automation</span></div>
+          <h3>最重的是自动化，不是默认起点</h3>
+          <p>Web Access 的位置在最底层：它是流程自动化和复杂认证的手段，只有在前面的层级都不够用时才上。</p>
+          <ul>
+            <li>自动访问适合复杂流程和任务编排</li>
+            <li>不应该成为所有问题的默认答案</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="sec2">
+      <div class="section-head">
+        <div class="section-no">02</div>
+        <div class="section-meta">
+          <div class="label">Six-layer stack</div>
+          <h2 id="sec2">6 个 Skill 怎么分工：从公开信息到真实浏览器，再到自动化</h2>
+          <p>这张图最有信息量的部分，是把“抓数据”拆成了六个决策层。每一层对应不同的输入条件、风控成本和执行方式，顺序本身就是方法论。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="step" data-accent="red"><div class="step-head"><div class="step-num">01</div><h3>Deep Research</h3></div><p>多源调研 / 公开资料。先在公开世界里查清楚、汇总好，再决定下一步，是最轻的一层。</p></article>
+        <article class="step" data-accent="blue"><div class="step-head"><div class="step-num">02</div><h3>Agent Reach</h3></div><p>社媒抓取 / 13+ 平台。它不是泛化爬虫，而是面向社交平台的可达性与数据获取层。</p></article>
+        <article class="step" data-accent="dark"><div class="step-head"><div class="step-num">03</div><h3>Scraping</h3></div><p>批量抓取 / 突破反爬。真正进入采集层时才碰反爬、批量化、结构化抓取这些问题。</p></article>
+        <article class="step" data-accent="blue"><div class="step-head"><div class="step-num">04</div><h3>Browser View</h3></div><p>登录页面 / Cookie 隔离。需要登录态时再引入受控浏览器视图，而不是把登录页当通用入口。</p></article>
+        <article class="step" data-accent="red"><div class="step-head"><div class="step-num">05</div><h3>Chrome</h3></div><p>真实浏览器 / 人工操作。这里强调的是真人环境的操作一致性，用于需要手工介入的复杂步骤。</p></article>
+        <article class="step" data-accent="blue"><div class="step-head"><div class="step-num">06</div><h3>Web Access</h3></div><p>自动访问 / 流程自动化。它负责把前面的步骤串起来，做完整工作流，而不是替代前面所有层级。</p></article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="sec3">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">Workflow</div>
+          <h2 id="sec3">执行顺序不是装饰：Search → Social → Scrape → Login → Automate</h2>
+          <p>底栏的五段流程实际上就是一条从轻到重的选择树。它告诉你，任务应该先在哪层解决，什么时候才值得升级工具。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">01 SEARCH</span><span class="tag red">research</span></div>
+          <h3>搜公开资料，先把问题缩小</h3>
+          <p>这一步只做公开信息上的调研和定位，不要求登入、不要求自动化。它是所有后续动作的地基。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">02 SOCIAL</span><span class="tag red">multiplatform</span></div>
+          <h3>扒社媒，多平台分流</h3>
+          <p>当数据散落在社媒平台时，先用 Agent Reach 处理入口差异，再决定是否需要进一步抓取。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">03 SCRAPE</span><span class="tag red">scale</span></div>
+          <h3>批量抓数据，才进入反爬对抗</h3>
+          <p>这一步是数据规模化的入口，意味着你已经不满足于手工浏览，而是要做系统性采集。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">04 LOGIN</span><span class="tag red">cookie</span></div>
+          <h3>登录后的页面，用 Cookie 隔离处理</h3>
+          <p>这一层把身份与会话分离出来，避免把需要登录的页面和公开页面混在一起处理。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">05 AUTOMATE</span><span class="tag red">orchestration</span></div>
+          <h3>最后才自动化，把流程串起来</h3>
+          <p>自动化是工作流编排，不是所有问题的第一步。只有当前面的层级都不足以解决任务，才升级到这一层。</p>
+        </article>
+        <article class="card">
+          <div class="quote">“从轻到重，够用就停，能不开浏览器就别开。”<br/>这句话就是整张海报的操作原则。</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="sec4">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">Case takeaway</div>
+          <h2 id="sec4">这条案例对实际使用有什么价值</h2>
+          <p>它的价值不在“工具很多”，而在于把工具的边界说清楚。对实际操作来说，这能减少误用：先调研、后社媒、再抓取、再登录、最后才自动化。</p>
+        </div>
+      </div>
+      <div class="meta-grid">
+        <article class="mini">
+          <div class="tagrow"><span class="tag red">适合</span><span class="tag blue">公开调研</span></div>
+          <h4>适合什么场景</h4>
+          <p>新闻核查、竞品扫描、社媒信号汇总、页面抓取、登录态页面处理、知识库沉淀，都能找到对应层级。</p>
+        </article>
+        <article class="mini">
+          <div class="tagrow"><span class="tag red">边界</span><span class="tag blue">not universal</span></div>
+          <h4>不适合什么场景</h4>
+          <p>它不是“万能浏览器替代品”。如果问题能用公开资料、摘要或最轻的一层解决，就不该直接上重工具。</p>
+        </article>
+        <article class="mini">
+          <div class="tagrow"><span class="tag red">收束</span><span class="tag blue">save to KB</span></div>
+          <h4>最后怎么收口</h4>
+          <p>图里还提到把结果沉淀到 Obsidian / 知识库，说明它不是单次动作，而是一个“获取—处理—归档”的完整闭环。</p>
+        </article>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="tagrow"><span class="tag dark">author note</span><span class="tag blue">full content in image</span></div>
+        <h3>这条帖本身几乎就是一张海报，而不是长文本</h3>
+        <p>帖子正文只是链接，真正的信息密度主要在配图里。这也是为什么做案例卡时，要把图片、结构和顺序都一起保住，而不能只摘一个标题。</p>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="sec5">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">Sources</div>
+          <h2 id="sec5">来源与证据</h2>
+          <p>这张卡的事实底座来自 X status 本体、vxtwitter 元数据和海报配图。标题、作者、互动数和图片内容都已对齐。</p>
+        </div>
+      </div>
+      <div class="footer-block">
+        <div class="links">
+          <span class="badge blue">https://x.com/i/status/2062115773775229318</span>
+          <span class="badge">http://x.com/i/article/2062111799772684288</span>
+          <span class="badge red">poster image localized</span>
+        </div>
+        <div class="rule"></div>
+        <p>一句话结论：这不是“会不会爬网”的炫技卡，而是一张把 Claude Code 网络访问能力分层的操作海报。真正重要的是选择合适的一层，而不是把所有任务都推给最重的一层。</p>
+      </div>
+    </section>
+
+    <p class="source-note">Source: X status 2062115773775229318 · Echo ./ (@0xEcho99) · Swiss red-blue case card · 2026-06-04 07:54:12</p>
+  </main>
+</body>
+</html>
