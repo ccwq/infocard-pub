@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Claude Code 动态工作流：自定义 Harness、子 Agent 隔离与三大失败模式</title>
+  <meta name="description" content="Thariq 的 Claude Code 动态工作流长文拆解：Harness 自生成、JS 工作流接口、子 Agent 与 worktree 隔离、动态选模，以及三大失败模式。" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--paper:#f8efd9;--paper-2:#fffaf0;--ink:#1d1b16;--muted:#6b6254;--line:#28231d;--shadow:8px 8px 0 rgba(29,27,22,.14);--radius:22px;--green:#9bdc77;--blue:#7cc8ff;--purple:#c7a2ff;--orange:#ffc45c;--yellow:#ffe36e;--red:#ff9a89;--teal:#7de3d6;--soft-green:#ebf8dd;--soft-blue:#e8f6ff;--soft-purple:#f1eaff;--soft-orange:#fff1d2;--soft-yellow:#fff8cc;--soft-red:#ffe9e4;--soft-teal:#e5fbf7;--soft-stone:#fff8ea}
+    html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:radial-gradient(circle at 12% 12%, rgba(255,222,97,.28) 0 13%, transparent 14%),radial-gradient(circle at 84% 10%, rgba(124,200,255,.18) 0 9%, transparent 10%),linear-gradient(120deg, rgba(255,255,255,.66), transparent 45%),var(--paper);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif;line-height:1.55}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;background-image:linear-gradient(rgba(29,27,22,.06) 1px, transparent 1px),linear-gradient(90deg, rgba(29,27,22,.05) 1px, transparent 1px);background-size:38px 38px;mask-image:linear-gradient(to bottom, black, transparent 88%)}
+    .page{width:min(1180px, calc(100% - 24px));margin:0 auto;padding:20px 0 84px}
+    .hero{position:relative;overflow:hidden;border:3px solid var(--line);border-radius:28px;background:var(--paper-2);box-shadow:var(--shadow);padding:clamp(20px,4vw,44px);min-height:300px}
+    .hero::after{content:"⚙️";position:absolute;right:clamp(14px,4vw,48px);top:clamp(12px,3vw,36px);transform:rotate(10deg);font-size:clamp(42px,9vw,96px);filter:drop-shadow(4px 7px 0 rgba(29,27,22,.12))}
+    .kicker{display:inline-flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:999px;background:#fff3b7;padding:7px 12px;font-size:12.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    h1{max-width:860px;margin:18px 0 12px;font-size:clamp(32px,5.8vw,72px);line-height:.98;letter-spacing:-.06em}
+    .hero p{max-width:860px;margin:0;color:var(--muted);font-size:clamp(15px,1.85vw,20px)}
+    .quickline{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px;max-width:980px}
+    .pill{display:inline-flex;align-items:center;gap:6px;min-height:34px;border:2px solid var(--line);border-radius:999px;background:#fff;padding:6px 10px;font-weight:850;font-size:12.5px;box-shadow:3px 3px 0 rgba(29,27,22,.09)}
+    .section-head{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:end;margin:32px 0 14px}
+    .section-no{display:grid;place-items:center;width:54px;height:54px;border:3px solid var(--line);border-radius:16px;background:#fff;box-shadow:5px 5px 0 rgba(29,27,22,.12);font-size:23px;font-weight:950}
+    .section-title h2{margin:0;font-size:clamp(22px,3.8vw,38px);line-height:1;letter-spacing:-.04em}
+    .section-title p{margin:7px 0 0;color:var(--muted)}
+    .choice-grid{display:grid;grid-template-columns:repeat(5, minmax(120px, 1fr));gap:10px}
+    .choice-card{position:relative;border:2px solid var(--line);border-radius:18px;background:#fff;padding:12px;min-height:132px;box-shadow:5px 5px 0 rgba(29,27,22,.1)}
+    .choice-card strong{display:block;margin:8px 0 6px;font-size:16px;line-height:1.18}
+    .choice-card span{display:block;color:var(--muted);font-size:12.5px;line-height:1.45}
+    .choice-card .arrow{display:inline-grid;place-items:center;width:28px;height:28px;border:2px solid var(--line);border-radius:50%;background:var(--paper);font-weight:900}
+    .cards{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:16px}
+    .framework-card{--accent:var(--blue);--soft:var(--soft-blue);position:relative;display:grid;grid-template-rows:auto 1fr;overflow:hidden;border:3px solid var(--line);border-radius:var(--radius);background:#fff;box-shadow:var(--shadow)}
+    .framework-card[data-kind="harness"]{--accent:var(--green);--soft:var(--soft-green)}
+    .framework-card[data-kind="api"]{--accent:var(--blue);--soft:var(--soft-blue)}
+    .framework-card[data-kind="failure"]{--accent:var(--red);--soft:var(--soft-red)}
+    .framework-card[data-kind="examples"]{--accent:var(--purple);--soft:var(--soft-purple)}
+    .framework-card[data-kind="advice"]{--accent:var(--orange);--soft:var(--soft-orange)}
+    .framework-card[data-kind="image"]{--accent:var(--teal);--soft:var(--soft-teal)}
+    .card-top{position:relative;padding:16px 16px 14px;background:linear-gradient(135deg, var(--soft), #fff 70%);border-bottom:3px solid var(--line)}
+    .card-top::before{content:"";position:absolute;inset:0 0 auto 0;height:8px;background:var(--accent);border-bottom:3px solid var(--line)}
+    .name-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding-top:10px}
+    .name-row h3{margin:0;font-size:clamp(20px,2vw,30px);letter-spacing:-.04em;line-height:1}
+    .index-badge{flex:0 0 auto;display:grid;place-items:center;width:40px;height:40px;border:2px solid var(--line);border-radius:13px;background:var(--accent);font-weight:950;box-shadow:4px 4px 0 rgba(29,27,22,.12)}
+    .tagline{display:inline-block;margin-top:8px;color:var(--muted);font-weight:850}
+    .position{margin-top:10px;border:2px dashed rgba(29,27,22,.28);border-radius:16px;background:rgba(255,255,255,.72);padding:10px 11px;font-weight:900}
+    .card-body{display:grid;gap:12px;padding:14px}
+    .info-block{border:2px solid rgba(29,27,22,.18);border-radius:16px;background:#fffdf7;padding:12px}
+    .info-block h4{display:flex;align-items:center;gap:7px;margin:0 0 8px;font-size:14px;letter-spacing:.02em}
+    .info-block ul{margin:0;padding-left:18px}
+    .info-block li{margin:3px 0}
+    .mini-grid{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:10px}
+    .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+    .chip{display:inline-flex;align-items:center;border:2px solid var(--line);border-radius:999px;background:#fff;padding:4px 9px;font-size:12.2px;font-weight:850;line-height:1.2}
+    .stars{letter-spacing:2px;color:var(--ink);white-space:nowrap}
+    .stars .on{color:var(--accent);text-shadow:0 1px 0 var(--line)}
+    .stars .off{color:rgba(29,27,22,.22)}
+    .quote{border:2px solid var(--line);border-radius:16px;background:var(--soft);padding:12px;font-weight:850;line-height:1.5}
+    .quote small{display:block;margin-top:8px;color:var(--muted);font-weight:700}
+    .matrix{display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:12px}
+    .scenario{border:2px solid var(--line);border-radius:18px;background:#fff;padding:14px;box-shadow:5px 5px 0 rgba(29,27,22,.1)}
+    .scenario h3{margin:0 0 8px;font-size:20px;line-height:1.1}
+    .scenario p{margin:0;color:var(--muted)}
+    .figure{margin-top:18px;border:3px solid var(--line);border-radius:24px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}
+    .figure img{display:block;width:100%;height:auto}
+    .figcap{padding:10px 14px;border-top:1px solid rgba(29,27,22,.16);font-size:12.5px;color:var(--muted);background:var(--paper-2)}
+    .footer-note{margin-top:28px;border:3px solid var(--line);border-radius:22px;background:#fff7cb;padding:18px;box-shadow:var(--shadow);font-size:clamp(17px,2vw,22px);font-weight:950;text-align:center}
+    .source-note{margin-top:14px;color:var(--muted);text-align:center;font-size:12.5px}
+    .fab-save{position:fixed;right:16px;bottom:18px;z-index:30;display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border:none;border-radius:999px;background:rgba(13,148,136,.96);color:#fff;font-family:inherit;font-size:13px;font-weight:800;letter-spacing:.02em;box-shadow:0 10px 24px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.16) inset;cursor:pointer;backdrop-filter:blur(8px)}
+    .fab-save:hover{background:#0d7c70}
+    .fab-save .icon{font-size:15px;line-height:1}
+    @media (max-width:1050px){
+      .choice-grid{grid-template-columns:repeat(3, minmax(0,1fr))}
+      .cards{grid-template-columns:1fr}
+      .matrix{grid-template-columns:repeat(2, minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 18px,1180px);padding-top:10px}
+      .hero{border-radius:20px;min-height:unset}
+      .hero::after{opacity:.22;right:12px;top:14px}
+      .quickline{margin-top:18px}
+      .choice-grid,.matrix,.mini-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;align-items:start}
+      .section-no{width:48px;height:48px}
+      .card-body{padding:12px}
+      .card-top{padding:14px 12px 12px}
+      .fab-save{right:10px;bottom:10px;padding:10px 12px;font-size:12.5px}
+    }
+    @media print{body{background:#fff}body::before{display:none}.page{width:100%;padding:0}.hero,.framework-card,.scenario,.choice-card,.footer-note,.figure{box-shadow:none;break-inside:avoid}.cards,.matrix{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="kicker">Claude Code · Dynamic Workflows</div>
+      <h1 id="page-title">Claude Code 动态工作流：自定义 Harness、子 Agent 隔离与三大失败模式</h1>
+      <p>Thariq 这篇 X 长文的核心不是“多加几个提示词”，而是把 Claude Code 变成一个可按任务临时生成的 Harness 系统：可以动态起工作流、选择模型、隔离 worktree，并用更强的流程去对抗复杂任务里的 laziness、bias 和 drift。</p>
+      <div class="quickline">
+        <span class="pill">🧠 Dynamic Harness</span>
+        <span class="pill">🧩 JavaScript Workflow</span>
+        <span class="pill">🧪 Adversarial Tasks</span>
+        <span class="pill">🪵 Worktree Isolation</span>
+        <span class="pill">🔁 Resume & Reuse</span>
+        <span class="pill">⚠️ 3 Failure Modes</span>
+      </div>
+    </section>
+
+    <section aria-labelledby="takeaways-title">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-title">
+          <h2 id="takeaways-title">先看结论：它到底解决什么</h2>
+          <p>把一条长推文压缩成 5 个最值得记住的判断点。</p>
+        </div>
+      </div>
+      <div class="choice-grid">
+        <article class="choice-card"><span class="arrow">1</span><strong>Claude Code 不是固定 harness，而是可按任务临时生成 harness 的执行层。</strong><span>作者强调：工作流是“为任务定制的 harness”。</span></article>
+        <article class="choice-card"><span class="arrow">2</span><strong>动态工作流本质上是一个 JS 文件，靠少量特殊函数协调子 agent。</strong><span>可以把它当成“任务级编排脚本”。</span></article>
+        <article class="choice-card"><span class="arrow">3</span><strong>它能按任务决定模型和隔离方式。</strong><span>不同子 agent 可分配不同模型，必要时独立 worktree 运行。</span></article>
+        <article class="choice-card"><span class="arrow">4</span><strong>复杂任务更适合自定义流程，而不是把所有东西塞进同一个上下文窗口。</strong><span>尤其是 adversarial、长流程、并行型任务。</span></article>
+        <article class="choice-card"><span class="arrow">5</span><strong>作者给出的 3 个失败模式，基本就是复杂 Agent 任务的通病清单。</strong><span>Agentic laziness / Self-preferential bias / Goal drift。</span></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="harness-title">
+      <div class="section-head">
+        <div class="section-no">02</div>
+        <div class="section-title">
+          <h2 id="harness-title">Harness 机制：为什么要“动态”</h2>
+          <p>默认 Claude Code harness 适合编码，但很多任务“长得像编码”，又不完全是编码。</p>
+        </div>
+      </div>
+      <div class="cards">
+        <article class="framework-card" data-kind="harness">
+          <header class="card-top">
+            <div class="name-row">
+              <div>
+                <h3>任务级 Harness</h3>
+                <span class="tagline">每个任务可以自己长出一套执行脚手架</span>
+              </div>
+              <span class="index-badge">01</span>
+            </div>
+            <div class="position">关键意思：不是固定一个工作台，而是按任务类型临时拼出更合适的工作台。</div>
+            <div class="meta">
+              <span class="chip">JS workflow</span>
+              <span class="chip">on the fly</span>
+              <span class="chip stars" aria-label="复杂度 3 星"><span class="on">★ ★ ★</span><span class="off"> ★ ★</span></span>
+            </div>
+          </header>
+          <div class="card-body">
+            <div class="mini-grid">
+              <section class="info-block">
+                <h4>⭐ 核心判断</h4>
+                <ul>
+                  <li>“Workflow” 不是插件，是执行编排</li>
+                  <li>可以在任务开始时生成专用 harness</li>
+                  <li>适合特定类型任务：测试、审计、检索、争议分析</li>
+                </ul>
+              </section>
+              <section class="info-block">
+                <h4>🧰 你能得到什么</h4>
+                <ul>
+                  <li>更强的任务隔离</li>
+                  <li>更好的重试与恢复</li>
+                  <li>更贴合任务的模型与工具组合</li>
+                </ul>
+              </section>
+            </div>
+            <div class="quote">“Workflows allow you to dynamically create harnesses that enable Claude to solve all of those problems and more natively inside of Claude Code.”<small>—— 文中核心定义</small></div>
+          </div>
+        </article>
+
+        <article class="framework-card" data-kind="api">
+          <header class="card-top">
+            <div class="name-row">
+              <div>
+                <h3>Workflow.js 接口</h3>
+                <span class="tagline">一段 JS 文件 + 几个特殊函数 = 任务编排层</span>
+              </div>
+              <span class="index-badge">02</span>
+            </div>
+            <div class="position">作者说的是“execute a javascript file with a few special functions”，重点是编排，不是模板。</div>
+            <div class="meta">
+              <span class="chip">JSON / Math / Array</span>
+              <span class="chip">spawn / coordinate</span>
+              <span class="chip stars" aria-label="复杂度 2 星"><span class="on">★ ★</span><span class="off"> ★ ★ ★</span></span>
+            </div>
+          </header>
+          <div class="card-body">
+            <div class="mini-grid">
+              <section class="info-block">
+                <h4>⭐ 重点能力</h4>
+                <ul>
+                  <li>协调多子 agent</li>
+                  <li>按步骤执行任务树</li>
+                  <li>可复用、可中断、可恢复</li>
+                </ul>
+              </section>
+              <section class="info-block">
+                <h4>🧰 适合的场景</h4>
+                <ul>
+                  <li>跨阶段工作流</li>
+                  <li>需要多角色协作的任务</li>
+                  <li>要把“怎么做”显式写出来的任务</li>
+                </ul>
+              </section>
+            </div>
+            <div class="quote">“Dynamic workflows also include standard JavaScript functions like JSON, Math, and Array.”<small>—— 表明它是可编程执行层，而不是纯配置文件</small></div>
+          </div>
+        </article>
+
+        <article class="framework-card" data-kind="harness">
+          <header class="card-top">
+            <div class="name-row">
+              <div>
+                <h3>模型 / worktree 决策</h3>
+                <span class="tagline">工作流可以决定子 agent 用什么模型、是否独立 worktree</span>
+              </div>
+              <span class="index-badge">03</span>
+            </div>
+            <div class="position">这意味着：作者把“智能度”和“隔离度”都交给 workflow 选择。</div>
+            <div class="meta">
+              <span class="chip">model selection</span>
+              <span class="chip">worktree isolation</span>
+              <span class="chip stars" aria-label="复杂度 3 星"><span class="on">★ ★ ★</span><span class="off"> ★ ★</span></span>
+            </div>
+          </header>
+          <div class="card-body">
+            <div class="info-block">
+              <h4>🎯 关键记忆</h4>
+              <ul>
+                <li>工作流可以根据任务选择“便宜/快/强”的不同模型。</li>
+                <li>需要隔离时，让子 agent 在自己的 worktree 里跑，避免互相污染。</li>
+                <li>这不是“多 agent”这么简单，而是“多 agent + 多执行域”。</li>
+              </ul>
+            </div>
+            <div class="quote">复杂任务不是只要更多 token，而是要更好的执行边界。</div>
+          </div>
+        </article>
+
+        <article class="framework-card" data-kind="failure">
+          <header class="card-top">
+            <div class="name-row">
+              <div>
+                <h3>三大失败模式</h3>
+                <span class="tagline">复杂任务里，Agent 很容易在这三件事上翻车</span>
+              </div>
+              <span class="index-badge">04</span>
+            </div>
+            <div class="position">作者明确点名：Agentic laziness、Self-preferential bias、Goal drift。</div>
+            <div class="meta">
+              <span class="chip">failure taxonomy</span>
+              <span class="chip">adversarial tasks</span>
+              <span class="chip stars" aria-label="复杂度 3 星"><span class="on">★ ★ ★</span><span class="off"> ★ ★</span></span>
+            </div>
+          </header>
+          <div class="card-body">
+            <div class="mini-grid">
+              <section class="info-block">
+                <h4>⚠️ Agentic laziness</h4>
+                <p>复杂任务没做完就提前宣布完成，常见于多步骤审查只处理了部分条目就停手。</p>
+              </section>
+              <section class="info-block">
+                <h4>⚠️ Self-preferential bias</h4>
+                <p>当要求它拿自己的结果去对照 rubric 时，它会倾向偏好自己的产出。</p>
+              </section>
+              <section class="info-block">
+                <h4>⚠️ Goal drift</h4>
+                <p>任务越长，越容易慢慢偏离原始目标，最后做成“很忙但不对题”的结果。</p>
+              </section>
+              <section class="info-block">
+                <h4>🔁 对策思路</h4>
+                <p>把任务拆成 workflow，把验证与执行分离，把复核动作显式写进流程里。</p>
+              </section>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="examples-title">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-title">
+          <h2 id="examples-title">文章里最能激发想象力的 9 个示例</h2>
+          <p>这些 prompt 不是装饰，而是在告诉你：workflow 可以把很多原本“像编码”的问题流程化。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <article class="scenario"><h3>不稳定测试复现</h3><p>“这个测试 1/50 才失败。建一个 workflow，复现、提出理论、在 worktree 里对抗性测试它们。”</p></article>
+        <article class="scenario"><h3>挖掘历史修正</h3><p>“用 workflow 扫描最近 50 个 session，把我反复犯的纠正点挖出来，固化成 CLAUDE.md 规则。”</p></article>
+        <article class="scenario"><h3>Slack 六个月根因挖掘</h3><p>“用 workflow 去 Slack 里找半年内重复出现但没人建单的根因。”</p></article>
+        <article class="scenario"><h3>商业计划拆解</h3><p>“从投资人、客户、竞争对手三个视角，对商业计划做多 agent 拆解。”</p></article>
+        <article class="scenario"><h3>简历分拣</h3><p>“给 80 份简历排序并复核前十，必要时用 AskUserQuestion 做 rubric 访谈。”</p></article>
+        <article class="scenario"><h3>命名 tournament</h3><p>“用 workflow 头脑风暴工具名，再做淘汰赛选出前三。”</p></article>
+        <article class="scenario"><h3>批量重命名</h3><p>“把 User model 全仓库改成 Account。”</p></article>
+        <article class="scenario"><h3>事实核查</h3><p>“用 workflow 验证博客草稿里的每一个技术主张，我不想发错东西。”</p></article>
+        <article class="scenario"><h3>任务即 harness</h3><p>这些例子共同说明：workflow 的作用不是“多点几下”，而是把任务变成一个可执行的专用系统。</p></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="advice-title">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-title">
+          <h2 id="advice-title">真正可落地的记忆点</h2>
+          <p>如果你要把这篇文章转成方法论，这几条最重要。</p>
+        </div>
+      </div>
+      <div class="cards">
+        <article class="framework-card" data-kind="advice">
+          <header class="card-top">
+            <div class="name-row">
+              <div>
+                <h3>何时该用 workflow</h3>
+                <span class="tagline">长、杂、需要复核、容易偏题的任务</span>
+              </div>
+              <span class="index-badge">05</span>
+            </div>
+            <div class="position">优先处理那些“默认 harness 容易失手”的任务，而不是所有任务都上 workflow。</div>
+          </header>
+          <div class="card-body">
+            <div class="info-block">
+              <h4>适用信号</h4>
+              <ul>
+                <li>任务多阶段、长时间运行</li>
+                <li>需要 adversarial 验证或多轮复核</li>
+                <li>需要模型分配和执行隔离</li>
+              </ul>
+            </div>
+            <div class="quote">工作流不是“更花哨的 prompt”，而是“把任务边界写进执行系统”。</div>
+          </div>
+        </article>
+
+        <article class="framework-card" data-kind="image">
+          <header class="card-top">
+            <div class="name-row">
+              <div>
+                <h3>原文配图</h3>
+                <span class="tagline">动态 workflow 的示意图，适合当作阅读锚点</span>
+              </div>
+              <span class="index-badge">06</span>
+            </div>
+            <div class="position">图在这篇里承担的是“把 workflow 具体化”的作用，而不是纯装饰。</div>
+          </header>
+          <div class="card-body">
+            <div class="info-block">
+              <h4>配图说明</h4>
+              <p>这张图来自原文链接页，用来帮助理解“动态 workflow = 可执行的任务 harness + 子 agent 编排 + 模型/隔离决策”。</p>
+            </div>
+            <div class="quote">完整内容往往不在正文里，而在作者给出的例子和图里。</div>
+          </div>
+        </article>
+      </div>
+      <figure class="figure">
+        <img src="assets/images/20260603-claude-code-dynamic-workflows/claude-code-dynamic-workflows.jpg" alt="Claude Code dynamic workflows 原文配图" loading="lazy" />
+        <figcaption class="figcap">配图：Thariq 文章里的动态 workflow 示例图。文章主张是把 Claude Code 从固定 harness 变成可按任务生成的执行系统。</figcaption>
+      </figure>
+    </section>
+
+    <div class="footer-note">最值得记住的一句：动态工作流不是更会聊天，而是更会把任务组织成可执行的系统。</div>
+    <p class="source-note">来源：X 长文 / article 版《A harness for every task: dynamic workflows in Claude Code》· Thariq (@trq212)</p>
+  </main>
+
+  <button class="fab-save save-btn" id="save-btn" onclick="saveCard()" aria-label="保存 PNG"><span class="icon">💾</span><span>保存 PNG</span></button>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+    async function saveCard(){
+      const button = document.getElementById('save-btn');
+      const card = document.querySelector('.page');
+      if(!card || !window.html2canvas) return;
+      const prev = button ? button.style.visibility : '';
+      if(button) button.style.visibility = 'hidden';
+      const canvas = await html2canvas(card, {backgroundColor:'#f8efd9', scale: Math.max(2, window.devicePixelRatio || 1), useCORS:true, logging:false});
+      if(button) button.style.visibility = prev;
+      const link = document.createElement('a');
+      link.download = '20260603-claude-code-dynamic-workflows.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
