@@ -50,10 +50,12 @@ def build_iframe(t):
     url = t.get('preview_url', '')
     if not url:
         return ''
+    slug = t.get('slug', 'preview')
     return (
-        f'<div class="preview-wrap">'
+        f'<div class="preview-wrap" id="wrap-{slug}">'
         f'<iframe src="{url}" loading="lazy" '
-        f'title="{t["title"]}" class="preview-iframe" referrerpolicy="no-referrer"></iframe>'
+        f'title="{t["title"]}" class="preview-iframe" id="frame-{slug}" '
+        f'referrerpolicy="no-referrer"></iframe>'
         f'</div>'
     )
 
@@ -112,8 +114,8 @@ def render(keywords_escaped, themes_html):
     .theme-body{{padding:14px;display:grid;gap:12px}}.desc{{font-size:14.5px;line-height:1.7;margin:0}}.chips{{display:flex;flex-wrap:wrap;gap:8px}}.chips span{{padding:6px 8px;border:1.5px solid var(--line);font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff}}
     .samples{{display:grid;gap:8px}}.samples a{{display:block;padding:10px 12px;border:1.5px solid var(--line);background:#fff;text-decoration:none;font-size:13px;line-height:1.5;overflow-wrap:anywhere}}.samples a small{{display:block;margin-top:4px;color:var(--muted);font-size:11px}}
     .swatch{{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}}.sw{{height:24px;border:1.5px solid var(--line)}}
-    .preview-wrap{{overflow:hidden;border:2px solid var(--line);height:560px;position:relative}}
-    .preview-iframe{{width:100%;height:560px;border:none;display:block;scrolling:no;overflow:hidden}}
+    .preview-wrap{{overflow:hidden;border:2px solid var(--line);position:relative}}
+    .preview-iframe{{width:100%;height:1px;border:none;display:block;min-height:200px;scrolling:no}}
     .note{{padding:12px 14px;border-top:2px solid var(--line);background:#faf7f1;font-size:12.5px;line-height:1.65;color:var(--muted)}}
     footer{{margin-top:18px;padding:12px 14px;border:2px solid var(--line);background:#fff;font-size:12.5px;line-height:1.7;color:var(--muted);box-shadow:var(--shadow)}}
     @media (max-width:880px){{.intro,.themes{{grid-template-columns:1fr}}}} @media (max-width:720px){{.page{{width:min(100%,calc(100% - 14px));padding:10px 0 44px}}.hero{{padding:14px 12px 12px}}.topbar{{flex-direction:column;align-items:flex-start}}.theme-name{{font-size:22px}}.desc{{font-size:14px}}}}
@@ -144,6 +146,40 @@ def render(keywords_escaped, themes_html):
     </section>
     <footer>维护原则：修改主题请编辑 <code>_themes.yaml</code>，然后运行 <code>python3 scripts/rebuild_themes.py</code> 重建本页面；若主题新增或改名，还应同步更新对应 Skill 与 fact_store。本页不写 sidecar，不进入 <code>_index.yaml</code>，但通过 GitHub Pages 正常公开访问。</footer>
   </main>
+  <script>
+    window.addEventListener('message', function(e) {{
+      if (e.data && e.data.type === 'theme-height') {{
+        var slug = e.data.slug;
+        var h = e.data.height;
+        var wrap = document.getElementById('wrap-' + slug);
+        var frame = document.getElementById('frame-' + slug);
+        if (wrap && h > 0) {{
+          wrap.style.height = h + 'px';
+          frame.style.height = h + 'px';
+        }}
+      }}
+    }});
+    // Also try direct scrollHeight read for same-origin iframes
+    function tryDirectHeight() {{
+      document.querySelectorAll('.preview-iframe').forEach(function(frame) {{
+        try {{
+          var doc = frame.contentDocument || frame.contentWindow && frame.contentWindow.document;
+          if (doc && doc.body) {{
+            var h = doc.body.scrollHeight;
+            var slug = frame.id.replace('frame-', '');
+            var wrap = document.getElementById('wrap-' + slug);
+            if (wrap && h > 0) {{
+              wrap.style.height = h + 'px';
+              frame.style.height = h + 'px';
+            }}
+          }}
+        }} catch(ex) {{}}
+      }});
+    }}
+    document.addEventListener('DOMContentLoaded', tryDirectHeight);
+    setTimeout(tryDirectHeight, 800);
+    setTimeout(tryDirectHeight, 2000);
+  </script>
 </body>
 </html>'''
 
