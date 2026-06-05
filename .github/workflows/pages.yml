@@ -25,19 +25,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: '22'
 
-      - name: Install dependencies
-        run: python -m pip install --disable-pip-version-check pyyaml
+      - name: Verify committed generated artifacts
+        run: npm run verify
 
-      - name: Rebuild _index.yaml for deploy artifact
-        run: python scripts/rebuild_index.py
-
-      - name: Verify _index.yaml before deploy
-        run: python scripts/verify_index.py
+      - name: Ensure build does not mutate tracked files
+        run: git diff --exit-code
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -55,37 +52,39 @@ jobs:
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
-          python - <<'PY'
-          import os
-          import time
-          import urllib.request
-          import yaml
+          node - <<'NODE'
+          const fs = require('fs');
 
-          page_url = os.environ['PAGE_URL'].rstrip('/')
-          index_url = page_url + '/_index.yaml'
+          const pageUrl = process.env.PAGE_URL.replace(/\/$/, '');
+          const indexUrl = `${pageUrl}/_index.yaml`;
+          const expected = fs.readFileSync('_index.yaml', 'utf8');
+          const local = require('./scripts/index-build-lib').extractInjectedIndexData(fs.readFileSync('index.html', 'utf8'));
+          const localTop = Array.isArray(local.cards) && local.cards.length ? local.cards[0].slug : null;
 
-          with open('_index.yaml', 'r', encoding='utf-8') as fp:
-              local = yaml.safe_load(fp)
-          local_count = local.get('_count')
-          local_cards = local.get('cards') or []
-          local_top = local_cards[0]['slug'] if local_cards else None
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-          last_err = None
-          for attempt in range(1, 11):
-              try:
-                  with urllib.request.urlopen(index_url, timeout=20) as resp:
-                      remote = yaml.safe_load(resp.read().decode('utf-8'))
-                  remote_count = remote.get('_count')
-                  remote_cards = remote.get('cards') or []
-                  remote_top = remote_cards[0]['slug'] if remote_cards else None
-                  if remote_count == local_count and remote_top == local_top:
-                      print(f'Smoke test OK on attempt {attempt}: count={remote_count} top={remote_top}')
-                      raise SystemExit(0)
-                  last_err = f'mismatch attempt {attempt}: local_count={local_count}, remote_count={remote_count}, local_top={local_top}, remote_top={remote_top}'
-              except Exception as exc:
-                  last_err = f'attempt {attempt} failed: {exc}'
-              print(last_err)
-              time.sleep(15)
-
-          raise SystemExit(f'Deployed index smoke test failed: {last_err}')
-          PY
+          (async () => {
+            let lastErr = '';
+            for (let attempt = 1; attempt <= 10; attempt += 1) {
+              try {
+                const response = await fetch(indexUrl, { cache: 'no-store' });
+                const remoteText = await response.text();
+                const remote = require('./assets/home/vendor/js-yaml.min.js').load(remoteText);
+                const remoteTop = Array.isArray(remote.cards) && remote.cards.length ? remote.cards[0].slug : null;
+                if (remoteText === expected && remoteTop === localTop) {
+                  console.log(`Smoke test OK on attempt ${attempt}: top=${remoteTop}`);
+                  process.exit(0);
+                }
+                lastErr = `mismatch attempt ${attempt}: local_top=${localTop}, remote_top=${remoteTop}`;
+              } catch (error) {
+                lastErr = `attempt ${attempt} failed: ${error.message}`;
+              }
+              console.log(lastErr);
+              await sleep(15000);
+            }
+            throw new Error(`Deployed index smoke test failed: ${lastErr}`);
+          })().catch((error) => {
+            console.error(error.message);
+            process.exit(1);
+          });
+          NODE

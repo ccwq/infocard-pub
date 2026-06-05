@@ -26,9 +26,9 @@ tags:
 
 ## 索引
 
-- `_index.yaml` 由 workflow 自动维护，不要手动编辑
-- Pages 部署前会现场重建 `_index.yaml`，保证上线产物与首页列表原子一致
-- 索引页：`index.html`（客户端 JS 筛选）
+- `_index.yaml` 与首页注入数据由本地 `npm run build` 统一生成，不要手动编辑
+- `npm run build` 会先执行 `node scripts/fix-meta-date.js --write --force` 对齐 meta 时间
+- 索引页：`index.html`（构建时注入数据，客户端 JS 筛选）
 
 ## 分类目录
 
@@ -43,19 +43,19 @@ tags:
 
 1. Agent 生成信息卡 HTML / `report.md`
 2. Agent 同步创建 `index.html.meta.yaml`
-3. `git push` 到 `main`（不要手动编辑 `_index.yaml`）
-4. `pages.yml` 在部署 artifact 前现场重建并校验 `_index.yaml`
-5. `index.yml` 将同一套规则生成的 `_index.yaml` 回写到仓库，保持 repo 与线上一致
+3. 运行 `npm run build`，生成 `_index.yaml` 并把同一份索引数据注入根目录 `index.html`
+4. `git push` 到 `main`（不要手动编辑 `_index.yaml` 和首页注入数据）
+5. workflow 只校验产物是否已按本地构建规则更新，不再代为创建或回写
 6. 部署后 workflow 会对线上 `/_index.yaml` 做 smoke test，确认首页 list 已包含最新结果
 
 ## 防漏发布机制
 
-- `_index.yaml` 由 `scripts/rebuild_index.py` 统一生成，`index.yml` 和 `pages.yml` 共用同一逻辑，避免两套规则漂移
-- `scripts/verify_index.py` 会阻止以下坏状态进入部署：
+- `_index.yaml` 与 `index.html` 注入数据由 `npm run build` 统一生成，`npm run verify` 只做一致性校验
+- `npm run verify` 会阻止以下坏状态进入部署：
   - meta 缺字段
   - meta 指向的 HTML 不存在
-  - `_index.yaml` 缺卡 / 重复 slug / 字段不一致
-  - `_count` 与实际卡片数不一致
-- GitHub Pages 上传前重新生成 `_index.yaml`，避免“详情页已部署但首页还是旧 list”的竞态
-- 部署完成后会轮询线上 `/_index.yaml`，比对卡片数量和顶部 slug；不一致直接让 workflow 失败
+  - `_index.yaml` 未按当前源码重建
+  - `index.html` 中注入的索引数据未同步更新
+- workflow 会检查构建后 `git diff --exit-code`，防止漏提生成产物
+- 部署完成后会轮询线上 `/_index.yaml`，比对线上产物与仓库提交结果是否一致；不一致直接让 workflow 失败
 

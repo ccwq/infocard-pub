@@ -3,6 +3,7 @@
 
   const BATCH_SIZE = 12;
   const SESSION_KEY = 'infocard_archive_state';
+  const INDEX_DATA_SELECTOR = '#home-index-data';
 
   const loadPersistedState = () => {
     try {
@@ -384,10 +385,17 @@
         }
       };
 
+      const readInjectedIndex = () => {
+        const source = document.querySelector(INDEX_DATA_SELECTOR);
+        if (!source) {
+          throw new Error('missing injected home-index-data');
+        }
+        const payload = source.textContent || '{}';
+        return JSON.parse(payload);
+      };
+
       const fetchIndex = async () => {
-        const response = await fetch(`./_index.yaml?t=${Date.now()}`, { cache: 'no-store' });
-        const text = await response.text();
-        const index = jsyaml.load(text);
+        const index = readInjectedIndex();
         const cards = Array.isArray(index?.cards) ? index.cards : [];
         allCards.value = cards;
       };
