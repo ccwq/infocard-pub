@@ -10,8 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. 在 `docs/` 下新增或更新信息卡页面。
 2. 为每个页面维护同名 `.meta.yaml`。
-3. 运行本地 Node 构建脚本，先执行 `fix-meta-date --write --date-source first`，再生成 `_index.yaml` 并把索引数据注入 `index.html`。
-4. 推送到 `main` 后，GitHub Actions 只校验这些生成产物是否已经提交，然后部署 Pages。
+3. 先运行 `npm run build`，确认本地可以成功生成 `_index.yaml` 并把索引数据注入 `index.html`。
+4. 通过后再提交并推送到 `main`；GitHub Actions 只校验这些生成产物是否已经提交，然后部署 Pages。
 
 ## Common commands
 
