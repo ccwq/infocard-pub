@@ -27,7 +27,14 @@ tags:
 ## 索引
 
 - `_index.yaml` 与首页注入数据由本地 `npm run build` 统一生成，不要手动编辑
-- `npm run build` 会先执行 `node scripts/fix-meta-date.js --write --force` 对齐 meta 时间
+- `npm run build` 会先执行 `node scripts/fix-meta-date.js --write --date-source first`，只补齐缺失的 `date`
+
+`scripts/fix-meta-date.js` 支持两种 git 时间来源：
+
+- `--date-source first`：使用 HTML 的首次提交时间
+- `--date-source last`：使用 HTML 的最后一次提交时间
+- 不加 `--force` 时仅补全缺失字段；加 `--force` 时覆盖已有字段
+- `--sync-updated` 开启后，`updated` 会沿用同一时间来源策略
 - 索引页：`index.html`（构建时注入数据，客户端 JS 筛选）
 
 ## 分类目录

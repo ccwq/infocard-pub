@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. 在 `docs/` 下新增或更新信息卡页面。
 2. 为每个页面维护同名 `.meta.yaml`。
-3. 运行本地 Node 构建脚本，先执行 `fix-meta-date --write --force`，再生成 `_index.yaml` 并把索引数据注入 `index.html`。
+3. 运行本地 Node 构建脚本，先执行 `fix-meta-date --write --date-source first`，再生成 `_index.yaml` 并把索引数据注入 `index.html`。
 4. 推送到 `main` 后，GitHub Actions 只校验这些生成产物是否已经提交，然后部署 Pages。
 
 ## Common commands
@@ -29,14 +29,17 @@ npm run preview
 仓库的正式生成链路已切到本地 Node 脚本；Python 仅保留少量辅助脚本。
 
 ```bash
-# 正式构建：先对齐 meta.date，再生成 _index.yaml，并把索引数据注入首页
+# 正式构建：先补齐缺失的 meta.date，再生成 _index.yaml，并把索引数据注入首页
 npm run build
 
 # 校验 repo 中的 _index.yaml 与首页注入数据是否最新
 npm run verify
 
-# 仅对齐 meta.date
-node scripts/fix-meta-date.js --write --force
+# 仅补齐缺失的 meta.date（默认使用首次提交时间）
+node scripts/fix-meta-date.js --write --date-source first
+
+# 如需按最后一次提交时间回填，并覆盖已有 date
+node scripts/fix-meta-date.js --write --date-source last --force
 
 # 样式审计：从已发布 HTML 中抽取样式信号，输出到 tmp_infocard_style_audit.json
 python scripts/extract_infocard_styles.py

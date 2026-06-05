@@ -119,7 +119,7 @@ function latestSourceMtimeNs(...paths) {
 function runFixMetaDate() {
   execFileSync(
     process.execPath,
-    [path.join(ROOT_DIR, "scripts", "fix-meta-date.js"), "--write", "--force"],
+    [path.join(ROOT_DIR, "scripts", "fix-meta-date.js"), "--write", "--date-source", "first"],
     {
       cwd: ROOT_DIR,
       stdio: "inherit",
