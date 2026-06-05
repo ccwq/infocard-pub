@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="description" content="Claude Code 动态工作流技术分享：每个任务都能即时生成自己的 harness，在单会话里编排并行步骤并 verify 收口；内嵌原帖配图与链接，适合做 workflow 级理解。" />
+  <title>Claude Code：每个任务都能有自己的 Harness</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f5f2ea;--paper:#fffdf8;--ink:#111;--muted:#5f6662;--line:#111;
+      --red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;
+      --soft-yellow:#fff7d3;--soft-green:#e8f8dd;--soft-purple:#efe9ff;--soft-teal:#e5fbf7;
+      --shadow:8px 8px 0 rgba(17,17,17,.12)
+    }
+    html{overflow-x:hidden;font-size:clamp(16px,calc(100vw / 78),18px)}
+    body{
+      margin:0;overflow-x:hidden;color:var(--ink);line-height:1.58;background:
+      linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+      linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+      radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+      radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+      var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      text-align:center;
+    }
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.06;background-image:linear-gradient(135deg, rgba(17,17,17,.16) 25%, transparent 25%, transparent 50%, rgba(17,17,17,.16) 50%, rgba(17,17,17,.16) 75%, transparent 75%, transparent);background-size:20px 20px;mask-image:linear-gradient(to bottom, black, transparent 95%)}
+    a{color:inherit;text-decoration:none} img{display:block;max-width:100%}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;background:var(--paper);text-align:left;padding:0 0 140px;overflow:hidden;box-shadow:var(--shadow)}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:0;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:140px;background:var(--blue)}
+    .hero-copy{padding:22px;border-right:3px solid var(--line);display:grid;gap:14px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:6px 10px;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:11px}
+    h1{margin:0;max-width:820px;font-size:clamp(34px,6vw,70px);line-height:.95;letter-spacing:-.065em}
+    .subtitle{max-width:820px;margin:0;color:var(--muted);font-size:clamp(15px,1.84vw,18px)}
+    .badge-row{display:flex;flex-wrap:wrap;gap:8px}
+    .badge{display:inline-flex;align-items:center;min-height:33px;padding:6px 10px;border:2px solid var(--line);background:#fff;font-size:12.1px;font-weight:850;line-height:1.2}
+    .badge.red{background:var(--red);color:#fff}.badge.blue{background:var(--blue);color:#fff}.badge.dark{background:#111;color:#fff}
+    .source{display:grid;gap:6px;background:#111;color:#fff;border:2px solid var(--line);padding:12px 14px}
+    .source strong{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#d9e6ff}
+    .source span{font-size:13px;line-height:1.6;color:#f2efe8;word-break:break-word}
+    .fact-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:2px}
+    .fact{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .fact .k{display:block;margin-bottom:6px;font-size:10.8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .fact .v{display:block;font-size:13.6px;line-height:1.34;font-weight:900}
+    .alert{border:3px solid var(--line);background:#111;color:#fff;padding:15px;display:grid;gap:10px}
+    .alert strong{display:block;font-size:15px;line-height:1.35}
+    .alert p{margin:0;font-size:14px;line-height:1.68;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual img{width:100%;height:auto}
+    .hero-visual figcaption{border-top:3px solid var(--line);padding:13px 14px;background:#f7f6f2;font-size:13px;line-height:1.62;color:#222}
+    .hero-visual figcaption b{color:#111}
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+    .grid-2,.grid-3,.grid-4,.flow-grid{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .repo-card,.mini,.step,.footer-block,.callout,.flow-item{border:2px solid var(--line);background:#fff;min-width:0}
+    .repo-card{padding:14px;display:grid;gap:10px}
+    .repo-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    .repo-kicker{font:900 12px/1 ui-monospace,Menlo,monospace;letter-spacing:.18em;color:var(--red);margin-bottom:6px}
+    .repo-card h3,.mini h4,.step h3,.footer-block h3,.flow-item h4{margin:0;letter-spacing:-.02em}
+    .repo-card h3{font-size:17px;line-height:1.16}
+    .repo-chip{display:inline-flex;align-items:center;justify-content:center;border:2px solid var(--line);padding:6px 10px;background:#111;color:#fff;font:900 12px/1 ui-monospace,Menlo,monospace;white-space:nowrap}
+    .repo-label{display:inline-flex;width:fit-content;align-items:center;border:2px solid var(--line);padding:5px 8px;background:var(--soft-blue);font-size:12px;font-weight:900;letter-spacing:.08em}
+    .repo-card[data-accent="red"] .repo-label{background:var(--soft-red)}
+    .repo-card[data-accent="yellow"] .repo-label{background:var(--soft-yellow)}
+    .repo-card[data-accent="green"] .repo-label{background:var(--soft-green)}
+    .repo-card[data-accent="purple"] .repo-label{background:var(--soft-purple)}
+    .repo-card p,.repo-card li{font-size:14px;line-height:1.62;color:#222}
+    .repo-card ul{margin:0;padding-left:0;list-style-position:inside}
+    .repo-card li{margin:4px 0}
+    .repo-foot,.links{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)} .tag.blue{background:var(--soft-blue)} .tag.dark{background:#111;color:#fff}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);color:#111;font-weight:750;line-height:1.58}
+    .step{padding:14px;display:grid;gap:10px;position:relative;overflow:hidden}
+    .step::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .step-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .step-num{display:grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;flex:0 0 auto}
+    .step h3{font-size:16px;line-height:1.16;padding-top:7px}
+    .step p{margin:0;font-size:14px;line-height:1.66;color:#222}
+    .step small{display:block;color:var(--muted);font-size:12.4px;line-height:1.56}
+    .step.red{--accent:var(--red)} .step.blue{--accent:var(--blue)} .step.dark{--accent:#111} .step.green{--accent:#1a8f5b}
+    .codebox{border:2px solid var(--line);background:#111;color:#f5efe4;padding:12px;overflow:auto}
+    .codebox pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.6}
+    .mini{display:grid;gap:8px;padding:14px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini p,.mini li{font-size:13.5px;line-height:1.62;color:#222}
+    .mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .footer-block{margin-top:14px;padding:16px;display:grid;gap:10px}
+    .footer-block h3{font-size:18px;line-height:1.2}
+    .footer-block p,.footer-block li{font-size:14px;line-height:1.66;color:#222}
+    .link-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border:2px solid var(--line);background:#fff;font-size:12px;font-weight:850;word-break:break-all}
+    .flow{display:grid;gap:10px}
+    .flow-item{display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:start;padding:12px}
+    .flow-num{width:48px;height:48px;display:grid;place-items:center;border:2px solid var(--line);background:#111;color:#fff;font:900 18px/1 ui-monospace,Menlo,monospace}
+    .flow-item h4{margin:0 0 4px;font-size:15px;line-height:1.2}
+    .flow-item p{margin:0;color:#222;font-size:13.8px;line-height:1.62}
+    .source-note{margin-top:12px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+    .save-fab{position:fixed;right:16px;bottom:16px;z-index:999;display:inline-flex;align-items:center;gap:10px;border:2px solid var(--line);background:linear-gradient(135deg, var(--red), #b00014);color:#fff;padding:11px 14px;border-radius:8px;font:900 13px/1 ui-monospace,Menlo,monospace;box-shadow:0 10px 24px rgba(0,0,0,.22);cursor:pointer}
+    .save-fab:disabled{opacity:.7;cursor:wait}
+    .save-fab:hover{transform:translateY(-1px)}
+    @media (max-width:720px){
+      .page{width:100%;padding-bottom:120px}
+      .hero{grid-template-columns:1fr}
+      .hero-copy{padding:18px;border-right:0;border-bottom:3px solid var(--line)}
+      h1{font-size:30px}.subtitle{font-size:15px}
+      .fact-grid{grid-template-columns:repeat(2,1fr)}
+      .grid-2,.grid-3,.grid-4,.meta-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:72px 1fr}.section-no{width:72px;height:72px;font-size:26px}
+      .repo-top{flex-direction:column;align-items:flex-start}
+      .flow-item{grid-template-columns:1fr;gap:10px}.flow-num{width:38px;height:38px;font-size:16px}
+      .save-fab{right:12px;bottom:12px;padding:10px 12px;font-size:12px}
+    }
+    @media (max-width:400px){
+      .hero-copy{padding:16px}.hero-visual figcaption{padding:11px 12px}
+      .fact{padding:10px}.repo-card,.mini,.footer-block,.step,.flow-item{padding:12px}.repo-card h3{font-size:16px}
+      .save-fab{right:10px;bottom:10px}
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <main class="page" id="card">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">X STATUS · TECH SHARE</div>
+        <h1>Claude Code：每个任务都能有自己的 Harness</h1>
+        <p class="subtitle">动态工作流不是固定脚本，而是在单个会话里按任务即时生成编排器：先 task，再分流并行，最后 verify 收口。<br>它更像一个可写脚本的执行器，而不是单次问答壳。</p>
+        <div class="badge-row">
+          <span class="badge red">Dynamic workflow</span>
+          <span class="badge blue">Task-specific harness</span>
+          <span class="badge dark">Claude Code</span>
+          <span class="badge">X article</span>
+        </div>
+        <div class="source">
+          <strong>Source snapshot</strong>
+          <span>https://x.com/i/status/2062068646902689895 · 文章链接：x.com/i/article/2062061963400867840 · 原帖时间：2026-06-03 15:07:31 UTC+8 · 作者：实践哥MinLi @MinLiBuilds</span>
+        </div>
+        <div class="fact-grid">
+          <div class="fact"><span class="k">Likes</span><span class="v">261</span></div>
+          <div class="fact"><span class="k">Reposts</span><span class="v">50</span></div>
+          <div class="fact"><span class="k">Replies</span><span class="v">7</span></div>
+          <div class="fact"><span class="k">关键主张</span><span class="v">每个任务可动态生成自己的 harness</span></div>
+        </div>
+        <div class="alert">
+          <strong>这条帖真正值得看的，不是“Claude Code 又多了一个名词”，而是它把 workflow 从固定模板推进到“按任务即时编排”。</strong>
+          <p>从图里的 task → 分流 → verify 可以看出，作者强调的是 <b>dynamic workflows</b>：不是一次性 prompt，而是会在会话里生成可执行的流程骨架，适合多步骤、并行、需要验证的任务。</p>
+          <div class="mini-row">
+            <span class="mini-tag">task</span>
+            <span class="mini-tag">parallel branches</span>
+            <span class="mini-tag">verify</span>
+            <span class="mini-tag">harness</span>
+            <span class="mini-tag">Claude Code</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <img src="assets/images/20260605-x-2062068646902689895.jpg" alt="X 帖配图：A harness for every task / Dynamic workflows in Claude Code" loading="lazy" />
+        <figcaption><b>配图是内容的一部分。</b> 图中海报直接给出主张：<b>A harness for every task</b>。右侧流程图表达 task → 分支执行 → verify 的动态工作流，不是普通封面图。</figcaption>
+      </figure>
+    </header>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">一句话结论</div>
+          <h2>这条帖的重心：把 Claude Code 从“聊天壳”推到“任务执行器”</h2>
+          <p>作者的观点不是“更会问答”，而是“更会替每个任务生成一套 harness”。这意味着工作流的单位从 prompt 变成了 <b>task-specific pipeline</b>：可分流、可并行、可验证、可复用。</p>
+        </div>
+      </div>
+      <div class="quote">如果一个任务需要你手写多个步骤、重复验证、并行跑多个分支，那就不该只靠一个静态 prompt；它更需要一套临时生成的 harness。</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">02</div>
+        <div class="section-meta">
+          <div class="label">图像证据</div>
+          <h2>图片里的结构，不是装饰，是论证本身</h2>
+          <p>这张图用最少元素表达了动态工作流的四步逻辑：<b>task</b> 进入后，系统按任务类型编排流程，分出多个分支并行处理，最后回到 <b>verify</b> 做结果确认。它证明的是“流程可以现场写出来”。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="repo-card" data-accent="yellow">
+          <div class="repo-top"><div><div class="repo-kicker">A</div><h3>主标题：A harness for every task</h3></div><div class="repo-chip">POSTER</div></div>
+          <div class="repo-label">主张</div>
+          <p>“每个任务都能有自己的 harness”不是比喻修辞，而是产品化方向：同一套 Claude Code 能力，不再固定成一条通用脚本，而是根据任务临场生成执行器。</p>
+          <ul>
+            <li>适合：多步骤、重复验证、并行处理、任务差异大</li>
+            <li>不适合：一句话就能回答的短问短答</li>
+          </ul>
+        </article>
+        <article class="repo-card" data-accent="red">
+          <div class="repo-top"><div><div class="repo-kicker">B</div><h3>副标题：Dynamic workflows in Claude Code</h3></div><div class="repo-chip">FLOW</div></div>
+          <div class="repo-label">结构</div>
+          <p>“Dynamic workflows” 指向的是一种更高层的执行方式：先根据任务临时写编排脚本，再把并行/验证/收口纳进一个会话内的控制流。</p>
+          <ul>
+            <li>核心不是模型更强，而是流程更可控</li>
+            <li>核心不是一次性输出，而是可追踪的执行链</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">工作流拆解</div>
+          <h2>把这套 harness 拆成 4 段，才能看懂它为什么有用</h2>
+          <p>下面这四段不是“教程步骤”，而是作者在图里表达的控制流：先定义任务，再生成 harness，再跑并行分支，最后 verify。这个顺序很关键。</p>
+        </div>
+      </div>
+      <div class="flow">
+        <div class="flow-item">
+          <div class="flow-num">1</div>
+          <div>
+            <h4>定义 task：先把目标说清</h4>
+            <p>动态工作流的前提不是“全自动”，而是先把当前任务类型、约束和验收条件说出来。没有任务边界，就没有 harness 的生成依据。</p>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-num">2</div>
+          <div>
+            <h4>生成 harness：按任务写脚本骨架</h4>
+            <p>作者强调的不是通用 prompt，而是临场编写编排脚本。换句话说，Claude Code 先搭流程，再执行内容。</p>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-num">3</div>
+          <div>
+            <h4>并行执行：把子任务拆成分支</h4>
+            <p>图里右侧的分叉说明，harness 可以把一个复杂任务拆成多个并行路径，让不同步骤同时推进，而不是串行等结果。</p>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-num">4</div>
+          <div>
+            <h4>verify 收口：最后统一验证</h4>
+            <p>verify 不是可选项，而是工作流的收口动作。它确保动态生成的过程不是“跑完就算”，而是“跑完要验”。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">工程意义</div>
+          <h2>为什么这类动态 workflow 值得关注</h2>
+          <p>它把 agent 的能力重点从“会回答”转成“会组织执行”。当任务复杂度上升时，最贵的不是 token，而是重复切换、人工协调和最后补救。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="mini">
+          <h4>降低固定脚本脆弱性</h4>
+          <p>同一套 harness 可以随任务变化而改变，不必让所有工作都挤进一个固定模板里。</p>
+        </article>
+        <article class="mini">
+          <h4>把并行能力变成默认能力</h4>
+          <p>复杂任务不再强迫串行执行，分支可以按需要并行跑，减少等待和反复往返。</p>
+        </article>
+        <article class="mini">
+          <h4>把 verify 变成流程内建约束</h4>
+          <p>验证不是事后补丁，而是 harness 里的一步；这会显著提高可交付性。</p>
+        </article>
+      </div>
+      <div class="callout">
+        一句话概括：<b>这条帖展示的是“任务驱动编排”而不是“回答驱动聊天”。</b>
+        <small>如果你要在 Claude Code 里真正做复杂活，重点不是把 prompt 写得更像命令，而是让每个任务都有自己的控制流和验收点。</small>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">适用边界</div>
+          <h2>哪些场景适合，哪些场景不值得上 harness</h2>
+          <p>不是所有任务都需要动态工作流。它最适合“结构清晰但步骤多”的任务；如果问题本身很短、很线性，额外的 harness 反而会增加复杂度。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="repo-card" data-accent="green">
+          <div class="repo-top"><div><div class="repo-kicker">适合</div><h3>多步骤、可验证、可并行的任务</h3></div><div class="repo-chip">YES</div></div>
+          <div class="repo-label">推荐</div>
+          <ul>
+            <li>研究型任务：先收集证据，再归纳，再对照验证</li>
+            <li>工程型任务：拆分子任务、并行执行、统一验收</li>
+            <li>工作流型任务：有固定流程，但每次输入不同</li>
+          </ul>
+        </article>
+        <article class="repo-card" data-accent="purple">
+          <div class="repo-top"><div><div class="repo-kicker">不适合</div><h3>一句话就能结束的轻任务</h3></div><div class="repo-chip">NO</div></div>
+          <div class="repo-label">边界</div>
+          <ul>
+            <li>简单问答：不需要动态编排</li>
+            <li>一次性短命令：直接执行更快</li>
+            <li>没有验收标准的任务：harness 会失去收口意义</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">06</div>
+        <div class="section-meta">
+          <div class="label">原帖与文章</div>
+          <h2>把 X 帖当作入口，把文章海报当作证据</h2>
+          <p>这条 X status 只有文章链接，但文章标题和海报已经足够说明它在讲什么。信息卡保留 status ID、文章 URL、作者名和配图，方便追溯和复核。</p>
+        </div>
+      </div>
+      <div class="meta-grid">
+        <div class="mini">
+          <h4>Source</h4>
+          <p><a class="link-chip" href="https://x.com/i/status/2062068646902689895">https://x.com/i/status/2062068646902689895</a></p>
+        </div>
+        <div class="mini">
+          <h4>Article</h4>
+          <p><a class="link-chip" href="https://x.com/i/article/2062061963400867840">https://x.com/i/article/2062061963400867840</a></p>
+        </div>
+        <div class="mini">
+          <h4>Author</h4>
+          <p><a class="link-chip" href="https://x.com/MinLiBuilds">实践哥MinLi @MinLiBuilds</a></p>
+        </div>
+      </div>
+      <div class="source-note">图片来源：pbs.twimg.com/media/HJ3qgBnakAElMX1.jpg · 已本地固化到 docs/assets/images/ · 生成时间：2026-06-05 · 技术分享卡</div>
+    </section>
+
+    <div class="footer-block">
+      <h3>📎 关键信号</h3>
+      <div class="links">
+        <span class="tag red">A harness for every task</span>
+        <span class="tag blue">Dynamic workflows in Claude Code</span>
+        <span class="tag dark">task → split → verify</span>
+      </div>
+      <p>如果你把这条帖读成“Claude Code 也有个新名词”，会错过重点；它真正说明的是：在复杂任务里，<b>workflow 本身可以被即时编写</b>，而不是每次都沿用固定脚本。</p>
+    </div>
+  </main>
+
+  <button id="save-btn" class="save-fab" onclick="saveCard()">💾 保存 PNG</button>
+  <script>
+    async function saveCard(){
+      const btn=document.getElementById('save-btn');
+      btn.disabled=true;btn.textContent='⏳ 生成中…';
+      try{
+        const el=document.getElementById('card');
+        const canvas=await html2canvas(el,{scale:2,useCORS:true,logging:false,backgroundColor:null});
+        const link=document.createElement('a');
+        link.download='claude-code-harness-tech-share.png';
+        link.href=canvas.toDataURL('image/png');
+        link.click();
+        btn.textContent='✅ 已保存';
+        setTimeout(()=>{btn.textContent='💾 保存 PNG';btn.disabled=false;},3000);
+      }catch(e){
+        btn.textContent='❌ 失败';
+        setTimeout(()=>{btn.textContent='💾 保存 PNG';btn.disabled=false;},3000);
+      }
+    }
+  </script>
+</body>
+</html>
