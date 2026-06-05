@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>OpenDataLoader PDF：把 PDF 解析和无障碍标注合成一条管线</title>
+  <style>
+    :root {
+      --paper: #f8efd9;
+      --paper-2: #fffaf0;
+      --ink: #1d1b16;
+      --muted: #6a6256;
+      --line: #28231d;
+      --red: #d21f2b;
+      --red-2: #a6151e;
+      --blue: #1e5eff;
+      --green: #1a8b57;
+      --orange: #c97500;
+      --yellow: #d4a400;
+      --soft-blue: #e8f1ff;
+      --soft-green: #e4f7ec;
+      --soft-orange: #fff1db;
+      --soft-yellow: #fff7d4;
+      --soft-red: #ffe7e6;
+      --shadow: 8px 8px 0 rgba(29,27,22,.12);
+      --mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    html {
+      font-size: clamp(15px, calc(100vw / 74), 16px);
+      background:
+        radial-gradient(circle at 10% 8%, rgba(210,31,43,.08) 0 10%, transparent 11%),
+        radial-gradient(circle at 82% 10%, rgba(30,94,255,.06) 0 8%, transparent 9%),
+        var(--paper);
+    }
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 10% 8%, rgba(210,31,43,.08) 0 10%, transparent 11%),
+        radial-gradient(circle at 82% 10%, rgba(30,94,255,.06) 0 8%, transparent 9%),
+        var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.6;
+      text-align: center;
+    }
+    img { max-width: 100%; display: block; }
+    a { color: var(--blue); }
+    .page {
+      width: min(780px, 100%);
+      margin: 0 auto;
+      padding: .84rem .72rem 6rem;
+      text-align: left;
+    }
+    .hero,
+    .panel,
+    .box,
+    .metric,
+    .source,
+    .mode,
+    .figure-card,
+    .closing {
+      border: 2px solid var(--line);
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 1rem 1rem .96rem;
+      background: linear-gradient(180deg, #fff, #fffaf2);
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.12fr .88fr;
+      gap: .92rem;
+      align-items: start;
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .42rem;
+      font-size: .72rem;
+      font-weight: 900;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      border: 2px solid var(--line);
+      border-radius: 999px;
+      background: #fff1c8;
+      padding: .24rem .68rem;
+      margin-bottom: .62rem;
+    }
+    .dot { width: .5rem; height: .5rem; border-radius: 999px; background: var(--line); display: inline-block; }
+    h1 {
+      margin: 0 0 .52rem;
+      font-size: clamp(1.74rem, 5.2vw, 3.05rem);
+      line-height: 1.06;
+      letter-spacing: -.04em;
+      font-weight: 900;
+    }
+    .subtitle {
+      margin: 0;
+      max-width: 34rem;
+      font-size: 1rem;
+      line-height: 1.7;
+      color: #2a261f;
+    }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .42rem;
+      margin-top: .72rem;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .26rem;
+      padding: .34rem .58rem;
+      border-radius: 999px;
+      border: 1.8px solid var(--line);
+      background: #fff;
+      font-size: .74rem;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 3px 3px 0 rgba(29,27,22,.08);
+    }
+    .pill.red { background: var(--soft-red); border-color: #e29a9c; color: #9b3138; }
+    .pill.blue { background: var(--soft-blue); border-color: #8eb4ff; color: #1b4cba; }
+    .pill.green { background: var(--soft-green); border-color: #8fd0ab; color: #1d764f; }
+    .pill.orange { background: var(--soft-orange); border-color: #ebb56c; color: #936100; }
+    .pill.yellow { background: var(--soft-yellow); border-color: #d6bd50; color: #7d6500; }
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .5rem;
+      margin-top: .78rem;
+    }
+    .stat {
+      border: 2px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 4px 4px 0 rgba(29,27,22,.08);
+      padding: .62rem .58rem .56rem;
+      min-height: 4.1rem;
+    }
+    .stat-k {
+      display: block;
+      font-size: .66rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .1rem;
+    }
+    .stat-v {
+      display: block;
+      font-size: .96rem;
+      line-height: 1.18;
+      font-weight: 900;
+    }
+    .hero-visual {
+      border: 3px solid var(--line);
+      border-radius: 22px;
+      background: #fff;
+      overflow: hidden;
+      box-shadow: 5px 5px 0 rgba(29,27,22,.08);
+    }
+    .hero-visual img { width: 100%; height: auto; }
+    .cap {
+      padding: .62rem .72rem .74rem;
+      border-top: 2px solid var(--line);
+      font-size: .76rem;
+      line-height: 1.56;
+      color: #453d31;
+      background: linear-gradient(180deg, #fff, #fef7e8);
+    }
+
+    .section { margin-top: 1.06rem; }
+    .section-head {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: .72rem;
+      align-items: center;
+      margin-bottom: .72rem;
+    }
+    .section-no {
+      width: 54px;
+      height: 54px;
+      border: 3px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 5px 5px 0 rgba(29,27,22,.08);
+      display: grid;
+      place-items: center;
+      font-size: .9rem;
+      font-weight: 900;
+      color: var(--red);
+      letter-spacing: .08em;
+    }
+    .section-title h2 {
+      margin: 0;
+      font-size: 1.06rem;
+      line-height: 1.2;
+      font-weight: 900;
+    }
+    .section-title p {
+      margin: .25rem 0 0;
+      font-size: .78rem;
+      line-height: 1.56;
+      color: var(--muted);
+    }
+
+    .lead {
+      border: 2px solid var(--line);
+      border-radius: 20px;
+      background: linear-gradient(180deg, #fff, #fffef7);
+      box-shadow: 4px 4px 0 rgba(29,27,22,.08);
+      padding: .92rem .96rem 1rem;
+    }
+    .lead strong {
+      display: block;
+      margin-bottom: .16rem;
+      font-size: .72rem;
+      color: var(--red);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .lead p {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.74;
+      font-weight: 700;
+      color: #202020;
+    }
+    .lead .muted {
+      display: block;
+      margin-top: .56rem;
+      font-size: .84rem;
+      line-height: 1.62;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .62rem; }
+    .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .56rem; }
+    .box {
+      padding: .84rem .84rem .88rem;
+      background: #fff;
+    }
+    .box h3 {
+      margin: 0 0 .34rem;
+      font-size: .95rem;
+      line-height: 1.24;
+      font-weight: 900;
+    }
+    .box p {
+      margin: 0;
+      font-size: .84rem;
+      line-height: 1.68;
+      color: #2b2b2b;
+    }
+    .box ul {
+      margin: .4rem 0 0 1.05rem;
+      padding: 0;
+    }
+    .box li {
+      margin: .18rem 0;
+      font-size: .82rem;
+      line-height: 1.56;
+      color: #2b2b2b;
+    }
+    .box .tagline {
+      display: inline-flex;
+      align-items: center;
+      gap: .26rem;
+      font-size: .68rem;
+      font-weight: 900;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      margin-bottom: .45rem;
+    }
+    .tagline.r { color: #a33; }
+    .tagline.b { color: #1b4cba; }
+    .tagline.g { color: #1d764f; }
+    .tagline.o { color: #936100; }
+    .tagline.y { color: #7d6500; }
+
+    .metric {
+      padding: .82rem .78rem .84rem;
+      min-height: 100%;
+    }
+    .metric .k {
+      display: block;
+      font-size: .66rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .1rem;
+    }
+    .metric .v {
+      display: block;
+      font-size: .92rem;
+      line-height: 1.2;
+      font-weight: 900;
+      margin-bottom: .22rem;
+    }
+    .metric .t {
+      font-size: .76rem;
+      line-height: 1.58;
+      color: #2b2b2b;
+    }
+    .metric.red { background: var(--soft-red); }
+    .metric.blue { background: var(--soft-blue); }
+    .metric.green { background: var(--soft-green); }
+    .metric.orange { background: var(--soft-orange); }
+
+    .flow-wrap {
+      border: 2px solid var(--line);
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 4px 4px 0 rgba(29,27,22,.08);
+      overflow: hidden;
+    }
+    .flow-svg {
+      width: 100%;
+      display: block;
+      background: linear-gradient(180deg, #fff, #fef8eb);
+    }
+    .flow-caption {
+      border-top: 2px solid var(--line);
+      padding: .62rem .72rem .72rem;
+      font-size: .76rem;
+      line-height: 1.56;
+      color: #453d31;
+    }
+
+    .figure-card {
+      background: #fff;
+    }
+    .figure-card img { width: 100%; height: auto; }
+    .figure-copy { padding: .62rem .72rem .76rem; }
+    .figure-copy h3 {
+      margin: 0 0 .2rem;
+      font-size: .88rem;
+      line-height: 1.22;
+      font-weight: 900;
+    }
+    .figure-copy p {
+      margin: 0;
+      font-size: .76rem;
+      line-height: 1.56;
+      color: var(--muted);
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .62rem;
+    }
+    .mode {
+      padding: .82rem .82rem .86rem;
+    }
+    .mode h3 {
+      margin: 0 0 .2rem;
+      font-size: .92rem;
+      line-height: 1.24;
+      font-weight: 900;
+    }
+    .mode .meta {
+      font-size: .68rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .3rem;
+    }
+    .mode p {
+      margin: 0;
+      font-size: .8rem;
+      line-height: 1.62;
+      color: #2b2b2b;
+    }
+    .mode code {
+      font-family: var(--mono);
+      font-size: .74rem;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 0 .28rem;
+      white-space: nowrap;
+    }
+
+    .code-box {
+      border: 2px solid var(--line);
+      border-radius: 20px;
+      background: #1d1b16;
+      color: #f5efe3;
+      box-shadow: 4px 4px 0 rgba(29,27,22,.08);
+      padding: .82rem .86rem;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: .75rem;
+      line-height: 1.75;
+    }
+    .code-box .c { color: #a79f92; }
+    .code-box .cmd { color: #85c7ff; }
+    .code-box .key { color: #ffdf72; }
+
+    .source-links {
+      border-top: 1px dashed #c9bfae;
+      margin-top: .56rem;
+      padding-top: .56rem;
+      font-size: .76rem;
+      line-height: 1.62;
+      color: var(--muted);
+    }
+    .source-links a { color: #1b4cba; text-decoration: none; }
+
+    .closing {
+      margin-top: 1rem;
+      background: #111;
+      color: #fff;
+      padding: .92rem .92rem 1rem;
+    }
+    .closing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .7rem;
+    }
+    .closing-box {
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.03);
+      border-radius: 14px;
+      padding: .76rem .8rem .82rem;
+    }
+    .closing-box h3 {
+      margin: 0 0 .34rem;
+      font-size: .92rem;
+      line-height: 1.22;
+      font-weight: 900;
+    }
+    .closing-box p,
+    .closing-box li {
+      margin: 0;
+      font-size: .82rem;
+      line-height: 1.66;
+      color: #d9d9d9;
+    }
+    .closing-box ul {
+      margin: .22rem 0 0 1.05rem;
+      padding: 0;
+    }
+    .closing-foot {
+      margin-top: .68rem;
+      font-size: .74rem;
+      line-height: 1.58;
+      color: #c8c8c8;
+    }
+
+    #save-btn {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 999;
+      border: 0;
+      border-radius: 8px;
+      padding: .62rem .86rem;
+      background: linear-gradient(135deg, var(--red), var(--red-2));
+      color: #fff;
+      font-size: .74rem;
+      font-weight: 900;
+      font-family: var(--mono);
+      letter-spacing: .04em;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 rgba(0,0,0,.22);
+    }
+    #save-btn:disabled { opacity: .66; cursor: not-allowed; }
+    #save-btn:hover { background: linear-gradient(135deg, #e43440, #c71824); }
+
+    @media (max-width: 720px) {
+      html { font-size: 18px; }
+      .page { width: 100%; max-width: none; margin: 0; padding: .72rem .45rem 5.4rem; }
+      .hero-grid,
+      .grid2,
+      .grid3,
+      .grid4,
+      .mode-grid,
+      .closing-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero-visual { order: -1; }
+      .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .subtitle,
+      .box p,
+      .box li,
+      .metric .t,
+      .mode p,
+      .cap,
+      .source-links,
+      .figure-copy p,
+      .section-title p,
+      .closing-box p,
+      .closing-box li,
+      .closing-foot {
+        font-size: .92rem;
+      }
+      .stat-v { font-size: .94rem; }
+      #save-btn { right: 10px; bottom: 10px; font-size: .86rem; }
+    }
+    @media (max-width: 400px) {
+      .hero { padding: .86rem .76rem .82rem; }
+      .section-no { width: 48px; height: 48px; }
+      .section-title h2 { font-size: .98rem; }
+      .stat-v { font-size: .9rem; }
+      .code-box { font-size: .7rem; }
+    }
+    @media print {
+      #save-btn { display: none !important; }
+      body { background: #fff; }
+      .page { padding-bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <article class="card" id="card">
+      <header class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="kicker"><span class="dot"></span> GitHub Repo · PDF Extraction / Accessibility</div>
+            <h1>OpenDataLoader PDF：把 PDF 解析和无障碍标注合成一条管线</h1>
+            <p class="subtitle">它不是单纯的 PDF 转文本工具，而是把结构化抽取、坐标级证据、复杂页混合处理、Tagged PDF 自动标注和 PDF/UA 企业导出串成一条产品化链路。对 RAG、合规和大批量文档处理来说，这是一套“先把 PDF 变成可用数据，再把文档变成可访问资产”的方案。</p>
+            <div class="pill-row">
+              <span class="pill red">Apache-2.0 开源核心</span>
+              <span class="pill blue">Python / Node.js / Java</span>
+              <span class="pill green">Hybrid 复杂页路由</span>
+              <span class="pill orange">Tagged PDF 自动标注</span>
+              <span class="pill yellow">PDF/UA 企业导出</span>
+              <span class="pill red">AI Safety + Bounding Boxes</span>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><span class="stat-k">Bench</span><span class="stat-v">0.907 overall</span></div>
+              <div class="stat"><span class="stat-k">Table</span><span class="stat-v">0.928 table acc.</span></div>
+              <div class="stat"><span class="stat-k">Speed</span><span class="stat-v">0.015s/page local</span></div>
+              <div class="stat"><span class="stat-k">Stack</span><span class="stat-v">Java 11+ · CPU first</span></div>
+            </div>
+          </div>
+          <figure class="hero-visual">
+            <img src="assets/images/20260606-opendataloader-pdf/annotated-pdf.png" alt="OpenDataLoader PDF 注释版示意图" />
+            <figcaption class="cap">▲ Annotated PDF / 带结构标注的输出示例。它强调的不是“读出来了”，而是每个标题、段落、表格和图片都带着坐标与语义标签，可用于 RAG 引用、审计与后续加工。</figcaption>
+          </figure>
+        </div>
+      </header>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-no">01</div>
+          <div class="section-title">
+            <h2>先给结论：它把“可读 PDF”变成“可用 PDF 数据”，再把“未标注 PDF”变成“可访问 PDF”</h2>
+            <p>这张卡最重要的判断是：OpenDataLoader PDF 的价值不在某一个单项能力，而在它把两条常常分开的链路合并了。</p>
+          </div>
+        </div>
+        <div class="lead">
+          <strong>一句话判断</strong>
+          <p>如果你要的是给 LLM / RAG 用的结构化 PDF 数据，它输出 Markdown、JSON（带 bounding boxes）和 HTML；如果你要的是无障碍和合规，它能把无标签 PDF 自动标成 Tagged PDF，并把 PDF/UA 导出放到企业层处理。</p>
+          <span class="muted">换句话说：它不是“PDF 转文本”，而是“PDF 数据管线 + 无障碍管线”一体化。复杂页面走 hybrid，普通页面走本地，批处理和可审计性都保留下来。</span>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-no">02</div>
+          <div class="section-title">
+            <h2>它同时解决两类问题：RAG 的结构化输入，和合规场景的可访问性修复</h2>
+            <p>不是把 PDF 读一遍就结束，而是把“结构保真”与“最终可交付”放在同一个产品里。</p>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="box">
+            <div class="tagline b">RAG / 数据抽取</div>
+            <h3>给模型和检索系统一个不会乱序的输入</h3>
+            <p>它输出的是带阅读顺序、元素类型和坐标的结构化结果，而不是一串看起来像文本、实则丢了版面的碎片。</p>
+            <ul>
+              <li>Markdown 用来做 chunking 和上下文拼接。</li>
+              <li>JSON 保留 bounding boxes，便于引用回原文。</li>
+              <li>HTML / Annotated PDF 用于人工核查和调试。</li>
+            </ul>
+          </div>
+          <div class="box">
+            <div class="tagline g">Accessibility / 合规修复</div>
+            <h3>把未标注 PDF 变成可被屏幕阅读器消费的文档</h3>
+            <p>它先做 layout analysis 和 auto-tagging，再把 Tagged PDF 作为合规链条的基础；PDF/UA 导出和 visual studio 则是企业层能力。</p>
+            <ul>
+              <li>适合 EAA、ADA、Section 508 等场景。</li>
+              <li>自动标注是开源核心，PDF/UA 导出是企业加值。</li>
+              <li>强调可验证：与 veraPDF / PDF Association 规范对齐。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-no">03</div>
+          <div class="section-title">
+            <h2>资源包里有什么：输出格式、SDK、模式和企业边界都写得很清楚</h2>
+            <p>这不是“一个 parser”，而是一组可以拆开使用的工作单元。</p>
+          </div>
+        </div>
+        <div class="grid3">
+          <div class="metric red">
+            <span class="k">Output</span>
+            <span class="v">Markdown / JSON / HTML / Tagged PDF</span>
+            <div class="t">Markdown 适合喂给 LLM，JSON 适合证据引用，HTML 适合展示，Tagged PDF 适合无障碍流程。</div>
+          </div>
+          <div class="metric blue">
+            <span class="k">SDK</span>
+            <span class="v">Python / Node.js / Java</span>
+            <div class="t">同一套能力可以从脚本、服务和企业 Java 环境里调用，不把入口锁死在单一语言。</div>
+          </div>
+          <div class="metric green">
+            <span class="k">Mode</span>
+            <span class="v">Fast local + Hybrid AI</span>
+            <div class="t">简单页本地跑，复杂页切 hybrid；OCR、公式、图像描述都在这个分支里补齐。</div>
+          </div>
+        </div>
+        <div class="grid2" style="margin-top:.62rem;">
+          <div class="metric orange">
+            <span class="k">Free core</span>
+            <span class="v">结构化抽取 + 自动标注</span>
+            <div class="t">开源核心已经覆盖 layout analysis、bounding boxes、XY-Cut++ 阅读顺序、AI safety 过滤和 Tagged PDF 自动标注。</div>
+          </div>
+          <div class="metric blue">
+            <span class="k">Enterprise</span>
+            <span class="v">PDF/UA export + Accessibility studio</span>
+            <div class="t">企业版把最终可交付做完整：导出 PDF/UA-1 / PDF/UA-2，并提供可视化编辑工具。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-no">04</div>
+          <div class="section-title">
+            <h2>它怎么工作：先本地，再 hybrid，最后把结构送到可访问输出</h2>
+            <p>流程图比口头描述更准确：它的链路核心是“先确定结构，再决定是否上 AI”。</p>
+          </div>
+        </div>
+        <div class="flow-wrap">
+          <svg class="flow-svg" viewBox="0 0 920 240" role="img" aria-label="OpenDataLoader PDF workflow">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#28231d"></path>
+              </marker>
+            </defs>
+            <rect x="16" y="22" width="168" height="76" rx="14" fill="#fff8dc" stroke="#28231d" stroke-width="3"/>
+            <rect x="208" y="22" width="168" height="76" rx="14" fill="#eef4ff" stroke="#28231d" stroke-width="3"/>
+            <rect x="400" y="22" width="168" height="76" rx="14" fill="#e8f1ff" stroke="#28231d" stroke-width="3"/>
+            <rect x="592" y="22" width="140" height="76" rx="14" fill="#e4f7ec" stroke="#28231d" stroke-width="3"/>
+            <rect x="756" y="22" width="148" height="76" rx="14" fill="#ffe7e6" stroke="#28231d" stroke-width="3"/>
+            <line x1="184" y1="60" x2="208" y2="60" stroke="#28231d" stroke-width="3" marker-end="url(#arrow)"/>
+            <line x1="376" y1="60" x2="400" y2="60" stroke="#28231d" stroke-width="3" marker-end="url(#arrow)"/>
+            <line x1="568" y1="60" x2="592" y2="60" stroke="#28231d" stroke-width="3" marker-end="url(#arrow)"/>
+            <line x1="732" y1="60" x2="756" y2="60" stroke="#28231d" stroke-width="3" marker-end="url(#arrow)"/>
+
+            <text x="100" y="48" text-anchor="middle" font-size="16" font-weight="900" fill="#1d1b16">输入 PDF</text>
+            <text x="100" y="71" text-anchor="middle" font-size="13" fill="#534a3d">digital / scanned / tagged</text>
+
+            <text x="292" y="46" text-anchor="middle" font-size="16" font-weight="900" fill="#1d1b16">本地解析</text>
+            <text x="292" y="69" text-anchor="middle" font-size="13" fill="#534a3d">XY-Cut++ · boxes</text>
+
+            <text x="484" y="46" text-anchor="middle" font-size="16" font-weight="900" fill="#1d1b16">复杂页分流</text>
+            <text x="484" y="69" text-anchor="middle" font-size="13" fill="#534a3d">Hybrid / OCR / formula</text>
+
+            <text x="662" y="46" text-anchor="middle" font-size="16" font-weight="900" fill="#1d1b16">结构化输出</text>
+            <text x="662" y="69" text-anchor="middle" font-size="13" fill="#534a3d">MD / JSON / HTML</text>
+
+            <text x="830" y="46" text-anchor="middle" font-size="16" font-weight="900" fill="#1d1b16">合规交付</text>
+            <text x="830" y="69" text-anchor="middle" font-size="13" fill="#534a3d">Tagged PDF / PDF-UA</text>
+
+            <rect x="50" y="134" width="220" height="64" rx="14" fill="#fff" stroke="#28231d" stroke-width="3"/>
+            <rect x="350" y="134" width="220" height="64" rx="14" fill="#fff" stroke="#28231d" stroke-width="3"/>
+            <rect x="650" y="134" width="220" height="64" rx="14" fill="#fff" stroke="#28231d" stroke-width="3"/>
+            <line x1="270" y1="166" x2="350" y2="166" stroke="#28231d" stroke-width="3" marker-end="url(#arrow)"/>
+            <line x1="570" y1="166" x2="650" y2="166" stroke="#28231d" stroke-width="3" marker-end="url(#arrow)"/>
+            <text x="160" y="160" text-anchor="middle" font-size="16" font-weight="900" fill="#1d1b16">普通页走本地</text>
+            <text x="160" y="180" text-anchor="middle" font-size="13" fill="#534a3d">快、稳、无 GPU 依赖</text>
+            <text x="460" y="160" text-anchor="middle" font-size="16" font-weight="900" fill="#1d1b16">复杂页进 Hybrid</text>
+            <text x="460" y="180" text-anchor="middle" font-size="13" fill="#534a3d">表格、扫描件、公式</text>
+            <text x="760" y="160" text-anchor="middle" font-size="16" font-weight="900" fill="#1d1b16">结果可审计</text>
+            <text x="760" y="180" text-anchor="middle" font-size="13" fill="#534a3d">坐标、语义、回溯</text>
+          </svg>
+          <div class="flow-caption">这个流程说明了它的定位：不是把所有页都交给 AI，而是在本地可确定的前提下尽量保持 deterministic；只有复杂页和增强项才切到 hybrid。</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-no">05</div>
+          <div class="section-title">
+            <h2>模式怎么选：按文档类型切，不要先猜功能再找参数</h2>
+            <p>README 已经把场景写得很清楚，真正要做的是按文档类型决定用 fast 还是 hybrid。</p>
+          </div>
+        </div>
+        <div class="mode-grid">
+          <article class="mode">
+            <div class="meta">Standard PDF</div>
+            <h3>普通数字版 PDF</h3>
+            <p>优先走 fast 模式，直接 `pip install opendataloader-pdf`，适合大多数结构清晰、文本可选的文档。</p>
+          </article>
+          <article class="mode">
+            <div class="meta">Complex tables</div>
+            <h3>复杂或嵌套表格</h3>
+            <p>切到 hybrid：`pip install "opendataloader-pdf[hybrid]"`，让表格和阅读顺序的准确率上一个台阶。</p>
+          </article>
+          <article class="mode">
+            <div class="meta">Scanned / OCR</div>
+            <h3>扫描件 / 图片型 PDF</h3>
+            <p>开启 `--force-ocr`，必要时指定 `--ocr-lang`。这条路径主要解决“文本根本不可选”的问题。</p>
+          </article>
+          <article class="mode">
+            <div class="meta">Formula / chart</div>
+            <h3>公式与图表理解</h3>
+            <p>用 `--enrich-formula` 和 `--enrich-picture-description`，并配合 `--hybrid-mode full` 获取增强输出。</p>
+          </article>
+          <article class="mode">
+            <div class="meta">Accessibility</div>
+            <h3>未标注 PDF 的无障碍修复</h3>
+            <p>直接输出 `tagged-pdf`，把未标注文档转成屏幕阅读器可读的结构化 PDF。</p>
+          </article>
+          <article class="mode">
+            <div class="meta">Enterprise</div>
+            <h3>PDF/UA 与可视化编辑</h3>
+            <p>当需求是企业合规交付，PDF/UA 导出和 Accessibility studio 才是最终层，而不是开源核心本身。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-no">06</div>
+          <div class="section-title">
+            <h2>证据怎么读：它的宣传点集中在“精度、速度、结构保留”三件事</h2>
+            <p>这部分要区分：数值是 benchmark 口径，不是所有真实文档的绝对保证。</p>
+          </div>
+        </div>
+        <div class="grid2">
+          <figure class="figure-card">
+            <img src="assets/images/20260606-opendataloader-pdf/benchmark.png" alt="OpenDataLoader benchmark chart" />
+            <figcaption class="figure-copy">
+              <h3>▲ Benchmark / 基准对比图</h3>
+              <p>README 里最核心的卖点是 hybrid 模式综合准确率 0.907，table 准确率 0.928；同时本地模式还能保持 0.015s/page 级别的速度。</p>
+            </figcaption>
+          </figure>
+          <figure class="figure-card">
+            <img src="assets/images/20260606-opendataloader-pdf/quality.png" alt="OpenDataLoader quality breakdown chart" />
+            <figcaption class="figure-copy">
+              <h3>▲ Quality Breakdown / 质量拆分图</h3>
+              <p>它想证明的不是“单项奇迹”，而是阅读顺序、表格、标题等多个维度同时站得住脚，这对 RAG 和审计都更重要。</p>
+            </figcaption>
+          </figure>
+        </div>
+        <div class="grid2" style="margin-top:.62rem;">
+          <div class="metric red">
+            <span class="k">Best claim</span>
+            <span class="v">Hybrid overall 0.907</span>
+            <div class="t">这个成绩只在 benchmark 语境里成立，但它足以说明：项目的重点不是“纯快”，而是“在不丢结构的前提下尽量快”。</div>
+          </div>
+          <div class="metric green">
+            <span class="k">Key edge</span>
+            <span class="v">Bounding boxes for every element</span>
+            <div class="t">坐标信息是它跟普通转文本工具拉开差距的核心：后续引用、标注、审计和高亮都靠它。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-no">07</div>
+          <div class="section-title">
+            <h2>最小上手路径：先跑 fast，再决定是否升级到 hybrid</h2>
+            <p>README 的推荐顺序很明确：先确认 Java 11+，再装包，最后根据文档类型决定输出格式。</p>
+          </div>
+        </div>
+        <div class="code-box">
+          <span class="c"># Python / 快速开始</span><br/>
+          <span class="cmd">pip install -U opendataloader-pdf</span><br/><br/>
+          <span class="c">import opendataloader_pdf</span><br/>
+          <span class="c"># 批量处理：每次 convert() 都会启动 JVM，别在循环里一页一页调</span><br/>
+          <span class="cmd">opendataloader_pdf.convert(</span><br/>
+          &nbsp;&nbsp;<span class="key">input_path</span>= ["file1.pdf", "file2.pdf", "folder/"],<br/>
+          &nbsp;&nbsp;<span class="key">output_dir</span>= "output/",<br/>
+          &nbsp;&nbsp;<span class="key">format</span>= "markdown,json"<br/>
+          <span class="cmd">)</span><br/><br/>
+          <span class="c"># Hybrid / 复杂页、扫描件、公式、图表</span><br/>
+          <span class="cmd">pip install -U "opendataloader-pdf[hybrid]"</span><br/>
+          <span class="cmd">opendataloader-pdf-hybrid --port 5002</span><br/>
+          <span class="cmd">opendataloader-pdf --hybrid docling-fast file1.pdf file2.pdf folder/</span><br/><br/>
+          <span class="c"># 无障碍修复</span><br/>
+          <span class="cmd">opendataloader-pdf --format tagged-pdf file1.pdf file2.pdf folder/</span><br/><br/>
+          <span class="c"># Node.js / Java 也有入口</span><br/>
+          <span class="cmd">npm install @opendataloader/pdf</span><br/>
+          <span class="cmd">mvn dependency: org.opendataloader:opendataloader-pdf-core</span>
+        </div>
+        <div class="source-links">
+          关键文档：<a href="https://github.com/opendataloader-project/opendataloader-pdf" target="_blank" rel="noreferrer">GitHub README</a> · <a href="https://opendataloader.org/docs/hybrid-mode" target="_blank" rel="noreferrer">Hybrid Mode Guide</a> · <a href="https://github.com/opendataloader-project/opendataloader-bench" target="_blank" rel="noreferrer">Benchmark repo</a>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-no">08</div>
+          <div class="section-title">
+            <h2>适合谁 / 不适合谁：它的边界比宣传口号更值得看</h2>
+            <p>这部分决定你要不要上手，也决定你该不该把它当成“万能 PDF 引擎”。</p>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="box">
+            <div class="tagline o">适合</div>
+            <h3>当你要把 PDF 当成结构化资产来处理</h3>
+            <ul>
+              <li>RAG / 检索增强：需要阅读顺序、表格和坐标。</li>
+              <li>合规 / 无障碍：要把未标注 PDF 修成 Tagged PDF。</li>
+              <li>批量文档管线：希望本地优先，复杂页再升级 hybrid。</li>
+              <li>工程团队：想在 Python、Node、Java 之间复用同一套能力。</li>
+            </ul>
+          </div>
+          <div class="box">
+            <div class="tagline y">不适合</div>
+            <h3>它不是 Word / Excel / PPT 的通吃转换器</h3>
+            <ul>
+              <li>README 明确写了：Word、Excel、PPT 不在能力范围内。</li>
+              <li>如果你的目标只是“导出纯文本”，它可能比你需要的更重。</li>
+              <li>如果你想完全绕开结构化与坐标，很多能力反而用不上。</li>
+              <li>它也不是一个 UI 编辑器；可视化编辑是企业加值。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="closing" style="margin-top:.62rem;">
+          <div class="closing-grid">
+            <div class="closing-box">
+              <h3>最终判断</h3>
+              <p>OpenDataLoader PDF 的核心价值是“把 PDF 的结构和可访问性一起处理”，这让它比单纯 parser 更像一条可交付的数据管线。</p>
+            </div>
+            <div class="closing-box">
+              <h3>一句话边界</h3>
+              <p>如果你要的是结构保真、坐标证据和合规链路，它很强；如果你只要把 PDF 粗暴变成文本，它可能过于完整。</p>
+            </div>
+          </div>
+          <div class="closing-foot">来源口径：GitHub README、Hybrid Mode Guide、Benchmark repo。许可证：Apache-2.0（核心开源）+ 企业扩展（PDF/UA / Accessibility studio）。</div>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <button id="save-btn" onclick="saveCard()">保存 PNG</button>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+    async function saveCard() {
+      const btn = document.getElementById('save-btn');
+      const card = document.getElementById('card');
+      if (!window.html2canvas) { alert('导出组件未加载'); return; }
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.textContent = '生成中…';
+      try {
+        const canvas = await html2canvas(card, {
+          backgroundColor: '#f8efd9',
+          scale: Math.max(2, window.devicePixelRatio || 2),
+          useCORS: true,
+          allowTaint: true,
+          scrollX: 0,
+          scrollY: -window.scrollY,
+          windowWidth: card.scrollWidth,
+          windowHeight: card.scrollHeight
+        });
+        const a = document.createElement('a');
+        a.download = '20260606-opendataloader-pdf.png';
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      } catch (e) {
+        console.error(e);
+        alert('PNG 导出失败');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    }
+  </script>
+</body>
+</html>
