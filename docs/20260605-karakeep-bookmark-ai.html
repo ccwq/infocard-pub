@@ -1,608 +1,302 @@
-<!DOCTYPE html>
-<html lang="zh">
+<!doctype html>
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Karakeep · 自托管 AI 书签管理</title>
-<meta name="description" content="自托管书签管理工具，AI 自动标签摘要，支持 LLM Agent，浏览器+移动端全覆盖">
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-:root {
-  --paper: #f8efd9;
-  --ink: #1d1b16;
-  --border: #28231d;
-  --accent1: #9bdc77;
-  --accent2: #7cc8ff;
-  --accent3: #ffc45c;
-  --accent4: #f56a7a;
-  --accent5: #c084fc;
-  --tag-bg: #e8e0cc;
-  --tag-text: #3d2e1a;
-  --shadow: rgba(40,35,29,0.18);
-}
-html, body { min-height: 100%; }
-body {
-  background: #0a0a0a;
-  font-family: 'PingFang SC','Microsoft YaHei',sans-serif;
-  text-align: center;
-}
-.page {
-  max-width: 720px;
-  margin: 0 auto;
-  background: var(--paper);
-  padding: 0 0 120px 0;
-  text-align: left;
-  min-height: 100vh;
-  position: relative;
-  box-shadow: 0 8px 48px rgba(0,0,0,0.5);
-}
-/* ─── HEADER ─── */
-.header {
-  background: var(--border);
-  padding: 1.4rem 1.4rem 1.1rem;
-  border-radius: 0 0 22px 22px;
-  margin-bottom: 0;
-}
-.header-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.8rem;
-  margin-bottom: 0.9rem;
-}
-.logo-badge {
-  background: var(--paper);
-  border-radius: 14px;
-  padding: 0.35rem 0.65rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  margin-top: 0.15rem;
-  border: 2.5px solid var(--border);
-}
-.header-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-.pill {
-  background: var(--paper);
-  border: 2px solid var(--border);
-  border-radius: 50px;
-  padding: 0.22rem 0.65rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--ink);
-  white-space: nowrap;
-}
-.pill-green  { background: var(--accent1); }
-.pill-blue   { background: var(--accent2); }
-.pill-yellow { background: var(--accent3); }
-.pill-red    { background: var(--accent4); }
-.pill-purple { background: var(--accent5); color: #fff; border-color: #6b21a8; }
-.title-block { margin-top: 0; }
-.page-title {
-  font-size: 1.95rem;
-  font-weight: 800;
-  color: var(--paper);
-  letter-spacing: -0.01em;
-  line-height: 1.15;
-  margin-bottom: 0.25rem;
-}
-.page-subtitle {
-  font-size: 0.82rem;
-  color: #c8b89a;
-  line-height: 1.5;
-  font-weight: 400;
-}
-.page-subtitle em { color: var(--accent3); font-style: normal; font-weight: 600; }
-/* ─── STATS BAR ─── */
-.stats-bar {
-  background: var(--paper);
-  border-top: 3px solid var(--border);
-  border-bottom: 3px solid var(--border);
-  display: flex;
-  justify-content: space-around;
-  flex-wrap: wrap;
-  padding: 0.7rem 1rem;
-  gap: 0.4rem;
-}
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-  min-width: 70px;
-}
-.stat-num {
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: var(--ink);
-  line-height: 1;
-}
-.stat-label {
-  font-size: 0.68rem;
-  color: #6b5c42;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.stat-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  display: inline-block;
-  margin-right: 2px;
-}
-.dot-green  { background: var(--accent1); }
-.dot-blue   { background: var(--accent2); }
-.dot-yellow { background: var(--accent3); }
-.dot-red    { background: var(--accent4); }
-.dot-purple { background: var(--accent5); }
-/* ─── SECTIONS ─── */
-.section {
-  padding: 1.1rem 1.4rem;
-  border-bottom: 2px solid rgba(40,35,29,0.12);
-}
-.section:last-child { border-bottom: none; }
-.section-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: #9b8973;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin-bottom: 0.55rem;
-}
-.section-label::before {
-  content: '// ';
-  font-weight: 800;
-  color: var(--accent4);
-}
-/* ─── CORE VALUE ─── */
-.core-card {
-  background: #fff8ec;
-  border: 2.5px solid var(--border);
-  border-radius: 16px;
-  padding: 0.9rem 1.1rem;
-  margin-bottom: 0.8rem;
-}
-.core-card-title {
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: var(--ink);
-  line-height: 1.4;
-  margin-bottom: 0.35rem;
-}
-.core-card-title strong { color: #b5451b; }
-.core-card-sub {
-  font-size: 0.78rem;
-  color: #5a4a30;
-  line-height: 1.55;
-}
-/* ─── FEATURE GRID ─── */
-.feat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-}
-.feat-card {
-  background: #fff;
-  border: 2px solid var(--border);
-  border-radius: 14px;
-  padding: 0.75rem 0.9rem;
-}
-.feat-card-icon {
-  font-size: 1.1rem;
-  margin-bottom: 0.25rem;
-  display: block;
-}
-.feat-card-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--ink);
-  margin-bottom: 0.2rem;
-}
-.feat-card-desc {
-  font-size: 0.72rem;
-  color: #5a4a30;
-  line-height: 1.45;
-}
-.feat-tag {
-  display: inline-block;
-  background: var(--tag-bg);
-  color: var(--tag-text);
-  border-radius: 6px;
-  padding: 0.1rem 0.4rem;
-  font-size: 0.65rem;
-  font-weight: 700;
-  margin-top: 0.25rem;
-}
-.feat-tag.ai  { background: var(--accent1); color: #2d4a0e; }
-.feat-tag.cli { background: var(--accent2); color: #0a3d5c; }
-.feat-tag.ss  { background: var(--accent3); color: #5c3a00; }
-.feat-tag.rss { background: var(--accent4); color: #fff; }
-.feat-tag.i18 { background: var(--accent5); color: #fff; }
-/* ─── PLATFORM STRIP ─── */
-.platform-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-.platform-chip {
-  background: var(--border);
-  color: var(--paper);
-  border-radius: 50px;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.platform-chip-emoji { font-size: 0.8rem; }
-/* ─── COMPARISON ─── */
-.comp-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.75rem;
-}
-.comp-table th {
-  background: var(--border);
-  color: var(--paper);
-  padding: 0.45rem 0.6rem;
-  text-align: left;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-}
-.comp-table th:first-child { border-radius: 8px 0 0 0; }
-.comp-table th:last-child  { border-radius: 0 8px 0 0; }
-.comp-table td {
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid rgba(40,35,29,0.1);
-  color: var(--ink);
-  vertical-align: middle;
-}
-.comp-table tr:last-child td:first-child { border-radius: 0 0 0 8px; }
-.comp-table tr:last-child td:last-child  { border-radius: 0 0 8px 0; }
-.comp-table tr:last-child td { border-bottom: none; }
-.check { color: var(--accent1); font-weight: 800; }
-.cross { color: #ccc; }
-.highlight-row td { background: #fff8ec; font-weight: 700; }
-/* ─── INSTALL ─── */
-.install-block {
-  background: #1d1b16;
-  border-radius: 12px;
-  padding: 0.85rem 1.1rem;
-  font-family: 'Courier New', monospace;
-  font-size: 0.73rem;
-  color: var(--accent1);
-  line-height: 1.7;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.install-block .comment { color: #7a8a6a; }
-.install-block .cmd { color: var(--accent3); font-weight: 700; }
-.install-block .url  { color: var(--accent2); }
-.install-block .var  { color: var(--accent5); }
-/* ─── AGENT FRIENDLY ─── */
-.agent-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-}
-.agent-card {
-  background: #fff;
-  border: 2px solid var(--border);
-  border-radius: 14px;
-  padding: 0.75rem 0.9rem;
-}
-.agent-card-title {
-  font-size: 0.82rem;
-  font-weight: 800;
-  color: var(--ink);
-  margin-bottom: 0.2rem;
-}
-.agent-card-desc {
-  font-size: 0.72rem;
-  color: #5a4a30;
-  line-height: 1.45;
-}
-.agent-card-emoji { font-size: 1rem; margin-bottom: 0.2rem; display: block; }
-/* ─── FOOTER ─── */
-.footer {
-  padding: 0.9rem 1.4rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  border-top: 3px solid var(--border);
-  margin-top: 0.2rem;
-}
-.footer-left { font-size: 0.7rem; color: #8a7a62; font-weight: 600; }
-.footer-right { font-size: 0.7rem; color: #8a7a62; }
-.footer-right a { color: #6b5c42; text-decoration: none; font-weight: 700; }
-.footer-right a:hover { text-decoration: underline; }
-/* ─── FAB ─── */
-#save-btn {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
-  background: linear-gradient(135deg, #b5451b, #e06030);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 0.6rem 0.9rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  z-index: 999;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-  font-family: 'Courier New', monospace;
-  letter-spacing: 0.03em;
-  transition: transform 0.15s;
-}
-#save-btn:hover { transform: scale(1.04); background: linear-gradient(135deg, #c05020, #e87040); }
-#save-btn:active { transform: scale(0.97); }
-/* ─── RESPONSIVE ─── */
-@media (max-width: 500px) {
-  .page { padding-bottom: 100px; }
-  .feat-grid { grid-template-columns: 1fr; }
-  .agent-grid { grid-template-columns: 1fr; }
-  .page-title { font-size: 1.6rem; }
-  .stats-bar { gap: 0.3rem; }
-  .stat-item { min-width: 55px; }
-  .stat-num { font-size: 1.1rem; }
-  .header { padding: 1.1rem 1rem 0.9rem; }
-  .section { padding: 0.9rem 1rem; }
-  .comp-table { font-size: 0.7rem; }
-  .comp-table th, .comp-table td { padding: 0.35rem 0.4rem; }
-}
-@media (max-width: 400px) {
-  .page-title { font-size: 1.4rem; }
-  .header-pills { gap: 0.3rem; }
-  .pill { font-size: 0.65rem; padding: 0.18rem 0.5rem; }
-}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Karakeep · 自托管 AI 书签管理</title>
+  <meta name="description" content="自托管书签管理工具，AI 自动标签摘要，支持 LLM Agent，浏览器+移动端全覆盖，已获 25.8k GitHub Stars">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --red:#c8102e;
+      --black:#0a0a0a;
+      --paper:#fffdf9;
+      --page-bg:#f5f2ec;
+      --blue:#0036a3;
+      --blue-bg:#eef4ff;
+      --yellow:#e8c200;
+      --yellow-bg:#fff1b0;
+      --green:#15803d;
+      --green-bg:#dcfce7;
+      --text:#111;
+      --muted:#555;
+    }
+    html,body{min-height:100%}
+    body{background:var(--page-bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text)}
+    .page{width:100%;max-width:720px;margin:0 auto;padding:0 0 80px}
+
+    /* ─── HEADER ─── */
+    .header{border-bottom:2px solid var(--black);padding:12px 14px 10px;margin-bottom:0}
+    .badge-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+    .badge{display:inline-block;padding:2px 8px;border:1.5px solid var(--black);background:var(--black);color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+    .title-block h1{font-size:18px;font-weight:800;letter-spacing:-.02em;line-height:1.1;margin-bottom:4px}
+    .title-block p{font-size:11px;color:#555;line-height:1.5}
+
+    /* ─── STATS BAR ─── */
+    .stats{display:flex;flex-wrap:wrap;border:1.5px solid var(--black);margin:0 0 8px;overflow:hidden;background:#fff}
+    .stat{flex:1;min-width:60px;padding:7px 8px 5px;border-right:1.5px solid var(--black);text-align:center}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:15px;font-weight:700;line-height:1}
+    .stat span{font-size:10px;color:#555;font-weight:600}
+
+    /* ─── PILL ROW ─── */
+    .pill-row{display:flex;flex-wrap:wrap;gap:5px;padding:0 14px;margin-bottom:10px}
+    .pill{padding:3px 8px;border:1.5px solid var(--black);font-size:10px;font-weight:700;background:#fff}
+    .pill.blue{background:var(--blue-bg);border-color:var(--blue);color:var(--blue)}
+    .pill.yellow{background:var(--yellow-bg);border-color:var(--yellow);color:#6b4e00}
+    .pill.green{background:var(--green-bg);border-color:var(--green);color:#14532d}
+    .pill.red{background:#fff5f6;border-color:var(--red);color:var(--red)}
+
+    /* ─── SECTIONS ─── */
+    .section{border:1.5px solid var(--black);margin:0 14px 8px;overflow:hidden}
+    .sec-head{background:var(--black);color:#fff;padding:6px 10px;font-size:11px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:#c8102e}
+    .sec-body{background:var(--paper);padding:10px 12px}
+    .sec-body p{font-size:12px;line-height:1.65;margin:0 0 8px;color:#333}
+    .sec-body p:last-child{margin-bottom:0}
+
+    /* ─── FEAT GRID ─── */
+    .feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .feat-card{border:1.5px solid var(--black);padding:8px 10px;background:#fff}
+    .feat-card-icon{font-size:14px;display:block;margin-bottom:3px}
+    .feat-card-title{font-size:11px;font-weight:800;margin-bottom:3px}
+    .feat-card-desc{font-size:11px;color:#555;line-height:1.5}
+    .feat-tag{display:inline-block;padding:1px 5px;border:1.5px solid var(--red);color:var(--red);font-size:9px;font-weight:700;background:#fff5f6;margin-top:4px}
+    .feat-tag.ai{background:var(--green-bg);border-color:var(--green);color:#14532d}
+    .feat-tag.cli{background:var(--blue-bg);border-color:var(--blue);color:var(--blue)}
+
+    /* ─── PLATFORM STRIP ─── */
+    .platform-strip{display:flex;flex-wrap:wrap;gap:5px}
+    .platform-chip{background:var(--black);color:#fff;border:1.5px solid var(--black);padding:4px 10px;font-size:11px;font-weight:700}
+
+    /* ─── AGENT GRID ─── */
+    .agent-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .agent-card{border:1.5px solid var(--black);padding:8px 10px;background:#fff}
+    .agent-card-emoji{font-size:14px;display:block;margin-bottom:3px}
+    .agent-card-title{font-size:11px;font-weight:800;margin-bottom:3px}
+    .agent-card-desc{font-size:11px;color:#555;line-height:1.5}
+
+    /* ─── COMPARISON TABLE ─── */
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th,td{padding:6px 8px;border:1.5px solid var(--black);text-align:left}
+    th{background:var(--black);color:#fff;font-weight:700}
+    td{background:var(--paper)}
+    tr:nth-child(even) td{background:#fff}
+    .check{color:var(--green);font-weight:800}
+    .cross{color:#ccc}
+
+    /* ─── INSTALL BLOCK ─── */
+    .install-block{background:#0a0a0a;border:1.5px solid var(--black);border-radius:0;padding:10px 12px;font-family:'Courier New',monospace;font-size:11px;color:#9bdc77;line-height:1.7;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+    .install-block .comment{color:#7a8a6a}
+    .install-block .cmd{color:#ffc45c;font-weight:700}
+    .install-block .url{color:#7cc8ff}
+    .install-block .var{color:#c084fc}
+
+    /* ─── FOOTER ─── */
+    .footer{border-top:2px solid var(--black);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;background:var(--paper)}
+    .footer-left{font-size:11px;color:#555;font-weight:600}
+    .footer-right{font-size:11px;color:#555}
+    .footer-right a{color:var(--black);text-decoration:none;font-weight:700}
+    .footer-right a:hover{text-decoration:underline}
+
+    /* ─── SAVE BUTTON ─── */
+    #save-btn{position:fixed;bottom:18px;right:18px;z-index:999;border:0;border-radius:8px;padding:.6rem .85rem;background:linear-gradient(135deg,var(--red),#b3000f);color:#fff;font-size:.72rem;font-weight:900;font-family:"Courier New",monospace;cursor:pointer;box-shadow:4px 4px 0 rgba(0,0,0,.25);letter-spacing:.03em}
+    #save-btn:hover{background:linear-gradient(135deg,#e8001e,#d80018)}
+
+    /* ─── RESPONSIVE ─── */
+    @media(max-width:500px){
+      .page{padding-bottom:70px}
+      .header{padding:10px 10px 8px}
+      .title-block h1{font-size:16px}
+      .stats{gap:0}
+      .stat{min-width:50px;padding:6px 6px 4px}
+      .stat strong{font-size:13px}
+      .section{margin-left:10px;margin-right:10px}
+      .feat-grid,.agent-grid{grid-template-columns:1fr}
+      .sec-body{padding:8px 10px}
+      table{font-size:10px}
+      th,td{padding:5px 6px}
+      #save-btn{bottom:14px;right:14px;padding:.5rem .7rem;font-size:.68rem}
+    }
+  </style>
 </head>
 <body>
 <div class="page" id="card">
+
   <!-- HEADER -->
   <div class="header">
-    <div class="header-top">
-      <div>
-        <div class="header-pills" style="margin-bottom:0.6rem;">
-          <span class="pill pill-green">⭐ 25.8k Stars</span>
-          <span class="pill pill-blue">🍴 1.2k Forks</span>
-          <span class="pill pill-yellow">📦 v0.32.0</span>
-          <span class="pill pill-red">🆓 AGPL-3.0</span>
-          <span class="pill pill-purple">🧠 AI Native</span>
-        </div>
-      </div>
+    <div class="badge-row">
+      <span class="badge">⭐ 25.8k Stars</span>
+      <span class="badge">🍴 1.2k Forks</span>
+      <span class="badge">📦 v0.32.0</span>
+      <span class="badge">🆓 AGPL-3.0</span>
+      <span class="badge">🧠 AI Native</span>
     </div>
     <div class="title-block">
-      <div class="page-title">Karakeep</div>
-      <div class="page-subtitle">自托管 · AI 书签管理 · LLM Agent 友好 · All-in-One 收藏</div>
+      <h1>Karakeep</h1>
+      <p>自托管 · AI 书签管理 · LLM Agent 友好 · All-in-One 收藏</p>
     </div>
   </div>
 
   <!-- STATS BAR -->
-  <div class="stats-bar">
-    <div class="stat-item">
-      <span class="stat-num" style="color:#b5451b;">25,811</span>
-      <span class="stat-label"><span class="stat-dot dot-yellow"></span> Stars</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-num">1,233</span>
-      <span class="stat-label"><span class="stat-dot dot-blue"></span> Forks</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-num">641</span>
-      <span class="stat-label"><span class="stat-dot dot-red"></span> Open Issues</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-num">TypeScript</span>
-      <span class="stat-label"><span class="stat-dot dot-purple"></span> Language</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-num" style="font-size:1.1rem;">2024-02</span>
-      <span class="stat-label"><span class="stat-dot dot-green"></span> Created</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-num" style="font-size:1.1rem;">v0.32.0</span>
-      <span class="stat-label"><span class="stat-dot dot-yellow"></span> Latest</span>
+  <div class="stats">
+    <div class="stat"><strong style="color:var(--red)">25,811</strong><span>Stars</span></div>
+    <div class="stat"><strong>1,233</strong><span>Forks</span></div>
+    <div class="stat"><strong>641</strong><span>Issues</span></div>
+    <div class="stat"><strong>TypeScript</strong><span>Language</span></div>
+    <div class="stat"><strong>2024-02</strong><span>Created</span></div>
+    <div class="stat"><strong>v0.32.0</strong><span>Latest</span></div>
+  </div>
+
+  <!-- PILL ROW -->
+  <div class="pill-row">
+    <span class="pill blue">自托管</span>
+    <span class="pill yellow">AI 标签</span>
+    <span class="pill green">Agent 友好</span>
+    <span class="pill red">多平台</span>
+  </div>
+
+  <!-- SECTION 01: CORE VALUE -->
+  <div class="section">
+    <div class="sec-head"><span class="num">01</span><span>Core Value</span></div>
+    <div class="sec-body">
+      <p>自托管的书签 + 笔记 + PDF + 图片收藏库，<strong style="color:var(--red)">内置 AI 自动标签、摘要、OCR</strong>，支持 LLM Agent（OpenClaw/Hermes）通过 CLI 调用</p>
+      <p>阿拉伯语词源"كراكيب"（零碎杂物），定位是"自托管优先的<em>个人知识收件箱</em>"，解决"随手收藏、稍后阅读、随手归类"的全链路需求</p>
     </div>
   </div>
 
-  <!-- CORE VALUE -->
+  <!-- SECTION 02: HOARD -->
   <div class="section">
-    <div class="section-label">Core Value</div>
-    <div class="core-card">
-      <div class="core-card-title">
-        自托管的书签 + 笔记 + PDF + 图片收藏库，<strong>内置 AI 自动标签、摘要、OCR</strong>，支持 LLM Agent（OpenClaw/Hermes）通过 CLI 调用
-      </div>
-      <div class="core-card-sub">
-        阿拉伯语词源 "كراكيب"（零碎杂物），定位是"自托管优先的<em>个人知识收件箱</em>"，解决"随手收藏、稍后阅读、随手归类"的全链路需求
-      </div>
-    </div>
-  </div>
-
-  <!-- WHAT YOU CAN HOARD -->
-  <div class="section">
-    <div class="section-label">可收藏内容</div>
-    <div class="feat-grid">
-      <div class="feat-card">
-        <span class="feat-card-icon">🔗</span>
-        <div class="feat-card-title">链接 + 文章</div>
-        <div class="feat-card-desc">自动抓取标题、描述、封面图；全文存档防死链；支持 YouTube 视频</div>
-      </div>
-      <div class="feat-card">
-        <span class="feat-card-icon">📝</span>
-        <div class="feat-card-title">笔记 + 纯文本</div>
-        <div class="feat-card-desc">随手记笔记，自动转可搜索文本；Markdown 支持</div>
-      </div>
-      <div class="feat-card">
-        <span class="feat-card-icon">📄</span>
-        <div class="feat-card-title">PDF + 图片</div>
-        <div class="feat-card-desc">PDF 上传、OCR 文字提取；图片存档，支持截图标注高亮</div>
-      </div>
-      <div class="feat-card">
-        <span class="feat-card-icon">📰</span>
-        <div class="feat-card-title">RSS 自动订阅</div>
-        <div class="feat-card-desc">设置 RSS 源，自动收录更新内容到列表</div>
-        <span class="feat-tag rss">RSS Auto-hoarding</span>
+    <div class="sec-head"><span class="num">02</span><span>可收藏内容</span></div>
+    <div class="sec-body">
+      <div class="feat-grid">
+        <div class="feat-card">
+          <span class="feat-card-icon">🔗</span>
+          <div class="feat-card-title">链接 + 文章</div>
+          <div class="feat-card-desc">自动抓取标题、描述、封面图；全文存档防死链；支持 YouTube 视频</div>
+        </div>
+        <div class="feat-card">
+          <span class="feat-card-icon">📝</span>
+          <div class="feat-card-title">笔记 + 纯文本</div>
+          <div class="feat-card-desc">随手记笔记，自动转可搜索文本；Markdown 支持</div>
+        </div>
+        <div class="feat-card">
+          <span class="feat-card-icon">📄</span>
+          <div class="feat-card-title">PDF + 图片</div>
+          <div class="feat-card-desc">PDF 上传、OCR 文字提取；图片存档，支持截图标注高亮</div>
+        </div>
+        <div class="feat-card">
+          <span class="feat-card-icon">📰</span>
+          <div class="feat-card-title">RSS 自动订阅</div>
+          <div class="feat-card-desc">设置 RSS 源，自动收录更新内容到列表</div>
+          <span class="feat-tag">RSS Auto-hoarding</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- AI CAPABILITIES -->
+  <!-- SECTION 03: AI -->
   <div class="section">
-    <div class="section-label">AI 能力</div>
-    <div class="feat-grid">
-      <div class="feat-card">
-        <span class="feat-card-icon">🏷️</span>
-        <div class="feat-card-title">AI 自动标签</div>
-        <div class="feat-card-desc">保存时自动推断标签，支持本地 Ollama 模型，保护隐私</div>
-        <span class="feat-tag ai">LLM Tagging</span>
-      </div>
-      <div class="feat-card">
-        <span class="feat-card-icon">📋</span>
-        <div class="feat-card-title">AI 自动摘要</div>
-        <div class="feat-card-desc">长文章自动生成摘要，方便快速浏览</div>
-        <span class="feat-tag ai">LLM Summary</span>
-      </div>
-      <div class="feat-card">
-        <span class="feat-card-icon">🔍</span>
-        <div class="feat-card-title">全文搜索引擎</div>
-        <div class="feat-card-desc">Meilisearch 驱动，支持标题+正文+标签全维度搜索</div>
-        <span class="feat-tag">Meilisearch</span>
-      </div>
-      <div class="feat-card">
-        <span class="feat-card-icon">🤖</span>
-        <div class="feat-card-title">Agent 友好</div>
-        <div class="feat-card-desc">官方 CLI + Skills 接口，OpenClaw/Hermes 等 Agent 可直接调用收藏库</div>
-        <span class="feat-tag cli">CLI + Skills</span>
+    <div class="sec-head"><span class="num">03</span><span>AI 能力</span></div>
+    <div class="sec-body">
+      <div class="feat-grid">
+        <div class="feat-card">
+          <span class="feat-card-icon">🏷️</span>
+          <div class="feat-card-title">AI 自动标签</div>
+          <div class="feat-card-desc">保存时自动推断标签，支持本地 Ollama 模型，保护隐私</div>
+          <span class="feat-tag ai">LLM Tagging</span>
+        </div>
+        <div class="feat-card">
+          <span class="feat-card-icon">📋</span>
+          <div class="feat-card-title">AI 自动摘要</div>
+          <div class="feat-card-desc">长文章自动生成摘要，方便快速浏览</div>
+          <span class="feat-tag ai">LLM Summary</span>
+        </div>
+        <div class="feat-card">
+          <span class="feat-card-icon">🔍</span>
+          <div class="feat-card-title">全文搜索引擎</div>
+          <div class="feat-card-desc">Meilisearch 驱动，支持标题+正文+标签全维度搜索</div>
+        </div>
+        <div class="feat-card">
+          <span class="feat-card-icon">🤖</span>
+          <div class="feat-card-title">Agent 友好</div>
+          <div class="feat-card-desc">官方 CLI + Skills 接口，OpenClaw/Hermes 可直接调用收藏库</div>
+          <span class="feat-tag cli">CLI + Skills</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- PLATFORM COVERAGE -->
+  <!-- SECTION 04: PLATFORM -->
   <div class="section">
-    <div class="section-label">全平台覆盖</div>
-    <div class="platform-strip">
-      <span class="platform-chip"><span class="platform-chip-emoji">🌐</span> Chrome 扩展</span>
-      <span class="platform-chip"><span class="platform-chip-emoji">🦊</span> Firefox 插件</span>
-      <span class="platform-chip"><span class="platform-chip-emoji">🧭</span> Safari 扩展</span>
-      <span class="platform-chip"><span class="platform-chip-emoji">📱</span> iOS App</span>
-      <span class="platform-chip"><span class="platform-chip-emoji">🤖</span> Android App</span>
-      <span class="platform-chip"><span class="platform-chip-emoji">🖥️</span> 桌面 Web</span>
-      <span class="platform-chip"><span class="platform-chip-emoji">☁️</span> Karakeep Cloud</span>
-    </div>
-    <div style="margin-top:0.65rem; font-size:0.72rem; color:#5a4a30; line-height:1.5;">
-      同时支持从 <strong>Pocket / Chrome / Linkwarden / Omnivore / Tab Session Manager</strong> 批量导入已有书签；通过 <strong>floccus</strong> 与浏览器书签双向同步。
-    </div>
-  </div>
-
-  <!-- AGENT INTEGRATION -->
-  <div class="section">
-    <div class="section-label">LLM Agent 集成</div>
-    <div class="agent-grid">
-      <div class="agent-card">
-        <span class="agent-card-emoji">💻</span>
-        <div class="agent-card-title">官方 CLI</div>
-        <div class="agent-card-desc">`karakeep bookmarks add` 添加书签，支持指定列表、标签、注释</div>
+    <div class="sec-head"><span class="num">04</span><span>全平台覆盖</span></div>
+    <div class="sec-body">
+      <div class="platform-strip">
+        <span class="platform-chip">🌐 Chrome</span>
+        <span class="platform-chip">🦊 Firefox</span>
+        <span class="platform-chip">🧭 Safari</span>
+        <span class="platform-chip">📱 iOS</span>
+        <span class="platform-chip">🤖 Android</span>
+        <span class="platform-chip">🖥️ 桌面 Web</span>
+        <span class="platform-chip">☁️ Cloud</span>
       </div>
-      <div class="agent-card">
-        <span class="agent-card-emoji">🧩</span>
-        <div class="agent-card-title">Skills 接口</div>
-        <div class="agent-card-desc">官方 Agent Skills，OpenClaw / Hermes 可直接调用收藏操作</div>
-      </div>
-      <div class="agent-card">
-        <span class="agent-card-emoji">🌐</span>
-        <div class="agent-card-title">REST API</div>
-        <div class="agent-card-desc">开放 API，第三方工具和脚本可编程访问收藏库</div>
-      </div>
-      <div class="agent-card">
-        <span class="agent-card-emoji">🔑</span>
-        <div class="agent-card-title">SSO 支持</div>
-        <div class="agent-card-desc">企业级 SSO 认证，适合团队协作场景</div>
-      </div>
+      <p style="margin-top:8px">支持从 <strong>Pocket / Chrome / Linkwarden / Omnivore / Tab Session Manager</strong> 批量导入；通过 <strong>floccus</strong> 与浏览器书签双向同步。</p>
     </div>
   </div>
 
-  <!-- COMPARISON -->
+  <!-- SECTION 05: AGENT -->
   <div class="section">
-    <div class="section-label">同类对比</div>
-    <table class="comp-table">
-      <thead>
-        <tr>
-          <th>工具</th>
-          <th>自托管</th>
-          <th>AI 标签</th>
-          <th>Agent 友好</th>
-          <th>多平台</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="highlight-row">
-          <td><strong>Karakeep</strong></td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-        </tr>
-        <tr>
-          <td>Pocket</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-        </tr>
-        <tr>
-          <td>Raindrop</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-        </tr>
-        <tr>
-          <td>Linkwarden</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="cross">部分</td>
-        </tr>
-        <tr>
-          <td>Wallabag</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="cross">部分</td>
-        </tr>
-        <tr>
-          <td>Shiori</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="cross">部分</td>
-        </tr>
-        <tr>
-          <td>Memos</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="cross">部分</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="sec-head"><span class="num">05</span><span>LLM Agent 集成</span></div>
+    <div class="sec-body">
+      <div class="agent-grid">
+        <div class="agent-card">
+          <span class="agent-card-emoji">💻</span>
+          <div class="agent-card-title">官方 CLI</div>
+          <div class="agent-card-desc">`karakeep bookmarks add` 添加书签，支持指定列表、标签、注释</div>
+        </div>
+        <div class="agent-card">
+          <span class="agent-card-emoji">🧩</span>
+          <div class="agent-card-title">Skills 接口</div>
+          <div class="agent-card-desc">官方 Agent Skills，OpenClaw / Hermes 可直接调用收藏操作</div>
+        </div>
+        <div class="agent-card">
+          <span class="agent-card-emoji">🌐</span>
+          <div class="agent-card-title">REST API</div>
+          <div class="agent-card-desc">开放 API，第三方工具和脚本可编程访问收藏库</div>
+        </div>
+        <div class="agent-card">
+          <span class="agent-card-emoji">🔑</span>
+          <div class="agent-card-title">SSO 支持</div>
+          <div class="agent-card-desc">企业级 SSO 认证，适合团队协作场景</div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- INSTALL -->
+  <!-- SECTION 06: COMPARISON -->
   <div class="section">
-    <div class="section-label">快速安装（Docker）</div>
-    <div class="install-block"><span class="comment"># 1. 创建目录</span>
-<span class="cmd">mkdir</span> -p karakeep <span class="cmd">&& cd</span> karakeep
+    <div class="sec-head"><span class="num">06</span><span>同类对比</span></div>
+    <div class="sec-body" style="padding:0">
+      <table>
+        <tr><th>工具</th><th>自托管</th><th>AI 标签</th><th>Agent 友好</th><th>多平台</th></tr>
+        <tr style="background:#fff5f6"><td><strong>Karakeep</strong></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+        <tr><td>Pocket</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+        <tr><td>Raindrop</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+        <tr><td>Linkwarden</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td>部分</td></tr>
+        <tr><td>Wallabag</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td>部分</td></tr>
+        <tr><td>Shiori</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td>部分</td></tr>
+        <tr><td>Memos</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td>部分</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECTION 07: INSTALL -->
+  <div class="section">
+    <div class="sec-head"><span class="num">07</span><span>快速安装（Docker）</span></div>
+    <div class="sec-body">
+      <div class="install-block"><span class="comment"># 1. 创建目录</span>
+<span class="cmd">mkdir</span> -p karakeep <span class="cmd">&amp;&amp; cd</span> karakeep
 
 <span class="comment"># 2. 一键启动（v0.32.0）</span>
 <span class="var">docker run</span> \
@@ -612,19 +306,16 @@ body {
 
 <span class="comment"># 首次访问： http://localhost:3000</span>
 <span class="comment"># 演示账号： demo@karakeep.app / demodemo</span></div>
-    <div style="margin-top:0.6rem; font-size:0.72rem; color:#5a4a30; line-height:1.5;">
-      也支持 Docker Compose 完整配置（含 Meilisearch / Chrome 等）；可选 <strong>☁️ Karakeep Cloud</strong>（托管版，无需自维护）
+      <p>也支持 Docker Compose 完整配置（含 Meilisearch / Chrome 等）；可选 <strong>☁️ Karakeep Cloud</strong>（托管版，无需自维护）</p>
     </div>
   </div>
 
   <!-- FOOTER -->
   <div class="footer">
-    <div class="footer-left">
-      github.com/karakeep-app/karakeep · AGPL-3.0
-    </div>
+    <div class="footer-left">github.com/karakeep-app/karakeep · AGPL-3.0</div>
     <div class="footer-right">
-      <a href="https://docs.karakeep.app" target="_blank">文档</a> · 
-      <a href="https://try.karakeep.app" target="_blank">在线演示</a> · 
+      <a href="https://docs.karakeep.app" target="_blank">文档</a> ·
+      <a href="https://try.karakeep.app" target="_blank">在线演示</a> ·
       <a href="https://discord.gg/NrgeYywsFh" target="_blank">Discord</a>
     </div>
   </div>
@@ -634,7 +325,7 @@ body {
 <script>
 function saveCard(){
   const el = document.getElementById('card');
-  html2canvas(el, { scale: 2, backgroundColor: '#f8efd9', useCORS: true }).then(canvas => {
+  html2canvas(el, { scale: 2, backgroundColor: '#fffdf9', useCORS: true }).then(canvas => {
     const link = document.createElement('a');
     link.download = 'karakeep-bookmark-ai.png';
     link.href = canvas.toDataURL('image/png');
