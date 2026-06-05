@@ -213,6 +213,13 @@ function main() {
         continue;
       }
 
+      if (currentDate && !shouldForce && (!shouldSyncUpdated || currentUpdated)) {
+        summary.unchanged += 1;
+        summary.skipped += 1;
+        console.log(`SKIP ${metaRelative} | 无需变更`);
+        continue;
+      }
+
       const commitDate = getGitCommitDate(htmlRelative, dateSource);
       if (!commitDate) {
         summary.missingGitHistory += 1;
