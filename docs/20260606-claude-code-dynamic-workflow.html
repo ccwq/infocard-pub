@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+<title>Claude Code 动态工作流：每个任务都可以有自己的 Harness</title>
+<style>
+/* ============================================
+   蓝技手册风格 / Blue Technical Manual
+   红蓝双强调 · 黑头标题 · 技术手册骨架
+   ============================================ */
+:root {
+  --black: #0a0a0a;
+  --white: #f5f2ec;
+  --red: #c8102e;
+  --blue: #0036a3;
+  --green: #006b3c;
+  --yellow: #e8c200;
+  --gray-5: #e6e0d8;
+  --gray-3: #333;
+  --gray-6: #666;
+  --gray-8: #888;
+}
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  background: var(--black);
+  width: min(780px, 100vw);
+  margin: 0 auto;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color: var(--black);
+}
+.page { width: 100%; max-width: 100vw; }
+
+/* ── 主卡片外壳 ── */
+.card {
+  width: 100%;
+  max-width: 780px;
+  margin: 0 auto;
+  border: 3px solid var(--red);
+  background: var(--white);
+  overflow: hidden;
+}
+
+/* ── 头部：黑头红渐变 ── */
+.header {
+  display: grid;
+  grid-template-columns: 1.15fr 1.4fr 0.8fr;
+  gap: 10px;
+  padding: 14px 14px 10px;
+  background: linear-gradient(180deg, var(--red) 0%, #a90f27 100%);
+  align-items: start;
+}
+.header-left {}
+.kicker {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.75);
+  margin-bottom: 6px;
+}
+.banner-title {
+  font-size: clamp(1.2rem, 4.5vw, 2rem);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.1;
+  letter-spacing: -.03em;
+  margin: 0 0 6px;
+}
+.banner-sub {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255,255,255,.88);
+  font-weight: 400;
+}
+.header-center { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 2px; }
+.header-right { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 2px; align-items: flex-end; }
+
+/* ── 统计条 ── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: #121212;
+  border-top: 2px solid var(--red);
+}
+.stat {
+  border-right: 1px solid #2a2a2a;
+  padding: 7px 8px;
+  text-align: center;
+}
+.stat:last-child { border-right: none; }
+.stat-num {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--red);
+  line-height: 1.1;
+}
+.stat-lab {
+  display: block;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #888;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* ── 警告/标注条 ── */
+.warn {
+  background: #fffde6;
+  border-top: 1px solid var(--gray-5);
+  border-bottom: 1px solid var(--gray-5);
+  padding: 7px 14px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #555;
+}
+.warn strong { color: var(--red); font-weight: 800; }
+
+/* ── 章节通用 ── */
+.section {
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid var(--gray-5);
+}
+.sec-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.sec-no {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  margin-top: 1px;
+}
+.sec-title { flex: 1; }
+.sec-title h2 {
+  margin: 0 0 3px;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+  color: var(--black);
+}
+.sec-title p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--gray-6);
+  line-height: 1.5;
+}
+
+/* ── lead / 结论块 ── */
+.lead {
+  background: var(--black);
+  color: #fff;
+  padding: 10px 14px;
+  margin: 0;
+  border-left: 3px solid var(--red);
+}
+.lead p {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.lead p:last-child { margin-bottom: 0; }
+.lead strong { color: var(--yellow); font-weight: 800; }
+.lead .muted { color: #aaa; font-size: 11px; }
+.lead .blue { color: #6fa8dc; }
+.lead .green { color: #93c47d; }
+
+/* ── 引用块 ── */
+.quote {
+  border-left: 3px solid var(--blue);
+  background: #f0f4ff;
+  padding: 8px 12px;
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #333;
+}
+.quote strong { color: var(--blue); font-weight: 700; }
+
+/* ── grid2 / grid3 ── */
+.grid2 { display: grid; grid-template-columns: calc(50% - 4px) calc(50% - 4px); gap: 8px; margin-top: 8px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+
+/* ── box / 能力卡片 ── */
+.box {
+  border: 1px solid var(--gray-5);
+  background: #f5f2ec;
+  padding: 9px 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.box-accent-blue { border-left: 3px solid var(--blue); }
+.box-accent-green { border-left: 3px solid var(--green); }
+.box-accent-red { border-left: 3px solid var(--red); }
+.box-accent-yellow { border-left: 3px solid var(--yellow); }
+.box h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.3;
+}
+.box p, .box li {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #333;
+}
+.box ul { margin: 4px 0 0 14px; padding: 0; }
+.box li { margin-bottom: 2px; }
+.box-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-bottom: 5px;
+}
+.box-tag.blue { background: var(--blue); color: #fff; }
+.box-tag.green { background: var(--green); color: #fff; }
+.box-tag.red { background: var(--red); color: #fff; }
+.box-tag.yellow { background: var(--yellow); color: #111; }
+.box-tag.gray { background: var(--gray-6); color: #fff; }
+.box a { color: var(--blue); text-decoration: none; font-weight: 600; font-size: 11px; }
+.box a:hover { text-decoration: underline; }
+
+/* ── 流程/列表 ── */
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.step {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 7px 10px;
+  background: #f5f2ec;
+  border-left: 3px solid var(--blue);
+}
+.step-num {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  margin-top: 1px;
+}
+.step-text { font-size: 11px; line-height: 1.5; color: #333; flex: 1; }
+.step-text strong { color: var(--black); }
+
+/* ── fit-grid / 适合不适合 ── */
+.fit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.fit-item {
+  padding: 9px 12px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #333;
+}
+.fit-item.green { background: #e6f4ec; border-left: 3px solid var(--green); }
+.fit-item.red { background: #fce8e8; border-left: 3px solid var(--red); }
+.fit-item strong { font-weight: 900; }
+.fit-item em { color: var(--blue); font-style: normal; font-weight: 700; }
+
+/* ── 目录导航 ── */
+.toc {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 8px;
+}
+.toc-item {
+  background: #f5f2ec;
+  border-left: 3px solid var(--blue);
+  padding: 5px 8px;
+  font-size: 10px;
+  color: #333;
+  line-height: 1.4;
+}
+.toc-item strong { color: var(--black); }
+.toc-item em { color: var(--gray-6); font-style: normal; }
+
+/* ── 场景列表 ── */
+.scenario-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+.scenario {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 6px 10px;
+  background: #f5f2ec;
+  border-left: 3px solid var(--green);
+}
+.scenario-icon { flex-shrink: 0; font-size: 13px; margin-top: 1px; }
+.scenario-text { font-size: 11px; line-height: 1.5; color: #333; flex: 1; }
+.scenario-text strong { color: var(--black); }
+.scenario-text em { color: var(--blue); font-style: normal; }
+
+/* ── pattern-list ── */
+.pattern-grid {
+  display: grid;
+  grid-template-columns: calc(50% - 4px) calc(50% - 4px);
+  gap: 8px;
+  margin-top: 8px;
+}
+.pattern {
+  background: #f5f2ec;
+  border-left: 3px solid var(--yellow);
+  padding: 7px 10px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #333;
+}
+.pattern strong { color: var(--black); font-weight: 800; display: block; margin-bottom: 2px; }
+.pattern em { color: var(--blue); font-style: normal; font-weight: 600; }
+
+/* ── closing / 最终判断 ── */
+.closing {
+  background: var(--black);
+  color: #fff;
+  padding: 10px 14px;
+}
+.closing p { margin: 0 0 5px; font-size: 12px; line-height: 1.65; }
+.closing p:last-child { margin-bottom: 0; }
+.closing strong { color: var(--yellow); font-weight: 800; }
+.closing .blue { color: #6fa8dc; }
+.closing .green { color: #93c47d; }
+.closing .red { color: #e06666; }
+.closing .muted { color: #888; font-size: 11px; }
+
+/* ── footer ── */
+.footer {
+  padding: 8px 14px;
+  border-top: 1px solid var(--gray-5);
+  background: #f5f2ec;
+  font-size: 10px;
+  color: var(--gray-8);
+  text-align: center;
+  line-height: 1.6;
+}
+.footer a { color: var(--blue); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+
+/* ── 响应式：390px ── */
+@media (max-width: 760px) {
+  body { width: 100vw; }
+  .header { grid-template-columns: 1fr; gap: 6px; }
+  .header-center, .header-right { display: none; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+  .stat { border-bottom: 1px solid #2a2a2a; }
+  .grid2, .grid3, .fit-grid, .pattern-grid { grid-template-columns: 1fr; }
+  .toc { grid-template-columns: repeat(2, 1fr); }
+  .pattern-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 400px) {
+  .section { padding: 8px 10px 10px; }
+  #save-btn { right: 10px; bottom: 10px; font-size: 11px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="card">
+
+<!-- ══ 头部：黑头红渐变 ══ -->
+<header class="header">
+  <div class="header-left">
+    <div class="kicker">X Post · Claude Code · Anthropic · 2026-06-05</div>
+    <h1 class="banner-title">Claude Code<br/>动态工作流</h1>
+    <p class="banner-sub">每个任务都可以有自己的 Harness</p>
+  </div>
+  <div class="header-center">
+    <div style="font-size:10px;color:rgba(255,255,255,.7);line-height:1.6;">
+      <div>技术分享 · Claude Code</div>
+      <div>原文 @Thariq · Anthropic</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div style="font-size:10px;color:rgba(255,255,255,.6);">蓝技手册</div>
+  </div>
+</header>
+
+<!-- ══ 统计条 ══ -->
+<div class="stats">
+  <div class="stat"><span class="stat-num">7</span><span class="stat-lab">回复</span></div>
+  <div class="stat"><span class="stat-num">67</span><span class="stat-lab">转帖</span></div>
+  <div class="stat"><span class="stat-num">279</span><span class="stat-lab">喜欢</span></div>
+  <div class="stat"><span class="stat-num">678</span><span class="stat-lab">书签</span></div>
+  <div class="stat"><span class="stat-num">18.5万</span><span class="stat-lab">观看</span></div>
+</div>
+
+<!-- ══ 一句话判断 ══ -->
+<div class="lead">
+  <p><strong>一句话判断：</strong>Claude Code 现在能<strong>即时写出属于自己的 harness</strong>，为手头任务量身定制——动态编排数十到数百个并行 subagents，在结果送到你面前之前先自行检查一遍。它是 <span class="green">goal 的加强版</span>，可能是 skill 发明以来最好的功能。</p>
+  <p class="muted">译者 @实践哥MinLi · 原文作者 @Thariq（Anthropic 核心员工）</p>
+</div>
+
+<!-- ══ 警告条 ══ -->
+<div class="warn">
+  <strong>⚠ 重要前提：</strong>workflow 会消耗更多 token，更适合 <strong>复杂、高价值的任务</strong>；常规编码不必硬上。
+</div>
+
+<!-- ══ 章节 01：导读 + 目录 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">01</div>
+    <div class="sec-title">
+      <h2>核心原理：dynamic workflow 是什么</h2>
+      <p>workflow 会执行 JavaScript 文件，文件里包含用于生成和协调 subagents 的特殊函数。</p>
+    </div>
+  </div>
+  <div class="quote">
+    <strong>导读（@实践哥批注）：</strong>好文值得读。workflow 可能是 skill 发明以来最好的发明，是 goal 的加强版，非常值得学习。原文作者 Thariq @trq212 是 Anthropic 核心员工，经常分享 Claude Code 技巧。
+  </div>
+  <div class="toc">
+    <div class="toc-item"><strong>1. 示例提示词</strong><br/><em>8 个例子直观感受</em></div>
+    <div class="toc-item"><strong>2. 原理</strong><br/><em>本质是一段脚本</em></div>
+    <div class="toc-item"><strong>3. 为什么需要</strong><br/><em>三种失效模式</em></div>
+    <div class="toc-item"><strong>4. 动态 vs 静态</strong><br/><em>定制 vs 通用</em></div>
+    <div class="toc-item"><strong>5. 六种模式</strong><br/><em>可复用套路</em></div>
+    <div class="toc-item"><strong>6. 九大场景</strong><br/><em>落地实践</em></div>
+    <div class="toc-item"><strong>7. 何时不用</strong><br/><em>常规编码不必</em></div>
+    <div class="toc-item"><strong>8. 构建技巧</strong><br/><em>/goal + /loop</em></div>
+    <div class="toc-item"><strong>9. 探索起点</strong><br/><em>新能力延伸</em></div>
+  </div>
+</section>
+
+<!-- ══ 章节 02：三种失效模式 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">02</div>
+    <div class="sec-title">
+      <h2>为什么默认 harness 会失效：三种失效模式</h2>
+      <p>默认 harness 在单个 context window 内完成规划与执行，碰到复杂任务会出问题。</p>
+    </div>
+  </div>
+  <div class="grid2" style="grid-template-columns: calc(50% - 4px) calc(50% - 4px) !important; display: grid !important; gap: 8px;">
+    <div class="box box-accent-red">
+      <div class="box-tag red">失效 1</div>
+      <h3>智能体偷懒</h3>
+      <p>面对复杂多部分任务，Claude 会过早停止，只做完一部分就宣布完成。比如 50 项安全审查只处理了其中 35 项。</p>
+    </div>
+    <div class="box box-accent-red">
+      <div class="box-tag red">失效 2</div>
+      <h3>自我偏好偏差</h3>
+      <p>被要求对照 rubric 验证或评判结果时，Claude 会偏袒自己得出的结论——自己做的题自己批。</p>
+    </div>
+    <div class="box box-accent-yellow" style="grid-column: span 2;">
+      <div class="box-tag yellow">失效 3</div>
+      <h3>目标漂移</h3>
+      <p>在多轮交互中保真度逐渐流失，每一次总结都会丢掉细节，包括边缘情况的需求和各种约束。context window 被信息污染。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 章节 03：六种实用模式 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">03</div>
+    <div class="sec-title">
+      <h2>六种可复用模式：workflow 编排套路</h2>
+      <p>这些模式可以直接照抄，也可以组合使用。</p>
+    </div>
+  </div>
+  <div class="pattern-grid">
+    <div class="pattern">
+      <strong>P1 · 扇出并综合</strong>
+      把任务拆成许多更小的步骤，每个步骤跑一个 agent，再综合所有结果。综合这一步充当 barrier，等所有扇出完成后合并结构化输出。
+    </div>
+    <div class="pattern">
+      <strong>P2 · 对抗式验证</strong>
+      每生成一个 agent，就再跑一个单独 agent，以对抗姿态对照 rubric 或判定准则来验证它的输出。
+    </div>
+    <div class="pattern">
+      <strong>P3 · 分类并执行</strong>
+      由 classifier agent 判断任务类型，据此路由到不同的 agent 或行为；也可以在任务完成时确定输出的分类。
+    </div>
+    <div class="pattern">
+      <strong>P4 · 生成并筛选</strong>
+      先就某个主题生成多个想法，再按 rubric 或验证来筛选，去重后只留下质量最高、经过检验的那些。
+    </div>
+    <div class="pattern">
+      <strong>P5 · 锦标赛</strong>
+      让 N 个 agent 用不同方法在同一个任务上互相竞争，由成对评判的 agent 决出胜者，直到只剩一个。
+    </div>
+    <div class="pattern">
+      <strong>P6 · 循环至完成</strong>
+      对工作量未知的任务，持续生成 agent 直到满足停止条件（不再有新发现、日志里不再有错误），而不是采用固定遍数。
+    </div>
+  </div>
+</section>
+
+<!-- ══ 章节 04：九大应用场景 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">04</div>
+    <div class="sec-title">
+      <h2>九大应用场景：落地实践</h2>
+      <p>从迁移到研究，从验证到分类，覆盖复杂任务全链路。</p>
+    </div>
+  </div>
+  <div class="scenario-list">
+    <div class="scenario">
+      <div class="scenario-icon">🔄</div>
+      <div class="scenario-text"><strong>迁移与重构</strong><br/>Bun 把 Zig 重写成 Rust 时用了 workflow。把任务拆成串行步骤（调用点、失败测试、模块），为每一处修复在 worktree 里生成 subagents，做对抗式审查再合并。</div>
+    </div>
+    <div class="scenario">
+      <div class="scenario-icon">🔬</div>
+      <div class="scenario-text"><strong>深度研究</strong><br/><em>Claude Code 的 /deep-research</em> 就用了 workflow：扇出网络搜索 → 抓取来源 → 对抗式验证论断 → 综合出带引用的报告。也可用于非网络类研究（汇编 Slack 报告、探索代码库功能）。</div>
+    </div>
+    <div class="scenario">
+      <div class="scenario-icon">✅</div>
+      <div class="scenario-text"><strong>深度验证</strong><br/>生成一个 workflow：一个 agent 负责识别各项论断，subagents 逐一核查，再由 verifier agent 确保来源质量（每条事实都要标注出处）。</div>
+    </div>
+    <div class="scenario">
+      <div class="scenario-icon">📊</div>
+      <div class="scenario-text"><strong>排序</strong><br/>按缺陷严重程度给工单排序时，单个提示给 1000+ 行排名会拉低质量、撑爆 context。可以用锦标赛成对比较流水线，或先分桶排名再合并。</div>
+    </div>
+    <div class="scenario">
+      <div class="scenario-icon">🧠</div>
+      <div class="scenario-text"><strong>记忆与规则遵循</strong><br/>当 Claude 即便把规则写进 CLAUDE.md 仍会漏掉某些规则时，创建带 rule verifier 的 workflow：一条规则配一个 verifier，再让 skeptic 人设审查防止误报。</div>
+    </div>
+    <div class="scenario">
+      <div class="scenario-icon">🏷️</div>
+      <div class="scenario-text"><strong>大规模分类处理</strong><br/>triage workflow 会对条目分类、跟现有记录去重，然后采取行动。用 quarantine 模式：读取不受信任公开内容的 agent 被禁止高权限操作，配合 /loop 持续运行。</div>
+    </div>
+    <div class="scenario">
+      <div class="scenario-icon">🎨</div>
+      <div class="scenario-text"><strong>探索与品味</strong><br/>设计或命名这类依赖品味的决策，能从 rubric 中受益。让 Claude 探索解法，同时让 review agent 依据好方案的 rubric 评判，满足标准即告完成。</div>
+    </div>
+    <div class="scenario">
+      <div class="scenario-icon">📈</div>
+      <div class="scenario-text"><strong>评估</strong><br/>轻量级 eval：在 worktree 里生成若干独立 agent，再生成 comparison agent 对照 rubric 给输出做比较和打分。可用于对照特定标准来评估和改进技能。</div>
+    </div>
+    <div class="scenario">
+      <div class="scenario-icon">🧭</div>
+      <div class="scenario-text"><strong>模型与智能路由</strong><br/>创建针对任务调校过的 classifier agent，由它决定用哪个模型。解释鉴权模块怎么工作取决于文件数量和代码库形态，classifier 会先调研再根据复杂度路由到 Sonnet 或 Opus。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 章节 05：何时不用 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">05</div>
+    <div class="sec-title">
+      <h2>何时不该使用 workflow：常规编码不必硬上</h2>
+      <p>workflow 是新能力，但不是每个任务都需要它。</p>
+    </div>
+  </div>
+  <div class="quote">
+    <strong>原文警告：</strong>workflow 可能消耗多得多的 token。要有创造性地用它，把 Claude Code 推到常规用法之外。而对常规编码任务，先掂量一下是否真的需要额外算力；<strong>大多数传统编码并不需要五个 reviewer</strong>。
+  </div>
+</section>
+
+<!-- ══ 章节 06：构建技巧 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">06</div>
+    <div class="sec-title">
+      <h2>构建 workflow 的关键技巧</h2>
+      <p>让 Claude 以比默认方式更原生的姿态解决问题。</p>
+    </div>
+  </div>
+  <div class="flow">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text"><strong>提示词要详细</strong>：运用具体技巧、把提示写详细，效果最好。不只用于大型任务，也可以提示快速 workflow（如对某个假设做一次快速对抗式审查）。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text"><strong>结合 /goal 和 /loop</strong>：对可重复的 workflow（分类、研究、验证），用 /loop 按固定间隔运行，用 /goal 设硬性完成要求。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text"><strong>设 token 预算</strong>：在提示里写明上限（例如只用 10k token），明确限制任务用量，避免成本失控。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-text"><strong>保存与分享</strong>：workflow 菜单里按 S 保存。签入 <code style="font-size:10px;background:#f5f2ec;padding:1px 3px;">~/.claude/workflows</code>，或通过技能来分发。把 JS workflow 文件放进技能文件夹并在 SKILL.md 里引用。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 章节 07：适合/不适合 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">07</div>
+    <div class="sec-title">
+      <h2>适合谁先看，谁最好别把它想窄了</h2>
+      <p>workflow 是 skill 发明以来最好的功能，适合想用 Claude Code 解决复杂任务的人。</p>
+    </div>
+  </div>
+  <div class="fit-grid">
+    <div class="fit-item green">
+      <strong>✓ 适合</strong><br/>
+      <em>Claude Code 重度用户</em>：想让 AI 解决超出常规编码的复杂任务<br/>
+      <em>AI 工程师</em>：研究 agent teams、代码审查、安全分析<br/>
+      <em>大型代码库维护者</em>：需要并行审查、重构、迁移<br/>
+      <em>技术写作者</em>：深度研究、长篇报告、论断核实
+    </div>
+    <div class="fit-item red">
+      <strong>✗ 不适合</strong><br/>
+      <em>普通 CRUD 开发</em>：简单增删改查不需要并行 subagents<br/>
+      <em>单次小任务</em>：三五分钟能搞定的事不必开 workflow<br/>
+      <em>极度 token 敏感场景</em>：成本优先时先评估 ROI
+    </div>
+  </div>
+</section>
+
+<!-- ══ 最终判断 ══ -->
+<div class="closing">
+  <p><strong>最终判断：</strong>dynamic workflow 是 Claude Code 自 skill 以来最重要的功能进化——它让 Claude 能<strong>即时写出属于自己的 harness</strong>，为手头任务量身定制，而不是在通用 harness 框架下勉强发挥。</p>
+  <p>workflow 的核心价值：<span class="green">编排彼此独立、各自拥有独立 context window、目标聚焦又互相隔离的 subagents</span>，从根本上解决了默认 harness 在复杂任务中的三种失效模式。</p>
+  <p>但记住：<span class="red">workflow 消耗更多 token</span>，不是万能药。最好的用法是：<span class="blue">对复杂高价值任务动用它，对常规编码保持默认 harness</span>。</p>
+  <p class="muted">来源：<a href="https://x.com/i/status/2062068646902689895" style="color:#6fa8dc;">x.com/i/status/2062068646902689895</a> · @实践哥MinLi（译）· @Thariq（原文，Anthropic）</p>
+</div>
+
+<!-- ══ Footer ══ -->
+<div class="footer">
+  蓝技手册风格 · 技术分享类信息卡 · 2026-06-06<br/>
+  Claude Code Dynamic Workflow · <a href="https://x.com/i/status/2062068646902689895" target="_blank">查看原帖</a>
+</div>
+
+</div><!-- .card -->
+</div><!-- .page -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('save-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'save-btn';
+    btn.textContent = '保存 PNG';
+    btn.style.cssText = 'position:fixed;right:14px;bottom:14px;background:#c8102e;color:#fff;border:none;padding:7px 12px;font-size:12px;font-weight:700;border-radius:4px;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+    btn.onclick = function() {
+      var card = document.querySelector('.card');
+      html2canvas(card, { backgroundColor: '#0a0a0a', scale: 2 }).then(function(canvas) {
+        var link = document.createElement('a');
+        link.download = '20260606-claude-code-dynamic-workflow.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }).catch(function(err) { alert('截图失败: ' + err); });
+    };
+    document.body.appendChild(btn);
+  }
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</body>
+</html>
