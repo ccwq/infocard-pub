@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>OpenHuman：把个人 AI 从临时对话，推成会记人的长期代理</title>
+<style>
+:root{
+  --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+  --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff;
+  --shadow:8px 8px 0 rgba(17,17,17,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  color:var(--ink);line-height:1.58;
+  background:
+    linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+    linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+    radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+    radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+    var(--bg);
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 92px}
+.card{border:3px solid var(--line);background:var(--paper);overflow:hidden}
+.hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:14px;border-bottom:3px solid var(--line)}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-copy{padding:22px;border-right:3px solid var(--line);display:grid;gap:14px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:6px 10px;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";color:var(--red);font-size:11px}
+h1.demo-title{margin:0;max-width:820px;font-size:clamp(30px,4.6vw,52px);line-height:.98;letter-spacing:-.05em}
+.subtitle{color:var(--muted);font-size:14px;line-height:1.65;max-width:62ch}
+.badge-row{display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:inline-flex;align-items:center;min-height:33px;padding:6px 10px;border:2px solid var(--line);background:#fff;font-size:12.1px;font-weight:850}
+.badge.red{background:var(--red);color:#fff}.badge.blue{background:var(--blue);color:#fff}.badge.dark{background:#111;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+.stat .k{display:block;margin-bottom:6px;font-size:10.8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.stat .v{display:block;font-size:13.2px;line-height:1.38;font-weight:900}
+.alert{border:3px solid var(--line);background:#111;color:#fff;padding:15px;display:grid;gap:10px}
+.alert strong{display:block;font-size:15px;line-height:1.38}
+.alert p{margin:0;font-size:14px;line-height:1.72;color:#f0ebe0}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+.hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+.panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+.panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.65}
+.panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+.hero-image{border:2px solid var(--line);background:#fff;box-shadow:var(--shadow);overflow:hidden}
+.hero-image img{width:100%;height:auto}
+.hero-caption{font-size:11.5px;color:var(--muted);line-height:1.55}
+.flow{display:grid;gap:8px}
+.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+.flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+.flow-item.red .c{color:var(--red)}.flow-item.blue .c{color:var(--blue)}.flow-item.dark .c{color:#111}
+.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px;padding:0 14px}
+.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1;box-shadow:var(--shadow)}
+.section-no.b{background:var(--blue)}.section-no.k{background:#111}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+.section-meta .label.b{color:var(--blue)}.section-meta .label.k{color:#111}
+.section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+.section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+.section-body{padding:0 14px 14px}
+.grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card-box,.mini{border:2px solid var(--line);background:#fff;min-width:0;padding:14px;box-shadow:4px 4px 0 rgba(17,17,17,.08)}
+.card-box{display:grid;gap:10px}.mini{display:grid;gap:8px}
+.card-box h3,.mini h4{margin:0;letter-spacing:-.02em}
+.card-box h3{font-size:17px;line-height:1.16}.mini h4{font-size:15px;line-height:1.2}
+.card-box p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+.card-box ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}.card-box li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+.tag.red{background:var(--soft-red)}.tag.blue{background:var(--soft-blue)}.tag.dark{background:#111;color:#fff}
+.small-note{font-size:11.5px;color:var(--muted);line-height:1.6}
+.matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.matrix .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.matrix .mini .red{color:var(--red)}.matrix .mini .blue{color:var(--blue)}
+.matrix .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+.risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden;box-shadow:4px 4px 0 rgba(17,17,17,.08)}
+.risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+.risk[data-accent="red"]{--accent:var(--red)}.risk[data-accent="blue"]{--accent:var(--blue)}.risk[data-accent="dark"]{--accent:#111}
+.risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+.risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}.risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+.quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+.quote-block b{color:#111}
+.link-list{display:grid;gap:8px}
+.link-item{display:grid;gap:4px;border:2px solid var(--line);padding:10px 12px;background:#fff}
+.link-item .label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red);font-weight:900}
+.link-item a{color:var(--blue);font-size:13px;word-break:break-all;line-height:1.55}
+.link-item p{font-size:13px;line-height:1.62;color:#222}
+.rule{height:3px;background:#111;margin:8px 14px 0}
+.source-note{margin:14px 14px 0;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+.footer{padding:10px 14px 16px;text-align:center;font-size:12px;line-height:1.68;color:var(--muted)}
+.footer a{color:var(--blue)}
+.save-btn{position:fixed;right:18px;bottom:18px;z-index:999;border:2px solid #111;border-radius:8px;padding:10px 14px;background:linear-gradient(135deg,var(--red) 0%,#a90f27 100%);color:#fff;font-weight:900;letter-spacing:.04em;box-shadow:6px 6px 0 rgba(0,0,0,.22);cursor:pointer}
+.save-btn:disabled{opacity:.75;cursor:progress}
+@media (max-width:1080px){.hero{grid-template-columns:1fr}.hero-copy{border-right:0;border-bottom:3px solid var(--line)}.stats,.grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 74px}
+  .hero{display:flex;flex-direction:column}
+  .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+  .panel-top,.panel-body{padding:12px}
+  .stats,.grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+  .section-head{grid-template-columns:1fr;gap:10px;padding:0 12px}
+  .section-no{width:72px;height:72px;font-size:28px}
+  .section-body,.rule,.source-note,.footer{padding-left:12px;padding-right:12px}
+  .card-box,.mini,.risk,.quote-block{padding:12px}
+  .stats{gap:8px}
+  .save-btn{right:12px;bottom:12px}
+}
+@media (max-width:400px){.page{width:min(100% - 12px,1040px)}.hero-copy{padding:14px}.section-body,.section-head{padding-left:10px;padding-right:10px}h1.demo-title{font-size:clamp(28px,9vw,38px)}.subtitle,.card-box p,.mini p,.risk p,.quote-block{font-size:13px}}
+</style>
+</head>
+<body>
+<main class="page">
+  <article class="card" id="card">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">X / GitHub / Agent · 硬核蓝手册</div>
+        <h1 class="demo-title">OpenHuman：把个人 AI 从临时对话，推成会记人的长期代理</h1>
+        <p class="subtitle">这条 X 帖刷屏的关键，不是“又一个 Agent”，而是把个人 AI 拆成 <strong>本地记忆</strong>、<strong>118+ 集成</strong>、<strong>托管服务</strong> 和 <strong>TokenJuice</strong> 的组合；README 则把它收束成一台能长期跟你一起工作的桌面助手。</p>
+        <div class="badge-row">
+          <span class="badge red">X 原帖 22 赞 / 6 转 / 0 评</span>
+          <span class="badge blue">GitHub Trending #1</span>
+          <span class="badge dark">Product Hunt #1</span>
+          <span class="badge">early beta</span>
+          <span class="badge">local memory</span>
+        </div>
+        <div class="stats" aria-label="summary stats">
+          <div class="stat"><span class="k">原帖热度</span><span class="v">22 likes / 6 reposts</span></div>
+          <div class="stat"><span class="k">榜单信号</span><span class="v">GitHub Trending + PH Top</span></div>
+          <div class="stat"><span class="k">核心主张</span><span class="v">Personal AI super intelligence</span></div>
+          <div class="stat"><span class="k">关键结构</span><span class="v">Memory Tree + Integrations</span></div>
+        </div>
+        <div class="alert">
+          <strong>一句话判断：OpenHuman 不是“轻量聊天壳”，而是把记忆、连接器、模型路由和托管服务拼成的一套长期运行的个人 AI 操作层。</strong>
+          <p>但它也不是完全离线的“本地一切”：README 明确写了 <em>local + managed services, where needed</em>，也就是本地存储与托管能力并存。看懂这个边界，才不会把它误读成纯本地私有助理。</p>
+          <div class="mini-row">
+            <span class="mini-tag">118+ integrations</span>
+            <span class="mini-tag">auto-fetch</span>
+            <span class="mini-tag">TokenJuice</span>
+            <span class="mini-tag">Obsidian Wiki</span>
+            <span class="mini-tag">managed backend</span>
+          </div>
+        </div>
+      </div>
+
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">SOURCE VISUAL</div>
+          <h3>README 里最能代表它的一张图</h3>
+          <p>左边是 mascot，右边是桌面端交互示例；下方是“资料入口 + 多语言 + 版本/状态”一整套产品面。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><strong>OpenHuman is your Personal AI super intelligence:</strong> local memory, managed services where needed, simple and powerful.</div>
+          <div class="hero-image"><img src="./assets/images/20260606-openhuman-personal-ai-super-intelligence/openhuman-demo.png" alt="OpenHuman README demo screenshot"/></div>
+          <p class="hero-caption">来源：tinyhumansai/openhuman README hero 图。它比单纯的榜单 badge 更能说明产品形态：这是一个桌面优先、带记忆树与集成层的长期代理。</p>
+        </div>
+      </figure>
+    </header>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">它到底是什么</div>
+          <h2>不是“会回答问题”，而是“会长期跟你一起工作”</h2>
+          <p>OpenHuman 的故事不是单点功能，而是把“理解你”做成了产品结构：本地记忆、可编辑知识库、连接器、模型路由、语音和桌面端 UI 一起上。</p>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="grid-3">
+          <article class="card-box">
+            <div class="tagrow"><span class="tag red">定位</span><span class="tag blue">Agent</span></div>
+            <h3>它的官方定义很直接</h3>
+            <p>README 把它定义为 <strong>personal AI super intelligence</strong>，不是单一聊天机器人，而是一个可持续吸收你数据与行为的 agentic assistant。</p>
+            <ul><li>桌面端优先</li><li>有 mascot，有交互面</li><li>默认就连着一套工具链</li></ul>
+          </article>
+          <article class="card-box">
+            <div class="tagrow"><span class="tag blue">问题</span><span class="tag dark">无状态</span></div>
+            <h3>它在解决什么痛点</h3>
+            <p>它瞄准的是 AI 的老问题：每次对话都像从零开始。OpenHuman 想把偏好、上下文、连接器数据和历史操作沉到可复用的记忆树里。</p>
+            <ul><li>减少“重复讲一遍”</li><li>把工作区信息持续带进来</li><li>让助手越用越懂你</li></ul>
+          </article>
+          <article class="card-box">
+            <div class="tagrow"><span class="tag dark">传播</span><span class="tag red">刷屏点</span></div>
+            <h3>为什么这条 X 帖会火</h3>
+            <p>因为它不是在卖“新模型”，而是在卖“新工作方式”：看起来像一个本地产品，实际把长期记忆、数据连接与托管能力捆在一起。</p>
+            <ul><li>GitHub Trending + Product Hunt 榜单加持</li><li>README hero 图足够像成品</li><li>一句话定位足够强</li></ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">核心能力矩阵</div>
+          <h2>四个最值钱的模块：记忆、连接、压缩、运行时</h2>
+          <p>如果只记 4 个关键词，记住这组就够了：Memory Tree、118+ integrations、TokenJuice、Desktop runtime。</p>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="matrix">
+          <article class="mini"><div class="lead">01 / 记忆</div><h4>Memory Tree + Obsidian Wiki</h4><p class="quote-line">把连接过的数据、偏好和活动汇成层级摘要树，并同步成可读可编辑的 Markdown vault。</p><p>这不是简单记聊天记录，而是把个人知识变成可持续检索的结构。</p></article>
+          <article class="mini"><div class="lead blue">02 / 连接</div><h4>118+ third-party integrations</h4><p class="quote-line">Gmail、Notion、GitHub、Slack、Stripe、Calendar、Drive、Linear、Jira……一次 OAuth 后，连接器直接进工具层。</p><p>它的价值在于“agent 已经有明天的上下文”。</p></article>
+          <article class="mini"><div class="lead red">03 / 压缩</div><h4>TokenJuice 把长输出压短</h4><p class="quote-line">HTML 变 Markdown、长 URL 变短、工具输出去重摘要，目标是把 token 成本和延迟压下去。</p><p>对重度 agent 来说，压缩层就是成本层。</p></article>
+          <article class="mini"><div class="lead">04 / 运行时</div><h4>桌面端 + mascot + model routing</h4><p class="quote-line">它不是一个纯网页壳：有桌面端、有可见 mascot、有语音与会议参与能力，还有默认的模型路由层。</p><p>这让它更像一台“个人 AI 工作站”。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">怎么上手</div>
+          <h2>最短路径：装包 → 登录/授权 → 连接数据源 → 选运行模式</h2>
+          <p>README 已经把安装路径分成“原生包优先”和“脚本安装备用”两条线；默认体验偏向托管 backend，想自定义则再切到本地/自带配置。</p>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <article class="card-box">
+            <div class="tagrow"><span class="tag dark">路径 A</span><span class="tag blue">推荐</span></div>
+            <h3>原生包优先，别先走脚本</h3>
+            <p>官方优先推荐 Homebrew / signed apt repo / AUR / MSI 这类原生包路径，因为它们能走系统签名链。脚本安装是备用方案，不是首选。</p>
+            <ul><li>macOS：Homebrew tap</li><li>Debian/Ubuntu：signed apt repo</li><li>Arch：AUR</li><li>Windows：signed MSI</li></ul>
+          </article>
+          <article class="card-box">
+            <div class="tagrow"><span class="tag red">路径 B</span><span class="tag">使用顺序</span></div>
+            <h3>先把“能用”跑起来，再谈深度定制</h3>
+            <div class="flow">
+              <div class="flow-item blue"><div class="t">Step 1</div><div class="c">安装原生包 / 打开桌面端</div></div>
+              <div class="flow-item red"><div class="t">Step 2</div><div class="c">完成登录与 OAuth 授权</div></div>
+              <div class="flow-item dark"><div class="t">Step 3</div><div class="c">连 Gmail / Notion / GitHub / Drive 等数据源</div></div>
+              <div class="flow-item blue"><div class="t">Step 4</div><div class="c">决定用托管 backend 还是自带模型 / 自配服务</div></div>
+            </div>
+          </article>
+        </div>
+        <p class="small-note" style="margin-top:10px;">一个关键细节：它不是“装上就彻底离线”的纯本地软件。README 说明默认体验仍会使用 OpenHuman 托管服务处理登录、模型路由、搜索代理和部分集成流程；如果要全自定义，需要自己带模型、搜索或 Composio 凭据。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">边界与风险</div>
+          <h2>最容易误读的点：它“本地”，但不是“完全本地”</h2>
+          <p>这部分是这张卡最重要的纠偏层：不要被“local memory”四个字带偏，OpenHuman 的实现是本地与托管混合架构。</p>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="risk-grid">
+          <article class="risk" data-accent="red"><div class="n">1</div><h4>边界一：并非全离线</h4><p>README 明确写着 managed services where needed。也就是说，登录、模型路由、搜索代理和部分集成仍依赖托管后端。</p></article>
+          <article class="risk" data-accent="blue"><div class="n">2</div><h4>边界二：仍处在 early beta</h4><p>它已经有很完整的叙事和产品面，但 README 也直接标了 early beta，意味着功能与稳定性都还在快速迭代。</p></article>
+          <article class="risk" data-accent="dark"><div class="n">3</div><h4>边界三：平台兼容不是零成本</h4><p>官方还单独提示了 Linux / AppImage / Wayland / Arch 相关问题，说明桌面端分发与环境兼容仍需认真看安装说明。</p></article>
+        </div>
+        <div class="quote-block" style="margin-top:12px;">换句话说：OpenHuman 的强项不是“没有后端”，而是“把本地记忆、连接器与托管能力做成一套可组合的个人 AI 系统”。这正是它在 X 和 GitHub 上同时成立的原因。</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">适合谁 / 不适合谁</div>
+          <h2>它适合“数据多、工具多、上下文长”的人</h2>
+          <p>如果你的工作本来就散落在邮箱、文档、日历、仓库和聊天工具里，这种产品的价值会比纯聊天机器人高得多。</p>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <article class="card-box">
+            <div class="tagrow"><span class="tag blue">适合</span><span class="tag red">高收益</span></div>
+            <h3>谁最该先看它</h3>
+            <ul><li>重度 SaaS 用户：邮箱、文档、代码仓库、日历全都要连</li><li>希望 AI 记住偏好与长期上下文的人</li><li>愿意接受“托管 + 本地”混合架构的人</li></ul>
+          </article>
+          <article class="card-box">
+            <div class="tagrow"><span class="tag dark">不适合</span><span class="tag">低耐心</span></div>
+            <h3>谁不要把它想太神</h3>
+            <ul><li>只想要最轻最简单的单轮问答</li><li>要求完全离线、完全自托管、零后端依赖</li><li>不愿意做 OAuth / 数据连接配置的人</li></ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">06</div>
+        <div class="section-meta">
+          <div class="label k">来源</div>
+          <h2>这张卡的证据链：X 原帖 + README + Docs</h2>
+          <p>技术分享卡最怕“只看一张图就下结论”，所以这里把可核查来源摊开。</p>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="link-list">
+          <div class="link-item"><div class="label">X 原帖</div><a href="https://x.com/i/status/2063023307448889712" target="_blank" rel="noopener noreferrer">https://x.com/i/status/2063023307448889712</a><p>这条帖子给出刷屏叙事与宣传图，也是这张信息卡的起点。</p></div>
+          <div class="link-item"><div class="label">GitHub 仓库</div><a href="https://github.com/tinyhumansai/openhuman" target="_blank" rel="noopener noreferrer">https://github.com/tinyhumansai/openhuman</a><p>仓库 README 是能力定义、安装路径、边界说明与多语言入口的主来源。</p></div>
+          <div class="link-item"><div class="label">官方文档</div><a href="https://tinyhumans.gitbook.io/openhuman/" target="_blank" rel="noopener noreferrer">https://tinyhumans.gitbook.io/openhuman/</a><p>如果要继续深挖 integrations、memory tree、token compression 与 model routing，文档站是下一步。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">infocard-hardblue-style · 技术分享卡 · 来源：X 原帖 + tinyhumansai/openhuman README / Docs · 已按硬核蓝手册重排</p>
+    <div class="footer">
+      <div>本卡聚焦 OpenHuman，不把整条 X 帖的另外 4 个项目混进来；这是“单项目单卡”的技术分享版。</div>
+      <div>生成后请用 390px / 780px 视口和保存 PNG 按钮做一次实测验收。</div>
+    </div>
+  </article>
+</main>
+<button id="save-btn" class="save-btn" onclick="savePNG()">保存 PNG</button>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+async function savePNG(){
+  const btn=document.getElementById('save-btn');
+  const card=document.getElementById('card');
+  if(!window.html2canvas){alert('导出组件未加载');return;}
+  btn.disabled=true;
+  const old=btn.textContent;
+  btn.textContent='导出中…';
+  try{
+    const canvas=await html2canvas(card,{backgroundColor:'#fffdf8',scale:Math.max(2,window.devicePixelRatio||2),useCORS:true,allowTaint:true,scrollX:0,scrollY:-window.scrollY,windowWidth:card.scrollWidth,windowHeight:card.scrollHeight});
+    const link=document.createElement('a');
+    link.download='20260606-openhuman-personal-ai-super-intelligence.png';
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+  }catch(e){console.error(e);alert('PNG 导出失败');}
+  finally{btn.disabled=false;btn.textContent=old;}
+}
+</script>
+</body>
+</html>
