@@ -87,7 +87,16 @@ def build_theme_block(t):
 def render_themes_list(themes):
     return '\n    '.join(build_theme_block(t) for t in themes)
 
-def render(keywords_escaped, themes_html):
+def render_themes_toc(themes):
+    """从 _themes.yaml 动态生成「当前正式主题」列表"""
+    items = []
+    for t in themes:
+        name = t.get('title', t.get('slug', ''))
+        desc = t.get('subtitle', '')
+        items.append(f'<li><strong>{name}</strong>：{desc}。</li>')
+    return '\n          '.join(items)
+
+def render(keywords_escaped, themes_html, themes_toc_html=''):
     return f'''<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -132,11 +141,7 @@ def render(keywords_escaped, themes_html):
     <section class="intro">
       <article class="panel"><h2>当前正式主题</h2>
         <ul>
-          <li><strong>infocard-q-style</strong>：纸感、手作感、彩色卡片、框架对比。</li>
-          <li><strong>infocard-green-style</strong>：青绿 / 翡翠 / editorial，冷静、克制。</li>
-          <li><strong>infocard-black-head-style</strong>：黑头、白纸、红色判断、调查拆解风。</li>
-          <li><strong>infocard-main-style</strong>：默认主骨架，红黑白主系统，小字高密度模块化。</li>
-          <li><strong>infocard-blue-technical-manual-style</strong>：黑头 + 红蓝双强调，技术手册 / workflow 说明。</li>
+          {themes_toc_html}
         </ul>
       </article>
       <article class="panel"><h2>命名规则</h2><p>主题统一采用 <code>infocard-***-style</code> 命名，不再把 <code>swiss</code> 放进技能名里。页面层面的瑞士风格、黑头结构、技术手册骨架，属于主题特征，不再写进顶层命名。</p></article>
@@ -188,7 +193,8 @@ def main():
     themes = render_themes_yaml(text)
     keywords_escaped = ''  # rendered server-side
     themes_html = render_themes_list(themes)
-    html = render(keywords_escaped, themes_html)
+    themes_toc_html = render_themes_toc(themes)
+    html = render(keywords_escaped, themes_html, themes_toc_html)
     OUT.write_text(html, encoding='utf-8')
     print(f'Written {OUT} with {len(themes)} themes')
 
