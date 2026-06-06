@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>如何安全地让 Claude Code 生产力倍增（含完整配置文件）</title>
+<style>
+:root{
+  --bg:#f6f4ef;
+  --paper:#fffdf8;
+  --ink:#111111;
+  --muted:#5f5950;
+  --line:#111111;
+  --red:#d80018;
+  --blue:#1f63ff;
+  --soft-red:#fde9eb;
+  --soft-blue:#e8f1ff;
+  --soft-ink:#f7f6f2;
+  --shadow:8px 8px 0 rgba(17,17,17,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  color:var(--ink);line-height:1.58;
+  background:
+    linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+    linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+    radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+    radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+    var(--bg);
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+/* ============ HERO ============ */
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-copy{padding:22px;border-right:3px solid var(--line);display:grid;gap:14px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:6px 10px;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";color:var(--red);font-size:11px}
+h1.demo-title{margin:0;max-width:820px;font-size:clamp(26px,4.6vw,46px);line-height:.98;letter-spacing:-.05em}
+.subtitle{color:var(--muted);font-size:14px;line-height:1.6}
+.badge-row{display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:inline-flex;align-items:center;min-height:33px;padding:6px 10px;border:2px solid var(--line);background:#fff;font-size:12.1px;font-weight:850}
+.badge.red{background:var(--red);color:#fff}
+.badge.blue{background:var(--blue);color:#fff}
+.badge.dark{background:#111;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+.stat .k{display:block;margin-bottom:6px;font-size:10.8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.stat .v{display:block;font-size:13.5px;line-height:1.34;font-weight:900}
+.alert{border:3px solid var(--line);background:#111;color:#fff;padding:15px;display:grid;gap:10px}
+.alert strong{display:block;font-size:15px;line-height:1.35}
+.alert p{margin:0;font-size:14px;line-height:1.68;color:#f0ebe0}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+.hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+.hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+.panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+.panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+.flow{display:grid;gap:8px}
+.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+.flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+.flow-item.red .c{color:var(--red)}
+.flow-item.blue .c{color:var(--blue)}
+.flow-item.dark .c{color:#111}
+
+/* ============ SECTIONS ============ */
+.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+.section-no.b{background:var(--blue)}
+.section-no.k{background:#111}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+.section-meta .label.b{color:var(--blue)}
+.section-meta .label.k{color:#111}
+.section-meta h2{margin:0;font-size:clamp(22px,3.7vw,36px);line-height:1.02;letter-spacing:-.05em}
+.section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+/* ============ GRIDS ============ */
+.grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+.card,.mini{padding:14px}
+.card{display:grid;gap:10px}
+.card h3,.mini h4{margin:0;letter-spacing:-.02em}
+.card h3{font-size:17px;line-height:1.16}
+.card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+.card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+.card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+.tag.red{background:var(--soft-red)}
+.tag.blue{background:var(--soft-blue)}
+.tag.dark{background:#111;color:#fff}
+
+/* ============ MATRIX + RISK ============ */
+.matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.matrix .mini{display:grid;gap:8px}
+.mini h4{font-size:15px;line-height:1.2}
+.mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.mini .red{color:var(--red)}
+.mini .blue{color:var(--blue)}
+.mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+.risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+.risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+.risk[data-accent="red"]{--accent:var(--red)}
+.risk[data-accent="blue"]{--accent:var(--blue)}
+.risk[data-accent="dark"]{--accent:#111}
+.risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+.risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+.risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+.quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+.quote-block b{color:#111}
+
+/* ============ PARAM + TABLE ============ */
+.param-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.param{border:2px solid var(--line);background:#fff;padding:10px 12px}
+.param .k{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.param .v{font-size:15px;font-weight:900}
+.param .v.red{color:var(--red)}
+.param .v.blue{color:var(--blue)}
+
+.mode-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.mode-table th{padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--soft-ink)}
+.mode-table td{padding:8px 12px;border:1.5px solid var(--line)}
+.mode-table tr:nth-child(even) td{background:var(--soft-ink)}
+.mode-table .mode-name{font-weight:900;font-size:13px}
+.mode-table .mode-name.red{color:var(--red)}
+.mode-table .mode-name.blue{color:var(--blue)}
+
+.footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+.footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+.footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+.footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+.footer-block .meta{font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px}
+
+.rule{height:3px;background:#111;margin:8px 0 0}
+.source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+/* ============ Responsive ============ */
+@media (max-width:1080px){
+  .hero{grid-template-columns:1fr}
+  .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+  .stats,.grid-4,.matrix,.risk-grid,.param-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+  .hero{display:flex;flex-direction:column}
+  .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+  .stats,.grid-4,.grid-3,.grid-2,.matrix,.risk-grid,.param-grid{grid-template-columns:1fr}
+  .section-head{grid-template-columns:1fr;gap:10px}
+  .section-no{width:72px;height:72px;font-size:28px}
+  .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">Claude Code · settings.json 配置指南</div>
+    <h1 class="demo-title">如何安全地让 Claude Code 生产力倍增（含完整配置文件）</h1>
+    <p class="subtitle">@FakeMaidenMaker · 2026-05-29 · 深入拆解 .claude/settings.json 四大核心字段，厘清 auto mode / bypassPermissions / 手动 permissions 三种机制边界，给出可直接复制的 JSON 配置。</p>
+    <div class="badge-row">
+      <span class="badge red">硬核手册</span>
+      <span class="badge blue">配置安全</span>
+      <span class="badge">Claude Code</span>
+      <span class="badge dark">settings.json</span>
+    </div>
+    <div class="stats" aria-label="style summary">
+      <div class="stat"><span class="k">核心字段</span><span class="v">4 个</span></div>
+      <div class="stat"><span class="k">权限模式</span><span class="v">6 种</span></div>
+      <div class="stat"><span class="k">配置范围</span><span class="v">全局→项目</span></div>
+      <div class="stat"><span class="k">加载优先级</span><span class="v">Managed → CLI → Local</span></div>
+    </div>
+    <div class="alert">
+      <strong>核心结论：写好 permissions 是基础，auto mode 是补充，bypass 是隔离环境特例</strong>
+      <p>手动写规则：字符串匹配，规则可读、可审计、可 git commit 团队共享；auto mode：AI 实时判断，但有 5 个真实门槛；bypass：本机 = 裸奔。</p>
+      <div class="mini-row">
+        <span class="mini-tag" style="background:var(--red)">deny 写死红线</span>
+        <span class="mini-tag" style="background:var(--blue)">allow 高频白名单</span>
+        <span class="mini-tag" style="background:#111">auto 按需补充</span>
+        <span class="mini-tag" style="background:var(--soft-blue);color:var(--blue);border:1.5px solid var(--blue)">bypass 禁用于本机</span>
+      </div>
+    </div>
+  </div>
+  <figure class="hero-visual">
+    <div class="panel-top">
+      <div class="eyebrow">CONFIG WORKFLOW</div>
+      <h3>配置三步走</h3>
+      <p>写 deny 兜底红线 → 写 allow 批量放行 → 切 auto 按需补充</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote"><b>一句话：</b>手写 permissions 不是「可有可无的偏好设置」，是安全基座。</div>
+      <div class="flow">
+        <div class="flow-item red"><div class="t">Step 1 · deny</div><div class="c">写死红线（任何模式都生效）</div></div>
+        <div class="flow-item blue"><div class="t">Step 2 · allow</div><div class="c">写死高频白名单（省 classifier token）</div></div>
+        <div class="flow-item dark"><div class="t">Step 3 · defaultMode</div><div class="c">defaultMode: "acceptEdits" 文件编辑直通</div></div>
+        <div class="flow-item blue"><div class="t">Step 4 · auto（可选）</div><div class="c">长任务无人值守时切 auto mode</div></div>
+      </div>
+    </div>
+  </figure>
+</header>
+
+<!-- SECTION 01: settings.json是什么 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">01</div>
+    <div class="section-meta">
+      <div class="label">SETTINGS.JSON</div>
+      <h2>settings.json 是什么：4 大字段 + 4 层 scope</h2>
+      <p>.claude/settings.json 是 Claude Code 官方 JSON 配置文件，每次启动会话都读它。100+ 字段，日常用得最多 4 个：permissions / hooks / env / statusLine。</p>
+    </div>
+  </div>
+  <div class="grid-4">
+    <article class="card">
+      <div class="tagrow"><span class="tag red">权限</span></div>
+      <h3>permissions</h3>
+      <p>allow / deny / ask，决定 Claude 能用什么命令、禁止什么。核心控制层。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">钩子</span></div>
+      <h3>hooks</h3>
+      <p>beforeEveryStdout / afterEveryCommand 等 10 个钩子，100% 触发，稳定自动化工作流。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag dark">环境</span></div>
+      <h3>env</h3>
+      <p>注入环境变量，hot-reload 无需重启会话。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">状态栏</span></div>
+      <h3>statusLine</h3>
+      <p>底部状态栏自定义显示内容，实时展示会话状态。</p>
+    </article>
+  </div>
+  <div style="border:2px solid var(--line);background:#fff;overflow:hidden;margin-top:12px">
+    <div style="background:var(--ink);color:#fff;padding:8px 12px;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em">4 层 scope 加载优先级（数组类跨 scope 合并，标量类取最高优先级）</div>
+    <table class="mode-table">
+      <tr>
+        <th>优先级</th>
+        <th>scope</th>
+        <th>说明</th>
+      </tr>
+      <tr>
+        <td style="color:var(--red);font-weight:900">最高</td>
+        <td class="mode-name red">Managed</td>
+        <td>企业管控，团队统一策略</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td class="mode-name">CLI 参数</td>
+        <td>命令行 --dangerously-skip-permissions 等</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td class="mode-name">Local</td>
+        <td>项目级 .claude/settings.local.json</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td class="mode-name">Project</td>
+        <td>项目级 settings.json</td>
+      </tr>
+      <tr>
+        <td style="color:var(--muted);font-weight:900">最低</td>
+        <td class="mode-name">User</td>
+        <td>~/.claude/settings.json（用户全局）</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION 02: 三种机制对比 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no b">02</div>
+    <div class="section-meta">
+      <div class="label b">THREE MECHANISMS · 三种机制</div>
+      <h2>auto mode / bypass / 手动 permissions：机制对比</h2>
+      <p>三者不是替代，是配合。了解各自的真实边界才能正确组合。</p>
+    </div>
+  </div>
+  <div class="grid-3">
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">AI 实时判断</span><span class="tag dark">auto mode</span></div>
+      <h3>auto mode 真实门槛（5 个）</h3>
+      <ul>
+        <li>只支持 Claude Sonnet 4.6 / Opus 4.6 / Opus 4.7</li>
+        <li>必须直连 Anthropic API（Bedrock/Vertex/Foundry 不可用）</li>
+        <li>Team/Enterprise 需管理员开启</li>
+        <li>公司内部资源（GitHub org / S3 / 内部域名）被当外部，需额外配置</li>
+        <li>进入时宽 allow 规则（Bash(*) 等）全部失效</li>
+        <li>连续 block 3 次或总计 20 次自动退弹窗</li>
+      </ul>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag red">⚠ 裸奔模式</span><span class="tag dark">bypassPermissions</span></div>
+      <h3>bypass 在本机 = 裸奔</h3>
+      <ul>
+        <li>受保护路径（.git / .bashrc / .ssh / .gitconfig）全部可写</li>
+        <li>无 prompt injection 保护（恶意 README 可骗私钥）</li>
+        <li>唯一保留核选项 rm -rf /</li>
+        <li>官方明确：只在隔离容器 / VM / dev container 里用</li>
+        <li>本机日常绝对不要碰</li>
+      </ul>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">静态规则</span><span class="tag dark">手动 permissions</span></div>
+      <h3>手写 permissions 优势</h3>
+      <ul>
+        <li>字符串匹配，规则可读、可审计</li>
+        <li>可 git commit 给团队共享</li>
+        <li>allow 写死高频白名单，省 classifier token</li>
+        <li>deny 写死红线，任何模式都生效</li>
+        <li>defaultMode: "acceptEdits" 让文件编辑直通</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- SECTION 03: 6 个权限模式 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no k">03</div>
+    <div class="section-meta">
+      <div class="label k">PERMISSIONS · 权限模式</div>
+      <h2>6 个权限模式速查 + permissions 配置语法</h2>
+      <p>Shift+Tab 在 default / acceptEdits / plan 三者切换。auto 和 bypass 不在默认循环，需要专门启用。</p>
+    </div>
+  </div>
+  <div class="grid-2" style="margin-bottom:12px">
+    <div style="border:2px solid var(--line);background:#fff;overflow:hidden">
+      <div style="background:var(--soft-blue);padding:8px 12px;border-bottom:2px solid var(--line);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:var(--blue)">6 个权限模式</div>
+      <table class="mode-table">
+        <tr><th>模式</th><th>行为</th></tr>
+        <tr><td class="mode-name blue">default</td><td>每次问确认</td></tr>
+        <tr><td class="mode-name blue">acceptEdits</td><td>文件编辑免确认</td></tr>
+        <tr><td class="mode-name">plan</td><td>只规划不执行</td></tr>
+        <tr><td class="mode-name blue">auto</td><td>AI 实时判断</td></tr>
+        <tr><td class="mode-name">dontAsk</td><td>禁止提问</td></tr>
+        <tr><td class="mode-name red">bypassPermissions</td><td>全部直通（危险）</td></tr>
+      </table>
+    </div>
+    <div style="border:2px solid var(--line);background:#fff;overflow:hidden">
+      <div style="background:#111;color:#fff;padding:8px 12px;border-bottom:2px solid var(--line);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em">permissions 语法速查</div>
+      <div style="padding:12px;font-size:13px;line-height:1.72">
+        <div style="margin-bottom:8px"><span style="font-weight:900;color:var(--red)">优先级：</span>deny &gt; ask &gt; allow</div>
+        <div style="margin-bottom:8px"><span style="font-weight:900;color:var(--blue)">allow：</span>免审批列表</div>
+        <div style="margin-bottom:8px"><span style="font-weight:900;color:var(--red)">deny：</span>禁止列表</div>
+        <div style="margin-bottom:8px"><span style="font-weight:900">ask：</span>每次都问</div>
+        <div><span style="font-weight:900">additionalDirectories：</span>扩展读写目录</div>
+      </div>
+    </div>
+  </div>
+  <div style="background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto">
+    <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px">// 基础 permissions 配置示例</div>
+    <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap"><span style="color:#888">// ~/.claude/settings.json</span>
+{
+  <span style="color:#1f63ff">"permissions"</span>: {
+    <span style="color:#1f63ff">"defaultMode"</span>: <span style="color:#e8c200">"acceptEdits"</span>,
+    <span style="color:#1f63ff">"allow"</span>: [
+      <span style="color:#e8c200">"Bash(npm test *)"</span>,
+      <span style="color:#e8c200">"Bash(npm run *)"</span>,
+      <span style="color:#e8c200">"Bash(git diff *)"</span>,
+      <span style="color:#e8c200">"Bash(git log *)"</span>
+    ],
+    <span style="color:#1f63ff">"deny"</span>: [
+      <span style="color:#e8c200">"Bash(rm -rf / *)"</span>,
+      <span style="color:#e8c200">"Bash(chmod -R 777 *)"</span>,
+      <span style="color:#e8c200">"Edit(~/**)"</span>
+    ]
+  }
+}</pre>
+  </div>
+</section>
+
+<!-- SECTION 04: 3 个为什么 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">04</div>
+    <div class="section-meta">
+      <div class="label">WHY WRITE SETTINGS.JSON</div>
+      <h2>为什么 settings.json 值得好好写</h2>
+      <p>新手最常犯的错：把它当"可有可无的偏好设置"。事实正好相反。</p>
+    </div>
+  </div>
+  <div class="param-grid">
+    <div class="param">
+      <div class="k">原因 1</div>
+      <div class="v red">免弹窗</div>
+      <p style="font-size:13px;color:#222;line-height:1.6;margin-top:6px">直接允许所有无关痛痒的操作，避免每次按 yes，手指发麻。</p>
+    </div>
+    <div class="param">
+      <div class="k">原因 2</div>
+      <div class="v red">守住红线</div>
+      <p style="font-size:13px;color:#222;line-height:1.6;margin-top:6px">拒绝所有高风险操作，防止 Claude Code 造成重大安全隐患。</p>
+    </div>
+    <div class="param">
+      <div class="k">原因 3</div>
+      <div class="v blue">自动化</div>
+      <p style="font-size:13px;color:#222;line-height:1.6;margin-top:6px">设置 100% 触发的 hook，稳定自动化重复工作流。</p>
+    </div>
+  </div>
+  <div class="alert" style="background:var(--soft-red);border-color:var(--red);color:var(--red);margin-top:12px">
+    <strong style="color:var(--red)">⚠ bypassPermissions 在本机 = 裸奔</strong>
+    <p style="color:#5a1010">受保护路径全部可写，无 prompt injection 保护。官方明确：只在隔离容器 / VM / dev container 里用。</p>
+  </div>
+</section>
+
+<!-- SECTION 05: 配置实战 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no b">05</div>
+    <div class="section-meta">
+      <div class="label b">WORKFLOW · 配置实战</div>
+      <h2>配置实战：按字段顺序配置</h2>
+      <p>按 permissions → hooks → env → statusLine 顺序配置，每步给可复制 JSON。</p>
+    </div>
+  </div>
+  <div class="risk-grid">
+    <article class="risk" data-accent="red">
+      <div class="n">1</div>
+      <h4>permissions · 权限</h4>
+      <p>defaultMode: "acceptEdits" + allow 高频命令 + deny 危险命令 + additionalDirectories 扩展目录。</p>
+    </article>
+    <article class="risk" data-accent="blue">
+      <div class="n">2</div>
+      <h4>hooks · 钩子</h4>
+      <p>beforeEveryCommand / afterEveryStdout 等 10 个钩子，100% 触发，稳定自动化工作流。</p>
+    </article>
+    <article class="risk" data-accent="dark">
+      <div class="n">3</div>
+      <h4>env + statusLine</h4>
+      <p>注入环境变量（hot-reload）+ 底部状态栏显示内容实时展示会话状态。</p>
+    </article>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<div class="footer-block" style="margin-top:30px">
+  <h3>核心结论</h3>
+  <p>写好 permissions 是基础，auto mode 是补充，bypass 是隔离环境特例。三者实际是配合，不是替代。</p>
+  <ul>
+    <li>deny 写死红线：任何模式都生效，包括 auto</li>
+    <li>allow 写死高频白名单：不浪费 classifier token</li>
+    <li>defaultMode: "acceptEdits"：文件编辑直通，减少弹窗</li>
+    <li>bypassPermissions：本机日常绝对不要用，只在隔离容器里</li>
+  </ul>
+  <div class="meta">来源：@FakeMaidenMaker · X 线程 · 2026-05-29 · 主题：Claude Code settings.json 配置完全指南</div>
+</div>
+
+<div class="rule"></div>
+<p class="source-note">infocard-hardblue-style · Claude Code 安全配置指南 · 2026-06-06</p>
+</main>
+</body>
+</html>
