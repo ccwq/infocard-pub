@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+<title>Flipbook Canvas：把每张 AI 图变成一棵可探索的知识树</title>
+<style>
+/* ============================================
+   蓝技手册风格 / Blue Technical Manual
+   红蓝双强调 · 黑头标题 · 技术手册骨架
+   ============================================ */
+:root {
+  --black: #0a0a0a;
+  --white: #f5f2ec;
+  --red: #c8102e;
+  --blue: #0036a3;
+  --green: #006b3c;
+  --yellow: #e8c200;
+  --gray-5: #e6e0d8;
+  --gray-3: #333;
+  --gray-6: #666;
+  --gray-8: #888;
+}
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  background: var(--black);
+  width: min(780px, 100vw);
+  margin: 0 auto;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color: var(--black);
+}
+.page { width: 100%; max-width: 100vw; }
+
+/* ── 主卡片外壳 ── */
+.card {
+  width: 100%;
+  max-width: 780px;
+  margin: 0 auto;
+  border: 3px solid var(--red);
+  background: var(--white);
+  overflow: hidden;
+}
+
+/* ── 头部：黑头红渐变 ── */
+.header {
+  display: grid;
+  grid-template-columns: 1.15fr 1.4fr 0.8fr;
+  gap: 10px;
+  padding: 14px 14px 10px;
+  background: linear-gradient(180deg, var(--red) 0%, #a90f27 100%);
+  align-items: start;
+}
+.header-left {}
+.kicker {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.75);
+  margin-bottom: 6px;
+}
+.banner-title {
+  font-size: clamp(1.2rem, 4.5vw, 2rem);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.1;
+  letter-spacing: -.03em;
+  margin: 0 0 6px;
+}
+.banner-sub {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255,255,255,.88);
+  font-weight: 400;
+}
+.header-center { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 2px; }
+.header-right { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 2px; align-items: flex-end; }
+
+/* ── 统计条 ── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: #121212;
+  border-top: 2px solid var(--red);
+}
+.stat {
+  border-right: 1px solid #2a2a2a;
+  padding: 7px 10px;
+  text-align: center;
+}
+.stat:last-child { border-right: none; }
+.stat-num {
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--red);
+  line-height: 1.1;
+}
+.stat-lab {
+  display: block;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #888;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* ── 警告/标注条 ── */
+.warn {
+  background: #fffde6;
+  border-top: 1px solid var(--gray-5);
+  border-bottom: 1px solid var(--gray-5);
+  padding: 7px 14px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #555;
+}
+.warn strong { color: var(--red); font-weight: 800; }
+
+/* ── 章节通用 ── */
+.section {
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid var(--gray-5);
+}
+.sec-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.sec-no {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  margin-top: 1px;
+}
+.sec-title { flex: 1; }
+.sec-title h2 {
+  margin: 0 0 3px;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+  color: var(--black);
+}
+.sec-title p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--gray-6);
+  line-height: 1.5;
+}
+
+/* ── lead / 结论块 ── */
+.lead {
+  background: var(--black);
+  color: #fff;
+  padding: 10px 14px;
+  margin: 0;
+  border-left: 3px solid var(--red);
+}
+.lead p {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.lead p:last-child { margin-bottom: 0; }
+.lead strong { color: var(--yellow); font-weight: 800; }
+.lead .muted { color: #aaa; font-size: 11px; }
+.lead .blue { color: #6fa8dc; }
+.lead .green { color: #93c47d; }
+
+/* ── 引用块 ── */
+.quote {
+  border-left: 3px solid var(--blue);
+  background: #f0f4ff;
+  padding: 8px 12px;
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #333;
+}
+.quote strong { color: var(--blue); font-weight: 700; }
+
+/* ── grid2 / grid3 ── */
+.grid2 { display: grid; grid-template-columns: calc(50% - 4px) calc(50% - 4px); gap: 8px; margin-top: 8px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+
+/* ── box / 能力卡片 ── */
+.box {
+  border: 1px solid var(--gray-5);
+  background: #f5f2ec;
+  padding: 9px 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.box-accent-blue { border-left: 3px solid var(--blue); }
+.box-accent-green { border-left: 3px solid var(--green); }
+.box-accent-red { border-left: 3px solid var(--red); }
+.box-accent-yellow { border-left: 3px solid var(--yellow); }
+.box h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.3;
+}
+.box p, .box li {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #333;
+}
+.box ul { margin: 4px 0 0 14px; padding: 0; }
+.box li { margin-bottom: 2px; }
+.box-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-bottom: 5px;
+}
+.box-tag.blue { background: var(--blue); color: #fff; }
+.box-tag.green { background: var(--green); color: #fff; }
+.box-tag.red { background: var(--red); color: #fff; }
+.box-tag.yellow { background: var(--yellow); color: #111; }
+.box-tag.gray { background: var(--gray-6); color: #fff; }
+.box a { color: var(--blue); text-decoration: none; font-weight: 600; font-size: 11px; }
+.box a:hover { text-decoration: underline; }
+.box code {
+  font-size: 9.5px;
+  background: var(--gray-5);
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: var(--black);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+/* ── 流程/列表 ── */
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.step {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 7px 10px;
+  background: #f5f2ec;
+  border-left: 3px solid var(--blue);
+}
+.step-num {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  margin-top: 1px;
+}
+.step-text { font-size: 11px; line-height: 1.5; color: #333; flex: 1; }
+.step-text strong { color: var(--black); }
+
+/* ── 架构图 SVG ── */
+.arch-svg {
+  background: #f5f2ec;
+  border: 1px solid var(--gray-5);
+  padding: 10px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.arch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+}
+.arch-node {
+  background: var(--blue);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.arch-node.green { background: var(--green); }
+.arch-node.red { background: var(--red); }
+.arch-node.yellow { background: var(--yellow); color: #111; }
+.arch-node.gray { background: var(--gray-6); }
+.arch-arrow { color: var(--gray-8); font-size: 12px; }
+
+/* ── 模态管道表 ── */
+.pipeline-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 10.5px;
+}
+.pipeline-table th {
+  background: var(--black);
+  color: #fff;
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: 800;
+  font-size: 10px;
+  border: 1px solid #333;
+}
+.pipeline-table td {
+  padding: 5px 8px;
+  border: 1px solid var(--gray-5);
+  color: #333;
+  vertical-align: top;
+  line-height: 1.5;
+}
+.pipeline-table tr:nth-child(even) td { background: #f8f6f2; }
+.pipeline-table td:first-child { font-weight: 700; color: var(--black); }
+.pipeline-table td:nth-child(2) { font-size: 13px; }
+
+/* ── fit-grid / 适合不适合 ── */
+.fit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.fit-item {
+  padding: 9px 12px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #333;
+}
+.fit-item.green { background: #e6f4ec; border-left: 3px solid var(--green); }
+.fit-item.red { background: #fce8e8; border-left: 3px solid var(--red); }
+.fit-item strong { font-weight: 900; }
+.fit-item em { color: var(--blue); font-style: normal; font-weight: 700; }
+
+/* ── tech-stack ── */
+.tech-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.tech-badge {
+  background: var(--black);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ── closing / 最终判断 ── */
+.closing {
+  background: var(--black);
+  color: #fff;
+  padding: 10px 14px;
+}
+.closing p { margin: 0 0 5px; font-size: 12px; line-height: 1.65; }
+.closing p:last-child { margin-bottom: 0; }
+.closing strong { color: var(--yellow); font-weight: 800; }
+.closing .blue { color: #6fa8dc; }
+.closing .green { color: #93c47d; }
+.closing .red { color: #e06666; }
+.closing .muted { color: #888; font-size: 11px; }
+
+/* ── footer ── */
+.footer {
+  padding: 8px 14px;
+  border-top: 1px solid var(--gray-5);
+  background: #f5f2ec;
+  font-size: 10px;
+  color: var(--gray-8);
+  text-align: center;
+  line-height: 1.6;
+}
+.footer a { color: var(--blue); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+
+/* ── 响应式：390px ── */
+@media (max-width: 760px) {
+  body { width: 100vw; }
+  .header { grid-template-columns: 1fr; gap: 6px; }
+  .header-center, .header-right { display: none; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stat { border-bottom: 1px solid #2a2a2a; }
+  .grid2, .grid3, .fit-grid { grid-template-columns: 1fr; }
+  .pipeline-table { font-size: 10px; }
+}
+@media (max-width: 400px) {
+  .section { padding: 8px 10px 10px; }
+  #save-btn { right: 10px; bottom: 10px; font-size: 11px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="card">
+
+<!-- ══ 头部：黑头红渐变 ══ -->
+<header class="header">
+  <div class="header-left">
+    <div class="kicker">X Post · AI × Knowledge Exploration · 2026-06-06</div>
+    <h1 class="banner-title">Flipbook Canvas</h1>
+    <p class="banner-sub">把每张 AI 图变成一棵可无限点击探索的知识树</p>
+  </div>
+  <div class="header-center">
+    <div style="font-size:10px;color:rgba(255,255,255,.7);line-height:1.6;">
+      <div>技术分享 · 开源项目</div>
+      <div>imcuttle / flipbook-app</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div style="font-size:10px;color:rgba(255,255,255,.6);">蓝技手册</div>
+  </div>
+</header>
+
+<!-- ══ 统计条 ══ -->
+<div class="stats">
+  <div class="stat"><span class="stat-num">17</span><span class="stat-lab">回复</span></div>
+  <div class="stat"><span class="stat-num">18</span><span class="stat-lab">转帖</span></div>
+  <div class="stat"><span class="stat-num">65</span><span class="stat-lab">喜欢</span></div>
+  <div class="stat"><span class="stat-num">4.2K</span><span class="stat-lab">观看</span></div>
+</div>
+
+<!-- ══ 一句话判断 ══ -->
+<div class="lead">
+  <p><strong>一句话判断：</strong>Flipbook Canvas 把<strong>静态 AI 生图</strong>变成了<strong>动态知识探索游戏</strong>——长按图片任意位置，系统识别内容、联网搜索、生成新的详细图解，层层递进成无限知识树。它是百科全书式的 AI 可视化工具，适合视觉化整理知识点或做演示。</p>
+  <p class="muted">来源 @GitHubDaily · 项目作者 imcuttle · Live: imcuttle.github.io/flipbook-app</p>
+</div>
+
+<!-- ══ 技术栈 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">01</div>
+    <div class="sec-title">
+      <h2>技术栈：前后端分离的多模态 AI 应用</h2>
+      <p>Express + SSE 后端 + Vite + React + TS 前端，plug-in 多模型图像管道。</p>
+    </div>
+  </div>
+  <div class="tech-stack">
+    <span class="tech-badge">Node.js ≥20.10</span>
+    <span class="tech-badge">Express + SSE</span>
+    <span class="tech-badge">React 18</span>
+    <span class="tech-badge">Vite 5</span>
+    <span class="tech-badge">TypeScript 5</span>
+    <span class="tech-badge">SQLite / Sequelize</span>
+    <span class="tech-badge">Multimodal LLM</span>
+    <span class="tech-badge">ImageGen</span>
+    <span class="tech-badge">WebSearch</span>
+    <span class="tech-badge">OCR (Apple Vision)</span>
+    <span class="tech-badge">Edge TTS</span>
+    <span class="tech-badge">SSE Streaming</span>
+  </div>
+</section>
+
+<!-- ══ 核心原理 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">02</div>
+    <div class="sec-title">
+      <h2>核心原理：点击 → 识别 → 搜索 → 生成 → 连接</h2>
+      <p>长按图片任意位置，系统执行一套完整的 AI 管道，生成子节点并链接回父节点。</p>
+    </div>
+  </div>
+  <div class="arch-svg">
+    <div class="arch-row">
+      <span class="arch-node">👆 长按图片</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-node green">🧠 LLM 识别标签</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-node yellow">🌐 联网搜索</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-node green">📝 规划器生成 caption + prompt</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-node red">🎨 ImageGen 生成图解</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-node gray">🔗 链接父子节点</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-node">🌳 生成子节点</span>
+    </div>
+  </div>
+  <div class="quote" style="margin-top:8px;">
+    <strong>空间 + 语义去重：</strong>点击同一区域会直接跳入已有子节点，不会重复生成。节点 ID 在点击瞬间就分配好了——即使图片还在生成中，链接也已生效，可分享、可跨设备观看。
+  </div>
+</section>
+
+<!-- ══ 五大核心功能 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">03</div>
+    <div class="sec-title">
+      <h2>五大核心功能：把 AI 生图变成动态知识树</h2>
+      <p>每个功能都是独立模块，可组合使用。</p>
+    </div>
+  </div>
+  <div class="grid2" style="grid-template-columns: calc(50% - 4px) calc(50% - 4px) !important; display: grid !important; gap: 8px;">
+    <div class="box box-accent-blue">
+      <div class="box-tag blue">核心 1</div>
+      <h3>无限点击探索</h3>
+      <p>长按（1秒）图片任意位置 → LLM 识别内容 → 联网搜索 → 生成新图解 → 层层递进。百科风格的 150–220 字 caption + 20–40 个图内标注。</p>
+    </div>
+    <div class="box box-accent-green">
+      <div class="box-tag green">核心 2</div>
+      <h3>实时流式生成</h3>
+      <p>节点标题 / caption / prompt <strong>打字机式实时输出</strong>（SSE 流），点击瞬间 ID 就分配好——生成中也能分享链接，访客看到相同进度。</p>
+    </div>
+    <div class="box box-accent-blue">
+      <div class="box-tag blue">核心 3</div>
+      <h3>图内文字可复制</h3>
+      <p>每张图上的文字（地名、日期、数字等）通过 Apple Vision OCR 识别，覆盖透明 HTML 层，拖选即可 Cmd-C 复制，完全不影响视觉。</p>
+    </div>
+    <div class="box box-accent-yellow">
+      <div class="box-tag yellow">核心 4</div>
+      <h3>语音朗读</h3>
+      <p>每个节点 title + caption 合成语音（Microsoft Edge 免费神经语音），可选角色音，支持自动朗读，导出静态网站后仍可离线播放。</p>
+    </div>
+    <div class="box box-accent-red" style="grid-column: span 2;">
+      <div class="box-tag red">核心 5</div>
+      <h3>导出离线静态站</h3>
+      <p>任意 canvas 可导出为静态 GitHub Pages 网站，带完整语音、图内可复制文字、全屏投影模式，不依赖服务器即可浏览。也有 read-only 分享链接。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 多模态管道 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">04</div>
+    <div class="sec-title">
+      <h2>多模态管道：5 种能力 × 可插拔模型</h2>
+      <p>文本规划 / 图像生成 / 网络搜索 / OCR / TTS，全部可替换为其他提供商。</p>
+    </div>
+  </div>
+  <table class="pipeline-table">
+    <thead>
+      <tr>
+        <th>能力</th>
+        <th>功能</th>
+        <th>默认实现</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>📝 LLM 规划</td>
+        <td>识别点击标签 · 决定是否搜索 · 生成 caption + prompt</td>
+        <td>codebuddy CLI（参考实现）</td>
+      </tr>
+      <tr>
+        <td>🎨 图像生成</td>
+        <td>2752×1536 带标注图解 · 20–40 个 bake-in 标签</td>
+        <td>SVG fallback + 图像模型（可插拔 OpenAI/Gemini/Seedream）</td>
+      </tr>
+      <tr>
+        <td>🌐 网络搜索</td>
+        <td>decide-then-search 门控：LLM 判断是否需要实时源</td>
+        <td>搜索后端 + 持久化到 DB / disk</td>
+      </tr>
+      <tr>
+        <td>👁️ OCR</td>
+        <td>Apple Vision（zh-Hans + en-US）→ 透明 HTML 层</td>
+        <td>本地无需 API Key</td>
+      </tr>
+      <tr>
+        <td>🔊 TTS</td>
+        <td>Microsoft Edge 神经语音 · 角色音切换 · 离线可用</td>
+        <td>msedge-tts（免费，无需 Key）</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══ 技术亮点 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">05</div>
+    <div class="sec-title">
+      <h2>工程亮点：SSE 断线重连 / 并行生成 / 渐进图片</h2>
+      <p>生产级可靠性设计，不是 Demo。</p>
+    </div>
+  </div>
+  <div class="flow">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text"><strong>SSE 断线重连</strong>：Last-Event-ID replay + per-job snapshot resume，页面刷新后从中断处继续，in-flight 打字机效果同步恢复。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text"><strong>Per-node 并行</strong>：单个父节点最多 4 个区域并行生成（可配置），每个热点实时显示阶段 chip（Inferring → Searching → Generating），达到上限时光标变为 ⌛。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text"><strong>渐进图片加载</strong>：每张 PNG 生成 blur → thumbnail → medium → full 四级，gallery blur-up 先展示，canvas 切换到完整分辨率时无闪烁。</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-text"><strong>场景过渡动画</strong>：drill-in / drill-out / fade 动画让导航像翻书，而不是页面切换。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 适合/不适合 ══ -->
+<section class="section">
+  <div class="sec-head">
+    <div class="sec-no">06</div>
+    <div class="sec-title">
+      <h2>适合谁先看，谁最好别把它想窄了</h2>
+      <p>Flipbook Canvas 不只是"AI 生图工具"，它的边界取决于你怎么用它。</p>
+    </div>
+  </div>
+  <div class="fit-grid">
+    <div class="fit-item green">
+      <strong>✓ 适合</strong><br/>
+      <em>知识整理者</em>：把抽象概念变成可视化知识树<br/>
+      <em>教师 / 演示者</em>：层层递进的百科图解很适合展示<br/>
+      <em>AI 应用开发者</em>：多模态管道架构值得参考<br/>
+      <em>独立博客主</em>：导出离线站 + 语音朗读 = 自成一派的呈现形式
+    </div>
+    <div class="fit-item red">
+      <strong>✗ 不适合</strong><br/>
+      <em>只想快速出图</em>：单次生图有更简单的工具<br/>
+      <em>隐私敏感数据</em>：需要联网搜索，不适合完全离线场景<br/>
+      <em>非视觉型学习者</em>：纯文本记录比这个更高效
+    </div>
+  </div>
+</section>
+
+<!-- ══ 最终判断 ══ -->
+<div class="closing">
+  <p><strong>最终判断：</strong>Flipbook Canvas 的核心创新是把 AI 生图从<strong>静态终点</strong>变成了<strong>动态起点</strong>——每张图都是一个新的入口，层层点击形成无限延伸的知识树。</p>
+  <p>它的工程价值同样值得关注：<span class="green">SSE 流式生成 + 断线重连 + 并行子节点 + 可插拔多模态管道</span>，这是一套可以迁移到其他 AI 应用的生产级架构。</p>
+  <p>但也要清醒：<span class="red">它不是一个通用工具</span>，而是一个<strong>知识探索平台</strong>。适合那些愿意花时间构建自己知识网络的人，而不是只想快速出图的用户。</p>
+  <p class="muted">来源：<a href="https://x.com/i/status/2062889733131526324" style="color:#6fa8dc;">x.com/i/status/2062889733131526324</a> · <a href="https://github.com/imcuttle/flipbook-app" style="color:#6fa8dc;">github.com/imcuttle/flipbook-app</a></p>
+</div>
+
+<!-- ══ Footer ══ -->
+<div class="footer">
+  蓝技手册风格 · 技术分享类信息卡 · 2026-06-06<br/>
+  Flipbook Canvas · AI × Knowledge Exploration · <a href="https://github.com/imcuttle/flipbook-app" target="_blank">GitHub</a> · <a href="https://imcuttle.github.io/flipbook-app/" target="_blank">Live Demo</a>
+</div>
+
+</div><!-- .card -->
+</div><!-- .page -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('save-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'save-btn';
+    btn.textContent = '保存 PNG';
+    btn.style.cssText = 'position:fixed;right:14px;bottom:14px;background:#c8102e;color:#fff;border:none;padding:7px 12px;font-size:12px;font-weight:700;border-radius:4px;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+    btn.onclick = function() {
+      var card = document.querySelector('.card');
+      html2canvas(card, { backgroundColor: '#0a0a0a', scale: 2 }).then(function(canvas) {
+        var link = document.createElement('a');
+        link.download = '20260606-flipbook-canvas.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }).catch(function(err) { alert('截图失败: ' + err); });
+    };
+    document.body.appendChild(btn);
+  }
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</body>
+</html>
