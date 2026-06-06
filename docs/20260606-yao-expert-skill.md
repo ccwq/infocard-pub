@@ -1,4 +1,4 @@
-# Yao Expert Skill：把陌生行业快速拆成可学习、可复述、可导出的专家报告
+# Yao Expert Skill：陌生行业专家学习包
 
 ## 一句话结论
 Yao Expert Skill 不是一个普通的“行业问答 Prompt”，而是一套结构化专家学习工作流：先定边界，再拆价值链、竞争结构、政策与风险，最后输出专家报告、关键词教学卡、费曼自测题，以及 Markdown / Word / PDF / HTML 四种导出成品。
