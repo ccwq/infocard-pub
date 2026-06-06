@@ -1,6 +1,6 @@
 # OpenHuman 技术分享简报
 
-**生成时间**：2026-06-06 08:14:53（Asia/Shanghai）  
+**生成时间**：2026-06-06 17:50:45（Asia/Shanghai）  
 **来源**：X 原帖 https://x.com/i/status/2063023307448889712；仓库 https://github.com/tinyhumansai/openhuman；文档 https://tinyhumans.gitbook.io/openhuman/  
 **卡片文件**：`docs/20260606-openhuman-personal-ai-super-intelligence.html`
 
