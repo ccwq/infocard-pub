@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>AI × E2E 测试体系：TinyShip 五阶段流程</title>
+  <meta name="description" content="TinyShip 作者 Viking 的 AI 辅助 E2E 测试开发流程：Spec → Code → Verify → Test → Green 五阶段，含 agent-browser 选择器预演、不在 CI 跑 E2E 的原因与触发条件。" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --black:#0a0a0a;
+      --white:#f5f2ec;
+      --paper:#fffdf9;
+      --red:#c8102e;
+      --blue:#0036a3;
+      --green:#006b3c;
+      --line:#0a0a0a;
+      --muted:#555;
+      --soft-red:#fff4f5;
+      --soft-blue:#f0f4ff;
+      --soft-green:#f0fff4;
+      --shadow:6px 6px 0 rgba(10,10,10,.12);
+      --mono:SFMono-Regular,Consolas,Menlo,Monaco,monospace;
+      --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden;background:var(--white);color:var(--black)}
+    body{font-family:var(--sans);text-align:center}
+    a{color:inherit}
+    img{display:block;max-width:100%}
+    .page{max-width:720px;margin:0 auto;padding:12px 10px 110px;text-align:left}
+
+    /* ── header ── */
+    .header{background:var(--black);border-bottom:3px solid var(--black);padding:3px 0 10px;margin-bottom:12px}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:3px 9px;border:2px solid #fff;background:transparent;color:#fff;font:800 10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#ccc}
+
+    /* ── hero ── */
+    .hero{display:grid;grid-template-columns:1.08fr .92fr;gap:10px;align-items:start;margin-bottom:12px}
+    .hero-card,.section,.panel,.stat{border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow)}
+    .hero-copy{padding:12px}
+    .hero-copy .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .chip{padding:4px 9px;border:1.5px solid var(--line);background:#fff;font:800 11.1px/1 var(--mono);letter-spacing:.04em;white-space:nowrap}
+    .chip.red{background:var(--red);border-color:var(--red);color:#fff}
+    .chip.blue{background:var(--blue);border-color:var(--blue);color:#fff}
+    .chip.green{background:var(--green);border-color:var(--green);color:#fff}
+    .chip.dark{background:var(--black);border-color:var(--black);color:#fff}
+    .hero-visual{padding:10px;background:var(--paper)}
+
+    /* ── stats ── */
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+    .stat{padding:10px 8px;min-width:0;background:#fff}
+    .stat .k{font:800 10.5px/1.1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#666}
+    .stat .v{margin-top:7px;font-size:17px;line-height:1;font-weight:900;letter-spacing:-.03em;color:var(--red)}
+    .stat .s{margin-top:6px;font-size:11.2px;line-height:1.45;color:#333}
+
+    /* ── sections ── */
+    .section{margin-bottom:10px;overflow:hidden;background:var(--paper)}
+    .sec-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--black);color:#fff;border-bottom:2px solid var(--line)}
+    .sec-no{font:900 13px/1 var(--mono);color:var(--red);letter-spacing:.06em}
+    .sec-title{font-size:11.5px;line-height:1.2;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+    .sec-body{padding:12px}
+    h3{margin:0 0 8px;font-size:14px;line-height:1.35;font-weight:900;letter-spacing:-.02em}
+    p{margin:0 0 10px;font-size:12.8px;line-height:1.72;color:#333}
+    .subhead{margin:14px 0 8px;font-size:11.5px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--red)}
+
+    /* ── flow ── */
+    .flow-box{
+      background:#111;
+      border:2px solid var(--line);
+      padding:14px 12px;
+      margin:0 0 4px;
+      overflow-x:auto;
+      font-family:var(--mono);
+      font-size:12.5px;
+      line-height:1.65;
+      color:#f0f0f0;
+      white-space:pre;
+      box-shadow:var(--shadow);
+    }
+
+    /* ── grids ── */
+    .grid-2,.grid-3{display:grid;gap:8px;margin-bottom:10px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .panel,.note{padding:11px;min-width:0}
+    .panel h4,.note h4{margin:0 0 7px;font-size:13px;line-height:1.3;font-weight:900;letter-spacing:-.01em}
+    .panel .lead,.note .lead{margin:0 0 6px;font:800 10.3px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--red)}
+    .panel ul,.note ul{margin:0;padding-left:16px}
+    .panel li,.note li{margin:4px 0;font-size:12.4px;line-height:1.62;color:#333}
+
+    /* ── tables ── */
+    .trow{display:grid;grid-template-columns:130px 1fr;gap:8px;border:2px solid var(--line);background:#fff;padding:10px;margin-bottom:8px}
+    .trow .tk{font:900 11px/1.2 var(--mono);letter-spacing:.08em;color:var(--red);text-transform:uppercase}
+    .trow .tv{font-size:12.5px;line-height:1.62;color:#333}
+
+    /* ── quote ── */
+    .quote{padding:12px 12px 12px 14px;border-left:5px solid var(--red);background:#111;color:#fff;font-size:13px;line-height:1.7;margin-bottom:10px}
+    .quote strong{color:#fff}
+
+    /* ── compare ── */
+    .compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+    .compare-item{padding:11px;border:2px solid var(--line);background:#fff}
+    .compare-item .ci{font:800 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+    .compare-item.red .ci{color:var(--red)}
+    .compare-item.green .ci{color:var(--green)}
+    .compare-item .ct{font-size:13px;font-weight:900;margin-bottom:7px}
+    .compare-item ul{margin:0;padding-left:16px}
+    .compare-item li{margin:4px 0;font-size:12.4px;line-height:1.62;color:#333}
+
+    /* ── ref-box ── */
+    .ref-box{border:2px solid var(--line);background:#111;color:#f0f0f0;padding:11px;font-family:var(--mono);font-size:11.8px;line-height:1.65;white-space:pre;overflow-x:auto;margin-bottom:10px;box-shadow:var(--shadow)}
+
+    /* ── footer ── */
+    .footer{margin-top:4px;padding:12px;background:#111;color:#fff;border:2px solid var(--line);box-shadow:var(--shadow)}
+    .footer .small{font-size:11.8px;line-height:1.65;color:#ddd}
+    .footer .src{margin-top:8px;font-size:11.5px;line-height:1.65;color:#ddd}
+    .footer a{color:#fff}
+
+    /* ── save ── */
+    .save-btn{position:fixed;right:18px;bottom:18px;z-index:999;border:2px solid var(--line);border-radius:8px;padding:10px 14px;background:linear-gradient(135deg,var(--red),#a90f27);color:#fff;font:900 12px/1 var(--mono);letter-spacing:.05em;box-shadow:5px 5px 0 rgba(10,10,10,.2);cursor:pointer}
+    .save-btn:disabled{opacity:.75;cursor:progress}
+
+    /* ── mobile ── */
+    @media(max-width:720px){
+      .page{padding:10px 8px 104px}
+      .hero{grid-template-columns:1fr}
+      .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .grid-2,.grid-3,.compare{grid-template-columns:1fr}
+      .trow{grid-template-columns:1fr}
+      .save-btn{right:12px;bottom:12px}
+    }
+    @media(max-width:400px){
+      .page{padding-left:6px;padding-right:6px;padding-bottom:98px}
+      .stat .v{font-size:16px}
+      .sec-body{padding:11px}
+    }
+  </style>
+</head>
+<body>
+<main class="page" id="card">
+
+  <!-- header -->
+  <header class="header">
+    <div class="kicker">TECH · WORKFLOW · E2E TESTING</div>
+  </header>
+
+  <!-- hero -->
+  <section class="hero">
+    <div class="hero-card hero-copy">
+      <h1 style="margin:0 0 8px;font-size:clamp(1.8rem,5.8vw,2.8rem);line-height:.95;letter-spacing:-.04em;font-weight:900">AI × E2E 测试体系：TinyShip 五阶段流程</h1>
+      <p class="subtitle">TinyShip（Next.js / Nuxt.js / TanStack Start × PostgreSQL / SQLite）作者的 AI 辅助 E2E 实践：先定义验收，再跑 agent-browser 预演，最后才写 Playwright。顺序不能反。</p>
+      <div class="chips">
+        <span class="chip red">Spec→Code→Verify→Test→Green</span>
+        <span class="chip dark">Playwright E2E</span>
+        <span class="chip">agent-browser</span>
+        <span class="chip blue">AI-First Testing</span>
+      </div>
+      <div class="chips" style="margin-top:8px">
+        <span class="chip">6 种组合</span>
+        <span class="chip green">本地跑 E2E</span>
+        <span class="chip">不发版前不跑全量</span>
+      </div>
+    </div>
+    <div class="hero-card hero-visual">
+      <div style="font:800 10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--red);margin-bottom:8px">ORIGINAL FLOW DIAGRAM</div>
+      <div class="flow-box" style="font-size:11px;line-height:1.7">
+┌─────────┐   ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌─────────┐
+│  SPEC   │──▶│  CODE   │──▶│  VERIFY  │──▶│  TEST   │──▶│  GREEN  │
+│ 定义验收 │   │ 实现功能 │   │ 视觉确认  │    │ 写 E2E  │    │ 全通过  │
+│ 标准     │  │         │   │          │    │ 测试    │    │        │
+└─────────┘   └─────────┘   └──────────┘   └─────────┘   └─────────┘</div>
+      <div style="font-size:11.5px;color:#555;margin-top:7px;line-height:1.55">五阶段顺序固定：Spec（想清楚测什么）→ Code（实现功能）→ Verify（agent-browser 预演）→ Test（写 Playwright）→ Green（全通过）。顺序不能反。</div>
+    </div>
+  </section>
+
+  <!-- stats -->
+  <section class="stats" aria-label="关键指标">
+    <div class="stat"><div class="k">framework</div><div class="v">3 套</div><div class="s">Next.js / Nuxt.js / TanStack Start</div></div>
+    <div class="stat"><div class="k">db</div><div class="v">2 种</div><div class="s">PostgreSQL + SQLite</div></div>
+    <div class="stat"><div class="k">combos</div><div class="v">6 种</div><div class="s">每功能改动最多 6 种组合</div></div>
+    <div class="stat"><div class="k">when</div><div class="v">本地</div><div class="s">E2E 不在 CI 上跑</div></div>
+  </section>
+
+  <!-- 01 -->
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">01</span> · <span class="sec-title">核心洞察</span></div><div class="sec-no">why spec-first</div></div>
+    <div class="sec-body">
+      <div class="compare">
+        <div class="compare-item red">
+          <div class="ci">✗ 不行</div>
+          <div class="ct">先写 E2E 再做 UI</div>
+          <ul>
+            <li>E2E 依赖真实 DOM 结构（选择器在 UI 成型前根本写不了）</li>
+            <li>三个框架渲染方式不同，同一选择器可能只在一个框架有效</li>
+            <li>界面前改了，选择器白写</li>
+          </ul>
+        </div>
+        <div class="compare-item green">
+          <div class="ci">✓ 正确</div>
+          <div class="ct">BDD 思维 + UI 后写</div>
+          <ul>
+            <li>先想清楚验收标准（Spec）</li>
+            <li>UI 成型后用 agent-browser 拿可靠选择器</li>
+            <li>Playwright 一次成功，三框架高度复用</li>
+          </ul>
+        </div>
+      </div>
+      <div class="quote"><strong>结论：</strong>E2E 测试是"核心流程必须 100% 覆盖"的保障，不是"先写测试再倒推 UI"的驱动方式。顺序反了就是浪费。</div>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">02</span> · <span class="sec-title">agent-browser 的价值</span></div><div class="sec-no">why agent-browser</div></div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="lead">问题</div>
+          <h4>传统 Playwright 给 AI 喂 DOM 树太重了。</h4>
+          <ul>
+            <li>DOM 树几千到上万 token，极快占满上下文</li>
+            <li>选择器（CSS selector）常脆，一改就挂</li>
+            <li>token 消耗大，每次跑都浪费</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="lead">解法</div>
+          <h4>agent-browser（Vercel Labs）：语义化 Accessibility Tree。</h4>
+          <ul>
+            <li>只保留交互元素，压缩 80%+ token</li>
+            <li>用 `@E_1`、`@E_4` 简洁引用代替 CSS 选择器</li>
+            <li>自然语言指令理解好，AI-First 设计</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ref-box"># agent-browser 返回示例——只有交互元素，无 DOM 树
+- textbox "输入提示词" [ref=E_1]
+- button "选择文件" [ref=E_2]  (上传按钮)
+- combobox "模型选择" [ref=E_3]  (下拉框)
+- button "开始生成" [ref=E_4]
+
+# 交互采用 ref，不写 CSS 选择器
+agent-browser click @E_4</div>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">03</span> · <span class="sec-title">为什么 E2E 不在 CI 上跑</span></div><div class="sec-no">local-only</div></div>
+    <div class="sec-body">
+      <div class="grid-3">
+        <div class="note">
+          <div class="lead">慢</div>
+          <h4>全量 E2E 跑完一个 app ≈ 6 分钟。</h4>
+          <ul>
+            <li>三个 app → 18 分钟</li>
+            <li>再加两个 DB → 36 分钟</li>
+            <li>CI 排队这么久不划算</li>
+          </ul>
+        </div>
+        <div class="note">
+          <div class="lead">依赖多</div>
+          <h4>支付测试需要 Stripe CLI 等环境变量。</h4>
+          <ul>
+            <li>多平台环境变量配置麻烦</li>
+            <li>CI 上配这些要么麻烦，要么不安全</li>
+          </ul>
+        </div>
+        <div class="note">
+          <div class="lead">分工</div>
+          <h4>CI 管"快反馈"，E2E 管"流程完整性"。</h4>
+          <ul>
+            <li>CI：typecheck + build 够快</li>
+            <li>E2E：本地跑，发版前全量检</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">04</span> · <span class="sec-title">三种情况跑 E2E</span></div><div class="sec-no">when to run</div></div>
+    <div class="sec-body">
+      <div class="trow"><div class="tk">触发情况</div><div class="tv">跑哪些</div></div>
+      <div class="trow"><div class="tk">做完一个功能</div><div class="tv">只跑相关的 spec 文件</div></div>
+      <div class="trow"><div class="tk">发版前</div><div class="tv">全部 spec，三个 app 都跑</div></div>
+      <div class="trow"><div class="tk">大重构</div><div class="tv">全部 spec，三个 app 都跑</div></div>
+      <div class="trow" style="background:#f0fff4"><div class="tk" style="color:var(--green)">小修小补</div><div class="tv" style="color:var(--green)">跑 typecheck + build 就够了，不需要跑 E2E</div></div>
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">05</span> · <span class="sec-title">完整流程图（原文复刻）</span></div><div class="sec-no">original flow</div></div>
+    <div class="sec-body">
+      <div class="ref-box">┌─────────┐   ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌─────────┐
+│  SPEC   │──▶│  CODE   │──▶│  VERIFY  │──▶│  TEST   │──▶│  GREEN  │
+│ 定义验收 │   │ 实现功能 │   │ 视觉确认  │    │ 写 E2E  │    │ 全通过  │
+│ 标准     │  │         │   │          │    │ 测试    │    │        │
+└─────────┘   └─────────┘   └──────────┘   └─────────┘   └─────────┘</div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="lead">SPEC</div>
+          <h4>在 tests/e2e/TEST-CATALOG.md 写验收标准</h4>
+          <ul>
+            <li>自然语言描述：打开哪页 → 点哪里 → 期望什么</li>
+            <li>结构化字段补充：优先级、文件路径、上下文依赖</li>
+            <li>BDD 思维，但不写测试代码</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="lead">CODE</div>
+          <h4>按清单实现功能，保持三个 app 一致</h4>
+          <ul>
+            <li>互相复用逻辑放 libs/*</li>
+            <li>路由层尽量薄</li>
+            <li>三个 app 的测试代码基本一样</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="lead">VERIFY</div>
+          <h4>agent-browser 走完真实流程</h4>
+          <ul>
+            <li>拿到可靠的元素引用和 DOM 结构</li>
+            <li>选择器成功率极高，一次稳定</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="lead">TEST</div>
+          <h4>写 Playwright E2E，UI 已确认再动手</h4>
+          <ul>
+            <li>选择器从 VERIFY 阶段获取</li>
+            <li>三个框架复用，只需少量调整</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">06</span> · <span class="sec-title">Green 阶段</span></div><div class="sec-no">green</div></div>
+    <div class="sec-body">
+      <div class="trow"><div class="tk">Next.js app</div><div class="tv">跑一遍全部 spec</div></div>
+      <div class="trow"><div class="tk">Nuxt.js app</div><div class="tv">切换，跑相同测试</div></div>
+      <div class="trow"><div class="tk">TanStack Start</div><div class="tv">切换，跑相同测试</div></div>
+      <div class="trow"><div class="tk">切 DB：PG / SQLite</div><div class="tv">三 app × 两 DB = 6 次全部通过 → 功能完成</div></div>
+      <div class="quote"><strong>切换 app 和数据库都让 AI 来，不需要手动。</strong>一个 app 跑完，切换另一个，跑相同的测试——全程自动化。</div>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <section class="section" style="margin-bottom:0">
+    <div class="sec-body">
+      <div class="footer">
+        <div class="small">本卡主题：<strong>infocard-black-head-style</strong> · 黑头主题 · 纯黑页眉 · 红蓝双强调 · 白纸正文。流程图严格按原文复刻。</div>
+        <div class="src">来源：<a href="https://vikingz.me/ai-e2e/">vikingz.me/ai-e2e/</a> · 作者：Viking · 发布：2026-06-06</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<button class="save-btn" id="saveBtn">SAVE PNG</button>
+<script>
+  const btn = document.getElementById('saveBtn');
+  btn.addEventListener('click', async () => {
+    try {
+      const card = document.getElementById('card');
+      const canvas = await html2canvas(card, { backgroundColor: '#f5f2ec', scale: Math.min(2, window.devicePixelRatio || 1), useCORS: true, scrollY: -window.scrollY });
+      const a = document.createElement('a');
+      a.download = '20260607-vikingz-ai-e2e-blackhead.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    } catch (e) {
+      console.error(e);
+      alert('PNG 导出失败：' + e.message);
+    }
+  });
+</script>
+</body>
+</html>
