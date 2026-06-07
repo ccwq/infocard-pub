@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>CGA：把仓库图谱变成 AI 编码的局部证据层</title>
+  <meta name="description" content="CGA（ContextGraphAgent）是一个 local-first graph context service，把仓库文件、符号、调用、导入与轻量数据流索引进 FalkorDB，再通过 MCP 工具、Admin Dashboard 与 3D Graph Viewer 给 AI 编码代理提供局部证据。" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#f5f2ec;
+      --paper:#fffdf9;
+      --paper-2:#fbf7f0;
+      --ink:#0a0a0a;
+      --red:#c8102e;
+      --red2:#a20c23;
+      --line:#0a0a0a;
+      --muted:#666;
+      --soft-red:#fff4f5;
+      --soft-ink:#f3f0ea;
+      --shadow:6px 6px 0 rgba(10,10,10,.12);
+      --mono:SFMono-Regular,Consolas,Menlo,Monaco,monospace;
+      --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+    body{font-family:var(--sans);text-align:center}
+    a{color:inherit}
+    img{display:block;max-width:100%}
+    code,pre{font-family:var(--mono)}
+    .page{max-width:720px;margin:0 auto;padding:12px 10px 112px;text-align:left}
+    .shell{background:transparent}
+    .topbar{border-bottom:3px solid var(--line);padding:2px 0 10px;margin-bottom:12px;display:grid;gap:8px}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:3px 9px;border:2px solid var(--line);background:var(--ink);color:#fff;font:800 10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+    .title{margin:0;font-size:clamp(2rem,5.8vw,3rem);line-height:.96;letter-spacing:-.04em;font-weight:900;max-width:16ch}
+    .subtitle{margin:0;max-width:62ch;font-size:14px;line-height:1.7;color:#222}
+    .tagline{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:4px 10px;border:2px solid var(--red);background:var(--soft-red);color:var(--red);font:800 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:10px;align-items:start}
+    .hero-card,.section,.panel,.metric,.mini,.note,.quote,.codebox{border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow)}
+    .hero-copy{padding:12px}
+    .hero-copy .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+    .chip{padding:4px 9px;border:1.5px solid var(--line);background:#fff;font:800 11.2px/1 var(--mono);letter-spacing:.04em;white-space:nowrap}
+    .chip.red{background:var(--red);border-color:var(--red);color:#fff}
+    .chip.soft{background:var(--soft-red);border-color:var(--red);color:var(--red)}
+    .chip.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+    .hero-visual{padding:10px;background:var(--paper)}
+    .hero-visual img{width:100%;height:auto;border:2px solid var(--line);background:#fff}
+    .hero-cap{margin-top:7px;font-size:11.2px;line-height:1.62;color:#555}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+    .stat{background:#fff;border:2px solid var(--line);padding:10px 8px;min-width:0}
+    .stat .k{font:800 10.8px/1.1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#666}
+    .stat .v{margin-top:7px;font-size:18px;line-height:1;font-weight:900;letter-spacing:-.03em;color:var(--red)}
+    .stat .s{margin-top:6px;font-size:11.2px;line-height:1.42;color:#333}
+    .section{margin-bottom:10px;overflow:hidden;background:var(--paper)}
+    .sec-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--ink);color:#fff;border-bottom:2px solid var(--line)}
+    .sec-no{font:900 13px/1 var(--mono);color:var(--red);letter-spacing:.06em}
+    .sec-title{font-size:11.5px;line-height:1.2;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+    .sec-body{padding:12px}
+    h3{margin:0 0 8px;font-size:14px;line-height:1.35;font-weight:900;letter-spacing:-.02em}
+    p{margin:0 0 10px;font-size:12.8px;line-height:1.72;color:#333}
+    .quote{padding:12px 12px 12px 14px;border-left:5px solid var(--red);background:#111;color:#fff;font-size:13px;line-height:1.7}
+    .quote strong{color:#fff}
+    .subhead{margin:14px 0 8px;font-size:11.5px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--red)}
+    .grid-2,.grid-3,.grid-4{display:grid;gap:8px;margin-bottom:10px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .panel,.metric,.mini,.note{padding:11px;min-width:0}
+    .panel h4,.mini h4,.metric h4{margin:0 0 7px;font-size:13px;line-height:1.3;font-weight:900;letter-spacing:-.01em}
+    .panel .lead,.mini .lead,.metric .lead{margin:0 0 6px;font:800 10.3px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--red)}
+    .panel ul,.mini ul{margin:0;padding-left:16px}
+    .panel li,.mini li{margin:4px 0;font-size:12.4px;line-height:1.62;color:#333}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+    .metric{background:#fff}
+    .metric .num{font-size:18px;font-weight:900;line-height:1;color:var(--red);letter-spacing:-.03em}
+    .metric .label{margin-top:5px;font-size:10.8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#666}
+    .metric .desc{margin-top:7px;font-size:12px;line-height:1.6;color:#333}
+    .arch{padding:12px;background:linear-gradient(180deg,#fff,#faf7f1);border:2px solid var(--line);box-shadow:var(--shadow)}
+    .arch svg{width:100%;height:auto;display:block}
+    .codebox{padding:11px;background:#111;color:#f7f7f7;overflow-x:auto}
+    .codebox pre{margin:0;font-size:11.8px;line-height:1.68;white-space:pre-wrap;word-break:break-word}
+    .list-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .list-item{background:#fff;border:2px solid var(--line);padding:11px;min-width:0}
+    .list-item .n{font:900 10.4px/1 var(--mono);color:var(--red);letter-spacing:.1em;text-transform:uppercase}
+    .list-item .t{margin-top:6px;font-size:13px;font-weight:900;line-height:1.25}
+    .list-item .d{margin-top:7px;font-size:12.1px;line-height:1.6;color:#333}
+    .flow{display:flex;align-items:stretch;gap:0;margin:10px 0 0}
+    .flow-item{flex:1;border:2px solid var(--line);padding:9px 10px;background:#fff;font-size:12px;font-weight:900;text-align:center;line-height:1.35}
+    .flow-item.red{background:var(--red);border-color:var(--red);color:#fff}
+    .flow-arrow{width:24px;display:flex;align-items:center;justify-content:center;font:900 15px/1 var(--mono);color:var(--red);background:transparent}
+    .links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .link-card{background:#fff;border:2px solid var(--line);padding:11px;min-width:0}
+    .link-card .u{font:800 10.3px/1.2 var(--mono);color:var(--red);letter-spacing:.08em;text-transform:uppercase}
+    .link-card .l{display:block;margin-top:6px;font-size:12.8px;font-weight:900;line-height:1.35}
+    .link-card .m{margin-top:6px;font-size:11.8px;line-height:1.55;color:#333}
+    .footer{margin-top:4px;padding:12px;background:#111;color:#fff;border:2px solid var(--line);box-shadow:var(--shadow)}
+    .footer .small{font-size:11.8px;line-height:1.65;color:#ddd}
+    .footer a{color:#fff}
+    .footer .src{margin-top:8px;font-size:11.5px;line-height:1.65;color:#ddd}
+    .save-btn{position:fixed;right:18px;bottom:18px;z-index:999;border:2px solid var(--line);border-radius:8px;padding:10px 14px;background:linear-gradient(135deg,var(--red),var(--red2));color:#fff;font:900 12px/1 var(--mono);letter-spacing:.05em;box-shadow:5px 5px 0 rgba(10,10,10,.2);cursor:pointer}
+    .save-btn:disabled{opacity:.75;cursor:progress}
+    .note{background:#fff}
+    .note strong{display:block;font-size:13px;line-height:1.35;margin-bottom:6px}
+    .note p{margin:0;font-size:12.1px;line-height:1.62;color:#333}
+    .mono{font-family:var(--mono)}
+
+    @media (max-width: 720px){
+      .page{padding:10px 8px 104px}
+      .hero{grid-template-columns:1fr}
+      .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .grid-4,.grid-3,.grid-2,.links,.list-grid{grid-template-columns:1fr}
+      .flow{flex-direction:column}
+      .flow-arrow{width:100%;height:18px;transform:rotate(90deg)}
+      .save-btn{right:12px;bottom:12px}
+    }
+    @media (max-width: 400px){
+      .page{padding-left:6px;padding-right:6px;padding-bottom:98px}
+      .title{font-size:2rem}
+      .subtitle{font-size:13.4px}
+      .stat .v{font-size:16px}
+      .sec-body{padding:11px}
+    }
+  </style>
+</head>
+<body>
+<main class="page" id="card">
+  <header class="topbar">
+    <div class="kicker">OPEN SOURCE · TECH SHARE · REDSWISS</div>
+    <div class="hero">
+      <section class="hero-card hero-copy">
+        <h1 class="title">CGA：把仓库图谱变成 AI 编码的局部证据层</h1>
+        <p class="subtitle">CGA（ContextGraphAgent）是一个 local-first graph context service：它把仓库文件、符号、调用、导入与轻量数据流索引进 FalkorDB，再通过 MCP 工具、Admin Dashboard 和 3D Graph Viewer，给 AI 编码代理提供“只取所需”的局部证据。</p>
+        <div class="chips">
+          <span class="chip red">Local-first</span>
+          <span class="chip dark">MCP-compatible</span>
+          <span class="chip soft">FalkorDB</span>
+          <span class="chip">Python 3.10+</span>
+          <span class="chip">Apache-2.0</span>
+        </div>
+        <div class="chips" style="margin-top:10px">
+          <span class="chip dark">102 real-code cases</span>
+          <span class="chip red">Token -90.44%</span>
+          <span class="chip dark">HPS -13.34%</span>
+        </div>
+      </section>
+      <aside class="hero-card hero-visual">
+        <img src="assets/images/20260607-cga-hero.png" alt="CGA 3D graph viewer rotating project relationships" />
+        <div class="hero-cap">首屏锚点：CGA Viewer 的 3D 图谱界面。左侧是项目 / 图谱 / 视图控制，右侧是仓库关系网络；它直观表达了“局部证据 + 关系路径”的产品定位。</div>
+      </aside>
+    </div>
+  </header>
+
+  <section class="stats" aria-label="关键指标">
+    <div class="stat"><div class="k">version</div><div class="v">1.30.79</div><div class="s">Published · README 当前版本</div></div>
+    <div class="stat"><div class="k">benchmark</div><div class="v">102</div><div class="s">真实代码案例总数</div></div>
+    <div class="stat"><div class="k">tokens</div><div class="v">90.44%</div><div class="s">平均 token 降幅</div></div>
+    <div class="stat"><div class="k">hps</div><div class="v">13.34%</div><div class="s">平均 HPS 改善</div></div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">01</span> · <span class="sec-title">核心判断</span></div><div class="sec-no">local-first graph context</div></div>
+    <div class="sec-body">
+      <h3>它解决的不是“再做一个搜索框”，而是让 AI 编码代理先拿到证据，再去写。</h3>
+      <p>CGA 的关键价值在于：它把仓库知识从“整文件 / 大搜索结果”降维成“符号片段 + 关系路径 + 最近事实”，让模型在生成之前先看见证据边界。对代理式编码来说，这比直接喂代码更省 token，也更不容易把猜测写成事实。</p>
+      <div class="quote"><strong>一句话总结：</strong>CGA 不是通用代码索引器，而是一个面向 AI-assisted development 的<strong>局部证据层</strong>：先把关系说清，再让模型动笔。</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">02</span> · <span class="sec-title">为什么需要它</span></div><div class="sec-no">problem / payoff</div></div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="lead">问题</div>
+          <h4>LLM 编码常见的失败，不是不会写，而是上下文太散。</h4>
+          <ul>
+            <li>整仓库文件被一股脑塞进 prompt，噪音太大。</li>
+            <li>grep 式搜索能找到关键词，但抓不到关系路径。</li>
+            <li>符号 / 调用 / import / data flow 混在一起，模型容易“猜”。</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="lead">收益</div>
+          <h4>先给关系证据，再给局部上下文，模型更省 token 也更稳。</h4>
+          <ul>
+            <li>定位目标符号摘录、相邻关系上下文、依赖路径与最近项目事实。</li>
+            <li>本地优先，避免把代码上下文外包给云端搜索。</li>
+            <li>给 AI 代理一个能“先问图谱，再写代码”的工作流。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note"><strong>README 原话要点：</strong>“focused code evidence instead of dumping whole files or broad search results into prompts.” 这句话基本就是整个项目的设计中心。</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">03</span> · <span class="sec-title">架构总览</span></div><div class="sec-no">index → graph → tools</div></div>
+    <div class="sec-body">
+      <div class="arch">
+        <svg viewBox="0 0 960 240" aria-label="CGA architecture overview">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="#c8102e"></path>
+            </marker>
+          </defs>
+          <rect x="18" y="56" width="168" height="120" rx="12" fill="#111" stroke="#c8102e" stroke-width="2"/>
+          <text x="102" y="92" text-anchor="middle" fill="#fff" font-size="22" font-weight="800">Repository</text>
+          <text x="102" y="120" text-anchor="middle" fill="#ddd" font-size="14">files / symbols</text>
+          <text x="102" y="144" text-anchor="middle" fill="#ddd" font-size="14">calls / imports</text>
+
+          <rect x="232" y="42" width="186" height="148" rx="12" fill="#fffdf9" stroke="#111" stroke-width="2"/>
+          <text x="325" y="76" text-anchor="middle" fill="#111" font-size="22" font-weight="800">CGA Indexer</text>
+          <text x="325" y="104" text-anchor="middle" fill="#333" font-size="14">FalkorDB graph</text>
+          <text x="325" y="128" text-anchor="middle" fill="#333" font-size="14">data flow / paths</text>
+          <text x="325" y="152" text-anchor="middle" fill="#333" font-size="14">recent project facts</text>
+
+          <rect x="474" y="24" width="176" height="184" rx="12" fill="#111" stroke="#111" stroke-width="2"/>
+          <text x="562" y="60" text-anchor="middle" fill="#fff" font-size="22" font-weight="800">MCP Tools</text>
+          <text x="562" y="90" text-anchor="middle" fill="#ddd" font-size="14">symbol retrieval</text>
+          <text x="562" y="114" text-anchor="middle" fill="#ddd" font-size="14">dependency paths</text>
+          <text x="562" y="138" text-anchor="middle" fill="#ddd" font-size="14">architecture queries</text>
+          <text x="562" y="162" text-anchor="middle" fill="#ddd" font-size="14">file excerpts</text>
+          <text x="562" y="186" text-anchor="middle" fill="#ddd" font-size="14">variable flow</text>
+
+          <rect x="706" y="56" width="236" height="120" rx="12" fill="#fffdf9" stroke="#111" stroke-width="2"/>
+          <text x="824" y="92" text-anchor="middle" fill="#111" font-size="22" font-weight="800">AI Coding Agent</text>
+          <text x="824" y="120" text-anchor="middle" fill="#333" font-size="14">Claude / Cursor / other agents</text>
+          <text x="824" y="144" text-anchor="middle" fill="#333" font-size="14">read evidence before generation</text>
+
+          <line x1="186" y1="116" x2="232" y2="116" stroke="#c8102e" stroke-width="3" marker-end="url(#arrow)"/>
+          <line x1="418" y1="116" x2="474" y2="116" stroke="#c8102e" stroke-width="3" marker-end="url(#arrow)"/>
+          <line x1="650" y1="116" x2="706" y2="116" stroke="#c8102e" stroke-width="3" marker-end="url(#arrow)"/>
+        </svg>
+      </div>
+      <div class="flow">
+        <div class="flow-item">仓库文件 / 符号 / 调用 / 导入</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item red">FalkorDB 图数据库</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">MCP-Compatible Tools</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item red">AI 编码代理</div>
+      </div>
+      <div class="grid-3" style="margin-top:10px">
+        <div class="panel"><div class="lead">数据层</div><h4>把关系装进图里，而不是塞进文本里。</h4><p>索引器把 repository files、symbols、calls、imports 和 lightweight data flow 组织进 FalkorDB，形成可查询的项目关系图。</p></div>
+        <div class="panel"><div class="lead">访问层</div><h4>MCP 工具让代理按需取证。</h4><p>代理不需要一次性读完整仓库，而是按 symbol、path、dependency、architecture query 分步取用局部证据。</p></div>
+        <div class="panel"><div class="lead">控制层</div><h4>Admin Dashboard 负责运维与工作节奏。</h4><p>项目注册、访问组、索引状态、调度、设置、活动简报、备份等都放进可视化控制台。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">04</span> · <span class="sec-title">你实际能拿到什么</span></div><div class="sec-no">capability matrix</div></div>
+    <div class="sec-body">
+      <div class="metrics">
+        <div class="metric"><div class="num">Admin Dashboard</div><div class="label">index / settings / schedules</div><div class="desc">项目注册、访问组、索引状态、设置、调度与运维视图。</div></div>
+        <div class="metric"><div class="num">3D Graph Viewer</div><div class="label">relationship exploration</div><div class="desc">以图形方式浏览仓库关系，支持布局与可视化控制。</div></div>
+        <div class="metric"><div class="num">MCP API</div><div class="label">agent retrieval</div><div class="desc">符号、文件、依赖、导入、变量流与架构查询。</div></div>
+        <div class="metric"><div class="num">CGA-Relay</div><div class="label">stdio gateway / sync</div><div class="desc">单机 relay、stdio MCP gateway、本地扫描同步与安全配置样例。</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="lead">扩展能力</div>
+          <h4>工作简报、调度自动化、运行时备份一起打包。</h4>
+          <ul>
+            <li>Work Briefing Aggregation：把活动捕获成简报。</li>
+            <li>Schedule Automation：可定时执行浏览器测试、Agent 激活调用与 HTTP 任务。</li>
+            <li>Runtime Backup：PostgreSQL 与 FalkorDB 快照，支持本地优先的恢复能力。</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="lead">产品气质</div>
+          <h4>不是单点工具，而是一套局部证据基础设施。</h4>
+          <ul>
+            <li>强调 local-first，不把项目上下文直接外包给云端。</li>
+            <li>强调“先查图谱，后生成”，降低 prompt 浪费。</li>
+            <li>适合代理式编码、代码审查、仓库问答和关系追踪。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">05</span> · <span class="sec-title">Benchmark 证据</span></div><div class="sec-no">102 cases</div></div>
+    <div class="sec-body">
+      <p>README 里给了一个带有方法边界的 live multi-project benchmark：3 个活跃项目、每个项目 34 个 deterministic symbol-level cases，总计 102 个真实代码案例。结论不是“所有项目都赢”，而是“平均上证据层能显著减 token 且改善 HPS”。</p>
+      <div class="metrics">
+        <div class="metric"><div class="num">17.66 → 13.94</div><div class="label">average HPS</div><div class="desc">平均 baseline HPS 与 CG HPS 对比。</div></div>
+        <div class="metric"><div class="num">5,474.95 → 483.29</div><div class="label">average tokens</div><div class="desc">平均 baseline tokens 与 graph-scoped tokens 对比。</div></div>
+        <div class="metric"><div class="num">-90.44%</div><div class="label">token reduction</div><div class="desc">平均 token 降幅，核心收益非常直接。</div></div>
+        <div class="metric"><div class="num">-13.34%</div><div class="label">HPS reduction</div><div class="desc">平均 HPS 改善，但 README 也明确说明有个别项目在保守上下文下上升。</div></div>
+      </div>
+      <div class="note"><strong>关键边界：</strong>这个 benchmark 的叙述方式是“带 nuance 的平均值”，不是“所有项目都无条件变好”。这比只讲胜率更可信。</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">06</span> · <span class="sec-title">快速上手</span></div><div class="sec-no">docker / source</div></div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="codebox">
+<pre>Option A: Docker Desktop Release
+1. Install Docker Desktop.
+2. 下载 CGA-Docker-Desktop-&lt;version&gt;.zip。
+3. 解压后双击 start-cga-desktop.cmd。
+
+打开：
+- http://localhost:18001/admin</pre>
+        </div>
+        <div class="codebox">
+<pre>Option B: Run From Source
+$ git clone https://github.com/nascousa/cga.git
+$ cd cga
+$ cp .env.example .env
+$ docker compose --profile dev up --build
+
+Windows PowerShell:
+PS&gt; Copy-Item .env.example .env
+PS&gt; docker compose --profile dev up --build
+
+打开：
+- http://localhost:8001/admin
+- http://localhost:8001/mcp
+- http://localhost:13000</pre>
+        </div>
+      </div>
+      <div class="list-grid">
+        <div class="list-item"><div class="n">Desktop stack</div><div class="t">仓库根目录桌面栈</div><div class="d">`./src/scripts/start-desktop.ps1 start`，对应 `http://localhost:18001/admin`。</div></div>
+        <div class="list-item"><div class="n">Docs</div><div class="t">最小入口文档</div><div class="d">`docs/mcp-agent-query-quickstart.md`、`docs/runtime-operations.md`、`docs/benchmarks/README.md`。</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">07</span> · <span class="sec-title">适用边界</span></div><div class="sec-no">fit / not fit</div></div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="lead">适合</div>
+          <h4>需要“先取证据，再生成”的编码工作流。</h4>
+          <ul>
+            <li>AI-assisted development。</li>
+            <li>仓库问答、代码审查、符号定位、关系追踪。</li>
+            <li>本地优先、想减少 prompt 噪音的团队。</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="lead">不适合</div>
+          <h4>把它当成通用搜索引擎或无脑自动编码器。</h4>
+          <ul>
+            <li>如果你只想要关键词搜索，它有点重。</li>
+            <li>如果你不愿意接受 Docker / FalkorDB / 本地运维，这套链路门槛会偏高。</li>
+            <li>如果你的目标只是“全仓库暴力投喂”，那就偏离了它的设计初衷。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="quote"><strong>结论：</strong>CGA 的定位是“上下文治理层”而不是“新一代搜索框”。它最强的地方，是把关系、证据和工作节奏收敛到同一套本地工作流里。</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><div><span class="sec-no">08</span> · <span class="sec-title">资源与来源</span></div><div class="sec-no">docs / repo</div></div>
+    <div class="sec-body">
+      <div class="links">
+        <div class="link-card"><div class="u">repo</div><span class="l">https://github.com/nascousa/cga</span><div class="m">仓库主页与 README。</div></div>
+        <div class="link-card"><div class="u">readme</div><span class="l">raw README</span><div class="m">定位、快速上手、benchmark snapshot、文档索引。</div></div>
+        <div class="link-card"><div class="u">docs</div><span class="l">docs/mcp-agent-query-quickstart.md</span><div class="m">MCP 查询最小入口。</div></div>
+        <div class="link-card"><div class="u">docs</div><span class="l">docs/benchmarks/live-context-quality.md</span><div class="m">基准完整表格与复现实验。</div></div>
+      </div>
+      <div class="footer">
+        <div class="small">本卡主题：<strong>infocard-redswiss-style</strong> · 红黑瑞士编辑风 · 无蓝黄绿辅助色。首屏锚点采用仓库官方 3D Graph Viewer 截图本地化后引用。</div>
+        <div class="src">来源：<a href="https://github.com/nascousa/cga">GitHub Repo</a> · <a href="https://raw.githubusercontent.com/nascousa/cga/main/README.md">README</a> · <a href="https://docs.github.com/">GitHub Docs</a></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<button class="save-btn" id="saveBtn">SAVE PNG</button>
+<script>
+  const btn = document.getElementById('saveBtn');
+  btn.addEventListener('click', async () => {
+    try {
+      const card = document.getElementById('card');
+      const canvas = await html2canvas(card, { backgroundColor: '#f5f2ec', scale: Math.min(2, window.devicePixelRatio || 1), useCORS: true, scrollY: -window.scrollY });
+      const a = document.createElement('a');
+      a.download = '20260607-cga-contextgraphagent.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    } catch (e) {
+      console.error(e);
+      alert('PNG 导出失败：' + e.message);
+    }
+  });
+</script>
+</body>
+</html>
