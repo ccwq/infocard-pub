@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8efd9" />
+  <meta name="description" content="BrowserAct Skills 把浏览器自动化、反爬破墙、人工接管、多会话并发和多账户隔离收敛成一套面向 AI Agent 的工作流层：entry skill + get-skills runtime。" />
+  <title>BrowserAct Skills：把浏览器自动化做成 AI Agent 的工作流层</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: #f8efd9;
+      --paper-2: #fffaf0;
+      --ink: #1d1b16;
+      --muted: #6b6254;
+      --line: #28231d;
+      --shadow: 8px 8px 0 rgba(29,27,22,.14);
+      --radius: 22px;
+      --green: #9bdc77;
+      --blue: #7cc8ff;
+      --purple: #c7a2ff;
+      --orange: #ffc45c;
+      --yellow: #ffe36e;
+      --red: #ff9a89;
+      --teal: #7de3d6;
+      --soft-green: #ebf8dd;
+      --soft-blue: #e8f6ff;
+      --soft-purple: #f1eaff;
+      --soft-orange: #fff1d2;
+      --soft-yellow: #fff8cc;
+      --soft-red: #ffe9e4;
+      --soft-teal: #e5fbf7;
+    }
+    html { scroll-behavior: smooth; overflow-x: hidden; font-size: clamp(16px, calc(100vw / 77), 18px); }
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 12%, rgba(255,227,110,.34) 0 12%, transparent 13%),
+        radial-gradient(circle at 84% 10%, rgba(124,200,255,.20) 0 9%, transparent 10%),
+        linear-gradient(120deg, rgba(255,255,255,.68), transparent 45%),
+        var(--paper);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
+      line-height: 1.56;
+      text-align: center;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .18;
+      background-image: linear-gradient(rgba(29,27,22,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(29,27,22,.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: linear-gradient(to bottom, black, transparent 88%);
+    }
+    img { display: block; max-width: 100%; }
+    a { color: inherit; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .page {
+      width: min(1180px, calc(100% - 24px));
+      margin: 0 auto;
+      padding: 20px 0 94px;
+      text-align: left;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+      border: 3px solid var(--line);
+      border-radius: 28px;
+      background: var(--paper-2);
+      box-shadow: var(--shadow);
+      padding: clamp(20px, 4vw, 44px);
+    }
+    .hero::after {
+      content: "🧭";
+      position: absolute;
+      right: clamp(14px, 4vw, 42px);
+      top: clamp(12px, 3vw, 36px);
+      font-size: clamp(42px, 8vw, 92px);
+      transform: rotate(8deg);
+      filter: drop-shadow(4px 7px 0 rgba(29,27,22,.12));
+      pointer-events: none;
+    }
+    .hero-copy { display: grid; gap: 14px; align-content: start; }
+    .kicker {
+      display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      border: 2px solid var(--line); border-radius: 999px; background: #fff3b7;
+      padding: 7px 12px; font-size: 12.5px; font-weight: 900; letter-spacing: .06em;
+      text-transform: uppercase; width: fit-content;
+    }
+    h1 { max-width: 800px; margin: 0; font-size: clamp(32px, 5.8vw, 72px); line-height: .96; letter-spacing: -.06em; }
+    .subtitle { max-width: 840px; margin: 0; color: var(--muted); font-size: clamp(15px, 1.85vw, 19px); }
+    .hero-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
+      border: 2px solid var(--line); border-radius: 999px; background: #fff;
+      padding: 6px 10px; font-weight: 850; font-size: 12.5px; box-shadow: 3px 3px 0 rgba(29,27,22,.09);
+    }
+    .hero-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+    .stat {
+      border: 2px solid var(--line); border-radius: 18px; background: #fff; padding: 12px 12px 11px;
+      box-shadow: 4px 4px 0 rgba(29,27,22,.08); min-width: 0;
+    }
+    .stat .k { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; font-weight: 900; }
+    .stat .v { display: block; font-size: 14px; line-height: 1.25; font-weight: 900; }
+    .hero-visual {
+      border: 3px solid var(--line); border-radius: 24px; overflow: hidden; background: #fff;
+      box-shadow: var(--shadow); align-self: start; min-width: 0;
+    }
+    .hero-visual img { width: 100%; height: auto; }
+    .hero-visual figcaption { padding: 12px 14px; border-top: 3px solid var(--line); font-size: 13px; line-height: 1.56; color: var(--muted); background: #fff; }
+    .section { margin-top: 28px; }
+    .section-head { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: end; margin: 0 0 14px; }
+    .section-no {
+      display: grid; place-items: center; width: 54px; height: 54px;
+      border: 3px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 5px 5px 0 rgba(29,27,22,.12);
+      font-size: 23px; font-weight: 950;
+    }
+    .section-title h2 { margin: 0; font-size: clamp(22px, 3.8vw, 38px); line-height: 1; letter-spacing: -.04em; }
+    .section-title p { margin: 7px 0 0; color: var(--muted); font-size: 14px; }
+    .method-grid, .compare-grid, .scene-grid, .intro-grid { display: grid; gap: 12px; }
+    .method-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .compare-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .scene-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .intro-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .method-card, .compare-card, .scene-card, .intro-card, .panel, .callout { min-width: 0; }
+    .intro-card, .compare-card, .scene-card, .panel {
+      border: 2px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 4px 4px 0 rgba(29,27,22,.08);
+    }
+    .intro-card { padding: 14px; display: grid; gap: 10px; }
+    .intro-card h3 { font-size: 17px; line-height: 1.18; letter-spacing: -.02em; margin: 0; }
+    .intro-card p { font-size: 14px; color: #222; line-height: 1.68; margin: 0; }
+    .tagrow { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--line); border-radius: 999px; background: #fff;
+      padding: 4px 9px; font-size: 12.2px; font-weight: 850; line-height: 1.2; box-shadow: 2px 2px 0 rgba(29,27,22,.08);
+    }
+    .chip.soft-blue { background: var(--soft-blue); }
+    .chip.soft-purple { background: var(--soft-purple); }
+    .chip.soft-orange { background: var(--soft-orange); }
+    .chip.soft-green { background: var(--soft-green); }
+    .chip.soft-yellow { background: var(--soft-yellow); }
+    .chip.soft-teal { background: var(--soft-teal); }
+    .chip.soft-red { background: var(--soft-red); }
+    .method-card {
+      overflow: hidden; display: grid; grid-template-rows: auto 1fr;
+      border: 2px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 4px 4px 0 rgba(29,27,22,.08);
+    }
+    .method-card::before { content: ""; height: 8px; background: var(--accent, #7cc8ff); border-bottom: 3px solid var(--line); }
+    .method-body { padding: 14px; display: grid; gap: 10px; }
+    .method-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .method-top h3 { margin: 0; font-size: 17px; line-height: 1.12; letter-spacing: -.02em; }
+    .method-no {
+      flex: 0 0 auto; display: grid; place-items: center; width: 38px; height: 38px; border: 2px solid var(--line);
+      border-radius: 13px; background: var(--accent, #7cc8ff); font-weight: 950; box-shadow: 3px 3px 0 rgba(29,27,22,.12);
+    }
+    .type-label {
+      display: inline-flex; align-items: center; width: fit-content; gap: 6px; border: 2px solid var(--line);
+      border-radius: 999px; font-size: 11.5px; font-weight: 950; letter-spacing: .08em; padding: 4px 9px; text-transform: uppercase;
+    }
+    .type-label.theory { background: var(--soft-yellow); }
+    .type-label.use { background: var(--soft-blue); }
+    .method-theory, .method-use {
+      margin: 0; color: #222; border-radius: 10px; border: 1.5px solid var(--line); padding: 8px 10px;
+      line-height: 1.64; font-size: 13px;
+    }
+    .method-theory { background: var(--soft-yellow); }
+    .method-use { background: #f5f5f5; border-style: dashed; font-size: 12.8px; }
+    .method-use strong { color: var(--ink); font-weight: 800; }
+    .method-card[data-accent="green"] { --accent: var(--green); --soft: var(--soft-green); }
+    .method-card[data-accent="blue"] { --accent: var(--blue); --soft: var(--soft-blue); }
+    .method-card[data-accent="purple"] { --accent: var(--purple); --soft: var(--soft-purple); }
+    .method-card[data-accent="orange"] { --accent: var(--orange); --soft: var(--soft-orange); }
+    .method-card[data-accent="yellow"] { --accent: var(--yellow); --soft: var(--soft-yellow); }
+    .method-card[data-accent="red"] { --accent: var(--red); --soft: var(--soft-red); }
+    .method-card[data-accent="teal"] { --accent: var(--teal); --soft: var(--soft-teal); }
+    .compare-card, .scene-card { padding: 14px; display: grid; gap: 10px; }
+    .compare-card h3, .scene-card h3 { margin: 0; font-size: 17px; line-height: 1.18; letter-spacing: -.02em; }
+    .compare-card p, .scene-card p { margin: 0; color: #222; font-size: 14px; line-height: 1.66; }
+    .compare-card ul, .scene-card ul { margin: 0; padding-left: 1.2em; color: #222; font-size: 13.5px; line-height: 1.62; }
+    .scene-card { position: relative; overflow: hidden; }
+    .scene-card::before { content: ""; position: absolute; inset: 0 auto auto 0; width: 100%; height: 8px; background: var(--accent, #7cc8ff); border-bottom: 3px solid var(--line); }
+    .scene-card .scene-top { padding-top: 10px; }
+    .scene-card[data-accent="green"] { --accent: var(--green); }
+    .scene-card[data-accent="blue"] { --accent: var(--blue); }
+    .scene-card[data-accent="purple"] { --accent: var(--purple); }
+    .scene-card[data-accent="orange"] { --accent: var(--orange); }
+    .scene-card[data-accent="yellow"] { --accent: var(--yellow); }
+    .scene-card[data-accent="red"] { --accent: var(--red); }
+    .scene-card[data-accent="teal"] { --accent: var(--teal); }
+    .panel { padding: 14px; display: grid; gap: 10px; }
+    .panel h3 { margin: 0; font-size: 18px; }
+    .panel p, .panel li { font-size: 14px; line-height: 1.66; color: #222; }
+    .panel ul { padding-left: 1.2em; margin: 0; }
+    .codebox { border: 2px solid var(--line); border-radius: 16px; background: #fffdf6; padding: 12px; overflow: auto; }
+    .codebox pre { font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: #222; }
+    .callout {
+      margin-top: 14px; border: 3px solid var(--line); border-radius: 20px; background: #fff7cb; box-shadow: var(--shadow);
+      padding: 16px 16px 15px; font-size: 16px; font-weight: 950; line-height: 1.62;
+    }
+    .callout small { display: block; margin-top: 8px; font-size: 13px; font-weight: 650; line-height: 1.62; color: var(--muted); }
+    .footer-block {
+      margin-top: 14px; border: 3px solid var(--line); border-radius: 22px; background: #fff; box-shadow: var(--shadow);
+      padding: 16px; display: grid; gap: 10px;
+    }
+    .footer-block h3 { margin: 0; font-size: 18px; }
+    .footer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .mini {
+      border: 2px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 4px 4px 0 rgba(29,27,22,.08);
+      padding: 13px; display: grid; gap: 8px;
+    }
+    .mini h4 { font-size: 15px; line-height: 1.2; margin: 0; }
+    .mini p { font-size: 13.5px; line-height: 1.64; color: #222; margin: 0; }
+    .source-note { margin-top: 12px; text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.62; }
+    .save-btn {
+      position: fixed; right: 18px; bottom: 18px; z-index: 999; border: 0; border-radius: 8px;
+      padding: .82rem .98rem; background: linear-gradient(135deg,#2a9d8f,#0f766e); color: #fff; font-weight: 800;
+      font-size: .86rem; cursor: pointer; box-shadow: 0 12px 28px rgba(0,0,0,.24);
+    }
+    .save-btn:disabled { opacity: .72; cursor: progress; }
+    @media (max-width: 1050px) {
+      .hero { grid-template-columns: 1fr; }
+      .intro-grid, .method-grid, .scene-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .compare-grid, .footer-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .page { width: min(100% - 16px, 1180px); padding: 10px 0 520px; }
+      .hero { padding: 18px; border-radius: 22px; }
+      .hero::after { opacity: .24; right: 12px; top: 14px; }
+      .hero-stats, .intro-grid, .method-grid, .scene-grid, .compare-grid, .footer-grid { grid-template-columns: 1fr; }
+      .hero-stats { gap: 8px; }
+      .section-head { grid-template-columns: 1fr; align-items: start; }
+      h1 { font-size: clamp(30px, 8.8vw, 52px); line-height: .98; }
+      .subtitle { font-size: 14px; line-height: 1.62; }
+      .kicker { font-size: 11.8px; }
+      .pill { font-size: 11.8px; min-height: 31px; padding: 5px 9px; }
+      .stat .v, .intro-card p, .panel p, .method-theory, .method-use, .compare-card p, .scene-card p, .mini p { font-size: 13.4px; }
+      .method-use { font-size: 12.8px; }
+      .source-note { font-size: 12px; line-height: 1.56; }
+      .callout { font-size: 15px; }
+    }
+    @media (max-width: 400px) {
+      .page { width: calc(100% - 12px); padding-bottom: 196px; }
+      .hero { padding: 16px; }
+      .save-btn { right: 12px; bottom: 12px; padding: .52rem .66rem; font-size: .72rem; }
+      .method-use, .method-theory, .intro-card p, .panel p { font-size: 12.8px; }
+    }
+    @media (print) {
+      .save-btn { display: none !important; }
+      body { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page" id="capture">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker">BrowserAct · skills</div>
+        <h1>BrowserAct Skills：把浏览器自动化做成 AI Agent 的工作流层</h1>
+        <p class="subtitle">它不是单纯的浏览器 CLI，而是把 <strong>anti-bot 破墙、人工接管、并发隔离、版本化技能加载</strong> 收敛成一套给 AI Agent 直接调用的运行时。</p>
+        <div class="hero-badges">
+          <span class="pill">1 个 entry skill</span>
+          <span class="pill">3 个 get-skills 入口</span>
+          <span class="pill">3 层破墙策略</span>
+          <span class="pill">3 种浏览器模式</span>
+          <span class="pill">6+ 兼容 agent</span>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><span class="k">Architecture</span><span class="v">Entry Skill + Runtime Content</span></div>
+          <div class="stat"><span class="k">Core Flow</span><span class="v">get-skills 先行，再选浏览器</span></div>
+          <div class="stat"><span class="k">Concurrency</span><span class="v">多会话 / 多浏览器互不串线</span></div>
+          <div class="stat"><span class="k">Boundary</span><span class="v">敏感操作仍需用户确认</span></div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <img src="20260609-browser-act-skills-banner.png" alt="BrowserAct banner" />
+        <figcaption>▲ BrowserAct / 浏览器自动化 CLI 的官方横幅（本地化后嵌入）。</figcaption>
+      </figure>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">1</div>
+        <div class="section-title">
+          <h2>先看结论：它是在给 Agent 装“可控的浏览器能力”</h2>
+          <p>README 的主张很清楚：不是再做一个脚本化浏览器，而是面向 AI Agent 的浏览器运行层。</p>
+        </div>
+      </div>
+      <div class="intro-grid">
+        <article class="intro-card">
+          <h3>它解决什么</h3>
+          <div class="tagrow">
+            <span class="chip soft-blue">anti-bot</span>
+            <span class="chip soft-green">human handoff</span>
+            <span class="chip soft-purple">parallel tasks</span>
+          </div>
+          <p>BrowserAct 关注的不是“能不能打开网页”，而是 Agent 在真实网页环境里会遇到的四个问题：封锁、接管、并发、隔离。</p>
+        </article>
+        <article class="intro-card">
+          <h3>它的产品形态</h3>
+          <div class="tagrow">
+            <span class="chip soft-orange">CLI</span>
+            <span class="chip soft-yellow">Skills</span>
+            <span class="chip soft-teal">get-skills</span>
+          </div>
+          <p>它把能力组织成 entry skill 和 runtime content 两层，先让 Agent 意识到 BrowserAct 存在，再把实时规则加载进来。</p>
+        </article>
+        <article class="intro-card">
+          <h3>它适合谁</h3>
+          <div class="tagrow">
+            <span class="chip soft-red">agent builders</span>
+            <span class="chip soft-blue">ops</span>
+            <span class="chip soft-green">research</span>
+          </div>
+          <p>适合需要稳定跑浏览器任务的人：自动化、信息抓取、账号运营、人工协作续接，而不是只想写一次性脚本的人。</p>
+        </article>
+        <article class="intro-card">
+          <h3>它不该怎么理解</h3>
+          <div class="tagrow">
+            <span class="chip soft-purple">not a search engine</span>
+            <span class="chip soft-orange">not a generic scraper</span>
+          </div>
+          <p>它不是把网页搜索又包装了一层；它的核心卖点是“Agent 视角下的浏览器运行协议”。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">2</div>
+        <div class="section-title">
+          <h2>三层破墙：环境、执行、人类接管</h2>
+          <p>README 把浏览器能力拆成三层递进，而不是单点功能。</p>
+        </div>
+      </div>
+      <div class="method-grid">
+        <article class="method-card" data-accent="yellow">
+          <div class="method-body">
+            <div class="method-top"><h3>环境层</h3><span class="method-no">01</span></div>
+            <span class="type-label theory">理论</span>
+            <p class="method-theory">先在浏览器指纹、TLS、代理等外层条件上做处理，尽量让多数站点在“还没触发风控”时就被化解。</p>
+            <span class="type-label use">常见用途</span>
+            <p class="method-use"><strong>场景：</strong>账号登录前置、站点初筛、批量任务起跑前的低摩擦访问。</p>
+          </div>
+        </article>
+        <article class="method-card" data-accent="green">
+          <div class="method-body">
+            <div class="method-top"><h3>执行层</h3><span class="method-no">02</span></div>
+            <span class="type-label theory">理论</span>
+            <p class="method-theory">当环境层还不够时，进入操作层工具：solve-captcha、stealth-extract 等，把“被挡住的页面”变成可继续处理的目标。</p>
+            <span class="type-label use">常见用途</span>
+            <p class="method-use"><strong>场景：</strong>验证码场景、受保护页面、需要快速提取内容的批量采集任务。</p>
+          </div>
+        </article>
+        <article class="method-card" data-accent="blue">
+          <div class="method-body">
+            <div class="method-top"><h3>人类层</h3><span class="method-no">03</span></div>
+            <span class="type-label theory">理论</span>
+            <p class="method-theory">当自动化无法继续时，不是硬撞，而是把任务交给人类在远程 URL 上接管，结束后再无缝回到 Agent。</p>
+            <span class="type-label use">常见用途</span>
+            <p class="method-use"><strong>场景：</strong>强校验登录、不可绕过的人工确认、卡住时的远程续接与恢复。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">3</div>
+        <div class="section-title">
+          <h2>三种浏览器模式：登录态、隐私态、固定身份</h2>
+          <p>它不是“一个浏览器跑到底”，而是按真实任务场景切换身份模型。</p>
+        </div>
+      </div>
+      <div class="compare-grid">
+        <article class="compare-card">
+          <h3>chrome：复用本地登录态</h3>
+          <p>更适合已经有浏览器用户状态的场景。重点是“借用既有会话”，而不是重新造一份身份。</p>
+          <ul>
+            <li>适合需要继续本地登录状态的网页。</li>
+            <li>更像 CDP / profile 复用。</li>
+            <li>强调低摩擦上手。</li>
+          </ul>
+        </article>
+        <article class="compare-card">
+          <h3>stealth privacy：匿名批处理</h3>
+          <p>用于没有登录依赖、只想快速跑完一批任务的场景。每次 session 更像“新壳”，减少残留与关联风险。</p>
+          <ul>
+            <li>适合批量抓取和一次性任务。</li>
+            <li>强调零残留与独立环境。</li>
+            <li>适合没有身份依赖的流程。</li>
+          </ul>
+        </article>
+        <article class="compare-card">
+          <h3>stealth fixed identity：稳定账号身份</h3>
+          <p>用于多账号并发或长期运行的固定身份模式，要求 fingerprint 与 IP 都稳定，避免被识别成批量异常流量。</p>
+          <ul>
+            <li>适合固定账号、长期在线与多会话并发。</li>
+            <li>强调稳定身份而非随机切换。</li>
+            <li>适合运营型或多人协作工作流。</li>
+          </ul>
+        </article>
+        <article class="compare-card">
+          <h3>为什么要分三种</h3>
+          <p>因为不同任务的核心约束不同：有的要继承登录态，有的要零痕迹，有的要稳定身份。BrowserAct 把这三类情况显式拆开了。</p>
+          <ul>
+            <li>避免把所有任务塞进同一个浏览器配置。</li>
+            <li>减少“明明是身份问题却当成脚本问题”的误判。</li>
+            <li>让 Agent 能根据目标选模式，而不是盲跑。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">4</div>
+        <div class="section-title">
+          <h2>两层 Skills 架构：入口文件 + 实时运行内容</h2>
+          <p>这部分最关键：它决定 Agent 何时“知道 BrowserAct 存在”，以及何时“拿到当前版本规则”。</p>
+        </div>
+      </div>
+      <div class="method-grid">
+        <article class="method-card" data-accent="orange">
+          <div class="method-body">
+            <div class="method-top"><h3>Entry Skill</h3><span class="method-no">A</span></div>
+            <span class="type-label theory">理论</span>
+            <p class="method-theory">安装到 Skills 目录的轻量文件，作用不是教所有细节，而是触发 Agent 对 BrowserAct 的识别与路由。</p>
+            <span class="type-label use">常见用途</span>
+            <p class="method-use"><strong>场景：</strong>首次安装、技能发现、让 Agent 进入 BrowserAct 生态的第一跳。</p>
+          </div>
+        </article>
+        <article class="method-card" data-accent="purple">
+          <div class="method-body">
+            <div class="method-top"><h3>get-skills core</h3><span class="method-no">B</span></div>
+            <span class="type-label theory">理论</span>
+            <p class="method-theory">第一次运行要拉取核心工作流、环境状态、浏览器列表和命令参考。它是实时规则的最小入口。</p>
+            <span class="type-label use">常见用途</span>
+            <p class="method-use"><strong>场景：</strong>初始化、浏览器选择、检查 API Key / 环境状态、开始工作前的标准动作。</p>
+          </div>
+        </article>
+        <article class="method-card" data-accent="teal">
+          <div class="method-body">
+            <div class="method-top"><h3>get-skills advanced / main</h3><span class="method-no">C</span></div>
+            <span class="type-label theory">理论</span>
+            <p class="method-theory">进阶内容按需加载，不一口气塞进来。版本不匹配时再切到 main，减少不必要的噪音和心智负担。</p>
+            <span class="type-label use">常见用途</span>
+            <p class="method-use"><strong>场景：</strong>代理、Profile、隐私模式、版本兼容问题、自更新场景。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">5</div>
+        <div class="section-title">
+          <h2>兼容面和使用边界：它是运行层，不是万能脚本框架</h2>
+          <p>README 列出的兼容对象很多，但真正重要的是：每个 agent 只需要会读 Skills、会跑 shell、会解析文本。</p>
+        </div>
+      </div>
+      <div class="scene-grid">
+        <article class="scene-card" data-accent="blue">
+          <div class="scene-top">
+            <h3>兼容的 agent 面</h3>
+            <p>Claude Code、GitHub Copilot、Cursor、Windsurf、Gemini CLI、OpenCode、Codex 等，只要能执行命令和读取 Skills 就能接入。</p>
+          </div>
+        </article>
+        <article class="scene-card" data-accent="green">
+          <div class="scene-top">
+            <h3>并发的真正价值</h3>
+            <p>它强调的是“互不串线”的多任务运行，而不是让所有任务挤在一个会话里硬跑。</p>
+          </div>
+        </article>
+        <article class="scene-card" data-accent="orange">
+          <div class="scene-top">
+            <h3>确认门槛</h3>
+            <p>敏感操作仍然要用户明确确认。历史授权不自动继承，这一点是安全边界，不是默认便利功能。</p>
+          </div>
+        </article>
+        <article class="scene-card" data-accent="purple">
+          <div class="scene-top">
+            <h3>最适合的任务</h3>
+            <p>账号运营、受保护页面、人工接管型流程、稳定批量浏览、需要浏览器状态复用的 AI 自动化工作流。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">6</div>
+        <div class="section-title">
+          <h2>安装与起步：先装 entry skill，再跑 get-skills core</h2>
+          <p>这是一套“先识别、再加载、再执行”的顺序，而不是直接上手乱点。</p>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>最小使用顺序</h3>
+        <div class="codebox"><pre>1. 安装 browser-act entry skill
+2. 让 Agent 运行：browser-act get-skills core --skill-version &lt;version&gt;
+3. 根据返回的 browser list / directives 选择浏览器
+4. 需要时再加载 advanced 或 main
+5. 执行操作后关闭 session，更新 desc</pre></div>
+        <ul>
+          <li>README 明确把 <strong>get-skills</strong> 放在第一步，而不是先写死一堆流程。</li>
+          <li>如果你只需要大多数场景，core 就够了；进阶能力按需加载。</li>
+          <li>这让 BrowserAct 更像“能力分发层”，而不是“命令堆栈”。</li>
+        </ul>
+      </div>
+      <div class="callout">
+        一句话收束：<strong>BrowserAct Skills 的本质，是把浏览器从“人手点网页”的工具，变成“AI Agent 可以按身份、按模式、按边界调用的运行时”。</strong>
+        <small>这也是它比普通浏览器自动化脚本更值得关注的地方：不是多了一个命令，而是多了一层面向 Agent 的组织方式。</small>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">7</div>
+        <div class="section-title">
+          <h2>来源与核查</h2>
+          <p>这张卡只用仓库公开 README / docs 叙述，不把 star 数当核心事实。</p>
+        </div>
+      </div>
+      <div class="footer-block">
+        <div class="footer-grid">
+          <div class="mini">
+            <h4>仓库</h4>
+            <p><a href="https://github.com/browser-act/skills" target="_blank" rel="noreferrer">https://github.com/browser-act/skills</a></p>
+          </div>
+          <div class="mini">
+            <h4>README</h4>
+            <p><a href="https://raw.githubusercontent.com/browser-act/skills/main/README.md" target="_blank" rel="noreferrer">raw.githubusercontent.com/browser-act/skills/main/README.md</a></p>
+          </div>
+          <div class="mini">
+            <h4>Skills 文档</h4>
+            <p><a href="https://raw.githubusercontent.com/browser-act/skills/main/docs/skills.md" target="_blank" rel="noreferrer">docs/skills.md</a></p>
+          </div>
+        </div>
+        <p class="source-note">▲ 本卡生成时间：2026-06-08 14:21:59 +08:00 · Q 风格技术分享卡 · 浏览器自动化 / Skills / Agent 主题</p>
+      </div>
+    </section>
+  </div>
+
+  <button id="save-btn" class="save-btn" onclick="saveCard()">保存 PNG</button>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+    async function saveCard() {
+      const btn = document.getElementById('save-btn');
+      const old = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '生成中…';
+      try {
+        if (!window.html2canvas) { alert('导出组件未加载'); return; }
+        const card = document.getElementById('capture');
+        const canvas = await html2canvas(card, {
+          scale: 2,
+          backgroundColor: '#f8efd9',
+          useCORS: true,
+          scrollY: -window.scrollY,
+          windowWidth: document.documentElement.scrollWidth,
+          windowHeight: card.scrollHeight
+        });
+        const a = document.createElement('a');
+        a.download = '20260609-browser-act-skills.png';
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      } catch (err) {
+        console.error(err);
+        alert('PNG 导出失败，请查看控制台');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    }
+  </script>
+</body>
+</html>
