@@ -46,14 +46,33 @@ tags:
 | `/investigation/` | 调查报道 |
 | `/trends/` | 趋势、舆情 |
 
+## 发布前必读：信息泄露检查
+
+每次发布新信息卡之前，**必须**先运行：
+
+```bash
+npm run check-leak
+```
+
+如果输出 `🚨` 或 `❗` 标记（CRITICAL / HIGH），**必须处理后才能发布**。MEDIUM 级别为建议审查，不阻断。
+
+如需只检查本次新增的文件：
+
+```bash
+node scripts/check-info-leak.js docs/20260608-your-slug.html
+```
+
+---
+
 ## 工作流
 
 1. Agent 生成信息卡 HTML / `report.md`
-2. Agent 同步创建 `index.html.meta.yaml`
-3. 运行 `npm run build`，生成 `_index.yaml` 并把同一份索引数据注入根目录 `index.html`
-4. `git push` 到 `main`（不要手动编辑 `_index.yaml` 和首页注入数据）
-5. workflow 只校验产物是否已按本地构建规则更新，不再代为创建或回写
-6. 部署后 workflow 会对线上 `/_index.yaml` 做 smoke test，确认首页 list 已包含最新结果
+2. **运行 `npm run check-leak`** ← 新增：信息泄露扫描
+3. Agent 同步创建 `index.html.meta.yaml`
+4. 运行 `npm run build`，生成 `_index.yaml` 并把同一份索引数据注入根目录 `index.html`
+5. `git push` 到 `main`（不要手动编辑 `_index.yaml` 和首页注入数据）
+6. workflow 只校验产物是否已按本地构建规则更新，不再代为创建或回写
+7. 部署完成后 workflow 会对线上 `/_index.yaml` 做 smoke test，确认首页 list 已包含最新结果
 
 ## 防漏发布机制
 
