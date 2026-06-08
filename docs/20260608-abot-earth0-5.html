@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ABot-Earth0.5：一图生城，把地图变成可生成的 3D 世界引擎</title>
+  <style>
+    :root{
+      --canvas:#f7f2e8; --paper:#fffdf8; --ink:#0c1220; --line:#111111;
+      --purple:#6e3fd6; --green:#2e9b4b; --blue:#2e6be6; --orange:#f59e0b; --yellow:#f5d46b;
+      --soft-purple:#f2ecff; --soft-green:#eefbf1; --soft-blue:#eef4ff; --soft-orange:#fff4e6;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:
+        linear-gradient(rgba(17,17,17,.04) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(110,63,214,.06) 0 11%, transparent 12%),
+        radial-gradient(circle at 86% 10%, rgba(46,155,75,.05) 0 10%, transparent 11%),
+        linear-gradient(180deg,#faf4e9 0,#f7f2e8 100%);
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1180px, calc(100% - 20px));margin:0 auto;padding:18px 0 96px}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(0,1.16fr) minmax(0,.78fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:180px;background:var(--purple)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:150px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--purple);font-size:10px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.7vw,44px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:#4d5567;font-size:12.5px;line-height:1.55}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.6px;font-weight:850}
+    .badge.purple{background:var(--purple);color:#fff}
+    .badge.green{background:var(--green);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.orange{background:var(--orange);color:#111}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px;box-shadow:var(--shadow)}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.62;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11px;font-weight:850;line-height:1;background:#111;color:#fff}
+
+    .gateway-column{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f1320 0%,#151a2b 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .img-card{border:2px solid var(--line);background:#fff;padding:10px;display:grid;gap:8px;box-shadow:var(--shadow)}
+    .img-card .cap{font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#5d6472}
+    .img-card img{width:100%;height:auto;border:1.5px solid var(--line);background:#fff}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative;box-shadow:4px 4px 0 rgba(17,17,17,.08)}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#5d6472;font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.purple .c{color:var(--purple)}
+    .flow-item.green .c{color:var(--green)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.orange .c{color:var(--orange)}
+
+    .summary-rail{background:#111;color:#fff;display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+    .summary-head{padding:14px;border-bottom:3px solid #0c0c0c;background:linear-gradient(180deg,#141414,#111)}
+    .summary-head h3{font-size:20px;line-height:1.08;letter-spacing:-.04em;margin:0 0 6px}
+    .summary-head p{margin:0;color:#e8e0d3;font-size:12.8px;line-height:1.6}
+    .summary-body{padding:14px;display:grid;gap:10px;background:#151515}
+    .summary-card{border:1.5px solid rgba(255,255,255,.14);background:#1a1a1a;padding:12px;display:grid;gap:6px}
+    .summary-card .t{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7}
+    .summary-card .t::before{content:"■";color:var(--purple)}
+    .summary-card p{margin:0;color:#ece8dc;font-size:12.6px;line-height:1.62}
+    .summary-card.purple .t::before{color:var(--purple)}
+    .summary-card.green .t::before{color:var(--green)}
+    .summary-card.blue .t::before{color:var(--blue)}
+    .summary-card.orange .t::before{color:var(--orange)}
+    .github{border:2px solid #fff;background:#fff;color:#111;padding:12px;display:grid;gap:8px}
+    .github .small{font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#666}
+    .github .num{font-size:30px;line-height:1;font-weight:950;letter-spacing:-.04em;color:var(--purple)}
+
+    .stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:14px}
+    .stat{border:2px solid var(--line);background:#fff;padding:12px;box-shadow:var(--shadow)}
+    .stat .k{font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#666}
+    .stat .v{margin-top:6px;font-size:18px;line-height:1.08;font-weight:950;letter-spacing:-.03em}
+    .stat .d{margin-top:4px;font-size:12px;line-height:1.5;color:#5d6472}
+
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--purple);color:#fff;font-size:34px;font-weight:950;line-height:1;box-shadow:var(--shadow)}
+    .section-no.b{background:var(--blue)}
+    .section-no.g{background:var(--green)}
+    .section-no.o{background:var(--orange);color:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--purple);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.g{color:var(--green)}
+    .section-meta .label.o{color:var(--orange)}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:#5d6472;font-size:14px;line-height:1.62;max-width:980px}
+
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0;box-shadow:var(--shadow)}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.6px;font-weight:850;line-height:1}
+    .tag.purple{background:var(--soft-purple);border-color:var(--purple);color:var(--purple)}
+    .tag.green{background:var(--soft-green);border-color:var(--green);color:var(--green)}
+    .tag.blue{background:var(--soft-blue);border-color:var(--blue);color:var(--blue)}
+    .tag.orange{background:var(--soft-orange);border-color:var(--orange);color:#8c5200}
+    .tag.dark{background:#111;color:#fff}
+
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:#5d6472;font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .quote-line{border-left:4px solid var(--purple);padding-left:10px;font-weight:900;line-height:1.58}
+
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="purple"]{--accent:var(--purple)}
+    .risk[data-accent="green"]{--accent:var(--green)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="orange"]{--accent:var(--orange)}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72;box-shadow:var(--shadow)}
+    .code-box{border:2px solid var(--line);background:#111;color:#e8e8e8;padding:14px;overflow-x:auto;box-shadow:var(--shadow)}
+    .code-box .cap{font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#8c8c8c;margin-bottom:8px}
+    .code-box pre{margin:0;font-size:12.4px;line-height:1.7;white-space:pre-wrap}
+    .note-yellow{border:2px solid var(--line);background:var(--yellow);padding:12px 14px;position:relative;box-shadow:var(--shadow)}
+    .note-yellow::before{content:"";position:absolute;right:16px;top:-10px;width:18px;height:18px;border-radius:50%;background:#c81e2c;box-shadow:0 2px 0 rgba(0,0,0,.18)}
+    .note-yellow strong{display:block;font-size:14px;line-height:1.35;margin-bottom:4px}
+    .note-yellow p{margin:0;font-size:13px;line-height:1.62}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:#5d6472;font-size:12.5px;line-height:1.62}
+
+    .save-fab{position:fixed;right:18px;bottom:18px;z-index:999;border:2px solid var(--line);background:linear-gradient(135deg,var(--purple),#4e2cbc);color:#fff;padding:12px 14px 12px 12px;box-shadow:var(--shadow);font:900 13px/1.05 Inter,system-ui,sans-serif;letter-spacing:.04em;cursor:pointer;display:inline-flex;align-items:center;gap:10px}
+    .save-fab:hover{transform:translateY(-1px)}
+    .save-fab .icon{display:grid;place-items:center;flex:0 0 auto;width:30px;height:30px;border:2px solid rgba(255,255,255,.92);background:rgba(0,0,0,.1);font-size:15px;line-height:1}
+    .save-fab .txt{display:grid;gap:3px;min-width:0;text-align:left}
+    .save-fab strong{display:block;font-size:13px;line-height:1.05;letter-spacing:.05em}
+    .save-fab small{display:block;font-size:10px;line-height:1.05;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.92)}
+
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .summary-rail{border-top:3px solid #0c0c0c}
+      .stats,.grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 72px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .stats,.grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block,.note-yellow,.code-box{padding-left:12px;padding-right:12px}
+      .save-fab{right:12px;bottom:12px;padding:10px 12px}
+      .save-fab .icon{width:26px;height:26px}
+      .save-fab strong{font-size:12px}
+      .save-fab small{font-size:9px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+  <header class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-copy">
+      <div class="kicker">高德 · ABOT-EARTH 0.5</div>
+      <h1 class="demo-title">ABot-Earth0.5：把地图从查询工具推向一图生城的 3D 世界引擎</h1>
+      <p class="subtitle">高德把“航拍采集 → 点云处理 → 机器拼接 → 人工精修”的手工作坊，改写成“卫星图 / 文本 → 3DGS → 消费级 GPU → 引擎接入”的生成管线。用户一句话或一张图，10 分钟左右就能得到公里级 3D 城市场景。</p>
+      <div class="badge-row">
+        <span class="badge purple">3D Native</span>
+        <span class="badge green">Satellite / Text</span>
+        <span class="badge blue">3DGS Export</span>
+        <span class="badge orange">UE / Unity</span>
+      </div>
+      <div class="badge-row">
+        <span class="badge dark">开放内测</span>
+        <span class="badge ink">10 min</span>
+        <span class="badge ink">190+ 国家和地区</span>
+        <span class="badge ink">1000x 提效</span>
+        <span class="badge ink">1% 成本</span>
+      </div>
+      <div class="alert">
+        <strong>一句话判断：它不是把地图做得更炫，而是把地图从“查找工具”升级成“生成式空间底座”。</strong>
+        <p>从官方表述、媒体翻译到技术报告，最稳定的一条线是：3D 原生训练 + 3DGS 输出 + 滑窗连续生成，把原本依赖航拍、拼接与人工精修的流程压缩到分钟级。</p>
+        <div class="mini-row">
+          <span class="mini-tag">1 张卫星图</span>
+          <span class="mini-tag">1 段文字</span>
+          <span class="mini-tag">1 块消费级 GPU</span>
+          <span class="mini-tag">公里级连续场景</span>
+        </div>
+      </div>
+    </div>
+
+    <section class="gateway-column">
+      <div class="panel-top">
+        <div class="eyebrow">ABOT-EARTH STUDIO</div>
+        <h3>即刻生成你的星球</h3>
+        <p>官方首页把产品讲得很直白：从一个地球出发，生成、漫游、定制真实级三维空间。它的视觉策略和产品定位都很一致。</p>
+      </div>
+      <div class="panel-body">
+        <div class="quote"><b>核心价值：</b>把地图从“理解现实世界”推进到“重建现实世界”。</div>
+        <div class="img-card">
+          <div class="cap">REFERENCE IMAGE · OFFICIAL LANDING PAGE</div>
+          <img src="assets/images/20260608-abot-earth-0-5/hero-compare.png" alt="ABot-Earth Studio landing page" />
+        </div>
+        <div class="img-card">
+          <div class="cap">REFERENCE IMAGE · PRODUCT POSTER</div>
+          <img src="assets/images/20260608-abot-earth-0-5/hero-output.png" alt="ABot-Earth 0.5 product poster" />
+        </div>
+        <div class="flow">
+          <div class="flow-item purple"><div class="t">Input</div><div class="c">卫星图像 / 文字描述</div></div>
+          <div class="flow-item green"><div class="t">Core model</div><div class="c">3D 原生训练 / 3DGS 压缩-生成</div></div>
+          <div class="flow-item blue"><div class="t">Inference</div><div class="c">滑窗推理 + 重叠融合</div></div>
+          <div class="flow-item orange"><div class="t">Output</div><div class="c">公里级城市场景 · UE / Unity 接入</div></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="summary-rail">
+      <div class="summary-head">
+        <h3>把世界变成可编辑的空间</h3>
+        <p>右侧摘要栏压住“官方怎么说 / 媒体怎么翻译 / 容易被怎么误读 / 当前边界在哪”。</p>
+      </div>
+      <div class="summary-body">
+        <article class="summary-card purple">
+          <div class="t">官方表述</div>
+          <p>全球首个 3D 原生城市世界模型，覆盖 190+ 国家和地区，支持开放内测。</p>
+        </article>
+        <article class="summary-card green">
+          <div class="t">媒体翻译</div>
+          <p>单图或文字输入，10 分钟左右生成公里级 3D 城市场景，效率与成本都被重写。</p>
+        </article>
+        <article class="summary-card blue">
+          <div class="t">常见误读</div>
+          <p>它不是“通用宇宙生成器”，而是工程可用的 3D 城市生成与交互底座，边界仍然重要。</p>
+        </article>
+        <article class="summary-card orange">
+          <div class="t">当前边界</div>
+          <p>开放内测、消费级 GPU、3DGS 导出、引擎接入，强的是生成管线，不是无限泛化。</p>
+        </article>
+        <div class="github">
+          <div class="small">Official access</div>
+          <div class="num">10 min</div>
+          <div style="font-size:12.4px;line-height:1.55">输入一图 / 一句 → 3D 原生世界模型 → 190+ 国家和地区 · 开放内测</div>
+        </div>
+      </div>
+    </aside>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Generation Time</div><div class="v">10 min</div><div class="d">分钟级出图</div></div>
+    <div class="stat"><div class="k">Coverage</div><div class="v">190+</div><div class="d">国家和地区</div></div>
+    <div class="stat"><div class="k">Output</div><div class="v">3DGS</div><div class="d">可编辑素材</div></div>
+    <div class="stat"><div class="k">Efficiency</div><div class="v">1000x</div><div class="d">相对传统方式</div></div>
+    <div class="stat"><div class="k">Cost</div><div class="v">1%</div><div class="d">制图成本压缩</div></div>
+  </div>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">CORE POSITIONING</div>
+        <h2>它到底是什么：3D 原生城市世界模型，而不是普通地图升级</h2>
+        <p>官方与媒体都在强调一个共同点：ABot-Earth0.5 把“城市 3D 生成”从采集、拼接、精修的重资产流程，变成可在消费级 GPU 上直接跑的生成管线。</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <article class="card">
+        <div class="tagrow"><span class="tag purple">官方</span><span class="tag dark">3D 原生</span></div>
+        <h3>直接面向 3D 数据训练</h3>
+        <p>核心不是把 2D 图像蒸馏成 3D，而是直接建立对三维空间的原生理解，再端到端生成 3DGS 城市场景。</p>
+        <ul><li>训练数据直接面向 3DGS</li><li>减少 2D 蒸馏损失</li><li>生成结果更一致</li></ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag green">产品</span><span class="tag dark">世界模型</span></div>
+        <h3>地图开始变成“可生成”的底座</h3>
+        <p>用户不再只是查地图，而是把地图作为空间生产系统：输入、生成、漫游、编辑、再导入引擎。</p>
+        <ul><li>生成真实级城市场景</li><li>支持自由互动</li><li>支持沉浸漫游</li></ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">结果</span><span class="tag orange">工程可用</span></div>
+        <h3>从“想法停在 PPT”到“可快速试跑”</h3>
+        <p>游戏、影视、虚拟城市、低空、机器人训练，很多原本要靠长期建模与人工修正的环节，被压到分钟级。</p>
+        <ul><li>更低制作门槛</li><li>更快试错</li><li>更适合原型验证</li></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">02</div>
+      <div class="section-meta">
+        <div class="label b">EVIDENCE & PIPELINE</div>
+        <h2>两张官方图 + 一条生成管线，足够解释它在做什么</h2>
+        <p>第一张图是 ABot-Earth Studio 的官网首页，第二张是高德发布海报。它们共同指向：一图生城，且要可交互、可漫游、可接入引擎。</p>
+      </div>
+    </div>
+    <div class="grid-2" style="grid-template-columns: calc(50% - 6px) calc(50% - 6px) !important;">
+      <article class="card">
+        <div class="tagrow"><span class="tag purple">官网首页</span><span class="tag dark">ABot-Earth Studio</span></div>
+        <img src="assets/images/20260608-abot-earth-0-5/hero-compare.png" alt="ABot-Earth Studio landing page" style="width:100%;height:auto;border:2px solid var(--line);display:block" />
+        <p style="margin-top:10px">主视觉就是一颗“你可以生成的星球”，按钮入口直接写着登录 / 申请内测，说明它不是概念海报而是可进入的平台。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag green">发布海报</span><span class="tag dark">AI 直出 / 沉浸漫游</span></div>
+        <img src="assets/images/20260608-abot-earth-0-5/hero-output.png" alt="ABot-Earth 0.5 product poster" style="width:100%;height:auto;border:2px solid var(--line);display:block" />
+        <p style="margin-top:10px">官方海报把卖点压成四件事：全球覆盖、单图生成、分钟级提效、UE / Unity 接入，读起来就是产品能力矩阵。</p>
+      </article>
+    </div>
+    <div class="code-box" style="margin-top:12px">
+      <div class="cap">Pipeline / input → model → output</div>
+      <pre>卫星图像 / 文字描述
+  → 3D 原生理解
+  → 3DGS 压缩-生成框架
+  → 滑窗推理 / 重叠融合
+  → 公里级连续城市场景
+  → UE / Unity / 仿真训练 / 交互开发</pre>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no g">03</div>
+      <div class="section-meta">
+        <div class="label g">TECHNICAL MECHANISMS</div>
+        <h2>四个技术点：为什么它能把 3D 城市生成压到分钟级</h2>
+        <p>这部分是技术报告的真正重点：不是“能生成”，而是如何在数据表征、推理与跨域适配上把可用性做出来。</p>
+      </div>
+    </div>
+    <div class="matrix">
+      <article class="mini">
+        <div class="lead purple">Framework</div>
+        <h4>直接面向 3DGS 点云的压缩-生成框架</h4>
+        <p class="quote-line">把数百万基元的真实场景压进紧凑隐空间，再从中生出新场景。</p>
+        <p>解决 3DGS 无序性，让大体量 3D 数据可以被模型“阅读”。</p>
+      </article>
+      <article class="mini">
+        <div class="lead green">Inference</div>
+        <h4>滑窗推理 + 重叠融合</h4>
+        <p class="quote-line">公里级广域连续构建，不靠一次性硬算整张大图。</p>
+        <p>分块生成、智能融合，保证连续性和空间一致性。</p>
+      </article>
+      <article class="mini">
+        <div class="lead blue">Adaptation</div>
+        <h4>跨域自适应模块</h4>
+        <p class="quote-line">弥合卫星影像与训练数据之间的域差异。</p>
+        <p>让卫星图也能稳定转成真实可用的三维结构。</p>
+      </article>
+      <article class="mini">
+        <div class="lead">Decoder</div>
+        <h4>多层次细节解码器</h4>
+        <p class="quote-line">远景和近景都有景深，场景不会只剩粗糙轮廓。</p>
+        <p>让输出具备可漫游、可交互、可进一步编辑的基础。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no o">04</div>
+      <div class="section-meta">
+        <div class="label o">SCENARIO MAP</div>
+        <h2>它会落到哪里：官方已说的场景 + 用户可想象的扩展</h2>
+        <p>把“官方已经明确的落地方向”和“用户自然会联想到的延展场景”分开写，卡片会更诚实，也更好用。</p>
+      </div>
+    </div>
+    <div class="grid-4">
+      <article class="card" style="background:var(--soft-purple)">
+        <div class="tagrow"><span class="tag purple">官方已说</span></div>
+        <h3>具身智能 / 机器人训练</h3>
+        <p>把训练场景的构建时间压缩到分钟级，填补开放环境训练数据空白。</p>
+      </article>
+      <article class="card" style="background:var(--soft-green)">
+        <div class="tagrow"><span class="tag green">官方已说</span></div>
+        <h3>低空经济 / 特种区域</h3>
+        <p>通过卫星影像快速生成对应区域 3D 地形，补足传统测绘盲区。</p>
+      </article>
+      <article class="card" style="background:var(--soft-blue)">
+        <div class="tagrow"><span class="tag blue">官方已说</span></div>
+        <h3>影视 / 游戏</h3>
+        <p>把城市 3D 场景从建模师手工制作变成 AI 直出，创意资源从建模转向内容本身。</p>
+      </article>
+      <article class="card" style="background:var(--soft-orange)">
+        <div class="tagrow"><span class="tag orange">用户延展</span></div>
+        <h3>虚拟城市 / 数字旅游</h3>
+        <p>用户会自然想到熟悉街区重建、城市漫游、沉浸式旅游等体验，但这些更像能力延展，不要写成已全部落地。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">05</div>
+      <div class="section-meta">
+        <div class="label b">FOUR-CORNER CHECK</div>
+        <h2>官方表述 / 媒体翻译 / 常见误读 / 当前边界</h2>
+        <p>这四格可以压住概念神化，也能避免把“科幻感”误写成“无限能力”。</p>
+      </div>
+    </div>
+    <div class="grid-4">
+      <article class="card" style="background:#fff">
+        <div class="tagrow"><span class="tag purple">官方表述</span></div>
+        <h3>3D 原生城市世界模型</h3>
+        <p>直接以 3D 数据训练，输出 3DGS 格式场景，面向工程可用而不是只做概念演示。</p>
+      </article>
+      <article class="card" style="background:#fff">
+        <div class="tagrow"><span class="tag green">媒体翻译</span></div>
+        <h3>10 分钟一图生城</h3>
+        <p>一句话或一张图，就能在消费级 GPU 上生成公里级 3D 城市场景，效率被放大到“看起来像未来”。</p>
+      </article>
+      <article class="card" style="background:#fff">
+        <div class="tagrow"><span class="tag blue">常见误读</span></div>
+        <h3>不是“万能地球编辑器”</h3>
+        <p>它强在生成管线，不代表每一块地、每一种细节、每一个行业都已经无缝适配。</p>
+      </article>
+      <article class="card" style="background:#fff">
+        <div class="tagrow"><span class="tag orange">当前边界</span></div>
+        <h3>开放内测，工程可用</h3>
+        <p>现在最合理的读法是“可试跑、可验证、可接入”，而不是“已经把全球世界模型彻底做完”。</p>
+      </article>
+    </div>
+    <div class="note-yellow" style="margin-top:12px">
+      <strong>不要把“科幻感”写成“无限性”</strong>
+      <p>真正值得抓住的是：高德把地图从查询界面推向生成式世界引擎；而游戏、影视、虚拟城市、数字旅游这些想象，才是这条能力线的自然延展。</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">06</div>
+      <div class="section-meta">
+        <div class="label">FIT / NOT FIT</div>
+        <h2>适合谁，不适合谁，最后怎么记住它</h2>
+        <p>收口要给边界：这类能力最适合做平台、做原型、做展示、做训练；不适合被写成“什么都能做”。</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card" style="background:var(--soft-purple)">
+        <div class="tagrow"><span class="tag purple">适合</span><span class="tag dark">平台 / 产品团队</span></div>
+        <h3>需要快速验证三维空间能力的人</h3>
+        <p>如果你的任务是把城市空间、引擎接入、训练场景和演示流打通，这条线很有价值。</p>
+      </div>
+      <div class="card" style="background:var(--soft-orange)">
+        <div class="tagrow"><span class="tag orange">不适合</span><span class="tag dark">泛化幻想</span></div>
+        <h3>把它当成“通用世界万能生成器”</h3>
+        <p>它是一个强大的 3D 城市生成底座，但边界、数据密度、区域覆盖和后续编辑链路都仍然重要。</p>
+      </div>
+      <div class="card" style="background:var(--soft-blue)">
+        <div class="tagrow"><span class="tag blue">一句话结论</span></div>
+        <h3>地图从“查”变成“造”</h3>
+        <p>以前地图帮你理解现实世界，现在它开始帮你重建一个现实世界；这就是这次最强的传播点。</p>
+      </div>
+    </div>
+    <div class="quote-block" style="margin-top:12px">“以前地图帮你理解现实世界，现在它开始帮你重建一个现实世界。”</div>
+    <div class="source-note">Sources: https://abot-earth.amap.com/ · https://github.com/amap-cvlab/ABot-Earth-0.5/blob/main/tech-report.pdf · https://new.qq.com/rain/a/20260608A04V0N00</div>
+  </section>
+
+  <div class="rule"></div>
+  <p class="source-note">Published information card · ABot-Earth0.5 · theme: infocard-mcp-forge-style</p>
+</main>
+
+  <button class="save-fab" id="save-btn" type="button" aria-label="保存 PNG">
+    <span class="icon">⬇</span>
+    <span class="txt"><strong>保存 PNG</strong><small>Export image</small></span>
+  </button>
+
+  <script>
+    (function(){
+      const btn = document.getElementById('save-btn');
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const old = btn.querySelector('strong').textContent;
+        btn.querySelector('strong').textContent = '导出中...';
+        try {
+          if (!window.html2canvas) {
+            await new Promise((resolve, reject) => {
+              const s = document.createElement('script');
+              s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+              s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+            });
+          }
+          const node = document.querySelector('.page');
+          const canvas = await html2canvas(node, {backgroundColor: '#f7f2e8', scale: 2, useCORS: true, scrollY: -window.scrollY});
+          const a = document.createElement('a');
+          a.download = '20260608-abot-earth0-5.png';
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+          btn.querySelector('strong').textContent = '已导出';
+          setTimeout(() => btn.querySelector('strong').textContent = old, 1600);
+        } catch (e) {
+          console.error(e);
+          btn.querySelector('strong').textContent = '导出失败';
+          setTimeout(() => btn.querySelector('strong').textContent = old, 1600);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
