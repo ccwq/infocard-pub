@@ -55,6 +55,25 @@
 
 `overly polished` / `studio lighting` / `glamour shot` / `fashion editorial` / `plastic skin` / `airbrushed skin` / `fake smile` / `stiff pose` / `over-posed` / `cinematic poster` / `hyper-stylized` / `doll-like face`
 
+## 社媒采样结论
+
+### X 侧公开信号
+X 的公开搜索墙较强，稳定能抓到的多数是登录引导页；但它仍然给出稳定的方向：`photorealistic` / `candid` / `natural lighting` / `realistic skin texture` / `imperfect composition` 这一组词最常见，核心都在压低“AI味”。
+
+### 小红书高热标题信号
+- 「别再让AI图像塑料人了，3步调出真实照片感」— 16,431👍 / 9,068⭐
+- 「AI人物太假？三大提示词，让你AI视频更真实」— 24,647👍 / 13,102⭐
+
+### 扩充方向
+用户最关心的不是“词越多越好”，而是：
+- 怎么去掉塑料感
+- 怎么让人物像真实拍下来的
+- 怎么让光线、皮肤和背景更自然
+
+## 扩充版关键词池
+
+`realistic skin texture` / `subtle facial expression` / `natural lighting` / `imperfect composition` / `off-center framing` / `candid moment` / `natural shadows` / `soft contrast` / `background clutter` / `slight motion blur` / `film grain` / `environmental context`
+
 ## 最终推荐完整提示词
 
 `photorealistic candid snapshot, documentary-style realism, natural smartphone photo, unposed subject, natural expression, casual everyday moment, imperfect composition, available natural light, realistic skin texture, slight motion blur, subtle background clutter, authentic real-life atmosphere, not studio lighting, not overly polished, not fashion editorial, not artificial pose`
