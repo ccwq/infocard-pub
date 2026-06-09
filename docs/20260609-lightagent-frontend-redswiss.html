@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="LightAgent 前端集成模块：通过 OpenAI-compatible API、Stream 事件和 browser-use 兼容层，让 Web 前端无缝接入 AI Agent 能力，实现任务型对话、工作流编排和可观测输出。" />
+  <title>LightAgent 前端设计模块：OpenAI-compatible API 与 Web 前端集成</title>
+  <style>
+    :root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#0a0a0a;--red:#c8102e;--soft-red:#fff5f6;--line:#0a0a0a;--shadow:6px 6px 0 rgba(10,10,10,.10)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6}
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    /* TOPBAR */
+    .topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:8px;overflow:hidden}
+    .topbar-hero{padding:18px 18px 14px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+    .topbar-meta{padding:9px 14px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto auto;gap:0;align-content:start;background:#f6f1f1}
+    .meta-row-high{display:grid;grid-template-columns:1.4fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-low{display:grid;grid-template-columns:1.2fr 1fr 0.8fr;gap:5px}
+    .meta-pill-lg{border:2px solid var(--line);padding:7px 9px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1}
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-md{border:2px solid var(--line);border-left:4px solid var(--red);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25}
+    .meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+    .meta-pill-sm{border:2px solid var(--line);border-left:4px solid #666;padding:3px 7px 3px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3}
+    .meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+    h1.demo-title{margin:10px 0 6px;font-size:clamp(20px,3.2vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.05}
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+    /* STATS */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+    /* PILLS */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+    /* SECTION */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:10px 12px}
+    /* GRID */
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .card h4{font-size:13px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+    .card p{margin:0;font-size:12px;line-height:1.62;color:#333}
+    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+    /* CODE */
+    .code-block{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:10px 12px;margin-bottom:10px;overflow-x:auto}
+    .code-block .l{font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:6px}
+    .code-block pre{margin:0;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+    /* FLOW */
+    .flow{display:flex;align-items:center;margin-bottom:10px;box-shadow:var(--shadow)}
+    .flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+    /* TABLE */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+    th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    tr:nth-child(even) td{background:#faf8f4}
+    .check{color:var(--red);font-weight:900;font-size:13px}
+    .cross{color:var(--ink);font-weight:900;font-size:13px}
+    /* ALERT */
+    .alert{border:2px solid var(--red);background:var(--soft-red);padding:10px 12px;margin-bottom:10px}
+    .alert strong{color:var(--red);font-size:12.5px}
+    .alert p{margin:4px 0 0;font-size:12px;color:#333}
+    /* ROUTE LIST */
+    .route-list{border:2px solid var(--line);background:#fff;overflow:hidden}
+    .route-head{background:var(--ink);color:#fff;padding:6px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .route-row{display:grid;grid-template-columns:160px 1fr;border-bottom:1.5px solid var(--line)}
+    .route-row:last-child{border-bottom:none}
+    .route-row .route-key{padding:6px 10px;border-right:1.5px solid var(--line);font-weight:800;font-size:11.5px;background:#f7f4ee}
+    .route-row .route-val{padding:6px 10px;font-size:11.5px;color:#222;line-height:1.55}
+    .route-row .route-val code{background:var(--ink);color:#fff;padding:1px 5px;font-size:11px;font-weight:800}
+    /* SOURCE */
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+    .source-note a{color:var(--red);text-decoration:none;border-bottom:1px solid rgba(200,16,46,.35)}
+    /* BOTTOM */
+    .bottom-bar{border-top:3px solid var(--line);padding-top:10px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    @media(max-width:720px){.topbar{grid-template-columns:1fr}.topbar-meta{border-left:none;border-top:3px solid var(--line)}.grid-2,.grid-3{grid-template-columns:1fr}.route-list{font-size:11px}.route-row{grid-template-columns:1fr}.route-row .route-key{border-right:none;border-bottom:1.5px solid var(--line)}.page{padding:10px 0 60px}}
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">LightAgent · Frontend Module</div>
+      <h1 class="demo-title">LightAgent 前端设计模块<br>OpenAI-compatible API</h1>
+      <p class="sub-line">通过标准 API、Stream 事件和 browser-use 兼容层，让 Web 前端无缝接入 AI Agent 能力，实现任务型对话与工作流编排。</p>
+      <div class="tagline">OpenAI-compatible · Stream · Web 前端</div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">OpenAI<span class="sub">API 兼容</span></div>
+        <div class="meta-pill-lg">Stream<span class="sub">事件流</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">HTTP<span class="sub">REST</span></div>
+        <div class="meta-pill-md">SSE<span class="sub">实时</span></div>
+        <div class="meta-pill-sm">browser<span class="sub">use</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- STATS -->
+  <div class="stats" aria-label="key metrics">
+    <div class="stat"><strong>REST</strong><span>HTTP API</span></div>
+    <div class="stat"><strong>JSON</strong><span>结构化输出</span></div>
+    <div class="stat"><strong>SSE</strong><span>实时流</span></div>
+    <div class="stat"><strong>CORS</strong><span>跨域支持</span></div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill red">OpenAI API 兼容</span>
+    <span class="pill dark">Stream 事件</span>
+    <span class="pill soft">browser-use</span>
+    <span class="pill">前端集成</span>
+    <span class="pill">结构化输出</span>
+  </div>
+
+  <!-- SECTION 01: 核心定位 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <span class="label">Core Positioning</span>
+    </div>
+    <div class="sec-body">
+      <h4 style="color:var(--red);font-size:14px;margin-bottom:8px">一句话判断：LightAgent 前端模块是「标准 API + 事件流 + 浏览器兼容层」的三位一体接入方案</h4>
+      <p style="font-size:12.5px;line-height:1.68;margin-bottom:10px">LightAgent 的前端设计不是「另起一套协议」，而是完全对齐 OpenAI API 风格，让已有的前端代码几乎零改动接入 Agent 能力。核心价值在于把 Python Agent 框架的能力，通过 HTTP / SSE / browser-use 三种路径透传给 Web 前端。</p>
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">API 风格</div>
+          <h4>OpenAI-compatible</h4>
+          <p>base_url + model + api_key 对齐 OpenAI SDK，前端无需感知底层是哪个推理服务。</p>
+        </div>
+        <div class="card">
+          <div class="lead">通信方式</div>
+          <h4>HTTP + SSE</h4>
+          <p>同步请求走 HTTP，实时事件走 Server-Sent Events，两种模式按场景切换。</p>
+        </div>
+        <div class="card">
+          <div class="lead">浏览器兼容</div>
+          <h4>browser-use</h4>
+          <p>可选的浏览器自动化兼容层，支持网页截图、表单填写、元素操作等前端场景。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 02: 接入模式 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">02</span>
+      <span class="label">Integration Modes</span>
+    </div>
+    <div class="sec-body">
+      <h4 style="margin-bottom:10px">三种前端接入模式：选对路径，不做过度工程</h4>
+      <div class="route-list">
+        <div class="route-head">前端接入路径对比</div>
+        <div class="route-row">
+          <div class="route-key">OpenAI SDK</div>
+          <div class="route-val">最简路径：<code>pip install lightagent</code> 后直接用 OpenAI Python SDK 调用，base_url 指向 LightAgent 服务。适合已有前端零改动迁移。</div>
+        </div>
+        <div class="route-row">
+          <div class="route-key">HTTP REST</div>
+          <div class="route-val">手动构造 POST 请求，body 走 <code>model</code> / <code>messages</code> / <code>tools</code>，响应走 <code>result_format="object"</code>。适合需要精细控制请求参数的场景。</div>
+        </div>
+        <div class="route-row">
+          <div class="route-key">SSE 事件流</div>
+          <div class="route-val">通过 <code>stream=True</code> 开启 Server-Sent Events，实时推送工具调用、推理步骤和最终结果。适合聊天界面和长任务追踪。</div>
+        </div>
+        <div class="route-row">
+          <div class="route-key">browser-use</div>
+          <div class="route-val">可选兼容层：需要 <code>provider</code> helper，适配浏览器自动化场景。适合需要操作真实网页的前端任务。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 03: API 契约 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">03</span>
+      <span class="label">API Contract</span>
+    </div>
+    <div class="sec-body">
+      <h4 style="margin-bottom:10px">关键 API 参数与返回值</h4>
+      <table>
+        <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+        <tr><td style="font-weight:800">model</td><td>string</td><td>模型标识符，对齐 OpenAI API 风格</td></tr>
+        <tr><td style="font-weight:800">api_key</td><td>string</td><td>认证密钥，支持任意 OpenAI-compatible provider</td></tr>
+        <tr><td style="font-weight:800">base_url</td><td>string</td><td>指向 LightAgent 服务地址</td></tr>
+        <tr><td style="font-weight:800">tools</td><td>array</td><td>工具列表，支持 Python function 或 MCP</td></tr>
+        <tr><td style="font-weight:800">result_format</td><td>string</td><td>"string"（默认）或 "object"（结构化）</td></tr>
+        <tr><td style="font-weight:800">trace</td><td>bool</td><td>可选，开启结构化可观测输出</td></tr>
+        <tr><td style="font-weight:800">stream</td><td>bool</td><td>可选，开启 SSE 实时流</td></tr>
+      </table>
+      <div class="code-block">
+        <div class="l">// 前端接入示例（OpenAI SDK 风格）</div>
+        <pre>from openai import OpenAI
+
+client = OpenAI(
+    api_key="your_api_key",
+    base_url="http://localhost:8000"  # LightAgent 服务地址
+)
+
+# 基础对话
+response = client.chat.completions.create(
+    model="gpt-4.1",
+    messages=[{"role": "user", "content": "Check weather in Shanghai"}]
+)
+print(response.choices[0].message.content)
+
+# 结构化输出
+result = agent.run(
+    "Analyze this code",
+    result_format="object",
+    trace=True
+)
+print(result.content)
+print(result.trace_id)</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 04: 输出格式 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="label">Output Formats</span>
+    </div>
+    <div class="sec-body">
+      <h4 style="margin-bottom:10px">三种输出格式：按需选型，不做过度设计</h4>
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">STRING</div>
+          <h4>默认字符串</h4>
+          <p>最简单场景：直接返回 LLM 生成的文本字符串，前端渲染即可。</p>
+        </div>
+        <div class="card">
+          <div class="lead">OBJECT</div>
+          <h4>结构化对象</h4>
+          <p>result_format="object" 返回 {content, trace_id, metadata}，适合需要解析工具调用结果的场景。</p>
+        </div>
+        <div class="card">
+          <div class="lead">STREAM</div>
+          <h4>SSE 事件流</h4>
+          <p>stream=True 实时推送中间步骤，适合需要展示推理过程的长任务界面。</p>
+        </div>
+      </div>
+      <div class="alert">
+        <strong>输出选型建议</strong>
+        <p>一般对话 → 默认字符串；需要解析工具结果 → 结构化对象；需要实时反馈 → SSE 事件流。不要混用，过度设计会增加前端复杂度。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 05: 边界与风险 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">05</span>
+      <span class="label">Boundaries & Risks</span>
+    </div>
+    <div class="sec-body">
+      <h4 style="margin-bottom:10px">前端集成的边界与风险清单</h4>
+      <div class="prob-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px">
+        <div class="card">
+          <div class="lead">CORS 跨域</div>
+          <h4>跨域请求配置</h4>
+          <p>生产环境需要正确配置 CORS 头，避免前端请求被浏览器拦截。开发阶段可用代理转发。</p>
+        </div>
+        <div class="card">
+          <div class="lead">流式输出</div>
+          <h4>SSE 兼容性</h4>
+          <p>SSE 在部分 CDN 或 API Gateway 环境下可能被改写，需要确保端到端支持 text/event-stream。</p>
+        </div>
+        <div class="card">
+          <div class="lead">认证安全</div>
+          <h4>API Key 管理</h4>
+          <p>不要在前端直接暴露 api_key，生产环境建议通过后端代理转发请求并做鉴权。</p>
+        </div>
+        <div class="card">
+          <div class="lead">浏览器兼容</div>
+          <h4>browser-use 适配</h4>
+          <p>browser-use 依赖外部服务，部分版本需要 provider helper，不是开箱即用。</p>
+        </div>
+      </div>
+      <table>
+        <tr><th>场景</th><th>推荐方案</th><th>风险提示</th></tr>
+        <tr><td style="font-weight:800">通用对话</td><td>默认字符串 + HTTP</td><td>最低风险，开箱即用</td></tr>
+        <tr><td style="font-weight:800">工具调用</td><td>结构化对象 + tools</td><td>需要后端代理做鉴权</td></tr>
+        <tr><td style="font-weight:800">实时界面</td><td>SSE 事件流</td><td>确认网络路径支持 SSE</td></tr>
+        <tr><td style="font-weight:800">网页自动化</td><td>browser-use</td><td>依赖外部服务，非标准路径</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECTION 06: 快速上手 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">06</span>
+      <span class="label">Quick Start</span>
+    </div>
+    <div class="sec-body">
+      <h4 style="margin-bottom:10px">前端接入三步走：安装 → 配置 → 调用</h4>
+      <div class="flow">
+        <div class="flow-item">安装 LightAgent</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">配置 API 端点</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item red">前端调用</div>
+      </div>
+      <div class="code-block">
+        <div class="l">// Step 1: 安装</div>
+        <pre>pip install lightagent
+# 或带可选依赖
+pip install "lightagent[mem0,tracing]"</pre>
+      </div>
+      <div class="code-block">
+        <div class="l">// Step 2: 启动服务（示例）</div>
+        <pre># 使用任意 OpenAI-compatible 端点
+python -m lightagent.server \
+  --model gpt-4.1 \
+  --base-url https://api.openai.com/v1 \
+  --api-key $OPENAI_API_KEY</pre>
+      </div>
+      <div class="code-block">
+        <div class="l">// Step 3: 前端调用（JavaScript 示例）</div>
+        <pre>import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: 'your-key',
+  baseURL: 'http://localhost:8000/v1'
+});
+
+const response = await client.chat.completions.create({
+  model: 'gpt-4.1',
+  messages: [{ role: 'user', content: 'Hello, who are you?' }]
+});
+
+console.log(response.choices[0].message.content);</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOURCE NOTE -->
+  <p class="source-note">LightAgent 前端设计模块信息卡 · redswiss 风格 · 来源：<a href="https://github.com/wanxingai/LightAgent" target="_blank" rel="noreferrer">github.com/wanxingai/LightAgent</a></p>
+
+</main>
+</body>
+</html>
