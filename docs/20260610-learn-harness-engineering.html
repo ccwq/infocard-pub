@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#f7f2e8" />
+<title>learn-harness-engineering：把 AI coding agent 的 harness 做成可安装技能</title>
+<meta name="description" content="learn-harness-engineering 把 harness engineering 拆成可复用技能：AGENTS/CLAUDE、状态文件、验证命令、作用域边界和 session handoff，并提供 scaffold、validate、benchmark 三类脚本。" />
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+:root{
+  --canvas:#f7f2e8;
+  --paper:#fffdf8;
+  --ink:#0c1220;
+  --line:#111111;
+  --purple:#6e3fd6;
+  --green:#2e9b4b;
+  --blue:#2e6be6;
+  --orange:#f59e0b;
+  --yellow:#f5d46b;
+  --soft-blue:#eef4ff;
+  --soft-green:#eefbf1;
+  --soft-orange:#fff4e6;
+  --soft-purple:#f2ecff;
+  --shadow: 7px 7px 0 rgba(17,17,17,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{
+  font-family:Inter,"IBM Plex Sans SC","Noto Sans SC","PingFang SC",system-ui,-apple-system,sans-serif;
+  color:var(--ink);
+  background:radial-gradient(circle at 16% 4%, rgba(110,63,214,.08), transparent 24%),
+             radial-gradient(circle at 84% 8%, rgba(46,155,75,.08), transparent 22%),
+             linear-gradient(0deg, rgba(17,17,17,.035) 1px, transparent 1px) 0 0/100% 42px,
+             linear-gradient(90deg, rgba(17,17,17,.035) 1px, transparent 1px) 0 0/42px 100%,
+             var(--canvas);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+a{color:inherit}
+img{display:block;max-width:100%}
+.page{width:min(1080px, calc(100% - 16px));margin:0 auto;padding:10px 0 92px}
+.card{background:var(--paper);border:3px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:0;background:linear-gradient(180deg,#fffdf8 0%,#fff9ef 100%);border-bottom:3px solid var(--line)}
+.hero-copy{padding:18px 18px 16px;display:grid;gap:12px}
+.kicker{display:inline-flex;align-items:center;gap:7px;width:fit-content;padding:5px 10px;border:2px solid var(--line);background:#fff;color:var(--purple);font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";font-size:9px}
+.title{font-size:clamp(28px,4.4vw,52px);line-height:.96;letter-spacing:-.06em}
+.subtitle{max-width:60ch;font-size:13px;line-height:1.62;color:#3c3a34}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;min-height:28px;padding:5px 10px;border:2px solid var(--line);border-radius:999px;background:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.05em;white-space:nowrap}
+.chip.purple{background:var(--soft-purple);color:var(--purple)}
+.chip.blue{background:var(--soft-blue);color:var(--blue)}
+.chip.green{background:var(--soft-green);color:var(--green)}
+.chip.orange{background:var(--soft-orange);color:#c96a00}
+.chip.dark{background:#111;color:#fff}
+.lead{border-left:4px solid var(--purple);background:#111;color:#fff;padding:12px 12px 11px;display:grid;gap:8px}
+.lead .t{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;color:#e7d8ff}
+.lead p{margin:0;font-size:12px;line-height:1.64;color:#eee7d8}
+.quickrow{display:flex;flex-wrap:wrap;gap:6px}
+.badge{display:inline-flex;align-items:center;min-height:24px;padding:4px 8px;border:1px solid var(--line);background:#fff;font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.badge.purple{background:#f3edff;color:var(--purple)}
+.badge.blue{background:#eef4ff;color:var(--blue)}
+.badge.green{background:#eefbf1;color:var(--green)}
+.badge.orange{background:#fff4e6;color:#c96a00}
+.badge.dark{background:#111;color:#fff}
+.hero-visual{background:linear-gradient(180deg,#131820 0%, #0c1220 100%);color:#efe7d8;border-left:3px solid var(--line);padding:14px;display:grid;gap:12px}
+.console{border:2px solid #111;background:linear-gradient(180deg,#171c26,#0b1020);color:#efe7d8;padding:12px;display:grid;gap:10px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+.console h3{font-size:18px;line-height:1.12;letter-spacing:-.04em;margin:0}
+.console p{font-size:12.5px;line-height:1.58;color:#ddd4c2;margin:0}
+.arch{border:2px solid #111;background:#fff;padding:10px}
+.arch svg{width:100%;height:auto;display:block}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 18px 18px;margin-top:14px}
+.stat{border:2px solid var(--line);background:#fff;padding:10px;min-width:0;box-shadow:none}
+.stat .k{font:900 9.5px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:#6a6a6a}
+.stat .v{margin-top:6px;font-size:17px;line-height:1.03;font-weight:950;letter-spacing:-.04em;color:var(--purple)}
+.stat .d{margin-top:5px;font-size:11px;line-height:1.45;color:#222;font-weight:600}
+.section{padding:18px 18px 0;border-top:2px solid var(--line)}
+.section-head{display:grid;grid-template-columns:88px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:88px;height:88px;border:2px solid var(--line);background:linear-gradient(180deg,var(--purple),#5630a5);color:#fff;font-size:28px;font-weight:950;line-height:1;box-shadow:4px 4px 0 rgba(17,17,17,.14)}
+.section-meta{display:grid;gap:8px;padding-top:4px}
+.section-meta .label{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--purple)}
+.section-meta h2{margin:0;font-size:clamp(22px,3.3vw,38px);line-height:1.03;letter-spacing:-.05em}
+.section-meta p{margin:0;max-width:1000px;font-size:14px;line-height:1.66;color:#4e4942}
+.warning{border-left:4px solid var(--orange);background:#111;color:#fff;padding:12px 12px 11px;display:grid;gap:8px;margin-bottom:12px}
+.warning .t{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase;color:#ffe4bb}
+.warning p{margin:0;font-size:12px;line-height:1.58;color:#eae1d2}
+.grid2,.grid3{display:grid;gap:10px}
+.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.box,.mini{border:2px solid var(--line);background:#fff;min-width:0;padding:14px;display:grid;gap:10px;box-shadow:none}
+.box.dark{background:#111;color:#fff}
+.box.blue{background:var(--soft-blue)}
+.box.green{background:var(--soft-green)}
+.box.orange{background:var(--soft-orange)}
+.box.purple{background:var(--soft-purple)}
+.box h3,.mini h4{margin:0;letter-spacing:-.03em}
+.box h3{font-size:16px;line-height:1.16}
+.mini h4{font-size:14px;line-height:1.16}
+.box p,.mini p,.box li,.mini li{font-size:13px;line-height:1.62;color:#23221f}
+.box.dark p,.box.dark li{color:#f1eadd}
+.box ul,.mini ul{margin:0;padding-left:18px}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;white-space:nowrap}
+.tag.purple{background:#f3edff;color:var(--purple)}
+.tag.blue{background:#eef4ff;color:var(--blue)}
+.tag.green{background:#eefbf1;color:var(--green)}
+.tag.orange{background:#fff4e6;color:#c96a00}
+.tag.dark{background:#111;color:#fff}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:8px 0;vertical-align:top;border-bottom:1px solid #ddd}
+.table th{font:900 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:#777;text-align:left}
+.table td:first-child{width:32%;font:900 10px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--purple);padding-right:10px}
+.table td{font-size:12.2px;line-height:1.56;color:#333}
+.code{background:#111;color:#d7f7e0;font:400 11px/1.62 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:12px;border:2px solid #111;overflow-x:auto;white-space:pre-wrap}
+.lifecycle{border:2px solid var(--line);background:#fff;padding:12px;display:grid;gap:10px}
+.stepper{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.step{border:2px solid var(--line);padding:10px;background:#fff;display:grid;gap:6px;min-width:0}
+.step .n{display:inline-flex;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%;background:var(--purple);color:#fff;font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.step .h{font:900 10px/1.25 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:#555}
+.step p{font-size:11.5px;line-height:1.45;color:#333}
+.footer{margin-top:14px;padding:12px 18px;background:#111;color:#fff;border-top:3px solid var(--purple);display:grid;grid-template-columns:1.15fr .85fr;gap:10px}
+.small{font:700 10px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#ddd;word-break:break-word}
+.small a{color:#fff}
+.save{display:block;width:fit-content;position:fixed;right:18px;bottom:18px;z-index:999;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--purple),#4a2b8e);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(0,0,0,.26);cursor:pointer}
+@media (max-width:1080px){
+  .hero{grid-template-columns:1fr}
+  .hero-visual{border-left:0;border-top:3px solid var(--line)}
+}
+@media (max-width:720px){
+  .page{width:min(100% - 12px,1080px);padding:8px 0 180px}
+  .hero-copy,.hero-visual,.stats,.section,.footer{padding-left:12px;padding-right:12px}
+  .hero-copy{padding-top:14px;padding-bottom:14px}
+  .hero-visual{padding-top:12px;padding-bottom:12px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));padding-bottom:16px}
+  .section{padding-top:16px}
+  .section-head{grid-template-columns:1fr;gap:12px;margin-bottom:14px}
+  .section-no{width:72px;height:72px;font-size:24px}
+  .grid2,.grid3,.stepper{grid-template-columns:1fr}
+  .stepper{grid-auto-rows:auto}
+  .footer{grid-template-columns:1fr}
+  .save{right:12px;bottom:12px;padding:9px 11px;font-size:10px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <main class="card" id="card">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker">learn-harness-engineering</div>
+        <h1 class="title">把 AI coding agent 的 harness 做成可安装、可验证、可接续的技能</h1>
+        <p class="subtitle">这个仓库不是单纯“写文档”，而是把 harness engineering 拆成一套可复用的技能包：为 agent 提供启动路径、当前状态、验证命令、作用域边界和 session handoff，让代码代理在仓库里更稳地开始、推进、收尾与续接。</p>
+        <div class="chips">
+          <span class="chip purple">AGENTS / CLAUDE</span>
+          <span class="chip blue">state + verify</span>
+          <span class="chip green">scope + lifecycle</span>
+          <span class="chip orange">benchmark</span>
+          <span class="chip dark">skills add</span>
+        </div>
+        <div class="lead">
+          <div class="t">一句话结论</div>
+          <p>它最有价值的地方，不是“再多一份说明”，而是把 agent 在仓库里最容易丢的四件事压实：从哪里开始、现在做到哪、怎么证明做完、下一次怎么接着做。</p>
+        </div>
+        <div class="quickrow">
+          <span class="badge purple">5 subsystems</span>
+          <span class="badge blue">10 eval cases</span>
+          <span class="badge green">7 stack detectors</span>
+          <span class="badge orange">10+ language docs</span>
+        </div>
+      </div>
+      <aside class="hero-visual">
+        <div class="console">
+          <h3>把 harness 当成“控制平面”，而不是散落的说明文件</h3>
+          <p>harness-creator 先看已有文件，再最小化补齐；它只关心 agent 跑通工作流的五个子系统，不做模型选择，也不把 prompt tuning 当成 harness。</p>
+          <div class="quickrow">
+            <span class="badge purple">instructions</span>
+            <span class="badge blue">state</span>
+            <span class="badge green">verification</span>
+            <span class="badge orange">scope</span>
+            <span class="badge dark">lifecycle</span>
+          </div>
+        </div>
+        <div class="arch">
+          <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Harness creator architecture flow">
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8 Z" fill="#2e6be6" />
+              </marker>
+            </defs>
+            <rect x="10" y="10" width="740" height="210" rx="18" fill="#fffdf8" stroke="#111" stroke-width="3"/>
+            <rect x="28" y="40" width="142" height="70" rx="14" fill="#f3edff" stroke="#111" stroke-width="2.2"/>
+            <text x="99" y="70" font-family="ui-monospace, monospace" font-size="17" font-weight="900" text-anchor="middle" fill="#6e3fd6">Skill Path</text>
+            <text x="99" y="93" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#333">harness-creator</text>
+            <line x1="170" y1="75" x2="265" y2="75" stroke="#2e6be6" stroke-width="5" marker-end="url(#arrow)" />
+            <rect x="270" y="26" width="220" height="98" rx="16" fill="#111" stroke="#111" stroke-width="2.2"/>
+            <text x="380" y="56" font-family="ui-monospace, monospace" font-size="18" font-weight="900" text-anchor="middle" fill="#fff">Five Subsystems</text>
+            <text x="380" y="82" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#e9e2d3">Instructions · State · Verify</text>
+            <text x="380" y="103" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#e9e2d3">Scope · Lifecycle</text>
+            <line x1="490" y1="75" x2="586" y2="75" stroke="#2e6be6" stroke-width="5" marker-end="url(#arrow)" />
+            <rect x="590" y="40" width="142" height="70" rx="14" fill="#eefbf1" stroke="#111" stroke-width="2.2"/>
+            <text x="661" y="70" font-family="ui-monospace, monospace" font-size="17" font-weight="900" text-anchor="middle" fill="#2e9b4b">Harness</text>
+            <text x="661" y="93" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#333">restartable</text>
+            <rect x="28" y="146" width="704" height="34" rx="10" fill="#fff" stroke="#111" stroke-width="2"/>
+            <text x="46" y="169" font-family="ui-monospace, monospace" font-size="13" font-weight="700" fill="#666">Create → Validate → Benchmark → Handoff</text>
+          </svg>
+        </div>
+      </aside>
+    </section>
+
+    <div class="stats">
+      <div class="stat"><div class="k">subsystems</div><div class="v">5</div><div class="d">instructions / state / verify / scope / lifecycle</div></div>
+      <div class="stat"><div class="k">eval cases</div><div class="v">10</div><div class="d">结构化 benchmark 与评估样例</div></div>
+      <div class="stat"><div class="k">language docs</div><div class="v">10+</div><div class="d">中英及多语言 README 体系</div></div>
+      <div class="stat"><div class="k">tooling</div><div class="v">3</div><div class="d">create / validate / benchmark 三类脚本</div></div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">核心定位</div>
+          <h2>把 harness 从“经验”变成“可复制的最小系统”</h2>
+          <p>README 把 harness 定义得很明确：帮助仓库给 coding agents 提供 instructions、state、verification、scope boundaries 和 lifecycle handoff 五项能力。它的目标不是堆一份超长手册，而是让 agent 真正能用、能接、能续。</p>
+        </div>
+      </div>
+      <div class="warning">
+        <div class="t">Boundary</div>
+        <p>它明确不用于模型选择、单独的 prompt tuning、聊天 UI 设计或通用应用架构；项目事实要留在目标仓库，不要塞回 skill 自己。</p>
+      </div>
+      <div class="grid3">
+        <article class="box purple">
+          <div class="tagrow"><span class="tag purple">instructions</span></div>
+          <h3>启动路径</h3>
+          <p>AGENTS.md / CLAUDE.md 负责告诉 agent：从哪开始、按什么规则做、什么算 done。</p>
+        </article>
+        <article class="box blue">
+          <div class="tagrow"><span class="tag blue">state</span></div>
+          <h3>当前状态</h3>
+          <p>feature_list.json 和 progress.md 用来记录当前功能、证据和下一步，避免只靠聊天上下文。</p>
+        </article>
+        <article class="box green">
+          <div class="tagrow"><span class="tag green">verification</span></div>
+          <h3>可证据化完成</h3>
+          <p>init.sh 或文档化命令让“做完”必须落到可执行检查，而不是口头宣告。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">02</div>
+        <div class="section-meta">
+          <div class="label">安装与使用</div>
+          <h2>它本身就是一份可安装技能：装进去，再生成 harness</h2>
+          <p>仓库 README 给出最直接的安装与使用路径：用 `skills add` 安装 skill，或者直接拷贝 skills 目录；然后通过脚本创建、验证并导出报告。逻辑很像“先装控制面，再生成控制面下游配置”。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="box dark">
+          <div class="tagrow"><span class="tag dark">install</span><span class="tag dark">copy path</span></div>
+          <h3>两种安装方式</h3>
+          <pre class="code">npx skills add walkinglabs/learn-harness-engineering --skill harness-creator
+
+# 或直接复制
+cp -R skills/harness-creator /path/to/skill/path</pre>
+        </article>
+        <article class="box">
+          <div class="tagrow"><span class="tag orange">create</span><span class="tag purple">validate</span><span class="tag blue">benchmark</span></div>
+          <h3>三类脚本，一条工作流</h3>
+          <pre class="code">node skills/harness-creator/scripts/create-harness.mjs --target /path/to/project
+node skills/harness-creator/scripts/validate-harness.mjs --target /path/to/project
+node skills/harness-creator/scripts/run-benchmark.mjs --target /path/to/project --html /path/to/report.html</pre>
+        </article>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <article class="mini">
+          <div class="tagrow"><span class="tag blue">built-in modules only</span></div>
+          <h4>脚本约束</h4>
+          <p>脚本只使用 Node.js 内置模块，方便复制到别的仓库后继续跑，不依赖复杂外部运行时。</p>
+        </article>
+        <article class="mini">
+          <div class="tagrow"><span class="tag green">multi-stack detection</span></div>
+          <h4>自动识别常见技术栈</h4>
+          <p>它能检测 Node/npm/pnpm/yarn/bun、Python、Go、Rust、Maven、Gradle、.NET 等常见项目栈的验证命令。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">五个子系统</div>
+          <h2>它不只是“写个 AGENTS”，而是五层一起补</h2>
+          <p>核心模型非常清楚：Instructions、State、Verification、Scope、Lifecycle。这个分法的好处是，agent 不会只拿到规则，还能拿到状态、证据和续接信息。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="box">
+          <table class="table">
+            <thead>
+              <tr><th>Subsystem</th><th>Minimal artifact</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Instructions</td><td>AGENTS.md / CLAUDE.md</td><td>启动路径与 done 定义</td></tr>
+              <tr><td>State</td><td>feature_list.json / progress.md</td><td>当前做什么、做到哪</td></tr>
+              <tr><td>Verification</td><td>init.sh / 文档命令</td><td>如何证明完成</td></tr>
+              <tr><td>Scope</td><td>依赖与完成条件</td><td>防止 overreach</td></tr>
+              <tr><td>Lifecycle</td><td>session-handoff.md</td><td>下次可以接着做</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="box green">
+          <div class="tagrow"><span class="tag green">minimal first</span><span class="tag blue">append state</span></div>
+          <h3>先最小可用，再逐步加厚</h3>
+          <ul>
+            <li>先检查已有的 instruction / state / verify / docs / manifests。</li>
+            <li>先补最小 harness，再考虑 memory、tool safety、multi-agent、benchmark。</li>
+            <li>状态文件比聊天记录更可靠，任务结束也更容易交接。</li>
+            <li>用证据而不是感觉判断完成度。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">验证与审查</div>
+          <h2>validate 不是验收全部，只是结构分数；但它能把底线先守住</h2>
+          <p>`validate-harness.mjs` 会对五个子系统打结构分，说明 harness 有没有齐、是否连贯。README 也明确说：结构分不等于真实效果，但它至少能帮你先发现 harness 是否缺骨架。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="box dark">
+          <div class="tagrow"><span class="tag dark">5 subsystem score</span><span class="tag dark">structural benchmark</span></div>
+          <h3>它测的是“有没有骨架”</h3>
+          <p>如果 instructions、state、verify、scope、lifecycle 任何一层缺失，agent 就会更容易跑偏、忘记状态或无法续接。</p>
+        </article>
+        <article class="box orange">
+          <div class="tagrow"><span class="tag orange">10 evals</span><span class="tag purple">HTML report</span></div>
+          <h3>报告与 benchmark 也是交付的一部分</h3>
+          <p>仓库提供 HTML assessment report 和 structural benchmark report，适合把 harness 质量变成可见、可比较的产物。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">适合 / 不适合</div>
+          <h2>它适合把 agent 工作流工程化，不适合拿来做泛化架构讨论</h2>
+          <p>这个技能的边界很明确：它是 harness engineering，不是模型路由器，也不是 app architecture 代替品。它解决的是“让 agent 在仓库里做事更稳”的问题。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="box purple">
+          <div class="tagrow"><span class="tag purple">适合</span></div>
+          <h3>最适合的场景</h3>
+          <ul>
+            <li>给 AI coding agent 建 AGENTS/CLAUDE、状态文件和验证命令。</li>
+            <li>想把“怎么开始、怎么证明、怎么接续”标准化。</li>
+            <li>需要把 harness 打包成技能，方便跨仓库复用。</li>
+            <li>需要结构化 benchmark 而不是只靠体验判断。</li>
+          </ul>
+        </article>
+        <article class="box">
+          <div class="tagrow"><span class="tag orange">不适合</span></div>
+          <h3>不该硬用的场景</h3>
+          <ul>
+            <li>想做模型选择或 prompt tuning 的单独优化。</li>
+            <li>想解决业务系统架构设计本身。</li>
+            <li>想把项目事实写进 skill 里长期维护。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">06</div>
+        <div class="section-meta">
+          <div class="label">生命周期</div>
+          <h2>这套技能最重要的产物，是让下一轮接手的人不会从零开始</h2>
+          <p>harness 的价值，最后会落到一个问题：下一个 agent 或下一个人进来时，能不能在最短时间理解现状、继续推进、并且拿证据说话。这个仓库把这件事写成了可执行的模板。</p>
+        </div>
+      </div>
+      <div class="lifecycle">
+        <div class="stepper">
+          <div class="step"><div class="n">1</div><div class="h">Inspect</div><p>先看已有的 instructions、state、docs 和 package manifests。</p></div>
+          <div class="step"><div class="n">2</div><div class="h">Create</div><p>补最小 harness：启动、状态、验证、scope、handoff。</p></div>
+          <div class="step"><div class="n">3</div><div class="h">Validate</div><p>跑结构验证，确认五层都在、逻辑自洽。</p></div>
+          <div class="step"><div class="n">4</div><div class="h">Benchmark</div><p>导出 HTML 报告，把质量显性化。</p></div>
+          <div class="step"><div class="n">5</div><div class="h">Handoff</div><p>把状态写回文件，让下一次能接着做。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="small">
+        <strong>来源</strong><br>
+        <a href="https://github.com/walkinglabs/learn-harness-engineering" target="_blank" rel="noreferrer">https://github.com/walkinglabs/learn-harness-engineering</a><br>
+        重点事实来自 `skills/README.md`、`skills/harness-creator/README.md` 和 `skills/harness-creator/SKILL.md`。
+      </div>
+      <div class="small">
+        <strong>备注</strong><br>
+        MIT 许可。<br>
+        这是一个把 harness engineering 变成可安装技能的仓库，而不是单纯的文档集合。
+      </div>
+    </footer>
+  </main>
+</div>
+<button class="save" onclick="saveCard()">保存 PNG</button>
+<script>
+async function saveCard(){
+  const card=document.getElementById('card');
+  const canvas=await html2canvas(card,{backgroundColor:null,scale:2,useCORS:true,scrollY:-window.scrollY});
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download='20260610-learn-harness-engineering.png';
+  a.click();
+}
+</script>
+</body>
+</html>
