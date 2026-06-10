@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#c8102e" />
+<title>Obscura：给 AI Agent 和爬虫的 Rust 无头浏览器引擎</title>
+<meta name="description" content="Obscura 是用 Rust 写的开源 headless browser engine，面向 AI agent 自动化和网页抓取，支持 V8、CDP、Puppeteer/Playwright、Stealth 和 MCP。" />
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+:root{
+  --red:#c8102e;
+  --black:#0a0a0a;
+  --white:#f5f2ec;
+  --gray1:#171717;
+  --gray2:#2b2b2b;
+  --gray3:#666;
+  --gray4:#aaa;
+  --gray5:#ddd;
+  --blue:#0036a3;
+  --green:#006b3c;
+  --yellow:#e8c200;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;background:radial-gradient(circle at 20% 0%,rgba(200,16,46,.08),transparent 28%),linear-gradient(0deg,rgba(255,255,255,.02) 1px,transparent 1px) 0 0/100% 38px,linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px) 0 0/38px 100%,var(--black);color:var(--white);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+img{display:block;max-width:100%}
+.page{width:min(780px,calc(100% - 16px));margin:0 auto;padding:10px 0 96px}
+.card{width:100%;border:3px solid var(--red);background:var(--white);color:#111;box-shadow:8px 8px 0 rgba(0,0,0,.16);overflow:hidden}
+.header{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:14px;padding:16px;background:linear-gradient(180deg,var(--red),#aa0f26);color:#fff;border-bottom:3px solid var(--black)}
+.hero-copy{display:grid;gap:10px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:7px;width:fit-content;border:2px solid #fff;background:#fff;color:var(--red);padding:5px 9px;font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase}
+.kicker::before{content:"■";font-size:9px}
+.title{margin:0;font-size:clamp(25px,4.3vw,44px);line-height:.96;letter-spacing:-.05em}
+.subtitle{margin:0;max-width:60ch;font-size:12.6px;line-height:1.56;color:rgba(255,255,255,.92)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid rgba(255,255,255,.82);background:rgba(255,255,255,.06);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.05em;white-space:nowrap}
+.chip.dark{background:#111;border-color:#111}
+.chip.red{background:#fff;color:var(--red);border-color:#fff}
+.chip.blue{background:#fff;color:var(--blue);border-color:#fff}
+.alert{border:2px solid #111;background:#111;color:#f7f2e8;padding:11px 12px;display:grid;gap:8px}
+.alert strong{font-size:13.5px;line-height:1.25;color:#fff}
+.alert p{margin:0;font-size:12.3px;line-height:1.6;color:#e8e0d3}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.65);padding:4px 8px;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.04)}
+.visual{background:#fff;display:grid;grid-template-rows:auto 1fr;border-left:3px solid #111}
+.visual-top{padding:16px 14px 10px;background:linear-gradient(135deg,#10162a,#151c31);color:#fff}
+.visual-top h3{margin:0 0 6px;font-size:18px;line-height:1.08;letter-spacing:-.04em}
+.visual-top p{margin:0;color:#ece8dc;font-size:12.8px;line-height:1.58}
+.visual-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.iconbox{display:grid;grid-template-columns:104px 1fr;gap:12px;align-items:center;border:1.5px solid #111;background:#fff;padding:10px}
+.iconbox img{width:96px;height:96px;object-fit:contain;background:#0b0b0b;padding:8px;border-radius:14px}
+.iconbox h4{margin:0;font-size:15px;line-height:1.12;letter-spacing:-.03em}
+.iconbox p{margin:4px 0 0;font-size:11.6px;line-height:1.55;color:#4e4a43}
+.quickline{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.quickline .badge{display:inline-flex;align-items:center;min-height:24px;padding:4px 8px;border:1px solid #111;font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;background:#fff;color:#111}
+.quickline .badge.dark{background:#111;color:#fff}
+.quickline .badge.red{background:#fdecee;color:#c8102e}
+.quickline .badge.blue{background:#eaf1ff;color:#0036a3}
+.quickline .badge.green{background:#eefbf1;color:#006b3c}
+.arch{border:1.5px solid #111;background:#fff;padding:10px}
+.arch svg{width:100%;height:auto;display:block}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 14px;margin-top:14px}
+.stat{border:2px solid #111;background:#fff;padding:10px;box-shadow:none;min-width:0}
+.stat .k{font:900 9.5px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:#666}
+.stat .v{margin-top:6px;font-size:18px;line-height:1.02;font-weight:950;letter-spacing:-.03em;color:var(--red)}
+.stat .d{margin-top:5px;font-size:11px;line-height:1.45;color:#222;font-weight:600}
+.section{margin-top:32px;border-top:2px solid #111;padding:16px 14px 0}
+.section-head{display:grid;grid-template-columns:88px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+.section-no{display:grid;place-items:center;width:88px;height:88px;border:2px solid #111;background:var(--red);color:#fff;font-size:30px;font-weight:950;line-height:1}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+.section-meta h2{margin:0;font-size:clamp(22px,3.6vw,38px);line-height:1.03;letter-spacing:-.05em}
+.section-meta p{margin:0;max-width:980px;font-size:14px;line-height:1.62;color:#5d5750}
+.lead{border-left:4px solid var(--red);background:#111;color:#fff;padding:12px 12px 11px;display:grid;gap:8px;margin-bottom:12px}
+.lead .t{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase;color:#ff8e9a}
+.lead p{margin:0;font-size:12px;line-height:1.58;color:#e6e0d2}
+.grid2,.grid3{display:grid;gap:10px}
+.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cardbox,.mini{border:2px solid #111;background:#fff;min-width:0;padding:14px;display:grid;gap:10px;box-shadow:none}
+.cardbox.dark{background:#111;color:#fff}
+.cardbox.blue{background:var(--blue);color:#fff}
+.cardbox.soft{background:#f7f6f2}
+.cardbox.green{background:#eefbf1}
+.cardbox h3,.mini h4{margin:0;letter-spacing:-.02em}
+.cardbox h3{font-size:16px;line-height:1.16}
+.mini h4{font-size:14px;line-height:1.18}
+.cardbox p,.mini p,.cardbox li,.mini li{font-size:13px;line-height:1.6;color:#222}
+.cardbox.dark p,.cardbox.blue p{color:#f0ebe0}
+.cardbox.dark li,.cardbox.blue li{color:#f0ebe0}
+.cardbox ul,.mini ul{margin:0;padding-left:18px}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid #111;padding:4px 8px;background:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.05em;white-space:nowrap}
+.tag.red{background:#fdecee}.tag.blue{background:#eaf1ff}.tag.green{background:#eefbf1}.tag.dark{background:#111;color:#fff}.tag.yellow{background:#fff7dd}
+.matrix{width:100%;border-collapse:collapse}
+.matrix th,.matrix td{padding:8px 0;vertical-align:top;border-bottom:1px solid #ddd}
+.matrix th{font:900 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:#777;text-align:left}
+.matrix td:first-child{width:26%;font:900 10px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--blue);padding-right:10px}
+.matrix td{font-size:12.3px;line-height:1.55;color:#333}
+.code{background:#111;color:#d9f7da;font:400 11px/1.62 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:12px;border:2px solid #111;overflow-x:auto;white-space:pre-wrap}
+.quote{border-left:4px solid var(--red);background:#fff;padding:11px 12px;font-size:13px;line-height:1.58;color:#222}
+.footer{margin-top:14px;padding:12px 14px;background:#111;color:#fff;border-top:3px solid var(--red);display:grid;grid-template-columns:1.2fr .8fr;gap:10px}
+.small{font:700 10px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#ddd;word-break:break-word}
+.small a{color:#fff}
+.save{display:block;width:fit-content;position:static;margin:14px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,#c8102e,#a10f25);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(0,0,0,.35);cursor:pointer}
+@media (max-width:1080px){
+  .header{grid-template-columns:1fr}
+  .visual{border-left:0;border-top:3px solid #111}
+}
+@media (max-width:720px){
+  .page{width:min(100% - 12px,780px);padding:8px 0 108px}
+  .card{border:0;box-shadow:none}
+  .header{padding:14px;gap:12px}
+  .hero-copy{gap:9px}
+  .visual-top,.visual-body{padding-left:12px;padding-right:12px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));padding:0 12px}
+  .section{padding:18px 10px 0}
+  .section-head{grid-template-columns:1fr;gap:12px;margin-bottom:16px}
+  .section-no{width:72px;height:72px;font-size:26px}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .iconbox{grid-template-columns:1fr}
+  .iconbox img{width:84px;height:84px}
+  .quickline{padding-right:72px}
+  .footer{grid-template-columns:1fr}
+  .save{right:8px;bottom:8px;padding:8px 10px;font-size:10px;border-radius:8px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <main class="card" id="card">
+    <header class="header">
+      <div class="hero-copy">
+        <div class="kicker">开源工具 · Browser Engine</div>
+        <h1 class="title">Obscura：给 AI Agent 和爬虫的 Rust 无头浏览器引擎</h1>
+        <p class="subtitle">它不是桌面浏览器，而是面向自动化和规模化抓取的 headless browser engine：用 Rust 写核心，真实 JavaScript 交给 V8，外层用 CDP、Puppeteer、Playwright、Stealth 和 MCP 把浏览器能力变成可编排的工具。</p>
+        <div class="chips">
+          <span class="chip red">Rust + V8</span>
+          <span class="chip">CDP</span>
+          <span class="chip">Puppeteer</span>
+          <span class="chip">Playwright</span>
+          <span class="chip">Stealth</span>
+          <span class="chip dark">MCP</span>
+        </div>
+        <div class="alert">
+          <strong>一句话结论</strong>
+          <p>Obscura 的卖点不是“再做一个浏览器”，而是把无头浏览器压成一个更轻、更快、更适合 AI agent 的自动化底座：能跑真实 JS、能对接主流自动化库、也能直接暴露 MCP 工具给 Agent 用。</p>
+          <div class="mini-row">
+            <span class="mini-tag">automation at scale</span>
+            <span class="mini-tag">drop-in replacement</span>
+            <span class="mini-tag">not desktop browsing</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="visual">
+        <div class="visual-top">
+          <h3>把浏览器拆成三层：入口、执行、扩展</h3>
+          <p>README 给出的核心叙事很稳定：核心是 Rust 引擎，执行层是 V8 + CDP，外层是抓取、自动化、Puppeteer / Playwright、MCP 和 stealth 能力。</p>
+        </div>
+        <div class="visual-body">
+          <div class="iconbox">
+            <img src="assets/images/20260610-obscura/icon.png" alt="Obscura icon" />
+            <div>
+              <h4>Open-source headless browser for AI agents and web scraping</h4>
+              <p>轻量、stealthy、Rust 实现。适合需要把浏览器能力产品化、工具化、规模化的自动化任务。</p>
+              <div class="quickline">
+                <span class="badge red">V8</span>
+                <span class="badge blue">CDP</span>
+                <span class="badge green">MCP</span>
+                <span class="badge dark">Stealth</span>
+                <span class="badge">Puppeteer</span>
+                <span class="badge">Playwright</span>
+              </div>
+            </div>
+          </div>
+          <div class="arch">
+            <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Obscura architecture flow">
+              <defs>
+                <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#1f63ff" />
+                </marker>
+              </defs>
+              <rect x="12" y="10" width="736" height="210" rx="18" fill="#f7f6f2" stroke="#111" stroke-width="3"/>
+              <rect x="38" y="48" width="168" height="80" rx="14" fill="#fff" stroke="#111" stroke-width="2.5"/>
+              <text x="122" y="80" font-family="ui-monospace, monospace" font-size="18" font-weight="900" text-anchor="middle" fill="#c8102e">AI Agent</text>
+              <text x="122" y="104" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle" fill="#444">Puppeteer / Playwright / MCP</text>
+              <line x1="208" y1="88" x2="290" y2="88" stroke="#1f63ff" stroke-width="5" marker-end="url(#arrow)" />
+              <rect x="294" y="34" width="190" height="108" rx="16" fill="#111" stroke="#111" stroke-width="2.5"/>
+              <text x="389" y="70" font-family="ui-monospace, monospace" font-size="18" font-weight="900" text-anchor="middle" fill="#fff">Obscura Core</text>
+              <text x="389" y="96" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle" fill="#e8e0d3">Rust · V8 · CDP</text>
+              <text x="389" y="120" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle" fill="#e8e0d3">stealth + tracker blocking</text>
+              <line x1="484" y1="88" x2="566" y2="88" stroke="#1f63ff" stroke-width="5" marker-end="url(#arrow)" />
+              <rect x="570" y="48" width="152" height="80" rx="14" fill="#fff" stroke="#111" stroke-width="2.5"/>
+              <text x="646" y="80" font-family="ui-monospace, monospace" font-size="18" font-weight="900" text-anchor="middle" fill="#0036a3">Browser Tasks</text>
+              <text x="646" y="104" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle" fill="#444">fetch · scrape · render · proxy</text>
+              <rect x="38" y="154" width="684" height="32" rx="10" fill="#fff" stroke="#111" stroke-width="2"/>
+              <text x="56" y="176" font-family="ui-monospace, monospace" font-size="13" font-weight="700" fill="#666">Built for automation at scale, not desktop browsing.</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="stats">
+      <div class="stat"><div class="k">memory</div><div class="v">30 MB</div><div class="d">比 headless Chrome 更轻</div></div>
+      <div class="stat"><div class="k">binary</div><div class="v">70 MB</div><div class="d">单体体积小，便于分发</div></div>
+      <div class="stat"><div class="k">page load</div><div class="v">85 ms</div><div class="d">README 里的性能对比值</div></div>
+      <div class="stat"><div class="k">milestone</div><div class="v">10k+</div><div class="d">stars / next roadmap</div></div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">核心定位</div>
+          <h2>不是“更像 Chrome”，而是“更适合自动化”的浏览器底座</h2>
+          <p>Obscura 的 README 把目标说得很直：为 web scraping 和 AI agent automation 而生。它跑真实 JavaScript，支持 Chrome DevTools Protocol，并且能作为 Puppeteer / Playwright 的替代执行层来用。</p>
+        </div>
+      </div>
+      <div class="lead">
+        <div class="t">Why it exists</div>
+        <p>Chrome 的问题不是“不能自动化”，而是太像一台桌面浏览器：重、慢、启动成本高。Obscura 把浏览器缩成一个面向规模化任务的执行核，目标是让爬虫、Agent 和自动化脚本更轻地接到同一套浏览器能力上。</p>
+      </div>
+      <div class="grid3">
+        <article class="cardbox dark">
+          <div class="tagrow"><span class="tag dark">AI agent automation</span></div>
+          <h3>给 Agent 的不是网页，而是动作接口</h3>
+          <p>Obscura 不是在帮你“打开网页看一眼”，而是在把浏览器变成一组可调用动作：导航、等待、抓取、渲染、导出、对接上层编排器。</p>
+        </article>
+        <article class="cardbox blue">
+          <div class="tagrow"><span class="tag dark">real JS via V8</span></div>
+          <h3>不是静态抓取器，而是能跑前端脚本的引擎</h3>
+          <p>它强调真实 JavaScript 执行，这意味着很多依赖前端渲染、异步加载和交互脚本的网站，不需要退回到纯 HTML 解析。</p>
+        </article>
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag red">drop-in replacement</span></div>
+          <h3>可以替换 headless Chrome 的一部分工作流</h3>
+          <p>README 明确把 Puppeteer / Playwright 兼容性放在核心叙事里，方便把它嵌进既有自动化工程，而不是重写整条链路。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">02</div>
+        <div class="section-meta">
+          <div class="label">性能与体积</div>
+          <h2>它把“重浏览器”压成了更小的自动化组件</h2>
+          <p>README 直接给了对比：内存、二进制大小、启动时间、页面加载速度都被拿来和 headless Chrome 比。这些不是装饰数据，而是它的核心卖点。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="cardbox">
+          <table class="matrix">
+            <thead>
+              <tr><th>metric</th><th>Obscura</th><th>Headless Chrome</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Memory</td><td>30 MB</td><td>200+ MB</td></tr>
+              <tr><td>Binary size</td><td>70 MB</td><td>300+ MB</td></tr>
+              <tr><td>Page load</td><td>85 ms</td><td>~500 ms</td></tr>
+              <tr><td>Startup</td><td>Instant</td><td>~2 s</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cardbox dark">
+          <div class="tagrow"><span class="tag dark">built-in anti-detect</span><span class="tag dark">Puppeteer / Playwright</span></div>
+          <h3>性能不是唯一指标，集成成本也要算进去</h3>
+          <ul>
+            <li>体积更小，适合分发到边缘节点或容器环境。</li>
+            <li>启动更快，适合频繁创建短生命周期任务。</li>
+            <li>内建 anti-detect，适合需要降低脚本痕迹的自动化场景。</li>
+            <li>同时保留主流自动化工具的接入路径，减少迁移阻力。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">安装与入口</div>
+          <h2>从下载、Docker 到源码构建，都给了明确入口</h2>
+          <p>README 的安装结构很清楚：先下载对应平台二进制，再看 Docker，最后才是源码构建。它覆盖了 Linux、macOS、Windows 和 AUR 这些常见路径。</p>
+        </div>
+      </div>
+      <div class="grid3">
+        <article class="mini">
+          <div class="tagrow"><span class="tag red">download</span></div>
+          <h4>平台下载</h4>
+          <p>Linux x86_64、Linux ARM64、Arch Linux (AUR)、macOS Apple Silicon、macOS Intel、Windows。</p>
+        </article>
+        <article class="mini">
+          <div class="tagrow"><span class="tag blue">docker</span></div>
+          <h4>容器部署</h4>
+          <p>如果你只想快速接入浏览器能力，Docker 是最容易把 Obscura 塞进现有流水线的方式。</p>
+        </article>
+        <article class="mini">
+          <div class="tagrow"><span class="tag green">build from source</span></div>
+          <h4>源码构建</h4>
+          <p>适合要自定义特性、调试引擎细节、或把它嵌入更复杂系统的人。</p>
+        </article>
+      </div>
+      <div class="quote" style="margin-top:10px;">
+        <strong>最小路径：先下载，再试用，再谈深度集成。</strong> 如果只是想验证能力，没必要一上来就做源码改造；README 的结构就是在提示你先把浏览器当工具跑起来。
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">Quick Start</div>
+          <h2>把页面抓取、渲染、导出和等待动态内容拆成几个动作</h2>
+          <p>Obscura 的 CLI 参考很像“浏览器动作菜单”：fetch、scrape、eval、selector、proxy、timeout、stealth。你不是在调用复杂平台，而是在组合几条明确命令。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag red">fetch</span><span class="tag">eval</span><span class="tag">selector</span></div>
+          <h3>抓页面标题 / DOM / JS 结果</h3>
+          <pre class="code">obscura fetch https://example.com
+obscura fetch https://example.com --selector title
+obscura fetch https://example.com --eval 'document.title'
+obscura fetch https://example.com --output dump.html</pre>
+        </article>
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag blue">scrape</span><span class="tag">proxy</span><span class="tag">timeout</span></div>
+          <h3>批量抓取与网络环境控制</h3>
+          <pre class="code">obscura scrape https://site1.example https://site2.example --concurrency 10
+obscura fetch https://example.com --proxy socks5://127.0.0.1:1080
+obscura fetch https://example.com --timeout 30</pre>
+        </article>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <article class="cardbox dark">
+          <div class="tagrow"><span class="tag dark">render js</span><span class="tag dark">wait dynamic</span></div>
+          <h3>适合那些“静态 HTML 还不够”的页面</h3>
+          <ul>
+            <li>前端渲染后才出现的内容。</li>
+            <li>依赖异步请求和脚本执行的页面。</li>
+            <li>需要等动态内容稳定后再导出的页面。</li>
+          </ul>
+        </article>
+        <article class="cardbox blue">
+          <div class="tagrow"><span class="tag dark">binary-safe body</span><span class="tag dark">output</span></div>
+          <h3>不只是 HTML：也能把原始响应当数据流处理</h3>
+          <p>README 还强调可以绕过 JS / DOM 层处理原始响应体，这对图片、JSON、CSS、JS 等非 HTML 资源很重要。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">集成面</div>
+          <h2>CDP、Puppeteer、Playwright 和 MCP 都在同一条叙事里</h2>
+          <p>这部分很关键：Obscura 不只是一个 CLI，它还有 CDP server 和 MCP server。意味着既能给脚本用，也能给 AI agent / 桌面客户端当工具用。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="cardbox">
+          <div class="tagrow"><span class="tag red">CDP</span><span class="tag blue">Puppeteer</span><span class="tag green">Playwright</span></div>
+          <h3>兼容现有自动化生态，减少迁移成本</h3>
+          <p>README 把 Chrome DevTools Protocol 和两个主流浏览器自动化框架都列进去了，这意味着它不是另起炉灶，而是在现有生态里替换执行层。</p>
+          <table class="matrix" style="margin-top:6px;">
+            <tbody>
+              <tr><td>CDP server</td><td>暴露浏览器能力给外部工具</td></tr>
+              <tr><td>Puppeteer</td><td>保留脚本自动化路径</td></tr>
+              <tr><td>Playwright</td><td>便于接入更广的测试/抓取栈</td></tr>
+            </tbody>
+          </table>
+        </article>
+        <article class="cardbox dark">
+          <div class="tagrow"><span class="tag dark">MCP</span><span class="tag dark">AI agent</span></div>
+          <h3>把浏览器工具直接交给 AI 客户端</h3>
+          <p>Obscura 还提供 MCP server，README 里明确写了 stdio 和 HTTP 两种启动方式。这让 Claude Desktop、Cursor 这类客户端可以直接调用浏览器工具。</p>
+          <pre class="code">obscura mcp
+obscura mcp --http --port 8080
+# endpoint: http://127.0.0.1:8080/mcp</pre>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">06</div>
+        <div class="section-meta">
+          <div class="label">Stealth 模式</div>
+          <h2>它不只是“能跑”，还试图让自动化更不容易被识别</h2>
+          <p>Stealth mode 是 README 里单独成章的主题，重点是 anti-fingerprinting 和 tracker blocking。它的目标不是“伪装成真人浏览”，而是降低自动化痕迹。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="mini">
+          <div class="tagrow"><span class="tag yellow">anti-fingerprinting</span></div>
+          <h4>减少指纹特征</h4>
+          <p>把容易暴露自动化环境的浏览器特征压低，适合需要在规模化抓取里减少被识别风险的场景。</p>
+        </article>
+        <article class="mini">
+          <div class="tagrow"><span class="tag yellow">tracker blocking</span></div>
+          <h4>阻断追踪器</h4>
+          <p>对跟踪脚本和相关请求做阻断，帮助自动化任务更干净地获取页面内容。</p>
+        </article>
+      </div>
+      <div class="quote" style="margin-top:10px;">
+        <strong>边界很明确：</strong>它不是让你回到“像真人一样随便上网”的桌面浏览器，而是面向自动化规模的执行引擎。这个定位决定了它的设计取舍。
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">07</div>
+        <div class="section-meta">
+          <div class="label">适合 / 不适合</div>
+          <h2>它适合把浏览器能力工程化，不适合替代日常桌面浏览</h2>
+          <p>当你需要的是“浏览器能力作为底层服务”时，它很合适；当你想要的是“日常打开网页、像人一样浏览”时，它就不是这个产品的目标。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="cardbox green">
+          <div class="tagrow"><span class="tag green">适合</span></div>
+          <h3>最适合的场景</h3>
+          <ul>
+            <li>AI agent 自动化，需要把浏览器当工具接入。</li>
+            <li>网页抓取，需要 JS / 动态内容 / 等待状态。</li>
+            <li>需要兼容 CDP、Puppeteer、Playwright 的既有工程。</li>
+            <li>需要更轻的二进制、更快的启动、更低的资源占用。</li>
+          </ul>
+        </article>
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag red">不适合</span></div>
+          <h3>不该硬用的场景</h3>
+          <ul>
+            <li>只想要一台桌面浏览器来日常上网。</li>
+            <li>不需要自动化，只要人工浏览体验。</li>
+            <li>对生态兼容和脚本接入没有需求。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="small">
+        <strong>来源</strong><br>
+        <a href="https://github.com/h4ckf0r0day/obscura" target="_blank" rel="noreferrer">https://github.com/h4ckf0r0day/obscura</a><br>
+        README 中的定位、性能对比、Quick Start、Stealth、CDP、Puppeteer / Playwright、MCP、License 等信息均已纳入卡片结构。
+      </div>
+      <div class="small">
+        <strong>备注</strong><br>
+        Apache 2.0 · 适合 open-source tool / technical share 场景。<br>
+        重点不是“更花哨”，而是把浏览器能力拆成可用、可接入、可扩展的自动化底座。
+      </div>
+    </footer>
+  </main>
+</div>
+<button class="save" onclick="saveCard()">保存 PNG</button>
+<script>
+async function saveCard(){
+  const card=document.getElementById('card');
+  const canvas=await html2canvas(card,{backgroundColor:null,scale:2,useCORS:true,scrollY:-window.scrollY});
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download='20260610-obscura.png';
+  a.click();
+}
+</script>
+</body>
+</html>
