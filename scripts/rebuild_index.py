@@ -132,7 +132,6 @@ def main():
     )
     index = {
         '_count': len(cards),
-        '_updated': datetime.now(timezone.utc).isoformat(),
         'cards': cards,
     }
     with open('_index.yaml', 'w', encoding='utf-8') as fp:
