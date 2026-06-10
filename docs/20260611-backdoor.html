@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Backdoor · Claude Code Proxy</title>
+  <style>
+    :root{
+      --canvas:#f7f2e8; --paper:#fffdf8; --ink:#0c1220; --line:#111111;
+      --purple:#6e3fd6; --green:#2e9b4b; --blue:#2e6be6; --orange:#f59e0b; --yellow:#f5d46b;
+      --soft-purple:#f2ecff; --soft-green:#eefbf1; --soft-blue:#eef4ff; --soft-orange:#fff4e6;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:
+        linear-gradient(rgba(17,17,17,.04) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(110,63,214,.06) 0 11%, transparent 12%),
+        radial-gradient(circle at 86% 10%, rgba(46,155,75,.05) 0 10%, transparent 11%),
+        linear-gradient(180deg,#faf4e9 0,#f7f2e8 100%);
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1180px, calc(100% - 20px));margin:0 auto;padding:18px 0 88px}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1.12fr) minmax(0,.82fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:180px;background:var(--purple)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:150px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--purple);font-size:10px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.7vw,44px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:#4d5567;font-size:12.5px;line-height:1.55}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.6px;font-weight:850}
+    .badge.purple{background:var(--purple);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.green{background:var(--green);color:#fff}
+    .badge.orange{background:var(--orange);color:#111}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px;box-shadow:var(--shadow)}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.62;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11px;font-weight:850;line-height:1;background:#111;color:#fff}
+
+    .architecture-column{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f1320 0%,#151a2b 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .cost-compare{display:grid;gap:8px}
+    .cost-row{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;box-shadow:4px 4px 0 rgba(17,17,17,.08)}
+    .cost-row .l{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#5d6472;font-weight:900}
+    .cost-row .v{font-size:22px;font-weight:950;line-height:1.1;letter-spacing:-.04em}
+    .cost-row .v.purple{color:var(--purple)}
+    .cost-row .v.green{color:var(--green)}
+    .cost-row .v.orange{color:var(--orange)}
+    .cost-row .note{font-size:13px;line-height:1.5;color:#222}
+
+    .summary-rail{background:#111;color:#fff;display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+    .summary-head{padding:14px;border-bottom:3px solid #0c0c0c;background:linear-gradient(180deg,#141414,#111)}
+    .summary-head h3{font-size:20px;line-height:1.08;letter-spacing:-.04em;margin:0 0 6px}
+    .summary-head p{margin:0;color:#e8e0d3;font-size:12.8px;line-height:1.6}
+    .summary-body{padding:14px;display:grid;gap:10px;background:#151515}
+    .summary-card{border:1.5px solid rgba(255,255,255,.14);background:#1a1a1a;padding:12px;display:grid;gap:6px}
+    .summary-card .t{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7}
+    .summary-card .t::before{content:"■"}
+    .summary-card p{margin:0;color:#ece8dc;font-size:12.6px;line-height:1.62}
+    .summary-card.purple .t::before{color:var(--purple)}
+    .summary-card.green .t::before{color:var(--green)}
+    .summary-card.blue .t::before{color:var(--blue)}
+    .summary-card.orange .t::before{color:var(--orange)}
+    .github{border:2px solid #fff;background:#fff;color:#111;padding:12px;display:grid;gap:8px}
+    .github .small{font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#666}
+    .github .num{font-size:30px;line-height:1;font-weight:950;letter-spacing:-.04em;color:var(--purple)}
+
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--purple);color:#fff;font-size:34px;font-weight:950;line-height:1;box-shadow:var(--shadow)}
+    .section-no.b{background:var(--blue)}
+    .section-no.g{background:var(--green)}
+    .section-no.o{background:var(--orange);color:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--purple);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.g{color:var(--green)}
+    .section-meta .label.o{color:var(--orange)}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:#5d6472;font-size:14px;line-height:1.62;max-width:980px}
+
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0;box-shadow:var(--shadow)}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.6px;font-weight:850;line-height:1}
+    .tag.purple{background:var(--soft-purple);border-color:var(--purple);color:var(--purple)}
+    .tag.green{background:var(--soft-green);border-color:var(--green);color:var(--green)}
+    .tag.blue{background:var(--soft-blue);border-color:var(--blue);color:var(--blue)}
+    .tag.orange{background:var(--soft-orange);border-color:var(--orange);color:#8c5200}
+    .tag.dark{background:#111;color:#fff}
+
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:#5d6472;font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .quote-line{border-left:4px solid var(--purple);padding-left:10px;font-weight:900;line-height:1.58}
+
+    .flow-v{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative;box-shadow:4px 4px 0 rgba(17,17,17,.08)}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#5d6472;font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.purple .c{color:var(--purple)}
+    .flow-item.green .c{color:var(--green)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.orange .c{color:var(--orange)}
+
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72;box-shadow:var(--shadow)}
+    .spec-table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.6}
+    .spec-table th,.spec-table td{border:2px solid var(--line);padding:8px 10px;text-align:left;background:#fff}
+    .spec-table th{background:#111;color:#fff;font-weight:850;font-size:11.6px;letter-spacing:.08em;text-transform:uppercase}
+    .spec-table .yes{color:var(--green);font-weight:900}
+    .spec-table .no{color:#aaa}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:#5d6472;font-size:12.5px;line-height:1.62}
+
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .summary-rail{border-top:3px solid #0c0c0c}
+      .grid-4,.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert{padding-left:12px;padding-right:12px}
+      .spec-table{font-size:12px}
+      .spec-table th,.spec-table td{padding:5px 6px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">BACKDOOR · CLAUDE CODE PROXY</div>
+        <h1 class="demo-title">Run Claude Code Against Any AI Provider</h1>
+        <p class="subtitle">Backdoor 是一个轻量级代理，拦截 Claude Code 的 Anthropic API 调用，路由到任何 OpenAI 兼容的提供商。DeepSeek、Groq、Ollama、OpenRouter — 你选。同一 UI、同一工具、同一 agentic loop，零锁定。</p>
+        <div class="badge-row">
+          <span class="badge purple">DeepSeek</span>
+          <span class="badge green">Groq</span>
+          <span class="badge blue">Ollama</span>
+          <span class="badge orange">OpenRouter</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge dark">NVIDIA NIM</span>
+          <span class="badge ink">LM Studio</span>
+          <span class="badge ink">200+ Models</span>
+          <span class="badge ink">Telegram Control</span>
+        </div>
+        <div class="alert">
+          <strong>最好的编码 agent，搭配你选的模型</strong>
+          <p>Claude Code 是目前最好的 coding agent — 工具调用、agentic 循环、代码库导航能力无可匹敌。Backdoor 解除了它和 Anthropic API 的硬绑定，让你用任何模型、任何价格跑同一个 ui。</p>
+          <div class="mini-row">
+            <span class="mini-tag">Zero Lock-in</span>
+            <span class="mini-tag">99.95% Cheaper</span>
+            <span class="mini-tag">&lt;600 LOC</span>
+          </div>
+        </div>
+      </div>
+
+      <section class="architecture-column">
+        <div class="panel-top">
+          <div class="eyebrow">COST COMPARISON</div>
+          <h3>500M Tokens · Same Workload</h3>
+          <p>Backdoor 实测数据：同一 task 负载跑过 500M tokens，两种后端的费用差距。</p>
+        </div>
+        <div class="panel-body">
+          <div class="cost-compare">
+            <div class="cost-row">
+              <div class="l">Claude Opus 4.7</div>
+              <div class="v purple">$9,834</div>
+              <div class="note">~$19.67 / 1M tokens</div>
+            </div>
+            <div class="cost-row">
+              <div class="l">DeepSeek V3 Flash</div>
+              <div class="v green">$5.34</div>
+              <div class="note">~$0.01 / 1M tokens — <strong>99.95% cheaper</strong></div>
+            </div>
+          </div>
+          <div class="quote">$9,834 vs $5.34 — 近 2,000x 成本差距。个人开发者从"肉疼"变"忽略不计"，团队从小没预算变随便跑。</div>
+          <div class="cost-row" style="border-color:var(--purple)">
+            <div class="l">NVIDIA NIM / Groq 免费层</div>
+            <div class="v green">$0</div>
+            <div class="note">月数千次请求免费 — 零成本上手。</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="summary-rail">
+        <div class="summary-head">
+          <h3>为什么选择 Backdoor</h3>
+          <p>Claude Code 的 harness 是免费的。背后跑什么模型，由你决定。</p>
+        </div>
+        <div class="summary-body">
+          <article class="summary-card purple">
+            <div class="t">完全免费层</div>
+            <p>NVIDIA NIM 和 Groq 都有免费层，月数千次请求。开箱即用，零成本启动。</p>
+          </article>
+          <article class="summary-card green">
+            <div class="t">成本降低 95%+</div>
+            <p>DeepSeek 比 Claude API 便宜约 95%。从"一杯咖啡"变成"忽略不计"。</p>
+          </article>
+          <article class="summary-card blue">
+            <div class="t">完全本地私密</div>
+            <p>指向本地 Ollama 实例，数据永远不会离开你的机器。无 API、无日志、无传输。</p>
+          </article>
+          <article class="summary-card orange">
+            <div class="t">200+ 模型，一把钥匙</div>
+            <p>通过 OpenRouter 接入 Gemini、Grok、Qwen 等所有主流模型，单一 API key。</p>
+          </article>
+          <div class="github">
+            <div class="small">GitHub / Backdoor</div>
+            <div class="num">288</div>
+            <div style="font-size:12.4px;line-height:1.55">stars · 30 forks · MIT · Python · 3 commands to set up</div>
+          </div>
+        </div>
+      </aside>
+    </header>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">THE PROBLEM & THE FIX</div>
+          <h2>锁定的代价与解耦的方案</h2>
+          <p>Claude Code 硬绑定到 Anthropic API。你付 Anthropic 的价格、用 Anthropic 的模型、受 Anthropic 的规则约束。Backdoor 在中间做了一层透明的协议转换。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag purple">Before</span><span class="tag dark">Lock-in</span></div>
+          <h3>锁定状态</h3>
+          <p>Claude Code → Anthropic API → $$$。最高质量的 coding agent 只有一种后端选择。</p>
+          <ul>
+            <li>单一 API 定价无竞争</li>
+            <li>模型更新节奏随 Anthropic</li>
+            <li>高成本限制使用规模</li>
+          </ul>
+        </article>
+        <article class="card" style="border-color:var(--green)">
+          <div class="tagrow"><span class="tag green">After</span><span class="tag dark">Freedom</span></div>
+          <h3>解耦方案</h3>
+          <p>Claude Code → Backdoor → 任意 OpenAI 兼容提供商。零改动、零配置切换。</p>
+          <ul>
+            <li>一行 .env 切换提供商</li>
+            <li>支持 DeepSeek/Groq/NVIDIA/Ollama</li>
+            <li>代码 &lt; 600 行，完全透明</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag orange">核心洞察</span><span class="tag dark">Why</span></div>
+          <h3>Agent Harness > 模型</h3>
+          <p>Claude Code 真正强大的是它的工具调用系统和 agentic loop。模型是可更换的。</p>
+          <ul>
+            <li>最好的 harness + 最便宜的模型 = 最优解</li>
+            <li>不否定 Anthropic，而是让更多人能用上</li>
+            <li>MIT 开源，任何人都能参与改进</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">PROVIDER MATRIX</div>
+          <h2>支持的提供商一览</h2>
+          <p>修改 .env 中三行配置即可切换后端。覆盖免费层、本地部署和商业 API 三种场景。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <table class="spec-table">
+          <thead>
+            <tr><th>提供商</th><th>免费层</th><th>速度</th><th>最适合</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>DeepSeek</strong></td><td class="no">—</td><td>快</td><td>极致性价比</td></tr>
+            <tr><td><strong>Groq</strong></td><td class="yes">✅</td><td>最快</td><td>即时响应场景</td></tr>
+            <tr><td><strong>NVIDIA NIM</strong></td><td class="yes">✅</td><td>快</td><td>免费 Llama 3.3 70B</td></tr>
+            <tr><td><strong>OpenRouter</strong></td><td class="no">—</td><td>因模型而异</td><td>一把钥匙通所有</td></tr>
+            <tr><td><strong>Ollama</strong></td><td class="yes">✅ (本地)</td><td>看硬件</td><td>完全私有部署</td></tr>
+            <tr><td><strong>LM Studio</strong></td><td class="yes">✅ (本地)</td><td>看硬件</td><td>便捷本地模型管理</td></tr>
+          </tbody>
+        </table>
+        <div style="display:grid;gap:8px;align-content:start">
+          <div class="quote-block">一行切换：改 <code>PROVIDER_BASE_URL</code>、<code>PROVIDER_API_KEY</code>、<code>PROVIDER_MODEL</code> 三个环境变量。除 Ollama 外所有提供商共用同一套配置模板。</div>
+          <div class="card">
+            <div class="tagrow"><span class="tag dark">.env</span><span class="tag purple">Configuration</span></div>
+            <h3>示例：切换到 DeepSeek</h3>
+            <pre style="font-size:12px;line-height:1.5;background:#f5f2eb;padding:10px;border:1px solid var(--line);overflow-x:auto">PROVIDER_BASE_URL=https://api.deepseek.com/v1
+PROVIDER_API_KEY=sk-...
+PROVIDER_MODEL=deepseek-chat</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no g">03</div>
+        <div class="section-meta">
+          <div class="label g">QUICK SETUP</div>
+          <h2>60 秒上手引导</h2>
+          <p>三条命令、一个交互式向导，从头到位零手动配置。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card" style="background:var(--soft-blue)">
+          <div class="tagrow"><span class="tag blue">One-liner</span><span class="tag dark">Step 1–3</span></div>
+          <h3>三行命令开始</h3>
+          <pre style="font-size:12px;line-height:1.5;background:#fff;padding:10px;border:1px solid var(--line);overflow-x:auto">git clone https://github.com/ajsai47/backdoor
+cd backdoor
+./backdoor   # 一步步向导</pre>
+          <p><strong>向导会做什么：</strong>动画开场 → 选择提供商 → 输入 API key → 写入配置 → 启动 Claude Code。想手动配置？复制 <code>.env.example</code> → 填写 → 运行 <code>./run.sh</code>。</p>
+        </div>
+        <div class="card" style="background:var(--soft-orange)">
+          <div class="tagrow"><span class="tag orange">Telegram</span><span class="tag dark">Mobile</span></div>
+          <h3>Bonus：手机控制 Claude Code</h3>
+          <p>设置 <code>TELEGRAM_BOT_TOKEN</code> 和 <code>TELEGRAM_ALLOWED_USER_ID</code> 环境变量，即可从 Telegram 发送 prompt 并在聊天中接收 Claude Code 输出。</p>
+          <p style="color:#8c5200;font-weight:850;font-size:13px">一个从手机上触发编码任务、在移动端获取编码结果的完整闭环。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no o">04</div>
+        <div class="section-meta">
+          <div class="label o">ARCHITECTURE</div>
+          <h2>工作原理：代理层的协议桥接</h2>
+          <p>Claude Code 认为自己在和 Anthropic API 通信。实际上 Backdoor 在本地做了实时协议翻译。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="flow-v">
+          <div class="flow-item purple"><div class="t">Step 1</div><div class="c">Claude Code 发送请求到 localhost:8082</div></div>
+          <div class="flow-item green"><div class="t">Step 2</div><div class="c">Backdoor 接收请求，从 Messages API 格式翻译为 OpenAI chat completions</div></div>
+          <div class="flow-item blue"><div class="t">Step 3</div><div class="c">转发到选择的提供商（DeepSeek/Groq/Ollama/...）</div></div>
+          <div class="flow-item orange"><div class="t">Step 4</div><div class="c">流式回传：结果实时翻译回 Anthropic SSE 格式。工具调用、delta、token 计数全部透明。</div></div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="tagrow"><span class="tag dark">Housekeeping</span><span class="tag purple">Short-circuit</span></div>
+            <h3>内部请求本地短路</h3>
+            <p>Claude Code 的部分内部请求（quota 探测、标题生成等）被 Backdoor 识别并在本地拦截，不消耗你的提供商配额。免费层用户特别受益于此。</p>
+          </div>
+          <div class="card" style="margin-top:12px">
+            <div class="tagrow"><span class="tag blue">Troubleshooting</span><span class="tag orange">Common</span></div>
+            <h3>常见问题速查</h3>
+            <ul>
+              <li><strong>Proxy failed to start</strong> — 端口 8082 被占用，改 <code>PORT=8083</code></li>
+              <li><strong>Model not found / 404</strong> — PROVIDER_MODEL 名称不正确（例：DeepSeek 用 <code>deepseek-chat</code>）</li>
+              <li><strong>响应慢</strong> — 切换到 Groq，最快推理 + 免费层</li>
+              <li><strong>查看日志</strong> — 检查 <code>proxy.log</code>；为空则直接运行 <code>uv run uvicorn server:app</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">OPEN SOURCE & COMMUNITY</div>
+          <h2>MIT 开源，零附随条件</h2>
+          <p>代码简洁、可读、可 fork。如果明天一个新 AI 提供商上线，当天就能用上。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card" style="background:var(--soft-purple)">
+          <div class="tagrow"><span class="tag purple">代码量</span><span class="tag dark">&lt;600 lines</span></div>
+          <h3>可审计的简洁代码</h3>
+          <p>读得懂的 600 行 Python。没有黑盒、没有隐藏端点、没有遥测。你可以逐行审计它做了什么。</p>
+        </div>
+        <div class="card" style="background:var(--soft-green)">
+          <div class="tagrow"><span class="tag green">许可</span><span class="tag dark">MIT</span></div>
+          <h3>真正的开放</h3>
+          <p>MIT 许可。Fork it、改它、用它构建你的产品。没有限制，没有 Strings attached。</p>
+        </div>
+        <div class="card" style="background:var(--soft-orange)">
+          <div class="tagrow"><span class="tag orange">未来就绪</span><span class="tag dark">New Provider</span></div>
+          <h3>当天接入新提供商</h3>
+          <p>新 AI 提供商发布当天就能用。不用等 PR merge，直接改 <code>PROVIDER_BASE_URL</code> 就行。</p>
+        </div>
+      </div>
+      <div class="quote-block" style="margin-top:14px;background:var(--soft-purple);border-color:var(--purple)">
+        <strong>Claude Code is the best coding agent ever built. The model underneath is optional.</strong> — Backdoor 的核心理念。Harness 免费、模型按需选择。学生、个人开发者、预算受限地区的用户，都应该用上最好的编码工具。
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">ajsai47/backdoor · MIT License · Python · 3 commands · Any provider · <a href="https://github.com/ajsai47/backdoor">github.com/ajsai47/backdoor</a></p>
+  </main>
+</body>
+</html>
