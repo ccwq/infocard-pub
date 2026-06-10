@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0036a3" />
+<title>Superlog：用 AI Agent 自愈软件的开放可观测性平台</title>
+<meta name="description" content="Superlog 是开源 agentic 可观测性系统，摄取 traces/logs/metrics，将噪声信号聚合成 incidents，支持 AI Agent 自我修复软件。Y Combinator P26 项目。" />
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+:root{
+  --blue:#0036a3;
+  --blue2:#1a56db;
+  --red:#c8102e;
+  --black:#0a0a0a;
+  --white:#f5f2ec;
+  --gray1:#171717;
+  --gray2:#2b2b2b;
+  --gray3:#666;
+  --gray4:#aaa;
+  --gray5:#ddd;
+  --green:#006b3c;
+  --yellow:#e8c200;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;background:radial-gradient(circle at 20% 0%,rgba(0,54,163,.07),transparent 28%),linear-gradient(0deg,rgba(255,255,255,.025) 1px,transparent 1px) 0 0/100% 38px,linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px) 0 0/38px 100%,var(--black);color:var(--white);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+img{display:block;max-width:100%}
+.page{width:min(780px,calc(100% - 16px));margin:0 auto;padding:10px 0 96px}
+.card{width:100%;border:3px solid var(--blue);background:var(--white);color:#111;box-shadow:8px 8px 0 rgba(0,54,163,.13);overflow:hidden}
+.header{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:14px;padding:16px;background:linear-gradient(180deg,var(--blue),#002a7a);color:#fff;border-bottom:3px solid var(--black)}
+.hero-copy{display:grid;gap:10px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:7px;width:fit-content;border:2px solid #fff;background:#fff;color:var(--blue);padding:5px 9px;font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase}
+.kicker::before{content:"■";font-size:9px}
+.title{margin:0;font-size:clamp(25px,4.3vw,44px);line-height:.96;letter-spacing:-.05em}
+.subtitle{margin:0;max-width:60ch;font-size:12.6px;line-height:1.56;color:rgba(255,255,255,.92)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid rgba(255,255,255,.82);background:rgba(255,255,255,.06);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.05em;white-space:nowrap}
+.chip.yc{background:var(--yellow);color:#111;border-color:var(--yellow)}
+.chip.dark{background:#111;border-color:#111}
+.alert{border:2px solid #111;background:#111;color:#f7f2e8;padding:11px 12px;display:grid;gap:8px}
+.alert strong{font-size:13.5px;line-height:1.25;color:#fff}
+.alert p{margin:0;font-size:12px;line-height:1.58;color:#e8e0d3}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.65);padding:4px 8px;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.04)}
+.visual{background:#fff;display:grid;grid-template-rows:auto 1fr;border-left:3px solid #111}
+.visual-top{padding:16px 14px 10px;background:linear-gradient(135deg,#0a1628,#0f2040);color:#fff}
+.visual-top h3{margin:0 0 6px;font-size:18px;line-height:1.08;letter-spacing:-.04em}
+.visual-top p{margin:0;color:#ece8dc;font-size:12.8px;line-height:1.58}
+.visual-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.iconbox{display:grid;grid-template-columns:104px 1fr;gap:12px;align-items:center;border:1.5px solid #111;background:#fff;padding:10px}
+.iconbox img{width:96px;height:96px;object-fit:contain;background:#f0f4ff;padding:8px;border-radius:14px}
+.iconbox h4{margin:0;font-size:15px;line-height:1.12;letter-spacing:-.03em}
+.iconbox p{margin:4px 0 0;font-size:11.6px;line-height:1.55;color:#4e4a43}
+.quickline{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.quickline .badge{display:inline-flex;align-items:center;min-height:24px;padding:4px 8px;border:1px solid #111;font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;background:#fff;color:#111}
+.quickline .badge.blue{background:#eaf1ff;color:#0036a3;border-color:#0036a3}
+.quickline .badge.green{background:#eefbf1;color:#006b3c;border-color:#006b3c}
+.quickline .badge.dark{background:#111;color:#fff;border-color:#111}
+.arch{border:1.5px solid #111;background:#fff;padding:10px}
+.arch svg{width:100%;height:auto;display:block}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 14px;margin-top:14px}
+.stat{border:2px solid #111;background:#fff;padding:10px;box-shadow:none;min-width:0}
+.stat .k{font:900 9.5px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:#666}
+.stat .v{margin-top:6px;font-size:18px;line-height:1.02;font-weight:950;letter-spacing:-.03em;color:var(--blue)}
+.stat .d{margin-top:5px;font-size:11px;line-height:1.45;color:#222;font-weight:600}
+.section{margin-top:32px;border-top:2px solid #111;padding:16px 14px 0}
+.section-head{display:grid;grid-template-columns:88px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+.section-no{display:grid;place-items:center;width:88px;height:88px;border:2px solid #111;background:var(--blue);color:#fff;font-size:30px;font-weight:950;line-height:1}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--blue)}
+.section-meta h2{margin:0;font-size:clamp(22px,3.6vw,38px);line-height:1.03;letter-spacing:-.05em}
+.section-meta p{margin:0;max-width:980px;font-size:14px;line-height:1.62;color:#5d5750}
+.lead{border-left:4px solid var(--blue);background:#111;color:#fff;padding:12px 12px 11px;display:grid;gap:8px;margin-bottom:12px}
+.lead .t{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase;color:#6b9fff}
+.lead p{margin:0;font-size:12px;line-height:1.58;color:#e6e0d2}
+.grid2,.grid3{display:grid;gap:10px}
+.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cardbox,.mini{border:2px solid #111;background:#fff;min-width:0;padding:14px;display:grid;gap:10px;box-shadow:none}
+.cardbox.dark{background:#111;color:#fff}
+.cardbox.blue{background:var(--blue);color:#fff}
+.cardbox.soft{background:#f7f6f2}
+.cardbox.green{background:#eefbf1}
+.cardbox h3,.mini h4{margin:0;letter-spacing:-.02em}
+.cardbox h3{font-size:16px;line-height:1.16}
+.mini h4{font-size:14px;line-height:1.18}
+.cardbox p,.mini p,.cardbox li,.mini li{font-size:13px;line-height:1.6;color:#222}
+.cardbox.dark p,.cardbox.blue p{color:#f0ebe0}
+.cardbox.dark li,.cardbox.blue li{color:#f0ebe0}
+.cardbox ul,.mini ul{margin:0;padding-left:18px}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid #111;padding:4px 8px;background:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.05em;white-space:nowrap}
+.tag.blue{background:#eaf1ff}.tag.green{background:#eefbf1}.tag.dark{background:#111;color:#fff}.tag.yellow{background:#fff7dd}.tag.red{background:#fdecee}
+.matrix{width:100%;border-collapse:collapse}
+.matrix th,.matrix td{padding:8px 0;vertical-align:top;border-bottom:1px solid #ddd}
+.matrix th{font:900 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:#777;text-align:left}
+.matrix td:first-child{width:26%;font:900 10px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--blue);padding-right:10px}
+.matrix td{font-size:12.3px;line-height:1.55;color:#333}
+.code{background:#111;color:#d9f7da;font:400 11px/1.62 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:12px;border:2px solid #111;overflow-x:auto;white-space:pre-wrap}
+.quote{border-left:4px solid var(--blue);background:#fff;padding:11px 12px;font-size:13px;line-height:1.58;color:#222}
+.footer{margin-top:14px;padding:12px 14px;background:#111;color:#fff;border-top:3px solid var(--blue);display:grid;grid-template-columns:1.2fr .8fr;gap:10px}
+.small{font:700 10px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#ddd;word-break:break-word}
+.small a{color:#fff}
+.save{display:block;width:fit-content;position:static;margin:14px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,#0036a3,#002a7a);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(0,0,0,.35);cursor:pointer}
+@media (max-width:1080px){
+  .header{grid-template-columns:1fr}
+  .visual{border-left:0;border-top:3px solid #111}
+}
+@media (max-width:720px){
+  .page{width:min(100% - 12px,780px);padding:8px 0 108px}
+  .card{border:0;box-shadow:none}
+  .header{padding:14px;gap:12px}
+  .hero-copy{gap:9px}
+  .visual-top,.visual-body{padding-left:12px;padding-right:12px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));padding:0 12px}
+  .section{padding:18px 10px 0}
+  .section-head{grid-template-columns:1fr;gap:12px;margin-bottom:16px}
+  .section-no{width:72px;height:72px;font-size:26px}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .iconbox{grid-template-columns:1fr}
+  .iconbox img{width:84px;height:84px}
+  .quickline{padding-right:72px}
+  .footer{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <main class="card" id="card">
+    <header class="header">
+      <div class="hero-copy">
+        <div class="kicker">开源工具 · 可观测性平台</div>
+        <h1 class="title">Superlog：用 AI Agent 自愈软件的开放可观测性平台</h1>
+        <p class="subtitle">Superlog 是一个开源 agentic telemetry 系统，摄取 traces、logs、metrics，将噪声信号聚合成 incidents，AI Agent 在后台自愈你的软件。Y Combinator P26 项目。</p>
+        <div class="chips">
+          <span class="chip yc">YC P26</span>
+          <span class="chip">OpenTelemetry</span>
+          <span class="chip">AI Agent</span>
+          <span class="chip">Self-healing</span>
+          <span class="chip">TypeScript</span>
+          <span class="chip dark">Open-core</span>
+        </div>
+        <div class="alert">
+          <strong>一句话结论</strong>
+          <p>Superlog 的核心叙事不是"又一个日志看板"，而是用 AI Agent 把可观测性信号变成自动化行动：摄取数据 → 聚合成 incidents → Agent 诊断 → 触发自愈。</p>
+          <div class="mini-row">
+            <span class="mini-tag">agentic observability</span>
+            <span class="mini-tag">local-first</span>
+            <span class="mini-tag">open-core</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="visual">
+        <div class="visual-top">
+          <h3>可观测性 + Agent → 自愈闭环</h3>
+          <p>传统的可观测性工具告诉你"哪里坏了"；Superlog 用 Agent 把诊断变成可执行的修复动作，形成"观测 → 诊断 → 自愈"的闭环。</p>
+        </div>
+        <div class="visual-body">
+          <div class="iconbox">
+            <img src="assets/images/20260610-superlog/avatar.png" alt="Superlog logo" />
+            <div>
+              <h4>Open-source agentic telemetry system</h4>
+              <p>社区版完全开源，支持本地部署；也提供 Superlog Cloud 托管版。Apache 2.0 许可。</p>
+              <div class="quickline">
+                <span class="badge blue">OTLP</span>
+                <span class="badge green">ClickHouse</span>
+                <span class="badge dark">Postgres</span>
+                <span class="badge">React</span>
+              </div>
+            </div>
+          </div>
+          <div class="arch">
+            <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Superlog architecture">
+              <defs>
+                <marker id="ba" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#1a56db" />
+                </marker>
+              </defs>
+              <rect x="12" y="10" width="736" height="190" rx="18" fill="#f7f6f2" stroke="#111" stroke-width="3"/>
+              <rect x="38" y="38" width="160" height="72" rx="14" fill="#fff" stroke="#111" stroke-width="2.5"/>
+              <text x="118" y="68" font-family="ui-monospace, monospace" font-size="17" font-weight="900" text-anchor="middle" fill="#0036a3">Telemetry</text>
+              <text x="118" y="92" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#444">traces · logs · metrics</text>
+              <text x="118" y="106" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#444">(OTLP)</text>
+              <line x1="200" y1="74" x2="280" y2="74" stroke="#1a56db" stroke-width="5" marker-end="url(#ba)" />
+              <rect x="284" y="38" width="190" height="72" rx="16" fill="#0036a3" stroke="#0036a3" stroke-width="2.5"/>
+              <text x="379" y="68" font-family="ui-monospace, monospace" font-size="17" font-weight="900" text-anchor="middle" fill="#fff">Superlog Core</text>
+              <text x="379" y="92" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#d0e0ff">OTLP proxy + incidents</text>
+              <text x="379" y="106" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#d0e0ff">ClickHouse queries</text>
+              <line x1="476" y1="74" x2="556" y2="74" stroke="#1a56db" stroke-width="5" marker-end="url(#ba)" />
+              <rect x="560" y="38" width="160" height="72" rx="14" fill="#fff" stroke="#111" stroke-width="2.5"/>
+              <text x="640" y="68" font-family="ui-monospace, monospace" font-size="17" font-weight="900" text-anchor="middle" fill="#006b3c">Agent Runner</text>
+              <text x="640" y="92" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#444">community agent</text>
+              <text x="640" y="106" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#444">self-heal logic</text>
+              <line x1="200" y1="136" x2="476" y2="136" stroke="#1a56db" stroke-width="5" marker-end="url(#ba)" stroke-dasharray="8,5" />
+              <rect x="284" y="122" width="190" height="38" rx="10" fill="#eaf1ff" stroke="#0036a3" stroke-width="1.5"/>
+              <text x="379" y="146" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle" fill="#0036a3">Web UI + API · localhost:5173</text>
+              <rect x="38" y="152" width="684" height="28" rx="10" fill="#fff" stroke="#111" stroke-width="2"/>
+              <text x="56" y="172" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#666">Open-source community edition · superlog.sh/cloud for hosted</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="stats">
+      <div class="stat"><div class="k">stars</div><div class="v">716</div><div class="d">GitHub 开源社区关注</div></div>
+      <div class="stat"><div class="k">language</div><div class="v">TS</div><div class="d">TypeScript monorepo</div></div>
+      <div class="stat"><div class="k">license</div><div class="v">Apache 2.0</div><div class="d">完全开源，社区版免费</div></div>
+      <div class="stat"><div class="k">y combinator</div><div class="v">P26</div><div class="d">2026 年夏季批次孵化</div></div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">核心定位</div>
+          <h2>不是另一个日志看板，而是把可观测性变成自动化行动</h2>
+          <p>Superlog 的 README 把定位说得很清楚：开源 agentic telemetry 系统。不是"更漂亮的数据可视化"，而是把 telemetry 数据变成 Agent 可以理解和执行的东西。</p>
+        </div>
+      </div>
+      <div class="lead">
+        <div class="t">Why it exists</div>
+        <p>传统可观测性工具告诉你"指标 spike 了"，然后你得自己去看日志、自己诊断、自己修。Superlog 的思路是：让 Agent 替你做这件事——摄取信号、聚合成 incidents、触发自愈。</p>
+      </div>
+      <div class="grid3">
+        <article class="cardbox blue">
+          <div class="tagrow"><span class="tag dark">agentic observability</span></div>
+          <h3>可观测性不只是看数据，而是让 Agent 能读懂</h3>
+          <p>Superlog 在摄取层就考虑了 Agent 的可用性：信号聚合、incidents 组织，都是为了给下游 Agent 提供可执行的上下文。</p>
+        </article>
+        <article class="cardbox dark">
+          <div class="tagrow"><span class="tag dark">self-healing</span></div>
+          <h3>把诊断变成动作，不只是发告警</h3>
+          <p>社区版的 community agent runner 记录本地 incident 摘要；接入自定义 Agent runner 后可以把诊断变成修复动作。</p>
+        </article>
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag blue">local-first</span></div>
+          <h3>可以完全本地部署，不需要云服务</h3>
+          <p>Docker Compose 一键启动，Web + API + OTLP intake 全在本地跑，数据不出你的机器。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">02</div>
+        <div class="section-meta">
+          <div class="label">技术架构</div>
+          <h2>TypeScript monorepo：apps/ + packages/ 双层结构</h2>
+          <p>README 里明确列出了 monorepo 结构：4 个 app + 2 个 package。技术上用 Vite/React 做前端，Node.js 20+ 做后端，Postgres 做元数据，ClickHouse 做 telemetry 查询。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="cardbox">
+          <div class="tagrow"><span class="tag blue">apps/</span><span class="tag blue">packages/</span></div>
+          <h3>Monorepo 完整结构</h3>
+          <table class="matrix" style="margin-top:6px;">
+            <tbody>
+              <tr><td>apps/web</td><td>Vite/React 前端</td></tr>
+              <tr><td>apps/api</td><td>HTTP API 服务</td></tr>
+              <tr><td>apps/proxy</td><td>OTLP intake 代理</td></tr>
+              <tr><td>apps/worker</td><td>后台 worker / Agent 编排</td></tr>
+              <tr><td>packages/db</td><td>Drizzle schema + migrations</td></tr>
+              <tr><td>packages/fingerprint</td><td>telemetry fingerprinting helpers</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cardbox dark">
+          <div class="tagrow"><span class="tag dark">OpenTelemetry</span><span class="tag dark">ClickHouse</span><span class="tag dark">Postgres</span></div>
+          <h3>数据层设计</h3>
+          <ul>
+            <li><strong>OTLP proxy</strong>：接收任何 OTLP-compatible telemetry 数据。</li>
+            <li><strong>Postgres</strong>：元数据、incidents、配置等结构化数据。</li>
+            <li><strong>ClickHouse</strong>：海量 traces/logs/metrics 的时序查询。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">安装与入口</div>
+          <h2>用 skills 安装 / Docker Compose 本地起量 / 源码构建</h2>
+          <p>Superlog 提供了很有趣的安装路径：不只是 Docker，还支持用 coding agent 的 skills 机制一键安装。这让它特别适合集成到 AI agent 工作流里。</p>
+        </div>
+      </div>
+      <div class="grid3">
+        <article class="mini">
+          <div class="tagrow"><span class="tag blue">npx skills add</span></div>
+          <h4>用 Coding Agent 安装</h4>
+          <p>在任意支持 skills 的 coding agent 里运行：`npx skills add superloglabs/skills --all`，即可把 Superlog 安装到你的项目。</p>
+        </article>
+        <article class="mini">
+          <div class="tagrow"><span class="tag green">docker compose</span></div>
+          <h4>本地快速起量</h4>
+          <p>只需要 Docker + pnpm，一条 `docker compose up -d` 即可启动全套本地栈。</p>
+        </article>
+        <article class="mini">
+          <div class="tagrow"><span class="tag dark">source</span></div>
+          <h4>源码构建</h4>
+          <p>需要 Node.js 20+ 和 pnpm 9+。适合想深度定制或参与开发的人。</p>
+        </article>
+      </div>
+      <div class="quote" style="margin-top:10px;">
+        <strong>本地服务端口：</strong>Web → <code>localhost:5173</code> · API → <code>localhost:4100</code> · OTLP intake → <code>localhost:4101</code>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">Quick Start</div>
+          <h2>三步起量：Docker → migrate → dev</h2>
+          <p>README 给的 Quick Start 非常简洁，前置要求清晰：Node.js 20+、pnpm 9+、Docker，然后三行命令即可跑起来。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag blue">pnpm</span><span class="tag blue">docker</span></div>
+          <h3>安装依赖</h3>
+          <pre class="code">pnpm install</pre>
+        </article>
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag green">docker compose</span></div>
+          <h3>启动本地栈</h3>
+          <pre class="code">docker compose up -d
+pnpm --filter @superlog/db db:migrate
+pnpm dev</pre>
+        </article>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <article class="cardbox dark">
+          <div class="tagrow"><span class="tag dark">typecheck</span></div>
+          <h3>类型检查</h3>
+          <pre class="code">pnpm typecheck</pre>
+        </article>
+        <article class="cardbox blue">
+          <div class="tagrow"><span class="tag dark">open-core</span></div>
+          <h3>社区版 = 完整开源，不删功能</h3>
+          <p>README 明确说明：社区版包含完整功能（Web + API + OTLP proxy + workers + agent runner）。Superlog Cloud 是可选的付费托管版，不是功能解锁付费。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">Open-core 模型</div>
+          <h2>社区版 vs Cloud 版：功能完整，区别在部署方式</h2>
+          <p>Superlog 采取 open-core 模式：社区版是完全开源的完整版本，Superlog Cloud 提供托管服务（有免费层、按量计费和月包套餐）。这个模型适合愿意本地部署的用户。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="cardbox green">
+          <div class="tagrow"><span class="tag green">社区版</span></div>
+          <h3>完全免费，开源完整</h3>
+          <ul>
+            <li>Web + API + OTLP proxy + workers</li>
+            <li>Postgres + ClickHouse 本地存储</li>
+            <li>community agent runner</li>
+            <li>Apache 2.0，没有任何功能锁</li>
+          </ul>
+        </article>
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag blue">Cloud 版</span></div>
+          <h3>托管服务，按需付费</h3>
+          <ul>
+            <li>不需要自己维护基础设施</li>
+            <li>免费层可用</li>
+            <li>pay-as-you-go 或月包套餐</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">06</div>
+        <div class="section-meta">
+          <div class="label">适合 / 不适合</div>
+          <h2>适合把可观测性接入 AI agent 工作流，不适合只需要简单告警</h2>
+          <p>Superlog 的设计从一开始就是为 Agent 准备的。如果你只是想要一个传统日志看板，它不是最轻的选择；但如果你想构建"观测 → Agent → 自愈"闭环，它是目前少有的开源路径。</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <article class="cardbox green">
+          <div class="tagrow"><span class="tag green">适合</span></div>
+          <h3>最合适的场景</h3>
+          <ul>
+            <li>想用 AI Agent 做可观测性驱动的自动化运维。</li>
+            <li>需要本地部署、不想数据上云的场景。</li>
+            <li>已有 OpenTelemetry 数据，想接入可扩展的 agentic 平台。</li>
+            <li>想自定义 Agent runner 的可观测性诊断逻辑。</li>
+          </ul>
+        </article>
+        <article class="cardbox soft">
+          <div class="tagrow"><span class="tag red">不适合</span></div>
+          <h3>不该硬用的场景</h3>
+          <ul>
+            <li>只需要一个传统日志看板或 APM 工具。</li>
+            <li>不想维护自己的基础设施。</li>
+            <li>对 Agent 自愈能力没有需求，只需要简单告警。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="small">
+        <strong>来源</strong><br>
+        <a href="https://github.com/superloglabs/superlog" target="_blank" rel="noreferrer">https://github.com/superloglabs/superlog</a><br>
+        README 中的定位、技术架构、Quick Start、open-core 模型、monorepo 结构、License 等信息均已纳入卡片结构。
+      </div>
+      <div class="small">
+        <strong>备注</strong><br>
+        Apache 2.0 · Y Combinator P26 2026<br>
+        topics: ai, llm, observability, opentelemetry, react, self-hosted, skills, typescript<br>
+        核心叙事：用 Agentic 可观测性替代传统日志看板。
+      </div>
+    </footer>
+  </main>
+</div>
+<button class="save" onclick="saveCard()">保存 PNG</button>
+<script>
+async function saveCard(){
+  const card=document.getElementById('card');
+  const canvas=await html2canvas(card,{backgroundColor:null,scale:2,useCORS:true,scrollY:-window.scrollY});
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download='20260611-superlog.png';
+  a.click();
+}
+</script>
+</body>
+</html>
