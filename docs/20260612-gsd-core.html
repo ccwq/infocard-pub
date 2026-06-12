@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GSD Core · Git Ship Done · Context Engineering Framework</title>
+  <meta name="description" content="GSD Core 是 meta-prompting + context engineering + spec-driven development 框架，解决 AI 编程中的上下文腐化（context rot）：用新鲜上下文子代理 + 5 阶段循环 + .planning/ 持久化，让任意 Agent 都保持高质量输出。" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --red:#ff6b6b;
+      --orange:#ff9f43;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{
+      width:min(1180px,calc(100% - 20px));
+      margin:0 auto;
+      padding:18px 0 82px;
+    }
+    /* === HERO === */
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);
+      gap:14px;
+      color:#fff;
+      margin-bottom:14px;
+    }
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .pill.red{border-color:rgba(255,107,107,.32);background:rgba(255,107,107,.12);color:#ffd8d8}
+    .pill.orange{border-color:rgba(255,159,67,.35);background:rgba(255,159,67,.12);color:#ffe8cc}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon.blue{color:var(--blue)}
+    .mini-icon.red{color:var(--red)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    /* === SHELL === */
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}
+    .panel-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .panel-title{margin:0;font-size:17px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .panel-row{display:grid;gap:8px}
+    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
+    .feat .label{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .feat .value{font-size:12.5px;font-weight:800;line-height:1.3;color:#eef4ff}
+    .feat .note{font-size:11px;line-height:1.5;color:#8897c4}
+    .bar-row{display:flex;align-items:center;gap:8px}
+    .bar-label{font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;flex:0 0 80px}
+    .bar-track{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}
+    .bar-fill{height:100%;border-radius:999px;background:var(--cyan)}
+    /* === SECTION === */
+    .section{margin-bottom:14px}
+    .section-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .section-no{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(74,120,255,.28),rgba(88,195,255,.18));border:1.5px solid rgba(88,195,255,.28);box-shadow:0 8px 20px rgba(88,195,255,.14);font:950 18px/1 Georgia,"Times New Roman",serif;color:#fff;flex:0 0 auto}
+    .section-label{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    /* === FLOW LOOP === */
+    .flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+    .phase{padding:12px 10px 10px;border-right:1px solid rgba(255,255,255,.1);display:grid;gap:6px;min-width:0}
+    .phase:last-child{border-right:none}
+    .phase .n{display:block;font:950 22px/1 Georgia,"Times New Roman",serif}
+    .phase .t{font:900 9px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .phase .d{font-size:11px;line-height:1.52;color:#9fb0de}
+    .phase:nth-child(1) .n{color:var(--cyan)}
+    .phase:nth-child(2) .n{color:var(--blue)}
+    .phase:nth-child(3) .n{color:var(--green)}
+    .phase:nth-child(4) .n{color:var(--yellow)}
+    .phase:nth-child(5) .n{color:var(--purple)}
+    /* === CONTENT GRID === */
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .card{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px;box-shadow:0 8px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:10px}
+    .card-head{display:flex;align-items:center;gap:8px}
+    .card-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .card-title{margin:0;font-size:16px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .card-body{display:grid;gap:8px;flex:1}
+    .point{padding:7px 9px 6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;display:grid;gap:3px}
+    .point .t{font-size:12px;font-weight:800;line-height:1.3}
+    .point .d{font-size:11.5px;line-height:1.55;color:#9fb0de}
+    /* === CODE === */
+    .code-block{background:#080b14;border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px 14px;margin-bottom:14px;box-shadow:0 8px 20px rgba(0,0,0,.22)}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--cyan);font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;color:#c9d4f7;white-space:pre-wrap}
+    .code-block .c{color:#5a6380}
+    .code-block .k{color:#a8c5ff}
+    .code-block .s{color:#7de3d6}
+    .code-block .fn{color:#c7a2ff}
+    /* === PLATFORMS === */
+    .plat-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .plat-chip{padding:9px 10px 8px;background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:14px;text-align:center;display:grid;gap:5px;box-shadow:0 6px 16px rgba(0,0,0,.16)}
+    .plat-chip .name{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#eef4ff}
+    .plat-chip .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:999px;font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;width:fit-content}
+    .plat-chip .tag.yes{background:rgba(45,179,106,.15);border:1px solid rgba(45,179,106,.3);color:#2db36a}
+    /* === COMPARE === */
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .cmp{min-width:0;border-radius:18px;padding:14px;display:grid;gap:10px}
+    .cmp.bad{background:rgba(255,107,107,.08);border:1.5px solid rgba(255,107,107,.2)}
+    .cmp.good{background:rgba(45,179,106,.08);border:1.5px solid rgba(45,179,106,.2)}
+    .cmp-head{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .cmp.bad .cmp-head{color:var(--red)}
+    .cmp.good .cmp-head{color:var(--green)}
+    .cmp-body{display:grid;gap:7px}
+    .cmp-item{font-size:12.5px;line-height:1.5;color:#c5d2f7;padding-left:14px;border-left:2px solid rgba(255,255,255,.1)}
+    .cmp.good .cmp-item{border-left-color:rgba(45,179,106,.4)}
+    .cmp.bad .cmp-item{border-left-color:rgba(255,107,107,.3)}
+    /* === QUOTE === */
+    .quote{border-left:3px solid var(--cyan);background:rgba(88,195,255,.06);border:1.5px solid rgba(88,195,255,.14);border-radius:16px;padding:12px 14px;margin-bottom:14px;display:grid;gap:6px}
+    .quote p{margin:0;font-size:13px;line-height:1.66;color:#d8e8ff;font-style:italic}
+    .quote cite{font-size:11px;color:#8897c4;font-style:normal;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    /* === FILES === */
+    .files{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .file-item{min-width:0;padding:9px 10px 8px;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;display:grid;gap:4px}
+    .file-item .name{font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--cyan)}
+    .file-item .role{font-size:11px;line-height:1.45;color:#8897c4}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1.5px solid rgba(255,255,255,.09);background:rgba(9,12,22,.42);border-radius:18px;padding:12px 14px 10px;margin-bottom:14px;box-shadow:var(--shadow)}
+    .footer .brand{font-weight:900;color:#fff;font-size:15px;letter-spacing:-.02em}
+    .footer .links{display:flex;flex-wrap:wrap;gap:6px}
+    .footer .link-item{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;font-size:11px}
+    .footer .meta{font:800 11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#5a6380;text-align:right}
+    /* === SAVE === */
+    .save{position:fixed;right:18px;bottom:18px;z-index:999;border:0;border-radius:10px;padding:.82rem 1rem;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 12px 28px rgba(74,120,255,.3);cursor:pointer}
+    @media(max-width:960px){
+      .hero,.shell,.compare{grid-template-columns:1fr}
+      .flow{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .grid3{grid-template-columns:1fr 1fr}
+      .plat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .files{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:12px 0 82px}
+      .hero,.flow,.grid3,.compare,.plat-grid,.files{grid-template-columns:1fr}
+      .shell{display:none}
+      h1{font-size:clamp(36px,10vw,64px)}
+      .save{right:10px;bottom:10px;font-size:11.5px;padding:.72rem .88rem}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">🔧 META-PROMPTING · CONTEXT ENGINEERING · SPEC-DRIVEN</span>
+          <span class="source">github.com/open-gsd/gsd-core</span>
+        </div>
+        <h1 class="title">GSD Core</h1>
+        <p class="subtitle">Git · Ship · Done</p>
+        <p class="subcn">解决 AI 编程的<strong style="color:#d8f4ff">上下文腐化（Context Rot）</strong>：用新鲜上下文子代理 + 5 阶段工作循环 + <code>.planning/</code> 持久化，让任意 Agent 在长时间项目中持续保持高质量输出。</p>
+        <div class="pill-row">
+          <span class="pill cyan">v1.4.4</span>
+          <span class="pill green">MIT License</span>
+          <span class="pill yellow">Node.js ≥22</span>
+          <span class="pill purple">12 平台支持</span>
+          <span class="pill">Context Engineering</span>
+          <span class="pill">Spec-Driven</span>
+          <span class="pill orange">Multi-Agent</span>
+        </div>
+        <div class="hero-note">
+          <strong>核心理念：Context Rot 不是模型 Bug，是注意力机制的基本属性。</strong>
+          <p>当上下文窗口被历史积累填满，模型不是"忘记"，而是信噪比下降。GSD Core 的解法不是清空重来，而是把重活全部移到有干净上下文的新鲜子代理里执行，主会话只做编排。</p>
+        </div>
+      </div>
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">GSD</div>
+          <div class="visual-meta">
+            <div class="big">12 Coding Agents</div>
+            <div class="small">Fresh Context Per Agent</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <div class="mini-card">
+            <div class="mini-icon cyan">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="label">PROBLEM</div>
+            <div class="value">Context Rot</div>
+            <div class="desc">上下文窗口被历史积累填满，质量静默下降</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon green">
+              <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+            </div>
+            <div class="label">SOLUTION</div>
+            <div class="value">Fresh Subagents</div>
+            <div class="desc">每个重活在新干净的 200K token 窗口中执行</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon yellow">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+            </div>
+            <div class="label">STATE</div>
+            <div class="value">.planning/</div>
+            <div class="desc">STATE.md 等文件跨会话持久化，不依赖上下文窗口</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon purple">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            </div>
+            <div class="label">WORKFLOW</div>
+            <div class="value">5-Phase Loop</div>
+            <div class="desc">Discuss → Plan → Execute → Verify → Ship</div>
+          </div>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <!-- SHELL STATS -->
+    <section class="shell">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-kicker">CORE ARCHITECTURE</span>
+        </div>
+        <div class="panel-row">
+          <div class="feat">
+            <div class="label">Fresh Context</div>
+            <div class="value">200K tokens / agent</div>
+            <div class="note">每个子代理启动时获得干净的上下文窗口</div>
+          </div>
+          <div class="feat">
+            <div class="label">Thin Orchestrator</div>
+            <div class="value">主会话只做编排</div>
+            <div class="note">主会话从不操作源文件，不积累腐化</div>
+          </div>
+          <div class="feat">
+            <div class="label">File-Based State</div>
+            <div class="value">STATE.md spine</div>
+            <div class="note">所有状态写入 .planning/，可 git commit，可人类审查</div>
+          </div>
+          <div class="feat">
+            <div class="label">Absent = Enabled</div>
+            <div class="value">Opt-out 设计</div>
+            <div class="note">config.json 缺少字段默认开启，无需显式配置</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-kicker">SUPPORTED AGENTS</span>
+        </div>
+        <div class="panel-row">
+          <div class="bar-row"><div class="bar-label">Claude Code</div><div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--cyan)"></div></div></div>
+          <div class="bar-row"><div class="bar-label">Gemini CLI</div><div class="bar-track"><div class="bar-fill" style="width:95%;background:var(--yellow)"></div></div></div>
+          <div class="bar-row"><div class="bar-label">Codex CLI</div><div class="bar-track"><div class="bar-fill" style="width:92%;background:var(--green)"></div></div></div>
+          <div class="bar-row"><div class="bar-label">Copilot</div><div class="bar-track"><div class="bar-fill" style="width:90%;background:var(--purple)"></div></div></div>
+          <div class="bar-row"><div class="bar-label">Cursor</div><div class="bar-track"><div class="bar-fill" style="width:88%;background:var(--blue)"></div></div></div>
+          <div class="bar-row"><div class="bar-label">Windsurf</div><div class="bar-track"><div class="bar-fill" style="width:86%;background:var(--cyan)"></div></div></div>
+          <div class="bar-row"><div class="bar-label">OpenCode</div><div class="bar-track"><div class="bar-fill" style="width:84%;background:var(--green)"></div></div></div>
+          <div class="bar-row"><div class="bar-label">Kilo</div><div class="bar-track"><div class="bar-fill" style="width:82%;background:var(--yellow)"></div></div></div>
+          <div class="bar-row"><div class="bar-label">Others</div><div class="bar-track"><div class="bar-fill" style="width:78%;background:var(--purple)"></div></div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-kicker">KEY TRADE-OFFS</span>
+        </div>
+        <div class="panel-row">
+          <div class="feat">
+            <div class="label">Overhead</div>
+            <div class="value" style="color:var(--yellow)">Real Friction</div>
+            <div class="note">多步交互比"直接开干"慢，对简单任务不划算</div>
+          </div>
+          <div class="feat">
+            <div class="label">Latency</div>
+            <div class="value" style="color:var(--yellow)">Multiple Agents</div>
+            <div class="note">子代理并行有往返延迟，比单次 in-context 编辑慢</div>
+          </div>
+          <div class="feat">
+            <div class="label">Ceremony</div>
+            <div class="value" style="color:var(--orange)">Avoid for Simple Tasks</div>
+            <div class="note">改个变量、加个 import 不值得走 5 阶段，用 /gsd-quick</div>
+          </div>
+          <div class="feat">
+            <div class="label">Pays Off When</div>
+            <div class="value" style="color:var(--green)">Complex Multi-File Work</div>
+            <div class="note">跨文件功能、重构、跨小时/会话的工作</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5-PHASE FLOW -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">1</div>
+        <span class="section-label">PHASE LOOP — 每个里程碑重复同样的五步循环</span>
+      </div>
+      <div class="flow">
+        <div class="phase">
+          <div class="n">1</div>
+          <div class="t" style="color:var(--cyan)">DISCUSS</div>
+          <div class="d">在规划前捕获实现决策。adaptive questioning 收集上下文，写入讨论记录。</div>
+        </div>
+        <div class="phase">
+          <div class="n">2</div>
+          <div class="t" style="color:var(--blue)">PLAN</div>
+          <div class="d">research + decompose + verify plan fits fresh context window。researcher 和 planner 分工。</div>
+        </div>
+        <div class="phase">
+          <div class="n">3</div>
+          <div class="t" style="color:var(--green)">EXECUTE</div>
+          <div class="d">并行 waves 执行计划。每个 executor 从干净的 200K token 上下文启动。</div>
+        </div>
+        <div class="phase">
+          <div class="n">4</div>
+          <div class="t" style="color:var(--yellow)">VERIFY</div>
+          <div class="d">逐项走查产出，诊断并修复问题，再宣布完成。</div>
+        </div>
+        <div class="phase">
+          <div class="n">5</div>
+          <div class="t" style="color:var(--purple)">SHIP</div>
+          <div class="d">创建 PR，归档阶段，进入下一个里程碑。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 CONTENT GRIDS -->
+    <section class="grid3">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-kicker" style="color:var(--cyan)">NAMESPACE COMMANDS</span>
+        </div>
+        <h3 class="card-title">6 大命令空间</h3>
+        <div class="card-body">
+          <div class="point"><div class="t">/gsd-workflow</div><div class="d">Phase pipeline：discuss / plan / execute / verify / phase / progress</div></div>
+          <div class="point"><div class="t">/gsd-project</div><div class="d">Project lifecycle：milestones、audits、summary</div></div>
+          <div class="point"><div class="t">/gsd-quality</div><div class="d">Quality gates：code review、debug、security、eval、ui</div></div>
+          <div class="point"><div class="t">/gsd-context</div><div class="d">Codebase intelligence：map、graphify、docs、learnings</div></div>
+          <div class="point"><div class="t">/gsd-manage</div><div class="d">Management：config、workspace、workstreams、thread、update、ship</div></div>
+          <div class="point"><div class="t">/gsd-ideate</div><div class="d">Exploration & capture：explore、sketch、spike、spec、capture</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-kicker" style="color:var(--green)">DESIGN PRINCIPLES</span>
+        </div>
+        <h3 class="card-title">5 条核心原则</h3>
+        <div class="card-body">
+          <div class="point"><div class="t">① Fresh Context Per Agent</div><div class="d">每个子代理从干净上下文启动，消除 context rot 的结构性根因。</div></div>
+          <div class="point"><div class="t">② Thin Orchestrators</div><div class="d">workflow 文件只做编排，不做重活。上下文通过 gsd-tools.cjs init 注入。</div></div>
+          <div class="point"><div class="t">③ File-Based State</div><div class="d">所有状态在 .planning/ 中的人类可读 Markdown/JSON，不依赖数据库。</div></div>
+          <div class="point"><div class="t">④ Absent = Enabled</div><div class="d">config.json 缺少的 key 默认 true，显式禁用才关闭，降低配置负担。</div></div>
+          <div class="point"><div class="t">⑤ Defense in Depth</div><div class="d">多层防护覆盖常见失败模式，spec 驱动的验证在执行前拦截低质量产出。</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-kicker" style="color:var(--purple)">KEY FILES</span>
+        </div>
+        <h3 class="card-title">.planning/ 文件结构</h3>
+        <div class="card-body">
+          <div class="point"><div class="t">PROJECT.md</div><div class="d">项目元信息：目标、范围、技术栈、团队约定</div></div>
+          <div class="point"><div class="t">REQUIREMENTS.md</div><div class="d">需求规格：功能性需求 + 验收标准</div></div>
+          <div class="point"><div class="t">ROADMAP.md</div><div class="d">路线图：里程碑分解、时间规划</div></div>
+          <div class="point"><div class="t">STATE.md</div><div class="d">项目脊柱：当前位置、活跃决策、阻塞项、进度指标</div></div>
+          <div class="point"><div class="t">phases/</div><div class="d">每个阶段的 context.md、research.md、plan.md 等工作产物</div></div>
+          <div class="point"><div class="t">research/</div><div class="d">调研发现，供 planner 子代理参考</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUOTE -->
+    <section class="quote">
+      <p>"Context rot 不是模型 bug。它是 transformer 在长序列上注意力权重分布的基本属性。GSD Core 的解法是结构性的：把重活移到子代理里执行，主会话保持精简。"</p>
+      <cite>— open-gsd/gsd-core · docs/explanation/context-engineering.md</cite>
+    </section>
+
+    <!-- COMPARE vs OTHERS -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">2</div>
+        <span class="section-label">VS CLAUDE.MD / AGENTS.MD — 增量在哪里</span>
+      </div>
+    </section>
+    <section class="compare">
+      <div class="cmp bad">
+        <div class="cmp-head">❌ CLAUDE.md / AGENTS.md</div>
+        <div class="cmp-body">
+          <div class="cmp-item">入口文件容易变成大而全的文档，缺少任务级上下文</div>
+          <div class="cmp-item">没有任务级的 PRD 和工作流关卡</div>
+          <div class="cmp-item">没有 workspace memory，跨会话依赖上下文记忆</div>
+          <div class="cmp-item">没有子代理新鲜上下文机制，context rot 随会话线性累积</div>
+          <div class="cmp-item">平台绑定工作流，换工具需要重新配置</div>
+        </div>
+      </div>
+      <div class="cmp good">
+        <div class="cmp-head">✓ GSD Core</div>
+        <div class="cmp-body">
+          <div class="cmp-item">作用域明确的 SPEC，每个阶段有独立 artifact</div>
+          <div class="cmp-item">任务级 PRD：DISCUSS → PLAN → EXECUTE → VERIFY → SHIP 闭环</div>
+          <div class="cmp-item">.planning/ 持久化，/clear 不会丢失工程上下文</div>
+          <div class="cmp-item">fresh-context 子代理，主会话永远保持精简</div>
+          <div class="cmp-item">跨 12 个 Agent 平台统一工作流，一套规范，多平台复用</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CODE QUICK START -->
+    <section class="code-block">
+      <div class="tag">// INSTALL & QUICK START</div>
+      <pre><span class="c"># 1. 安装（一行命令，自动检测平台）</span>
+<span class="k">npx</span> <span class="s">@opengsd/gsd-core@latest</span>
+
+<span class="c"># 2. 初始化新项目</span>
+<span class="fn">/gsd-new-project</span>
+
+<span class="c"># 3. 开始第一阶段（五步循环）</span>
+<span class="fn">/gsd-discuss-phase</span>    <span class="c"># 讨论捕获实现决策</span>
+<span class="fn">/gsd-plan-phase</span>        <span class="c"># 研究 + 分解 + 验证计划</span>
+<span class="fn">/gsd-execute-phase</span>     <span class="c"># 在新鲜子代理中执行</span>
+<span class="fn">/gsd-verify-phase</span>     <span class="c"># 走查 + 诊断 + 修复</span>
+<span class="fn">/gsd-ship</span>              <span class="c"># 创建 PR + 归档阶段</span>
+
+<span class="c"># 轻量任务（不走完整 phase loop）</span>
+<span class="fn">/gsd-quick</span>             <span class="c"># 快速 ad-hoc 任务</span>
+<span class="fn">/gsd-fast</span>             <span class="c"># 比 quick 更轻量</span></pre>
+    </section>
+
+    <!-- PLATFORMS -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">3</div>
+        <span class="section-label">SUPPORTED PLATFORMS — 12 Coding Agents</span>
+      </div>
+    </section>
+    <section class="plat-grid">
+      <div class="plat-chip"><div class="name">Claude Code</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Gemini CLI</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Codex CLI</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Copilot</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Cursor</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Windsurf</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Kilo Code</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">OpenCode</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Antigravity</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Trae</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Cline</div><div class="tag yes">✓ Full</div></div>
+      <div class="plat-chip"><div class="name">Augment Code</div><div class="tag yes">✓ Full</div></div>
+    </section>
+
+    <!-- FILES -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">4</div>
+        <span class="section-label">INSTALLER ARCHITECTURE — 命令运行时自动适配</span>
+      </div>
+    </section>
+    <section class="files">
+      <div class="file-item"><div class="name">/gsd-* (Claude)</div><div class="role">连字符形式，Claude Code 格式</div></div>
+      <div class="file-item"><div class="name">/gsd:* (Gemini)</div><div class="role">冒号形式，Gemini CLI 命名空间</div></div>
+      <div class="file-item"><div class="name">$gsd-* (Codex)</div><div class="role">美元前缀，Codex CLI 格式</div></div>
+      <div class="file-item"><div class="name">gsd-tools.cjs</div><div class="role">工作流层，通过 init 注入上下文</div></div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div>
+        <div class="brand">open-gsd / gsd-core</div>
+        <div class="links">
+          <span class="link-item">github.com/open-gsd/gsd-core</span>
+          <span class="link-item">npm: @opengsd/gsd-core v1.4.4</span>
+          <span class="link-item">docs.trygsd.dev</span>
+          <span class="link-item">Discord: discord.gg/mYgfVNfA2r</span>
+        </div>
+      </div>
+      <div class="meta">
+        MIT License · Node.js ≥22 · darkblue-style
+      </div>
+    </footer>
+
+  </main>
+
+  <button class="save" onclick="html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,logging:false,backgroundColor:'#0c1020'}).then(c=>{let a=document.createElement('a');a.download='gsd-core-darkblue.png';a.href=c.toDataURL('image/png');a.click()}).catch(e=>alert(e))">⬇ PNG</button>
+</body>
+</html>
