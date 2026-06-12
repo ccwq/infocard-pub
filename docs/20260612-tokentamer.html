@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TokenTamer · Real-Time LLM Cost Compression Proxy</title>
+  <meta name="description" content="TokenTamer 是 AI 编程代理与 LLM API 之间的中间件代理，拦截 payloads、用 AST 解析代码、把背景文件替换为结构骨架，同时保留最新读取：50–80% API 费用节省。" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --red:#ff6b6b;
+      --orange:#ff9f43;
+      --teal:#2dd4bf;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{
+      width:min(1180px,calc(100% - 20px));
+      margin:0 auto;
+      padding:18px 0 82px;
+    }
+    /* === HERO === */
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);
+      gap:14px;
+      color:#fff;
+      margin-bottom:14px;
+    }
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .pill.red{border-color:rgba(255,107,107,.32);background:rgba(255,107,107,.12);color:#ffd8d8}
+    .pill.orange{border-color:rgba(255,159,67,.35);background:rgba(255,159,67,.12);color:#ffe8cc}
+    .pill.teal{border-color:rgba(45,212,191,.32);background:rgba(45,212,191,.12);color:#d0fff8}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:22px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon.orange{color:var(--orange)}
+    .mini-icon.teal{color:var(--teal)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    /* === SHELL === */
+    .shell{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}
+    .panel-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .panel-title{margin:0;font-size:17px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .panel-row{display:grid;gap:8px}
+    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
+    .feat .label{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .feat .value{font-size:12.5px;font-weight:800;line-height:1.3;color:#eef4ff}
+    .feat .note{font-size:11px;line-height:1.5;color:#8897c4}
+    /* === SECTION === */
+    .section{margin-bottom:14px}
+    .section-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .section-no{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(74,120,255,.28),rgba(88,195,255,.18));border:1.5px solid rgba(88,195,255,.28);box-shadow:0 8px 20px rgba(88,195,255,.14);font:950 18px/1 Georgia,"Times New Roman",serif;color:#fff;flex:0 0 auto}
+    .section-label{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    /* === FLOW === */
+    .flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+    .node{padding:12px 10px 10px;border-right:1px solid rgba(255,255,255,.1);display:grid;gap:6px;min-width:0}
+    .node:last-child{border-right:none}
+    .node .n{display:block;font:950 20px/1 Georgia,"Times New Roman",serif}
+    .node .t{font:900 9px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .node .d{font-size:11px;line-height:1.52;color:#9fb0de}
+    .node:nth-child(1) .n{color:var(--cyan)}
+    .node:nth-child(2) .n{color:var(--purple)}
+    .node:nth-child(3) .n{color:var(--yellow)}
+    .node:nth-child(4) .n{color:var(--green)}
+    /* === CONTENT GRID === */
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .card{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px;box-shadow:0 8px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:10px}
+    .card-head{display:flex;align-items:center;gap:8px}
+    .card-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .card-title{margin:0;font-size:16px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .card-body{display:grid;gap:8px;flex:1}
+    .point{padding:7px 9px 6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;display:grid;gap:3px}
+    .point .t{font-size:12px;font-weight:800;line-height:1.3}
+    .point .d{font-size:11.5px;line-height:1.55;color:#9fb0de}
+    /* === CODE === */
+    .code-block{background:#080b14;border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px 14px;margin-bottom:14px;box-shadow:0 8px 20px rgba(0,0,0,.22)}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--cyan);font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;color:#c9d4f7;white-space:pre-wrap}
+    .code-block .c{color:#5a6380}
+    .code-block .k{color:#a8c5ff}
+    .code-block .s{color:#7de3d6}
+    .code-block .fn{color:#c7a2ff}
+    .code-block .cm{color:#8897c4}
+    /* === TABLES === */
+    .tbl{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px}
+    .tbl th{background:rgba(88,195,255,.12);border:1px solid rgba(255,255,255,.1);padding:7px 10px;text-align:left;font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+    .tbl td{padding:7px 10px;border:1px solid rgba(255,255,255,.07);vertical-align:top;color:#c5d2f7;line-height:1.55}
+    .tbl td:first-child{font-weight:800;color:#eef4ff}
+    .tbl tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+    /* === CACHE FLOW === */
+    .cache-flow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .cache-box{border-radius:18px;padding:12px;display:grid;gap:10px}
+    .cache-box.bad{background:rgba(255,107,107,.06);border:1.5px solid rgba(255,107,107,.2)}
+    .cache-box.good{background:rgba(45,179,106,.06);border:1.5px solid rgba(45,179,106,.2)}
+    .cache-head{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .cache-box.bad .cache-head{color:var(--red)}
+    .cache-box.good .cache-head{color:var(--green)}
+    .cache-body{display:grid;gap:6px}
+    .cache-row{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#8897c4;padding-left:10px;border-left:2px solid rgba(255,255,255,.08)}
+    .cache-box.good .cache-row{border-left-color:rgba(45,179,106,.3)}
+    .cache-box.bad .cache-row{border-left-color:rgba(255,107,107,.25)}
+    .cache-row .cost{float:right;font-weight:900}
+    .cache-box.bad .cache-row .cost{color:var(--red)}
+    .cache-box.good .cache-row .cost{color:var(--green)}
+    .cache-row .tag{display:inline-flex;padding:1px 5px;border-radius:4px;font-size:9.5px;margin-left:4px}
+    .cache-box.bad .cache-row .tag{background:rgba(255,107,107,.15);color:var(--red)}
+    .cache-box.good .cache-row .tag{background:rgba(45,179,106,.15);color:var(--green)}
+    /* === PLATFORMS === */
+    .plat-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .plat-chip{padding:9px 10px 8px;background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:14px;text-align:center;display:grid;gap:5px;box-shadow:0 6px 16px rgba(0,0,0,.16)}
+    .plat-chip .name{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#eef4ff}
+    .plat-chip .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:999px;font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;width:fit-content}
+    .plat-chip .tag.yes{background:rgba(45,179,106,.15);border:1px solid rgba(45,179,106,.3);color:var(--green)}
+    .plat-chip .tag.warn{background:rgba(244,200,76,.12);border:1px solid rgba(244,200,76,.25);color:var(--yellow)}
+    /* === QUOTE === */
+    .quote{border-left:3px solid var(--cyan);background:rgba(88,195,255,.06);border:1.5px solid rgba(88,195,255,.14);border-radius:16px;padding:12px 14px;margin-bottom:14px;display:grid;gap:6px}
+    .quote p{margin:0;font-size:13px;line-height:1.66;color:#d8e8ff;font-style:italic}
+    .quote cite{font-size:11px;color:#8897c4;font-style:normal;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    /* === LANG GRID === */
+    .lang-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .lang-chip{padding:8px 10px;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;display:grid;gap:4px}
+    .lang-chip .name{font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#eef4ff}
+    .lang-chip .method{font-size:11px;color:#8897c4}
+    .lang-chip .method span{color:var(--cyan)}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1.5px solid rgba(255,255,255,.09);background:rgba(9,12,22,.42);border-radius:18px;padding:12px 14px 10px;margin-bottom:14px;box-shadow:var(--shadow)}
+    .footer .brand{font-weight:900;color:#fff;font-size:15px;letter-spacing:-.02em}
+    .footer .links{display:flex;flex-wrap:wrap;gap:6px}
+    .footer .link-item{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;font-size:11px}
+    .footer .meta{font:800 11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#5a6380;text-align:right}
+    /* === SAVE === */
+    .save{position:fixed;right:18px;bottom:18px;z-index:999;border:0;border-radius:10px;padding:.82rem 1rem;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 12px 28px rgba(74,120,255,.3);cursor:pointer}
+    @media(max-width:960px){
+      .hero,.shell,.grid2,.cache-flow{grid-template-columns:1fr}
+      .flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .plat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .lang-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:12px 0 82px}
+      .hero,.shell,.flow,.grid2,.cache-flow,.plat-grid,.lang-grid{grid-template-columns:1fr}
+      h1{font-size:clamp(36px,10vw,64px)}
+      .save{right:10px;bottom:10px;font-size:11.5px;padding:.72rem .88rem}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">💰 LLM COST OPTIMIZATION · MIDDLEWARE PROXY · AST COMPRESSION</span>
+          <span class="source">github.com/borhen68/TokenTamer</span>
+        </div>
+        <h1 class="title">TokenTamer</h1>
+        <p class="subtitle">Drop-in proxy that compresses bloated code context in real-time</p>
+        <p class="subcn">TokenTamer 位于 AI 编程代理与 LLM API 之间：拦截 payloads、用 AST 解析代码，把「背景文件」替换为结构骨架，同时保留「活跃文件」的完整内容。<strong style="color:#d8f4ff">节省 50–80% API 费用。</strong></p>
+        <div class="pill-row">
+          <span class="pill yellow">v0.2.0</span>
+          <span class="pill green">MIT License</span>
+          <span class="pill cyan">Python 3.10+</span>
+          <span class="pill purple">5 Clients</span>
+          <span class="pill teal">AST Compression</span>
+          <span class="pill orange">Tool-Aware</span>
+          <span class="pill">Anthropic Cache</span>
+        </div>
+        <div class="hero-note">
+          <strong>⚠️ Alpha 软件。</strong>
+          <p>压缩取决于文件重读次数（单次读取无收益）；启发式文件检测可能漏掉特殊 schema；仅 macOS 提供一键证书配置。</p>
+        </div>
+      </div>
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">TT</div>
+          <div class="visual-meta">
+            <div class="big">50–80% API Cost Cut</div>
+            <div class="small">Zero Latency Overhead</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <div class="mini-card">
+            <div class="mini-icon cyan">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="label">PROBLEM</div>
+            <div class="value">Context Bloat</div>
+            <div class="desc">AI 每次调用把完整文件 history 注入 context，token 费用爆炸</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon green">
+              <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+            </div>
+            <div class="label">SOLUTION</div>
+            <div class="value">AST Skeleton</div>
+            <div class="desc">保留签名/imports/classes，把函数体替换为骨架，agent 仍知道文件结构</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon yellow">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <div class="label">TOOL-AWARE</div>
+            <div class="value">Stale Reads</div>
+            <div class="desc">追踪 tool_use→file，骨架化旧 tool_result，保留最新读取完整</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon purple">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+            </div>
+            <div class="label">CACHE</div>
+            <div class="value">~73% Off Long Sessions</div>
+            <div class="desc">Anthropic 缓存设计：前缀 exact-match，TokenTamer 保证字节一致</div>
+          </div>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <!-- SHELL STATS -->
+    <section class="shell">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">HOW IT WORKS</span></div>
+        <div class="panel-row">
+          <div class="feat"><div class="label">Intercept</div><div class="value">Drop-in proxy</div><div class="note">只需改 API base URL，无需改 coding agent</div></div>
+          <div class="feat"><div class="label">Parse</div><div class="value">AST / Brace-balance</div><div class="note">Python 用原生 AST，其他语言用 brace-balance 启发式</div></div>
+          <div class="feat"><div class="label">Skeletonize</div><div class="value">Body → [...] skeleton</div><div class="note">保留签名/imports/class structures，函数体替换为骨架注释</div></div>
+          <div class="feat"><div class="label">Forward</div><div class="value">Compressed payload → LLM</div><div class="note">毫秒级本地处理，零延迟体感</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">KEY FEATURES</span></div>
+        <div class="panel-row">
+          <div class="feat"><div class="label">🌳 AST Compression</div><div class="value">保留签名，去函数体</div><div class="note">Python native AST；JS/TS/Go/Rust 用 brace-balance</div></div>
+          <div class="feat"><div class="label">🧠 Tool-Aware</div><div class="value">追踪 tool_use→file</div><div class="note">旧 tool_result 骨架化，最新读取保留 100%</div></div>
+          <div class="feat"><div class="label">💰 Cost Dashboard</div><div class="value">实时美元节省</div><div class="note">Rich 终端面板：tokens saved + money saved</div></div>
+          <div class="feat"><div class="label">⚡ Zero Latency</div><div class="value">本地毫秒级</div><div class="note">压缩在本地完成，API 响应速度不受影响</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">⚠️ LIMITATIONS</span></div>
+        <div class="panel-row">
+          <div class="feat"><div class="label">Single-Read</div><div class="value" style="color:var(--red)">No Savings</div><div class="note">只读一次的 session 无压缩收益，收益来自重读</div></div>
+          <div class="feat"><div class="label">Heuristic Detection</div><div class="value" style="color:var(--orange)">May Miss Exotic Schema</div><div class="note">依赖 file_path/path/filename key 检测，特殊 schema 可能漏掉</div></div>
+          <div class="feat"><div class="label">macOS Only</div><div class="value" style="color:var(--orange)">Cert Setup</div><div class="note">一键证书配置仅 macOS；Linux/Windows 需手动 trust</div></div>
+          <div class="feat"><div class="label">v0.2 Numbers</div><div class="value" style="color:var(--yellow)">Synthetic Benchmarks</div><div class="note">节省数字来自单元测试合成 payloads，非真实 Claude Code session</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLOW -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">1</div>
+        <span class="section-label">REQUEST FLOW — 100k → 15k tokens</span>
+      </div>
+      <div class="flow">
+        <div class="node">
+          <div class="n">1</div>
+          <div class="t" style="color:var(--cyan)">INTERCEPT</div>
+          <div class="d">Coding Agent 发送原始 payload（含完整文件 history）到 TokenTamer</div>
+        </div>
+        <div class="node">
+          <div class="n">2</div>
+          <div class="t" style="color:var(--purple)">DETECT</div>
+          <div class="d">追踪 tool_use → file 映射，识别活跃文件 vs 背景文件</div>
+        </div>
+        <div class="node">
+          <div class="n">3</div>
+          <div class="t" style="color:var(--yellow)">COMPRESS</div>
+          <div class="d">对背景文件执行 AST skeletonize，保留签名/class/imports，函数体变骨架</div>
+        </div>
+        <div class="node">
+          <div class="n">4</div>
+          <div class="t" style="color:var(--green)">FORWARD</div>
+          <div class="d">压缩后的 15k token payload 转发给 LLM API，结果原路返回 Agent</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SKELETON DEMO -->
+    <section class="code-block">
+      <div class="tag">// SKELETONIZE EXAMPLE — BEFORE vs AFTER</div>
+      <pre><span class="cm"># BEFORE — 完整函数体，token 费用高</span>
+<span class="k">def</span> <span class="fn">calculate_tax</span>(amount: <span class="s">float</span>, region: <span class="s">str</span>) -> <span class="s">float</span>:
+    <span class="s">"""Calculates regional tax rates based on complex logic."""</span>
+    rate = get_base_rate(region)
+    adjustments = fetch_adjustments(region, amount)
+    <span class="k">if</span> amount > THRESHOLD:
+        rate *= <span class="s">1.05</span>
+    <span class="c"># ... 50 more lines of complex math ...</span>
+    <span class="k">return</span> final_tax
+
+<span class="cm"># AFTER — 骨架，token 费用低，LLM 仍知道如何调用</span>
+<span class="cm"># [TOKEN-GUARD: Compressed — structural skeleton only]</span>
+<span class="k">def</span> <span class="fn">calculate_tax</span>(amount: <span class="s">float</span>, region: <span class="s">str</span>) -> <span class="s">float</span>: ...</pre>
+    </section>
+
+    <!-- CACHE COMPARISON -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">2</div>
+        <span class="section-label">ANTHROPIC PROMPT CACHING — ~73% OFF LONG SESSIONS</span>
+      </div>
+    </section>
+    <section class="cache-flow">
+      <div class="cache-box bad">
+        <div class="cache-head">❌ Without TokenTamer</div>
+        <div class="cache-body">
+          <div class="cache-row">Turn 5: [sys, tools, msg1-5] <span class="cost">$$$$$</span></div>
+          <div class="cache-row">Turn 6: [sys, tools, msg1-6] <span class="cost">$$$$$$</span></div>
+          <div class="cache-row">Turn 7: [sys, tools, msg1-7] <span class="cost">$$$$$$$</span></div>
+          <div class="cache-row">Turn 50: [sys, tools, msg1-50] <span class="cost">$$$$$$$$$$</span></div>
+        </div>
+        <div style="font-size:12px;color:var(--red);padding-top:8px;border-top:1px solid rgba(255,107,107,.15)">
+          50-turn Claude Code session ≈ <strong>$3.00</strong>
+        </div>
+      </div>
+      <div class="cache-box good">
+        <div class="cache-head">✓ With TokenTamer (cache-first)</div>
+        <div class="cache-body">
+          <div class="cache-row">Turn 5: [prefix cached] [msg4,5] <span class="cost">$$</span> <span class="tag">$0.30/M</span></div>
+          <div class="cache-row">Turn 6: [prefix cached] [msg4,5,6] <span class="cost">$$</span> <span class="tag">$0.30/M</span></div>
+          <div class="cache-row">Turn 7: [prefix cached] [msg4,5,6,7] <span class="cost">$$</span> <span class="tag">$0.30/M</span></div>
+          <div class="cache-row">Turn 50: [prefix cached] [msg4..50] <span class="cost">$$</span> <span class="tag">$0.30/M</span></div>
+        </div>
+        <div style="font-size:12px;color:var(--green);padding-top:8px;border-top:1px solid rgba(45,179,106,.15)">
+          50-turn Claude Code session ≈ <strong>$0.80</strong> · <strong style="color:var(--green)">~73% saved</strong>
+        </div>
+      </div>
+    </section>
+    <section class="code-block">
+      <div class="tag">// CACHE-FIRST DESIGN — WHY ORDER MATTERS</div>
+      <pre><span class="cm"># Anthropic cache 是 exact prefix match</span>
+<span class="cm"># 如果字节变了 → 整个 prefix cache miss</span>
+<span class="cm"># Cache miss → pay $3.75/M (write cost) NOT $0.30/M (read cost)</span>
+
+<span class="cm"># Broken order (compress-first → then cache):</span>
+<span class="cm">#   → 压缩后的 bytes 与 Turn 1 不同</span>
+<span class="cm">#   → $3.75/M × huge prefix = 比不加 cache 还贵!</span>
+
+<span class="cm"># TokenTamer 正确顺序 (cache-first → then compress):</span>
+<span class="k">1.</span> 先在原始消息上添加 cache_control breakpoints
+<span class="k">2.</span> compression 只作用在 cached prefix 之后的消息
+<span class="k">3.</span> prefix 字节在 Turn 间完全一致 → 真的 hit $0.30/M
+
+<span class="cm"># 验证 header：</span>
+<span class="cm"># X-TokenTamer-Cache-Breakpoints: 3</span>
+<span class="cm"># X-TokenTamer-Cache-Tokens: 12400</span></pre>
+    </section>
+
+    <!-- CLIENT SUPPORT -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">3</div>
+        <span class="section-label">CLIENT SUPPORT MATRIX</span>
+      </div>
+    </section>
+    <section class="plat-grid">
+      <div class="plat-chip"><div class="name">Aider</div><div class="tag yes">✓ Full</div><div style="font-size:10.5px;color:#8897c4;margin-top:2px">--openai-api-base</div></div>
+      <div class="plat-chip"><div class="name">Cursor</div><div class="tag yes">✓ Full</div><div style="font-size:10.5px;color:#8897c4;margin-top:2px">Custom base URL</div></div>
+      <div class="plat-chip"><div class="name">curl / SDK</div><div class="tag yes">✓ Full</div><div style="font-size:10.5px;color:#8897c4;margin-top:2px">直接代理</div></div>
+      <div class="plat-chip"><div class="name">Claude Code</div><div class="tag warn">⚡ SSL</div><div style="font-size:10.5px;color:#8897c4;margin-top:2px">HTTPS 拦截，工具感知压缩</div></div>
+      <div class="plat-chip"><div class="name">Codex CLI</div><div class="tag warn">⚡ SSL</div><div style="font-size:10.5px;color:#8897c4;margin-top:2px">HTTPS 拦截，工具感知压缩</div></div>
+    </section>
+
+    <!-- QUICK START CODE -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">4</div>
+        <span class="section-label">QUICK START — PATH A (Aider / Cursor / SDK)</span>
+      </div>
+    </section>
+    <section class="code-block">
+      <div class="tag">// PATH A — NO SSL SETUP NEEDED</div>
+      <pre><span class="cm"># 1. Install</span>
+<span class="k">git clone</span> https://github.com/borhen68/TokenTamer.git
+<span class="k">cd</span> TokenTamer
+<span class="k">python3 -m venv</span> venv && <span class="k">source</span> venv/bin/activate
+<span class="k">pip install</span> -e .
+
+<span class="cm"># 2. Start proxy (no SSL, no dashboard)</span>
+token-tamer --port <span class="s">8000</span> --no-dashboard
+
+<span class="cm"># 3. Point agent at the proxy</span>
+<span class="cm"># Aider:</span>
+aider --openai-api-base <span class="s">http://127.0.0.1:8000/v1</span>
+
+<span class="cm"># Cursor: Settings → Models → OpenAI API Base</span>
+<span class="s">http://127.0.0.1:8000/v1</span>
+
+<span class="cm"># 4. Verify</span>
+curl <span class="s">http://127.0.0.1:8000/health</span>
+<span class="cm"># → {"status":"ok","version":"0.2.0","tokens_saved":0}</span></pre>
+    </section>
+
+    <!-- LANGUAGE GRID -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">5</div>
+        <span class="section-label">MULTI-LANGUAGE SUPPORT</span>
+      </div>
+    </section>
+    <section class="lang-grid">
+      <div class="lang-chip"><div class="name">Python</div><div class="method"><span>Native AST</span> ✅ Full</div></div>
+      <div class="lang-chip"><div class="name">JavaScript</div><div class="method"><span>Brace-balance</span> ✅</div></div>
+      <div class="lang-chip"><div class="name">TypeScript</div><div class="method"><span>Brace-balance</span> ✅</div></div>
+      <div class="lang-chip"><div class="name">Go</div><div class="method"><span>Brace-balance</span> ✅</div></div>
+      <div class="lang-chip"><div class="name">Rust</div><div class="method"><span>Brace-balance</span> ✅</div></div>
+      <div class="lang-chip"><div class="name">Java</div><div class="method"><span>Brace-balance</span> ✅</div></div>
+      <div class="lang-chip"><div class="name">C#</div><div class="method"><span>Brace-balance</span> ✅</div></div>
+      <div class="lang-chip"><div class="name">C / C++</div><div class="method"><span>Brace-balance</span> ✅</div></div>
+    </section>
+
+    <!-- QUOTE -->
+    <section class="quote">
+      <p>"The agent still sees signatures, classes, and imports — it just stops paying for function bodies it isn't editing."</p>
+      <cite>— borhen68/TokenTamer · README</cite>
+    </section>
+
+    <!-- ROADMAP -->
+    <section class="grid2">
+      <div class="card">
+        <div class="card-head"><span class="card-kicker" style="color:var(--green)">✓ SHIPPED</span></div>
+        <h3 class="card-title">v0.2 / v0.3 已完成</h3>
+        <div class="card-body">
+          <div class="point"><div class="t">v0.2 — Tool-aware compression</div><div class="d">Skeletonize stale tool_result reads，保留活跃文件 100% 完整</div></div>
+          <div class="point"><div class="t">v0.3 — Anthropic prompt caching</div><div class="d">Long-lived session hijacking：~73% off input tokens on 50-turn sessions</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-kicker" style="color:var(--orange)">TODO</span></div>
+        <h3 class="card-title">Roadmap v0.4 / v0.5</h3>
+        <div class="card-body">
+          <div class="point"><div class="t">v0.4 — Tree-sitter AST</div><div class="d">用 Tree-sitter 替代 brace-balance heuristic，多语言精确语法树</div></div>
+          <div class="point"><div class="t">v0.5 — Web Dashboard</div><div class="d">Per-file compression heatmap + live cache hit metrics 实时监控面板</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div>
+        <div class="brand">borhen68 / TokenTamer</div>
+        <div class="links">
+          <span class="link-item">github.com/borhen68/TokenTamer</span>
+          <span class="link-item">MIT License</span>
+          <span class="link-item">Python 3.10+</span>
+          <span class="link-item">FastAPI · httpx · tiktoken</span>
+        </div>
+      </div>
+      <div class="meta">
+        v0.2.0 · Alpha · darkblue-style · 2026-06-12
+      </div>
+    </footer>
+
+  </main>
+
+  <button class="save" onclick="html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,logging:false,backgroundColor:'#0c1020'}).then(c=>{let a=document.createElement('a');a.download='tokentamer-darkblue.png';a.href=c.toDataURL('image/png');a.click()}).catch(e=>alert(e))">⬇ PNG</button>
+</body>
+</html>
