@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f1ece2">
+  <title>MiMoCode2API · MiMo 到 OpenAI 的轻量网关</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{color-scheme:light;--bg:#f1ece2;--paper:#fbf7ef;--paper-2:#fffaf3;--ink:#181614;--ink-body:#2d2926;--muted:#5a5248;--line:#2c2723;--line-mid:#7c6e62;--accent:#a76632;--accent-2:#c9762f;--accent-soft:#f2decb;--blue:#1e5cb5;--blue-soft:#edf3ff;--black:#111111;--green:#355f35;--max:1220px}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 14% 10%, rgba(255,255,255,.58) 0, rgba(255,255,255,0) 24%),radial-gradient(circle at 84% 8%, rgba(255,255,255,.3) 0, rgba(255,255,255,0) 16%),linear-gradient(180deg,#f4efe6 0%,#efe9de 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13.5px;line-height:1.68;text-rendering:optimizeLegibility}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;background-image:repeating-linear-gradient(0deg, rgba(45,41,38,.016) 0 1px, transparent 1px 5px),repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 7px);mix-blend-mode:multiply;z-index:0}
+    a{color:inherit;text-decoration:none}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .page{width:min(var(--max),calc(100% - 34px));margin:0 auto;padding:18px 0 88px;position:relative;z-index:1}
+    .rough-box{position:relative}
+    .frame{background:linear-gradient(180deg,#fbf7ef 0%,#f8f2e8 100%);padding:16px;transform:rotate(-0.12deg)}
+    .topbar{display:flex;justify-content:space-between;gap:14px;font:800 12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:#1e5cb5;margin-bottom:10px;border-bottom:1px solid #d0c8be;padding-bottom:9px}
+    .hero{display:grid;grid-template-columns:minmax(0,1fr) 354px;gap:14px;align-items:start}
+    .hero-title{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(30px,5vw,64px);line-height:.93;letter-spacing:-.048em;color:#171513;margin:0 0 10px}
+    .hero-lead{font-size:14.6px;line-height:1.72;color:#2d2926;max-width:760px;margin:0 0 10px}
+    .hero-lead b{color:var(--black)}
+    .hero-note{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#5a5248}
+    .tag-chip{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;border-radius:999px;background:#fffdf8;font:700 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em;text-transform:uppercase;color:#5a5248;white-space:nowrap;transform:rotate(-0.5deg)}
+    .tag-chip.blue{background:#edf3ff;color:#1e5cb5;transform:rotate(0.3deg)}
+    .tag-chip.orange{background:#f2decb;color:#a76632;transform:rotate(-0.4deg)}
+    .tag-chip.green{background:#edf8ed;color:#355f35;transform:rotate(0.2deg)}
+    .tag-chip.red{background:#fff0f0;color:#c8442f;transform:rotate(0.15deg)}
+    .compare-box{background:#111;padding:14px;color:#ede8e0;transform:rotate(0.2deg)}
+    .compare-head{font:900 12px/1.28 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;margin-bottom:9px;color:#ede8e0}
+    .compare-grid{display:grid;gap:8px}
+    .compare-item{background:#1e1c1a;padding:10px;border-radius:6px;color:#c8c0b8;font-size:12px}
+    .compare-item b{display:block;margin-bottom:4px;font-size:12.5px;color:#fff}
+    .compare-item p{margin:0;font-size:11.8px;line-height:1.58}
+    .quote-band{margin-top:11px;background:linear-gradient(135deg,#c99d78 0%,#b07b51 100%);padding:12px 15px;color:#2a1f17;transform:rotate(-0.18deg)}
+    .quote-big{font-family:Georgia,"Times New Roman",serif;font-size:17px;line-height:1.4;font-weight:900;margin:0 0 5px;color:#fff}
+    .quote-small{font-size:12px;line-height:1.62;opacity:.88}
+    .process{margin-top:12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .step{background:#1e1c1a;padding:12px;color:#fff;min-height:88px}
+    .step:nth-child(odd){transform:rotate(-0.35deg)}
+    .step:nth-child(even){transform:rotate(0.28deg)}
+    .step-n{display:block;font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#c99d78;margin-bottom:5px}
+    .step b{display:block;font-size:13.5px;font-weight:900;margin-bottom:4px;color:#fff}
+    .step p{margin:0;font-size:12px;line-height:1.58;color:#c8c0b8}
+    .columns{margin-top:11px;display:grid;grid-template-columns:1.02fr .98fr .98fr;gap:11px;align-items:start}
+    .section-card{background:#fffaf3;padding:13px}
+    .columns>.section-card:nth-child(1){transform:rotate(-0.18deg)}
+    .columns>.section-card:nth-child(2){transform:rotate(0.12deg)}
+    .columns>.section-card:nth-child(3){transform:rotate(-0.06deg)}
+    .section-kicker{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:9px;padding-bottom:8px;border-bottom:2px dashed #231f1c}
+    .section-cn{font:900 18px/1.06 Georgia,"Times New Roman","Songti SC",serif;letter-spacing:-.02em;color:#181614}
+    .section-en{color:#1e5cb5;font:800 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;text-align:right;max-width:124px}
+    .principles{display:grid;gap:9px}
+    .principle{background:#f4f8ff;padding:8px 9px;display:grid;grid-template-columns:30px 1fr;gap:9px;align-items:start;transform:rotate(0.03deg)}
+    .principle-num{display:grid;place-items:center;width:30px;height:30px;background:#1e5cb5;color:#fff;font:900 13.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;border-radius:8px;flex-shrink:0}
+    .principle b{display:block;margin-bottom:3px;font-size:13.2px;line-height:1.28;color:#181614}
+    .principle p{margin:0;font-size:12px;line-height:1.58;color:#2d2926}
+    .agent-note{margin-top:10px;background:#fff5ef;padding:10px 12px;border-left:6px solid #c8442f;color:#5a2a20;font-size:12px;line-height:1.62;transform:rotate(-0.14deg)}
+    .subsection{display:grid;gap:8px;margin-top:8px}
+    .subcard{background:#fffdf8;padding:11px 12px;transform:rotate(0.05deg)}
+    .subcard h3{margin:0 0 5px;font-size:13.5px;line-height:1.26;display:flex;justify-content:space-between;gap:8px;align-items:center;color:#181614}
+    .subcard h3 .mini{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:#a76632}
+    .subcard p,.subcard li{margin:0;font-size:12px;line-height:1.6;color:#2d2926}
+    .subcard ul{margin:7px 0 0 16px;padding:0;display:grid;gap:4px}
+    .tiny-rail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+    .tiny-rail div{background:#edf3ff;padding:8px 9px;border-radius:10px;font-size:11.5px;line-height:1.4;color:#1e5cb5}
+    .tiny-rail div b{display:block;margin-bottom:3px;color:#181614;font-size:12.5px}
+    .defense-stack{display:grid;gap:8px}
+    .defense{background:#fffcf6;padding:11px 12px}
+    .defense-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:5px}
+    .defense-row b{font-size:13px;line-height:1.26;color:#181614}
+    .defense-row span{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#355f35;letter-spacing:.06em;text-transform:uppercase}
+    .defense p{margin:0;font-size:12px;line-height:1.6;color:#2d2926}
+    .showboat{margin-top:8px;background:#f3efe7;padding:10px 11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.2px;line-height:1.55;white-space:pre-wrap;color:#2a2622}
+    .footer{margin-top:12px;background:#f7f0e6;padding:11px 12px;color:#5a5048;font-size:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;transform:rotate(0.08deg)}
+    .footer-brand{font-weight:700}
+    .footer-hash{color:#1e5cb5}
+    .save-wrap{display:flex;justify-content:flex-end;margin-top:14px;padding-right:2px}
+    #saveBtn{border:0;border-radius:8px;padding:.8rem .95rem;background:linear-gradient(135deg,#a76632,#bf5f14);color:#fff;font-weight:800;font-size:.82rem;cursor:pointer;box-shadow:0 12px 28px rgba(167,102,50,.2)}
+    .cmd-line{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.8px;line-height:1.65;color:#2a2622;background:#f3efe7;padding:10px 12px;border-radius:6px;white-space:pre-wrap;margin-top:6px}
+    .highlight{background:#fff5ef;border-left:4px solid #c8442f;padding:8px 10px;font-size:12.5px;line-height:1.65;color:#5a2a20;margin-top:6px}
+    .callout{background:#fffaf3;border:1.5px solid #2c2723;padding:10px 11px;font-size:12.4px;line-height:1.68;color:#2d2926;box-shadow:2px 2px 0 rgba(22,20,18,.1);transform:rotate(-0.1deg)}
+    .callout b{color:#181614}
+    .studio-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .studio-card{background:#f4f8ff;padding:10px 11px;border:1.5px solid #2c2723;box-shadow:2px 2px 0 rgba(22,20,18,.08);transform:rotate(-0.08deg)}
+    .studio-card b{display:block;margin-bottom:4px;color:#181614}
+    .studio-card p{margin:0;color:#2d2926;font-size:12px;line-height:1.58}
+    .listline{display:grid;gap:6px}
+    .listline div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed #c9c0b3;padding-bottom:4px}
+    .listline span{color:#1e5cb5;font-weight:800}
+    @media(max-width:1080px){.hero{grid-template-columns:1fr}.compare-box{max-width:440px}.columns{grid-template-columns:1fr}}
+    @media(max-width:720px){.page{width:min(100% - 18px,var(--max));padding:10px 0 28px}.frame{padding:13px}.topbar,.footer{flex-direction:column;align-items:flex-start;font-size:12px;line-height:1.4}.hero{gap:12px}.process{grid-template-columns:1fr 1fr;gap:8px}.section-cn{font-size:16px}.save-wrap{justify-content:flex-start}.subcard p,.subcard li,.principle p,.defense p{font-size:12.5px;line-height:1.65}.process p{font-size:12.2px}.studio-grid{grid-template-columns:1fr}}
+    @media(max-width:420px){.process{grid-template-columns:1fr}.hero-note{gap:6px}.tiny-rail{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="page" id="card">
+    <div class="frame rough-box">
+      <div class="topbar">
+        <div>github.com/Sliverkiss/mimocode2api</div>
+        <div>handline · api gateway / bridge</div>
+      </div>
+
+      <section class="hero">
+        <div>
+          <h1 class="hero-title">MiMoCode2API</h1>
+          <p class="hero-lead">把 <b>MiMo 语言模型服务</b>封装成标准的 <b>OpenAI Chat Completions</b> 接口：对外是通用 API，对内是轻量网关。它的核心价值不是再造模型，而是降低接入门槛，让现有 OpenAI 生态的客户端、工具和工作流能直接对接 MiMo。</p>
+          <div class="hero-note">
+            <span class="tag-chip blue rough-box">59 stars</span>
+            <span class="tag-chip orange rough-box">MIT</span>
+            <span class="tag-chip green rough-box">Go service</span>
+            <span class="tag-chip red rough-box">chat completions</span>
+          </div>
+        </div>
+        <div class="compare-box rough-box">
+          <div class="compare-head">原生 MiMo 接入 vs 网关接入</div>
+          <div class="compare-grid">
+            <div class="compare-item rough-box"><b>原生接入</b><p>每个客户端都要单独适配 MiMo 的接口、参数和调用方式，迁移成本高。</p></div>
+            <div class="compare-item rough-box"><b>MiMoCode2API</b><p>把 MiMo 包成 OpenAI Chat Completions 形状，现成工具链可直接复用。</p></div>
+            <div class="compare-item rough-box"><b>结果</b><p>对上游客户端是“标准 OpenAI”，对下游模型是“MiMo 网关桥接”。</p></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="quote-band rough-box">
+        <p class="quote-big">“轻量级 API 网关。”</p>
+        <div class="quote-small">这个仓库的重点不是复杂编排，而是把模型服务转换成熟悉的接口，让调用层尽量不改代码。</div>
+      </div>
+
+      <div class="process rough-box">
+        <div class="step rough-box"><span class="step-n">01 · 输入</span><b>OpenAI 风格请求</b><p>客户端继续按 `chat.completions` 的思维发请求，不必理解 MiMo 的内部差异。</p></div>
+        <div class="step rough-box"><span class="step-n">02 · 适配</span><b>API 网关转换</b><p>服务端把请求转成 MiMo 可处理的形状，并把响应再翻译回标准格式。</p></div>
+        <div class="step rough-box"><span class="step-n">03 · 交付</span><b>标准化输出</b><p>上层拿到的还是熟悉的 OpenAI 兼容响应，可以继续接 SDK、工具和脚本。</p></div>
+        <div class="step rough-box"><span class="step-n">04 · 部署</span><b>轻量服务</b><p>仓库包含 Go 实现与 Docker 相关文件，适合容器化或单服务部署。</p></div>
+      </div>
+
+      <div class="columns">
+        <div class="section-card rough-box">
+          <div class="section-kicker">
+            <div class="section-cn">为什么值得用</div>
+            <div class="section-en">why it matters</div>
+          </div>
+          <div class="principles">
+            <div class="principle rough-box"><div class="principle-num">A</div><div><b>接入成本低</b><p>如果你的工具链已经围绕 OpenAI Chat Completions 建好，这种网关可以把迁移工作压到最小。</p></div></div>
+            <div class="principle rough-box"><div class="principle-num">B</div><div><b>兼容面广</b><p>面向现有客户端、脚本和 SDK 的“标准接口”比重新训练使用习惯更现实。</p></div></div>
+            <div class="principle rough-box"><div class="principle-num">C</div><div><b>轻量定位清楚</b><p>它不是综合平台，也不是多模型路由层；更像一个干净的桥接器，职责边界很明确。</p></div></div>
+          </div>
+          <div class="agent-note"><b>一句话定位</b>：把 MiMo 服务伪装成 OpenAI 接口，让现成工具能直接上手。</div>
+        </div>
+
+        <div class="section-card rough-box">
+          <div class="section-kicker">
+            <div class="section-cn">仓库里透露的结构</div>
+            <div class="section-en">repo signals</div>
+          </div>
+          <div class="subsection">
+            <div class="subcard rough-box"><h3><span>Go 实现</span><span class="mini">main.go</span></h3>
+              <p>仓库包含 `main.go`、`go.mod`，说明核心服务以 Go 编写，偏向单体、可部署、可执行的网关形态。</p>
+            </div>
+            <div class="subcard rough-box"><h3><span>容器化入口</span><span class="mini">docker</span></h3>
+              <p>仓库带有 `Dockerfile` 和 `docker-compose.yml`，意味着它被设计成较容易本地启动和部署的服务组件。</p>
+            </div>
+            <div class="subcard rough-box"><h3><span>环境配置</span><span class="mini">env</span></h3>
+              <p>还有 `.env.example`，说明网关通过环境变量配置上游/下游连接信息，适合做轻量本地代理。</p>
+            </div>
+            <div class="subcard rough-box"><h3><span>许可证</span><span class="mini">license</span></h3>
+              <p>MIT 许可证，便于在个人项目和内部工具链中快速复用。</p>
+            </div>
+          </div>
+          <div class="highlight"><b>视觉锚点：</b>这是一个桥，不是一个平台；重点在“转接口”而不是“堆功能”。</div>
+        </div>
+
+        <div class="section-card rough-box">
+          <div class="section-kicker">
+            <div class="section-cn">适合谁 / 不适合谁</div>
+            <div class="section-en">fit & boundary</div>
+          </div>
+          <div class="defense-stack">
+            <div class="defense rough-box"><div class="defense-row"><b>适合</b><span>good fit</span></div>
+              <p>已经有 OpenAI 兼容客户端、想接入 MiMo 的团队；或者想把现成脚本、工作流、代理工具快速迁移到新模型的人。</p>
+            </div>
+            <div class="defense rough-box"><div class="defense-row"><b>不适合</b><span>not for</span></div>
+              <p>需要复杂路由、模型聚合、评测编排的大平台需求；它的设计目标更偏“桥接”，不是“控制中枢”。</p>
+            </div>
+            <div class="defense rough-box"><div class="defense-row"><b>核心边界</b><span>boundary</span></div>
+              <div class="showboat">MiMo 负责模型能力
+网关负责接口形状
+客户端保持 OpenAI 语义</div>
+            </div>
+          </div>
+          <div class="tiny-rail">
+            <div class="rough-box"><b>Bridge</b>把模型和客户端语义对齐</div>
+            <div class="rough-box"><b>Gateway</b>服务边界单一、职责清晰</div>
+            <div class="rough-box"><b>Compat</b>复用现成 OpenAI 生态</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer rough-box">
+        <div class="footer-brand">🔌 MiMoCode2API</div>
+        <div><span class="footer-hash">#api-gateway #openai-compatible #bridge</span> · <b>MIT</b> · 1 open issue</div>
+        <div><a href="https://github.com/Sliverkiss/mimocode2api" target="_blank" rel="noopener">github.com/Sliverkiss/mimocode2api ↗</a></div>
+      </div>
+    </div>
+  </main>
+
+  <div class="save-wrap">
+    <button id="saveBtn">保存 PNG</button>
+  </div>
+
+  <script>
+    document.getElementById('saveBtn').addEventListener('click',async function(){
+      const card=document.getElementById('card');
+      if(!window.html2canvas){alert('html2canvas 未加载');return;}
+      const btn=this;
+      const old=btn.textContent;
+      btn.disabled=true;btn.textContent='导出中…';
+      try{
+        const canvas=await html2canvas(card,{backgroundColor:'#f1ece2',scale:Math.max(2,window.devicePixelRatio||2),useCORS:true,scrollX:0,scrollY:-window.scrollY,windowWidth:card.scrollWidth,windowHeight:card.scrollHeight});
+        const a=document.createElement('a');a.download='20260613-mimocode2api.png';a.href=canvas.toDataURL('image/png');a.click();
+      }finally{btn.disabled=false;btn.textContent=old;}
+    });
+    (function(){
+      function send(){
+        var h=document.body.scrollHeight;
+        window.parent.postMessage({type:'theme-height',slug:'handline',height:h},'*');
+      }
+      if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+      setTimeout(send,500);
+    })();
+  </script>
+
+  <script>
+  function jitter(v, amt) { return v + (Math.random() - 0.5) * amt; }
+  function mk(tag, attrs) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function roughRect(x, y, w, h, opts) {
+    opts = opts || {};
+    var r = opts.roughness || 1.2, sw = opts.strokeWidth || 2;
+    var sc = opts.stroke || '#1a1a1a';
+    var g = mk('g', {});
+    var points = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+    for (var i = 0; i < 4; i++) {
+      var p1 = points[i], p2 = points[(i + 1) % 4];
+      var segs = 4, d = 'M ' + jitter(p1[0], r * 2) + ' ' + jitter(p1[1], r * 2);
+      for (var s = 1; s <= segs; s++) {
+        var t = s / segs;
+        d += ' L ' + jitter(p1[0] + (p2[0] - p1[0]) * t, r * 2) + ' ' + jitter(p1[1] + (p2[1] - p1[1]) * t, r * 2);
+      }
+      var path = mk('path', {d: d, stroke: sc, 'stroke-width': sw, fill: 'none','stroke-linecap': 'round', 'stroke-linejoin': 'round'});
+      g.appendChild(path);
+    }
+    return g;
+  }
+  function drawRough(el) {
+    var rect = el.getBoundingClientRect();
+    if (rect.width < 8 || rect.height < 8) return;
+    var svg = mk('svg', {width: rect.width, height: rect.height, style: 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:0'});
+    el.insertBefore(svg, el.firstChild);
+    svg.appendChild(roughRect(0, 0, rect.width, rect.height, {roughness: 1.2, strokeWidth: 2, stroke: '#1a1a1a'}));
+    el.style.position = el.style.position || 'relative';
+  }
+  function initRough() { Array.prototype.slice.call(document.querySelectorAll('.rough-box')).forEach(drawRough); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initRough); else initRough();
+  window.addEventListener('resize', function() { document.querySelectorAll('.rough-box svg').forEach(function(s){ s.parentNode.removeChild(s); }); initRough(); });
+  </script>
+</body>
+</html>
