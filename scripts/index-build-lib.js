@@ -188,6 +188,11 @@ function buildIndexData() {
       }
 
       const item = { ...data };
+      // Normalize description → desc (fix legacy cards using wrong field name)
+      if (item.description != null && item.desc == null) {
+        item.desc = item.description;
+        delete item.description;
+      }
       item.date = normalizeDateValue(item.date);
       if (Object.prototype.hasOwnProperty.call(item, "updated")) {
         item.updated = normalizeDateValue(item.updated);
