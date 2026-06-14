@@ -1,187 +1,328 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0c1020">
-  <title>abtop · AI agent monitor</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#08101f" />
+  <meta name="description" content="abtop 是一个面向 AI coding agent 的只读终端状态总览工具，把会话、token、context window、rate limit、子进程和端口占用收进一屏。" />
+  <title>把多 Agent 终端状态收进一屏：abtop</title>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
-    :root{--bg:#0c1020;--bg2:#11162a;--panel:#171c2b;--panel2:#0f1424;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);--cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--shadow:0 18px 42px rgba(0,0,0,.34)}
-    *{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden}
-    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:radial-gradient(circle at 18% 10%,rgba(88,195,255,.16) 0 10%,transparent 11%),radial-gradient(circle at 86% 8%,rgba(132,89,255,.18) 0 9%,transparent 10%),radial-gradient(circle at 72% 72%,rgba(45,179,106,.10) 0 13%,transparent 14%),radial-gradient(circle at 18% 78%,rgba(244,200,76,.08) 0 11%,transparent 12%),linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%)}
-    a{color:inherit;text-decoration:none}
-    .page{width:min(1200px,calc(100% - 20px));margin:0 auto;padding:18px 0 84px}
-    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
-    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
-    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
-    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
-    .source{max-width:300px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
-    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
-    .subtitle{margin:0;max-width:960px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
-    .subcn{margin:0;max-width:960px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
-    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
-    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
-    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}.pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}.pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}.pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
-    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
-    .hero-note strong{font-size:14px;line-height:1.35}.hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
-    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
-    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.36) 0 10%,transparent 11%),linear-gradient(135deg,var(--cyan) 0%,var(--blue) 34%,var(--purple) 68%,var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24),inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
-    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}.visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}.visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
-    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
-    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}.mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}.mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
-    .image-box{background:#0f1424;border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:10px;box-shadow:0 12px 26px rgba(0,0,0,.18)}
-    .image-box img{display:block;width:100%;height:auto;border-radius:12px;border:1px solid rgba(255,255,255,.08)}
-    .image-cap{margin-top:6px;font-size:11.5px;line-height:1.45;color:#c7d2f9}
-    .shell{display:grid;grid-template-columns:1fr 1.24fr .96fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
-    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%,#141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
-    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
-    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}.panel-head .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#dfe8ff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
-    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
-    .project{border:1.5px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2131,#171c2b);padding:10px 11px;border-radius:14px;display:grid;gap:4px;min-width:0}.project .name{font-size:13px;font-weight:900;color:#fff}.project .desc{font-size:11.5px;color:#9fb0de;overflow-wrap:anywhere}.project .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.mini-dot{width:10px;height:10px;border-radius:50%;margin-top:2px;background:linear-gradient(135deg,var(--cyan),var(--purple));box-shadow:0 0 0 3px rgba(88,195,255,.12)}
-    .task{border:1.5px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2030,#151a28);padding:10px 11px;border-radius:14px;display:grid;gap:8px}.task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.task-name{font-size:13px;font-weight:900;color:#fff}.status{font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:rgba(45,179,106,.14);color:#7fe1a2;border:1px solid rgba(45,179,106,.32)}.status.yellow{background:rgba(244,200,76,.14);color:#ffe380;border-color:rgba(244,200,76,.32)}.status.purple{background:rgba(132,89,255,.14);color:#c9a8ff;border-color:rgba(132,89,255,.32)}
-    .task p{font-size:12px;line-height:1.55;color:#d9e2ff;margin:0}.task-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#b6c5f2}.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);padding:4px 8px;border-radius:999px}
-    .status-list{display:grid;gap:8px}.status-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.08);background:#0f1424;padding:9px 10px;border-radius:12px;font-size:12px;color:#d8e2ff}.status-item .left{display:grid;gap:2px}.status-item .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
-    .term{background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}.term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#111831;border-bottom:1px solid rgba(255,255,255,.08);color:#dfe8ff;font-size:11px}.term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8f59f;font-size:12px;line-height:1.7;min-height:178px;white-space:pre-wrap}.term .url{color:#7ad9ff}
-    .stats-body{padding:12px;display:grid;gap:12px;color:#dce4ff}.stat{display:grid;gap:6px}.stat .label{display:flex;justify-content:space-between;gap:8px;font-size:12px}.bar{height:10px;border-radius:999px;background:#0d1220;border:1px solid rgba(255,255,255,.08);overflow:hidden}.bar>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--green))}.bar.blue>span{background:linear-gradient(90deg,var(--blue),var(--purple))}.bar.yellow>span{background:linear-gradient(90deg,var(--yellow),#f08040)}.bar.purple>span{background:linear-gradient(90deg,var(--purple),var(--cyan))}
-    .feature-row{margin-top:14px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.feature{background:#171c2b;border:1.5px solid rgba(255,255,255,.08);border-radius:16px;padding:11px 9px;color:#e8edf8;text-align:center;display:grid;gap:7px;min-width:0}.feature .icon-wrap{width:28px;height:28px;margin:0 auto;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.09);display:grid;place-items:center}.feature .icon-wrap svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.feature.cyan .icon-wrap{color:var(--cyan)}.feature.green .icon-wrap{color:var(--green)}.feature.yellow .icon-wrap{color:var(--yellow)}.feature.purple .icon-wrap{color:var(--purple)}.feature.blue .icon-wrap{color:var(--blue)}.feature span{font-size:11px;line-height:1.35;font-weight:800}
-    .download{margin:16px auto 0;display:flex;justify-content:center}.download-btn{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--purple),#6a4cff 54%,var(--blue));color:#fff;border:0;border-radius:18px;padding:16px 24px;box-shadow:0 16px 36px rgba(132,89,255,.34);font-weight:950;letter-spacing:.02em;font-size:18px;cursor:pointer}.download-btn small{display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em}
-    .footer{margin-top:14px;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#dfe8ff;font-size:12px;flex-wrap:wrap}.footer .stars{font-weight:900}
-    @media(max-width:1080px){.hero,.shell{grid-template-columns:1fr}.feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
-    @media(max-width:720px){.page{width:min(100% - 16px,1200px);padding:10px 0 58px}.title{font-size:clamp(34px,13vw,54px)}.subtitle{font-size:14px}.subcn{font-size:13px}.feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}.shell{grid-template-columns:1fr}.visual-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;overflow-x:hidden}
+    html{scroll-behavior:smooth;font-size:clamp(16px,calc(100vw / 78),18px)}
+    body{
+      color:#eef4ff;
+      background:
+        radial-gradient(circle at 16% 8%, rgba(88,195,255,.18) 0 10%, transparent 11%),
+        radial-gradient(circle at 84% 12%, rgba(132,89,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 50% 100%, rgba(45,179,106,.10) 0 18%, transparent 19%),
+        linear-gradient(180deg,#08101f 0%,#0a1326 42%,#060b16 100%);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif;
+      line-height:1.56;
+      text-align:center;
+    }
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      opacity:.2;
+      background-image:linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+      background-size:44px 44px;
+      mask-image:linear-gradient(to bottom, black, transparent 92%);
+    }
+    a{color:inherit}
+    img{display:block;max-width:100%}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1180px, calc(100% - 24px));margin:0 auto;padding:18px 0 96px;text-align:left}
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.03fr) minmax(0,.97fr);
+      gap:16px;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:28px;
+      background:linear-gradient(180deg, rgba(17,24,44,.92), rgba(10,16,33,.88));
+      backdrop-filter:blur(14px);
+      box-shadow:0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.04);
+      padding:clamp(18px,3.4vw,38px);
+      overflow:hidden;
+      position:relative;
+    }
+    .hero::after{
+      content:"";
+      position:absolute;
+      inset:auto -10% -34% -10%;
+      height:220px;
+      background:radial-gradient(circle, rgba(88,195,255,.22), transparent 60%);
+      pointer-events:none;
+    }
+    .hero-copy{display:grid;gap:14px;align-content:start;min-width:0;position:relative;z-index:1}
+    .kicker{
+      display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;width:fit-content;
+      border:1px solid rgba(88,195,255,.38);border-radius:999px;
+      background:rgba(12,20,38,.72);padding:7px 12px;
+      color:#bfe8ff;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+      box-shadow:0 8px 20px rgba(0,0,0,.18);
+    }
+    .kicker::before{content:"";width:8px;height:8px;border-radius:999px;background:#2db36a;box-shadow:0 0 0 4px rgba(45,179,106,.14)}
+    h1{margin:0;max-width:820px;font-size:clamp(32px,5.9vw,74px);line-height:.94;letter-spacing:-.06em}
+    .subtitle{margin:0;max-width:860px;color:#b7c4e3;font-size:clamp(15px,1.8vw,19px)}
+    .hero-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;min-height:34px;
+      border:1px solid rgba(255,255,255,.14);border-radius:999px;
+      background:rgba(8,14,27,.78);padding:6px 10px;
+      font-weight:850;font-size:12.4px;color:#edf4ff;
+      box-shadow:0 8px 20px rgba(0,0,0,.18);
+    }
+    .pill::before{content:"";width:7px;height:7px;border-radius:999px;background:var(--dot,#58c3ff)}
+    .pill.blue{--dot:#58c3ff}.pill.green{--dot:#2db36a}.pill.yellow{--dot:#f4c84c}.pill.purple{--dot:#8459ff}.pill.red{--dot:#ff7c8d}
+    .hero-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:2px}
+    .stat{
+      min-width:0;border:1px solid rgba(255,255,255,.12);border-radius:18px;background:rgba(8,14,27,.82);
+      padding:12px 12px 11px;box-shadow:0 10px 20px rgba(0,0,0,.16)
+    }
+    .stat .k{display:block;margin-bottom:6px;color:#8ea2cb;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:900}
+    .stat .v{display:block;color:#f2f7ff;font-size:14px;line-height:1.25;font-weight:900}
+    .stat .s{display:block;margin-top:4px;color:#a5b5d8;font-size:12px;line-height:1.45}
+    .hero-visual{
+      min-width:0;border:1px solid rgba(255,255,255,.12);border-radius:24px;overflow:hidden;
+      background:linear-gradient(180deg, rgba(10,18,34,.86), rgba(5,10,20,.94));
+      box-shadow:0 18px 40px rgba(0,0,0,.3);
+      align-self:start;position:relative
+    }
+    .hero-visual img{width:100%;height:auto;display:block}
+    .hero-visual figcaption{
+      padding:12px 14px;border-top:1px solid rgba(255,255,255,.12);
+      color:#aebddf;font-size:13px;line-height:1.58;background:rgba(7,12,23,.96)
+    }
+    .section{margin-top:26px}
+    .section-head{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:end;margin:0 0 14px}
+    .section-no{
+      width:54px;height:54px;display:grid;place-items:center;
+      border:1px solid rgba(88,195,255,.36);border-radius:16px;
+      background:linear-gradient(135deg, rgba(88,195,255,.16), rgba(132,89,255,.12));
+      color:#f3f8ff;font-size:22px;font-weight:950;box-shadow:0 10px 24px rgba(0,0,0,.18)
+    }
+    .section-title h2{margin:0;font-size:clamp(22px,3.6vw,38px);line-height:1;letter-spacing:-.04em}
+    .section-title p{margin:7px 0 0;color:#9fb0d2;font-size:14px}
+    .intro-grid,.feature-grid,.watch-grid,.footer-grid{display:grid;gap:12px}
+    .intro-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .feature-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+    .watch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .footer-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{
+      min-width:0;border:1px solid rgba(255,255,255,.12);border-radius:20px;
+      background:linear-gradient(180deg, rgba(15,21,40,.88), rgba(8,12,24,.9));
+      box-shadow:0 12px 28px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.04);
+      padding:14px;display:grid;gap:10px
+    }
+    .card h3,.card h4{margin:0;line-height:1.15;letter-spacing:-.02em}
+    .card h3{font-size:17px}
+    .card p{margin:0;color:#b7c4e3;font-size:14px;line-height:1.62}
+    .chiprow{display:flex;flex-wrap:wrap;gap:6px}
+    .chip{
+      display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.12);border-radius:999px;
+      background:rgba(255,255,255,.03);padding:4px 9px;font-size:11.9px;font-weight:850;color:#edf4ff
+    }
+    .chip.blue{background:rgba(88,195,255,.14);border-color:rgba(88,195,255,.22)}
+    .chip.green{background:rgba(45,179,106,.14);border-color:rgba(45,179,106,.24)}
+    .chip.yellow{background:rgba(244,200,76,.13);border-color:rgba(244,200,76,.24)}
+    .chip.purple{background:rgba(132,89,255,.14);border-color:rgba(132,89,255,.24)}
+    .chip.red{background:rgba(255,124,141,.14);border-color:rgba(255,124,141,.24)}
+    .feature-card{
+      min-width:0;border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:14px;
+      background:linear-gradient(180deg, rgba(10,16,32,.96), rgba(7,11,21,.96));
+      box-shadow:0 12px 26px rgba(0,0,0,.18);display:grid;gap:10px;position:relative;overflow:hidden
+    }
+    .feature-card::before{
+      content:"";position:absolute;inset:0 auto auto 0;height:6px;width:100%;background:var(--accent,#58c3ff);border-bottom:1px solid rgba(255,255,255,.08)
+    }
+    .feature-card[data-accent="blue"]{--accent:#58c3ff}.feature-card[data-accent="green"]{--accent:#2db36a}.feature-card[data-accent="yellow"]{--accent:#f4c84c}.feature-card[data-accent="purple"]{--accent:#8459ff}.feature-card[data-accent="red"]{--accent:#ff7c8d}
+    .feature-head{padding-top:4px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    .feature-head h4{font-size:16px}
+    .badge{
+      flex:0 0 auto;display:grid;place-items:center;width:38px;height:38px;border-radius:13px;
+      border:1px solid rgba(255,255,255,.12);background:var(--accent,#58c3ff);color:#09111f;
+      font-size:18px;font-weight:950;box-shadow:0 8px 18px rgba(0,0,0,.2)
+    }
+    .legend-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .legend{padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:16px;background:rgba(255,255,255,.03);display:grid;gap:8px}
+    .legend .l{display:inline-flex;width:fit-content;align-items:center;gap:8px;font-size:12px;font-weight:900;color:#eef4ff}
+    .legend .l::before{content:"";width:10px;height:10px;border-radius:999px;background:var(--c,#58c3ff);box-shadow:0 0 0 4px color-mix(in srgb, var(--c) 18%, transparent)}
+    .legend p{color:#aab9dc;font-size:13px;line-height:1.6}
+    .codebox{
+      border:1px solid rgba(255,255,255,.12);border-radius:18px;background:rgba(5,9,18,.94);
+      padding:14px;box-shadow:0 14px 28px rgba(0,0,0,.22);overflow:auto
+    }
+    .codebox pre{white-space:pre-wrap;word-break:break-word;color:#dfe8ff;font-size:13px;line-height:1.64}
+    .callout{
+      margin-top:14px;border:1px solid rgba(88,195,255,.28);border-radius:20px;
+      background:linear-gradient(180deg, rgba(17,29,53,.94), rgba(10,15,28,.95));
+      padding:16px 16px 15px;box-shadow:0 18px 36px rgba(0,0,0,.22)
+    }
+    .callout strong{display:block;font-size:16px;line-height:1.5;color:#f3f8ff}
+    .callout small{display:block;margin-top:8px;color:#a6b5d8;font-size:13px;line-height:1.62}
+    .footer-block{
+      margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:22px;background:rgba(10,16,33,.9);
+      box-shadow:0 18px 36px rgba(0,0,0,.24);padding:16px;display:grid;gap:10px
+    }
+    .footer-block h3{margin:0;font-size:18px}
+    .footer-block p,.footer-block li{color:#b7c4e3;font-size:14px;line-height:1.62}
+    .source-note{margin-top:12px;text-align:center;color:#8ea2cb;font-size:12.5px;line-height:1.62;word-break:break-word}
+    .source-note a{color:#d4e4ff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.2)}
+    .save-btn{
+      position:fixed;right:18px;bottom:18px;z-index:999;border:0;border-radius:10px;
+      padding:11px 14px;background:linear-gradient(135deg,#58c3ff,#8459ff);
+      color:#06111f;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.06em;box-shadow:0 12px 26px rgba(0,0,0,.36);cursor:pointer
+    }
+    .save-btn:disabled{opacity:.78;cursor:wait}
+    @media (max-width: 1100px){.hero{grid-template-columns:1fr}.intro-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.feature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.legend-grid,.footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media (max-width: 720px){
+      .page{width:100%;padding:12px 8px 104px}
+      .hero{padding:14px 12px 12px;border-radius:24px}
+      h1{font-size:clamp(28px,8vw,36px)}
+      .subtitle{font-size:14px}
+      .hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .intro-grid,.feature-grid,.watch-grid,.legend-grid,.footer-grid{grid-template-columns:1fr}
+      .section{margin-top:24px}
+      .section-head{gap:10px}
+      .section-no{width:46px;height:46px;font-size:20px;border-radius:14px}
+      .section-title h2{font-size:clamp(20px,7vw,30px)}
+      .save-btn{right:12px;bottom:12px}
+    }
+    @media (max-width: 420px){
+      .kicker,.pill,.chip{font-size:11.6px}
+      .stat .v{font-size:13px}
+      .card h3,.card h4{font-size:16px}
+    }
   </style>
 </head>
 <body>
-<main class="page" id="card">
-  <div class="hero">
-    <div class="hero-copy">
-      <div class="kicker-row">
-        <span class="kicker">🖥 AI Agent Monitor</span>
-        <span class="source">github.com/graykode/abtop</span>
+  <div class="page">
+    <main class="hero" id="card">
+      <div class="hero-copy">
+        <div class="kicker">AI CODING AGENT / TERMINAL DASHBOARD / READ-ONLY</div>
+        <div>
+          <h1>把多 Agent 终端状态收进一屏</h1>
+          <p class="subtitle">abtop 是一个面向 AI coding agents 的只读总览工具：把 Claude Code、Codex CLI、OpenCode 的会话、token、context window、rate limits、子进程和端口占用收进同一块屏幕。</p>
+        </div>
+        <div class="hero-badges">
+          <span class="pill blue">local-first</span>
+          <span class="pill green">readonly</span>
+          <span class="pill purple">multi-session</span>
+          <span class="pill yellow">real-time</span>
+          <span class="pill red">cross-platform</span>
+        </div>
+        <section class="hero-stats" aria-label="关键指标">
+          <article class="stat"><span class="k">stars</span><span class="v">2.8k GitHub Stars</span><span class="s">截至 2026-06-13</span></article>
+          <article class="stat"><span class="k">stack</span><span class="v">Rust + ratatui</span><span class="s">终端原生渲染</span></article>
+          <article class="stat"><span class="k">mode</span><span class="v">默认只读</span><span class="s">不干扰、不改动</span></article>
+          <article class="stat"><span class="k">signal</span><span class="v">本地运行</span><span class="s">数据不离开机器</span></article>
+        </section>
       </div>
-      <h1 class="title">abtop</h1>
-      <p class="subtitle">Like htop, but for AI coding agents。一个终端监控仪表盘，用来实时查看 Claude Code、Codex CLI 等会话的 token、上下文窗口、速率限制、子进程和端口占用。</p>
-      <p class="subcn">Rust + Ratatui + Crossterm 构建，支持 JSON snapshot、tmux 跳转、主题切换和本地只读监控，不需要 API key。</p>
-      <div class="pill-row">
-        <span class="pill cyan">Rust</span>
-        <span class="pill blue">Ratatui</span>
-        <span class="pill green">Claude Code</span>
-        <span class="pill yellow">Codex CLI</span>
-        <span class="pill purple">OpenCode</span>
-        <span class="pill">MIT</span>
-      </div>
-      <div class="hero-note">
-        <strong>把分散的 agent 状态压进一个 TUI</strong>
-        <p>适合在多会话并行时监控 token、context、rate limit、git 状态与子进程；也适合快速发现哪个 agent 卡住、哪个端口没关、哪个会话快触发配额。</p>
-      </div>
-    </div>
+      <figure class="hero-visual">
+        <img src="assets/images/20260614-abtop/hero.jpg" alt="abtop 宣传图与终端状态总览预览" />
+        <figcaption>官方视觉锚点直接说明了它的价值：多窗口、多会话、多限制，一屏总览。</figcaption>
+      </figure>
+    </main>
 
-    <aside class="hero-visual">
-      <div class="visual-top">
-        <div class="orb">AB</div>
-        <div class="visual-meta"><div class="big">abtop v0.4.8</div><div class="small">AI coding agent dashboard</div></div>
+    <section class="section">
+      <div class="section-head"><div class="section-no">01</div><div class="section-title"><h2>核心判断：abtop 不是 htop 的替代品，而是 AI Agent 看板</h2><p>它监控的不是一般系统负载，而是 AI coding agent 的真实工作状态：会话、上下文、额度、进程和端口。</p></div></div>
+      <div class="intro-grid">
+        <article class="card"><h3>一屏总览</h3><p>把分散在多个终端窗口里的 Claude Code、Codex CLI、OpenCode 会话收束到同一屏，先看全局，再下钻细节。</p><div class="chiprow"><span class="chip blue">overview</span><span class="chip purple">multi-window</span><span class="chip green">at-a-glance</span></div></article>
+        <article class="card"><h3>只读安全</h3><p>默认是 read-only 模式，不会改写你的会话状态或终端环境，适合长期挂着观察和排障。</p><div class="chiprow"><span class="chip green">read-only</span><span class="chip yellow">no auth</span><span class="chip blue">safe by default</span></div></article>
+        <article class="card"><h3>轻量高效</h3><p>零依赖、终端原生、刷新很快。它更像一个实时面板，而不是一个重型控制台应用。</p><div class="chiprow"><span class="chip purple">zero-dependency</span><span class="chip blue">fast refresh</span><span class="chip yellow">tui</span></div></article>
+        <article class="card"><h3>本地运行</h3><p>数据不出机器，适合本地开发、私有工作区和多项目并行场景；Windows、macOS、Linux 都能用。</p><div class="chiprow"><span class="chip red">local-first</span><span class="chip blue">macOS</span><span class="chip green">Linux</span><span class="chip purple">Windows</span></div></article>
       </div>
-      <div class="image-box">
-        <img src="assets/images/abtop/abtop-theme-btop.png" alt="abtop terminal dashboard screenshot">
-        <div class="image-cap">README 中的主题截图：终端里同时看 token、context、会话列表和端口占用。非常适合作为这个卡片的主视觉。</div>
+      <div class="callout"><strong>结论：abtop 的价值在于把“Agent 协作中的状态管理”从口头经验变成可视化仪表盘。</strong><small>它适合的不是单机编程，而是同时跑多个 AI coding agents、又要追踪上下文、限额、进程和端口占用的工作流。</small></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">02</div><div class="section-title"><h2>它到底在看什么：五类最关键的监控面板</h2><p>abtop 的重点不是“漂亮图表”，而是把最容易失控的 AI 编码工作流指标放在一起：会话、限额、上下文、子进程和端口。</p></div></div>
+      <div class="feature-grid">
+        <article class="feature-card" data-accent="blue"><div class="feature-head"><h4>会话总览</h4><div class="badge">S</div></div><p>显示每个 session 的状态、时长、输入/输出 token、context 使用率、RPM/TPM 与成本，快速定位“哪个代理最忙”。</p><div class="chiprow"><span class="chip blue">tokens</span><span class="chip green">status</span></div></article>
+        <article class="feature-card" data-accent="yellow"><div class="feature-head"><h4>速率限制</h4><div class="badge">R</div></div><p>把 OpenAI、Anthropic、Google、TogetherAI 等提供方的 RPM、TPM、RPD 使用率放在一起，方便提前看到 warning。</p><div class="chiprow"><span class="chip yellow">RPM</span><span class="chip purple">TPM</span></div></article>
+        <article class="feature-card" data-accent="green"><div class="feature-head"><h4>上下文窗口</h4><div class="badge">C</div></div><p>通过进度条把 token 使用量和总上下文窗口直观可视化，避免“模型快满了才发现”。</p><div class="chiprow"><span class="chip green">context%</span><span class="chip red">warning</span></div></article>
+        <article class="feature-card" data-accent="purple"><div class="feature-head"><h4>子进程</h4><div class="badge">P</div></div><p>列出 node、python 等子进程及其 PID、CPU、内存和运行时长，防止 agent 启动的服务和脚本失控。</p><div class="chiprow"><span class="chip purple">PID</span><span class="chip blue">CPU</span></div></article>
+        <article class="feature-card" data-accent="red"><div class="feature-head"><h4>端口占用</h4><div class="badge">O</div></div><p>检查 3000、5432、6379 这类监听端口对应的服务，避免重复占用或忘记释放服务进程。</p><div class="chiprow"><span class="chip red">LISTEN</span><span class="chip yellow">orphan</span></div></article>
       </div>
-      <div class="visual-grid">
-        <div class="mini-card"><div class="label">Stars</div><div class="value" style="color:var(--yellow)">2.8K+</div><div class="desc">开发者工具类热门</div></div>
-        <div class="mini-card"><div class="label">Forks</div><div class="value" style="color:var(--cyan)">269</div><div class="desc">Rust TUI 工具</div></div>
-        <div class="mini-card"><div class="label">Release</div><div class="value" style="color:var(--green)">0.4.8</div><div class="desc">2026-06-08</div></div>
-        <div class="mini-card"><div class="label">License</div><div class="value" style="color:var(--purple)">MIT</div><div class="desc">可自由使用</div></div>
+      <div style="height:12px"></div>
+      <div class="legend-grid">
+        <article class="legend"><div class="l" style="--c:#2db36a">Green：正常</div><p>0–70% 属于健康区间，适合继续跑。</p></article>
+        <article class="legend"><div class="l" style="--c:#f4c84c">Yellow：注意</div><p>70–90% 进入提醒区，应该开始盯着看。</p></article>
+        <article class="legend"><div class="l" style="--c:#ff7c8d">Red：紧张</div><p>90%+ 说明资源已经接近上限。</p></article>
+        <article class="legend"><div class="l" style="--c:#93a3bf">Grey：离线</div><p>Idle 或 offline 状态，通常是没在跑。</p></article>
       </div>
-    </aside>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">03</div><div class="section-title"><h2>快速开始与使用边界</h2><p>abtop 的入口很轻，真正的重点是：先看总览，再做细分排障，不要把它当成要改系统状态的管理器。</p></div></div>
+      <div class="watch-grid">
+        <article class="card"><h3>安装 / 运行</h3><div class="codebox"><pre>curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/graykode/abtop/releases/latest/download/abtop-installer.sh | sh
+
+cargo install abtop
+
+abtop                 # 进入 TUI
+abtop --once          # 打印快照后退出
+abtop --json          # 输出 JSON 快照</pre></div></article>
+        <article class="card"><h3>常用快捷键</h3><p>截图里的交互逻辑非常清晰：`r` 刷新、`s` 排序、`f` 过滤、`?` 帮助、`q` 退出。它更像一个可操作的观察面板。</p><div class="chiprow"><span class="chip blue">r refresh</span><span class="chip green">s sort</span><span class="chip yellow">f filter</span><span class="chip purple">? help</span><span class="chip red">q quit</span></div></article>
+      </div>
+      <div class="footer-block">
+        <h3>适合谁，不适合谁</h3>
+        <ul style="padding-left:1.2em;display:grid;gap:6px">
+          <li>适合：同时开多个 AI coding agents、又要盯 token / context / 端口 / 子进程的人。</li>
+          <li>适合：需要本地只读监控，不想把数据送到外部服务的人。</li>
+          <li>不适合：只想要单一模型聊天窗口、没有多会话管理需求的人。</li>
+          <li>不适合：希望它自动替你改配置、杀进程、提交代码的人——它本质上是看板，不是管家。</li>
+        </ul>
+      </div>
+      <div class="callout"><strong>边界一句话：abtop 解决的是“看见并管理 AI Agent 的运行态”，不是“替你执行工作流”。</strong><small>它的强项是可视化和本地观测；你仍然需要自己决定该暂停、排序、过滤，还是继续让某个 session 跑下去。</small></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">04</div><div class="section-title"><h2>发布信息卡时要记住的三件事</h2><p>这张卡已经把信息压成“产品故事 + 仪表盘 + 快速上手”三层；发布时，别再把它退回成目录页。</p></div></div>
+      <div class="footer-grid">
+        <article class="card"><h3>先结论，再证据</h3><p>标题直接写成判断：abtop 不是 htop 的替代品，而是 AI coding agent 的终端看板。</p></article>
+        <article class="card"><h3>先看视觉锚点</h3><p>官方 promo + dashboard 预览就是最强证据，说明它的设计目标就是“一屏总览”。</p></article>
+        <article class="card"><h3>先看边界</h3><p>默认只读、无 API key、无 auth、数据本地化，是这类工具最关键的信任前提。</p></article>
+      </div>
+      <p class="source-note">Sources: <a href="https://github.com/graykode/abtop">github.com/graykode/abtop</a> · <a href="https://raw.githubusercontent.com/graykode/abtop/main/README.md">README.md</a> · image asset from provided local screenshot</p>
+    </section>
   </div>
 
-  <div class="shell">
-    <div class="panel">
-      <div class="panel-head"><h3>核心能力</h3><span class="badge"><span class="mini-dot" style="width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--purple));box-shadow:0 0 0 3px rgba(88,195,255,.12)"></span>features</span></div>
-      <div class="panel-body">
-        <div class="task"><div class="task-top"><div class="task-name">多 Agent 统一监控</div><span class="status green">核心</span></div><p>一个界面看多个 Claude / Codex / OpenCode 会话，避免在多个终端窗口里来回切换。</p></div>
-        <div class="task"><div class="task-top"><div class="task-name">Token / Context / Quota</div><span class="status yellow">重点</span></div><p>实时展示 token 消耗、上下文占比与 rate limits，便于判断是否需要切上下文或暂停任务。</p></div>
-        <div class="task"><div class="task-top"><div class="task-name">子进程 / 端口 / Git</div><span class="status purple">排障</span></div><p>能发现 agent 是否留下了后台进程、端口和脏工作区。</p></div>
-        <div class="task"><div class="task-top"><div class="task-name">JSON / tmux / Theme</div><span class="status">集成</span></div><p>支持 JSON snapshot、tmux pane 跳转以及多主题切换。</p></div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head"><h3>信息流</h3><span class="badge">monitoring</span></div>
-      <div class="panel-body">
-        <div class="status-list">
-          <div class="status-item"><div class="left"><b>Claude Code</b><span class="small">session / token / context</span></div><strong style="color:var(--cyan)">100%</strong></div>
-          <div class="status-item"><div class="left"><b>Codex CLI</b><span class="small">ports / subprocess / git</span></div><strong style="color:var(--green)">ACTIVE</strong></div>
-          <div class="status-item"><div class="left"><b>OpenCode</b><span class="small">multi-agent support</span></div><strong style="color:var(--purple)">READY</strong></div>
-        </div>
-        <div class="term">
-          <div class="term-top"><span>SNAPSHOT</span><span>no API key required</span></div>
-          <div class="term-body">abtop --once
-<span class="url">agent sessions</span>   12 active
-<span class="url">tokens</span>          78.4k / 120k
-<span class="url">context</span>         64% used
-<span class="url">quota</span>           2 warnings
-<span class="url">ports</span>           3 listeners
-<span class="url">git</span>             dirty workspace
-<span class="url">subagents</span>       7 running</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head"><h3>安装与用法</h3><span class="badge">CLI</span></div>
-      <div class="panel-body">
-        <div class="project">
-          <div class="top"><div><div class="name">安装</div><div class="desc">适用于 macOS / Linux / Windows</div></div><div class="mini-dot"></div></div>
-          <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.6;color:#e8eefc;white-space:pre-wrap">curl --proto '=https' --tlsv1.2 -LsSf https://github.com/graykode/abtop/releases/latest/download/abtop-installer.sh | sh
-
-# or
-cargo install abtop</div>
-        </div>
-        <div class="task">
-          <div class="task-top"><div class="task-name">常用命令</div><span class="status yellow">usage</span></div>
-          <p><code>abtop</code> 启动 TUI；<code>abtop --once</code> 打印快照；<code>abtop --json</code> 输出结构化数据；<code>abtop --setup</code> 安装采集 hook。</p>
-        </div>
-        <div class="task">
-          <div class="task-top"><div class="task-name">适用场景</div><span class="status purple">why</span></div>
-          <p>多 agent 并行、上下文膨胀、配额接近、端口占用、会话失控时，快速定位问题点。</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="feature-row">
-    <div class="feature cyan"><div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M12 2v20"/><path d="M6 7h12"/></svg></div><span>实时监控</span></div>
-    <div class="feature green"><div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 8h8"/><path d="M8 12h8"/></svg></div><span>会话列表</span></div>
-    <div class="feature yellow"><div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg></div><span>Context Gauge</span></div>
-    <div class="feature purple"><div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 8h10"/><path d="M7 16h10"/></svg></div><span>Tokens & Quota</span></div>
-    <div class="feature blue"><div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M7 16V8"/><path d="M12 16V4"/><path d="M17 16v-6"/></svg></div><span>Ports & Git</span></div>
-    <div class="feature"><div class="icon-wrap" style="color:#fff"><svg viewBox="0 0 24 24"><path d="M4 17h16"/><path d="M4 7h16"/><path d="M7 7l-3 5 3 5"/></svg></div><span>JSON Snapshot</span></div>
-  </div>
-
-  <div class="download"><a class="download-btn" href="https://github.com/graykode/abtop"><span>查看 GitHub 仓库</span><small>v0.4.8 · Rust TUI · MIT</small></a></div>
-
-  <div class="footer">
-    <div><span class="stars">⭐ 2.8K+</span> · <strong>abtop</strong> · graykode</div>
-    <div>darkblue · AI agent monitor · 2026-06-14</div>
-    <div style="color:var(--cyan)">Source: github.com/graykode/abtop</div>
-  </div>
-</main>
-
-<div style="text-align:center;padding:12px 0 24px"><button id="saveBtn" style="border:0;border-radius:14px;padding:13px 22px;background:linear-gradient(135deg,#8459ff,#4a78ff);color:#fff;font-weight:950;font-size:15px;cursor:pointer;box-shadow:0 12px 28px rgba(132,89,255,.28)">保存 PNG</button></div>
-
-<script>
-document.getElementById('saveBtn').addEventListener('click',async function(){
-  const card=document.getElementById('card');
-  const btn=this;
-  btn.disabled=true;btn.textContent='导出中…';
-  try{
-    const canvas=await html2canvas(card,{backgroundColor:'#0c1020',scale:Math.max(2,window.devicePixelRatio||2),useCORS:true,scrollX:0,scrollY:-window.scrollY});
-    const a=document.createElement('a');a.download='20260614-abtop.png';a.href=canvas.toDataURL('image/png');a.click();
-  }finally{btn.disabled=false;btn.textContent='保存 PNG';}
-});
-(function(){function send(){window.parent.postMessage({type:'theme-height',slug:'darkblue',height:document.body.scrollHeight},'*');}if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}setTimeout(send,500);})();
-</script>
+  <button class="save-btn" id="saveBtn" type="button">SAVE PNG</button>
+  <script>
+    const btn = document.getElementById('saveBtn');
+    async function saveAsPng(){
+      const card = document.getElementById('card');
+      if(!window.html2canvas) throw new Error('html2canvas not loaded');
+      btn.disabled = true;
+      btn.textContent = 'EXPORTING...';
+      try{
+        const canvas = await html2canvas(card, {
+          backgroundColor: '#08101f',
+          scale: Math.max(2, window.devicePixelRatio || 2),
+          useCORS: true,
+          allowTaint: true,
+          scrollX: 0,
+          scrollY: -window.scrollY,
+          windowWidth: document.documentElement.clientWidth,
+          windowHeight: document.documentElement.clientHeight
+        });
+        const a = document.createElement('a');
+        a.download = 'abtop-info-card.png';
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'SAVE PNG';
+      }
+    }
+    btn.addEventListener('click', saveAsPng);
+  </script>
 </body>
 </html>
