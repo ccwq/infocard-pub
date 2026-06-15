@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 图像分层全景：5 类方法 + 决策树</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:#07120d;color:#eaf7ef;font-size:13px
+    }
+    .page{width:100%;max-width:720px;margin:0 auto;padding:16px 14px 80px}
+
+    /* === Status bar === */
+    .status-bar{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 14px;background:#0b1711;
+      border-bottom:1px solid rgba(180,255,210,.12);
+      font-size:11px;color:#9fbeab;margin-bottom:16px
+    }
+    .status-bar .dot{width:8px;height:8px;border-radius:50%;background:#33d17a;box-shadow:0 0 6px #33d17a;flex-shrink:0}
+    .status-bar .label{color:#78f2b0;font-weight:700}
+    .status-bar .live{color:#33d17a;font-weight:700;margin-left:auto}
+
+    /* === Hero === */
+    .hero{margin-bottom:16px}
+    .kicker{border-left:3px solid #33d17a;padding-left:10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#33d17a;margin-bottom:8px}
+    h1{font-size:36px;font-weight:700;margin:0 0 8px;color:#eaf7ef;letter-spacing:-.03em;line-height:1.1}
+    .subtitle{font-size:14px;color:#9fbeab;margin:0 0 6px}
+    .tagline{border-left:3px solid #78f2b0;padding-left:10px;font-size:12px;color:#9fbeab;margin:0}
+
+    /* === Problem statement === */
+    .alert{border-radius:6px;padding:10px 12px;font-size:12px;margin-bottom:12px;border-left:3px solid}
+    .alert.warn{background:rgba(242,212,92,.08);border-color:#f2d45c;color:#f2d45c}
+    .alert.info{background:rgba(51,209,122,.08);border-color:#33d17a;color:#78f2b0}
+
+    /* === Category blocks === */
+    .cat{margin-bottom:14px}
+    .cat-title{
+      display:flex;align-items:center;gap:8px;
+      font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+      color:#33d17a;margin-bottom:8px
+    }
+    .cat-title .badge{
+      padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;
+      background:#33d17a;color:#07120d
+    }
+    .cat-title .label-text{flex:1}
+    .cat-title .count{color:#9fbeab;font-weight:400;font-size:10px}
+
+    /* === Tool cards === */
+    .tool-list{display:grid;gap:6px}
+    .tool-card{
+      background:#102018;border:1px solid rgba(180,255,210,.12);
+      border-radius:8px;padding:10px 12px
+    }
+    .tool-card-header{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+    .tool-name{font-size:13px;font-weight:700;color:#eaf7ef}
+    .tool-source{font-size:11px;color:#4a6050;margin-left:auto}
+    .tool-desc{font-size:12px;color:#9fbeab;line-height:1.5;margin-bottom:6px}
+    .tool-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+    .tag{padding:2px 7px;border:1px solid rgba(51,209,122,.3);border-radius:12px;font-size:10px;color:#33d17a;background:rgba(51,209,122,.06)}
+    .tag.cyan{border-color:#57d7c0;color:#57d7c0;background:rgba(87,215,192,.06)}
+    .tag.yellow{border-color:#f2d45c;color:#f2d45c;background:rgba(242,212,92,.06)}
+    .tag.lime{border-color:#b7f171;color:#b7f171;background:rgba(183,241,113,.06)}
+    .code-snippet{
+      background:#0b1711;border:1px solid rgba(180,255,210,.1);
+      border-radius:4px;padding:6px 10px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+      font-size:11px;color:#9fbeab;white-space:pre-wrap;word-break:break-all;
+      line-height:1.6
+    }
+
+    /* === Decision tree === */
+    .decision-panel{
+      background:#102018;border:1px solid rgba(180,255,210,.12);
+      border-radius:8px;padding:12px;margin-bottom:12px
+    }
+    .decision-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#33d17a;border-bottom:1px solid rgba(180,255,210,.08);padding-bottom:8px;margin-bottom:10px}
+    .branch{display:flex;flex-direction:column;gap:3px;padding-left:12px;border-left:2px solid #33d17a}
+    .branch-item{display:flex;flex-direction:column;gap:2px}
+    .branch-q{font-size:12px;font-weight:700;color:#eaf7ef;padding:2px 0}
+    .branch-a{font-size:11px;color:#78f2b0;padding-left:10px;border-left:2px solid #78f2b0;margin-left:0}
+    .branch-dot{color:#f2d45c}
+
+    /* === Comparison matrix === */
+    .matrix{overflow-x:auto;margin-bottom:12px}
+    .matrix table{width:100%;border-collapse:collapse;font-size:11px}
+    .matrix th{
+      background:#102018;color:#33d17a;font-weight:700;
+      padding:6px 8px;text-align:left;border-bottom:1px solid rgba(180,255,210,.2)
+    }
+    .matrix td{padding:5px 8px;border-bottom:1px solid rgba(180,255,210,.06);vertical-align:top}
+    .matrix tr:hover td{background:rgba(51,209,122,.04)}
+    .ok{color:#33d17a}
+    .no{color:#ff7474}
+    .warn{color:#f2d45c}
+    .partial{color:#57d7c0}
+
+    /* === Pitfalls === */
+    .pitfalls{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+    .pitfall{
+      display:flex;align-items:flex-start;gap:8px;
+      background:rgba(255,116,116,.06);border:1px solid rgba(255,116,116,.2);
+      border-radius:6px;padding:8px 10px;font-size:12px
+    }
+    .pitfall .num{color:#ff7474;font-weight:700;min-width:16px}
+    .pitfall .text{color:#eaf7ef;line-height:1.5}
+    .pitfall .fix{color:#9fbeab;font-size:11px;margin-top:2px}
+
+    /* === Footer === */
+    .footer{border-top:1px solid rgba(180,255,210,.1);padding-top:10px;margin-top:4px}
+    .source-note{font-size:11px;color:#4a6050;line-height:1.5}
+    p{font-size:13px;line-height:1.7;color:#9fbeab;margin:0 0 12px}
+
+    @media(max-width:720px){
+      h1{font-size:28px}
+      .matrix{font-size:10px}
+      .code-snippet{font-size:10px}
+    }
+    @media(max-width:390px){
+      h1{font-size:24px}
+      .tool-card-header{flex-direction:column;gap:2px}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="status-bar">
+      <span class="dot"></span>
+      <span class="label">● MONITOR</span>
+      <span class="tag">· 调研报告 · 2026-06-14</span>
+      <span class="live">● 5 CLASSES · 11 TOOLS</span>
+    </div>
+
+    <div class="hero">
+      <div class="kicker">DARKGREEN · IMAGE LAYER · PSD WORKFLOW</div>
+      <h1>AI 图像分层全景</h1>
+      <p class="subtitle">5 类方法 + 11 工具 + 决策树 + 坑点矩阵</p>
+      <p class="tagline">从"扁平死图"到"可编辑图层资产"的全链路地图</p>
+    </div>
+
+    <div class="alert info">● 问题：主流 AI 生图输出 JPEG/PNG，所有像素粘在一起，无法单独编辑其中一个元素。<br>
+    专业设计依赖 PSD 格式（图层 + Alpha 通道 + 合成关系），需要的是独立层、可移动、可替换。</div>
+
+    <!-- A类：原生分层生成 -->
+    <div class="cat">
+      <div class="cat-title">
+        <span class="badge">A</span>
+        <span class="label-text">AI 原生分层生成 — 生成即分层</span>
+        <span class="count">3 工具</span>
+      </div>
+      <div class="tool-list">
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">Qwen-Image-Layered</span>
+            <span class="tool-source">阿里 · 2025-12 · Apache 2.0</span>
+          </div>
+          <p class="tool-desc">首次在模型内实现 PS 级图层理解的开源模型，将任意图像分解为多个 RGBA 图层（3-8+ 层），智能填充被遮挡区域，"零漂移"精准编辑。</p>
+          <div class="tool-tags">
+            <span class="tag">开源</span>
+            <span class="tag">RGBA 原生</span>
+            <span class="tag cyan">本地部署</span>
+            <span class="tag yellow">需 RTX 4090</span>
+          </div>
+          <div class="code-snippet">pip install git+https://github.com/huggingface/diffusers
+pipeline = QwenImageLayeredPipeline.from_pretrained("Qwen/Qwen2.5-VL-Image-Layered")
+layers = pipeline分解(input_image, num_layers=5)</div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">OmniPSD</span>
+            <span class="tool-source">NUS + Lovart AI · 2025-12 · arXiv:2512.09247</span>
+          </div>
+          <p class="tool-desc">基于 Flux 生态的 Diffusion Transformer 框架，同时支持 Text-to-PSD 和 Image-to-PSD，输出真正可导入 Photoshop 的 .psd 文件。</p>
+          <div class="tool-tags">
+            <span class="tag">PSD 原生输出</span>
+            <span class="tag">RGBA-VAE</span>
+            <span class="tag">透明 Alpha 通道</span>
+            <span class="tag lime">Flux 生态</span>
+          </div>
+          <div class="code-snippet"># Text-to-PSD
+prompt → semantic layers → spatial attention → PSD file
+# Image-to-PSD
+input image → iterative in-context editing → PSD layers</div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">Canva Magic Layers</span>
+            <span class="tool-source">Canva · 2026-03</span>
+          </div>
+          <p class="tool-desc">上传任意 AI 图像（不必须在 Canva 生成），自动分解为可编辑格式。文字可改样式/颜色/字号/排版，图像可改内容。</p>
+          <div class="tool-tags">
+            <span class="tag">Web</span>
+            <span class="tag">任意 AI 图像</span>
+            <span class="tag">Canva 生态</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- B类：生成后拆解 -->
+    <div class="cat">
+      <div class="cat-title">
+        <span class="badge">B</span>
+        <span class="label-text">生成后拆解 — 已有图 → 分层图</span>
+        <span class="count">2 工具</span>
+      </div>
+      <div class="tool-list">
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">Lovart AI</span>
+            <span class="tool-source">Web · 2025-11</span>
+          </div>
+          <p class="tool-desc">纯 Web 操作，无需安装。上传图片 → 编辑元素，AI 自动分层，文字层和图像层均可独立修改内容。</p>
+          <div class="tool-tags">
+            <span class="tag">Web</span>
+            <span class="tag">零安装</span>
+            <span class="tag">RGBA</span>
+            <span class="tag lime">最快上手</span>
+          </div>
+          <div class="code-snippet">lovart.ai → 新建项目 → 上传图片 → 图片 → 编辑元素</div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">Qwen-Image-Layered（逆向）</span>
+            <span class="tool-source">同 A1 模型</span>
+          </div>
+          <p class="tool-desc">同一模型用于对任意现有图像做分层拆解，支持本地 Python 精细控制输出。</p>
+          <div class="tool-tags">
+            <span class="tag">本地</span>
+            <span class="tag">Python API</span>
+            <span class="tag">精细控制</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- C类：背景移除 -->
+    <div class="cat">
+      <div class="cat-title">
+        <span class="badge">C</span>
+        <span class="label-text">背景移除 / 抠图 — 单层前景分离</span>
+        <span class="count">2 工具</span>
+      </div>
+      <div class="tool-list">
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">rembg</span>
+            <span class="tool-source">danielgatis · U-2-Net · pip</span>
+          </div>
+          <p class="tool-desc">轻量背景移除 CLI/API，支持批处理，底层 U-2-Net（CVPR 2020）。输出 PNG 带透明通道，但为二值蒙版，半透明区域质量有限。</p>
+          <div class="tool-tags">
+            <span class="tag">CLI</span>
+            <span class="tag">批处理</span>
+            <span class="tag">pip 安装</span>
+            <span class="tag yellow">二值蒙版</span>
+          </div>
+          <div class="code-snippet">pip install rembg          # CPU
+pip install rembg[gpu]      # GPU
+rembg i input.png output.png
+rembg p input/ output/       # 批处理</div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">RMBG-2.0</span>
+            <span class="tool-source">BRIA AI · 2026</span>
+          </div>
+          <p class="tool-desc">高精度背景移除模型，精度/速度/显存/易用性四维优于 rembg，适合专业电商、人像、产品摄影。</p>
+          <div class="tool-tags">
+            <span class="tag">高精度</span>
+            <span class="tag">电商级</span>
+            <span class="tag cyan">商业授权</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- D类：提示词工程 -->
+    <div class="cat">
+      <div class="cat-title">
+        <span class="badge">D</span>
+        <span class="label-text">提示词工程路线 — AI 生图 → PSD</span>
+        <span class="count">1 方法</span>
+      </div>
+      <div class="tool-list">
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">GPT Image 2 → PSD Prompt</span>
+            <span class="tool-source">社区实践 · 2026</span>
+          </div>
+          <p class="tool-desc">通过精细提示词引导模型输出多张独立图层图，再手动合成 PSD。成功率不稳定，但零成本。</p>
+          <div class="tool-tags">
+            <span class="tag">零成本</span>
+            <span class="tag yellow">不稳定</span>
+            <span class="tag">需自检句</span>
+          </div>
+          <div class="code-snippet"># 核心要点：独立图层 / 背景处理 / 图层顺序 / 可编辑性
+"请检查最终 PSD 预览是否尽量还原原图，避免出现图层偏移、
+尺寸变化、顺序错误、白底残留或元素误删。"</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- E类：传统工具 -->
+    <div class="cat">
+      <div class="cat-title">
+        <span class="badge">E</span>
+        <span class="label-text">传统工具 / 后处理</span>
+        <span class="count">3 工具</span>
+      </div>
+      <div class="tool-list">
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">psd-tools / psd-tools2</span>
+            <span class="tool-source">pip · Python</span>
+          </div>
+          <p class="tool-desc">读写 PSD 文件，导出单图层为 PNG/JPEG，处理已有 PSD 的图层读写需求。</p>
+          <div class="tool-tags">
+            <span class="tag">PSD 读写</span>
+            <span class="tag">图层导出</span>
+          </div>
+          <div class="code-snippet">pip install psd-tools
+psd-tools convert input.psd output.png
+psd-tools export_layer input.psd output_dir/</div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">Photoshop AI</span>
+            <span class="tool-source">Adobe Firefly · CC 订阅</span>
+          </div>
+          <p class="tool-desc">生成式扩展、生成式填充、图层感知编辑。需 Creative Cloud 订阅，输出仍以扁平为主。</p>
+          <div class="tool-tags">
+            <span class="tag">Adobe</span>
+            <span class="tag">Firefly</span>
+            <span class="tag yellow">订阅付费</span>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-card-header">
+            <span class="tool-name">StartAI 插件</span>
+            <span class="tool-source">Windows · 免费</span>
+          </div>
+          <p class="tool-desc">Photoshop AI 插件，支持文生图、局部重绘、线稿上色、产品精修。Windows 专用，功能较基础。</p>
+          <div class="tool-tags">
+            <span class="tag">PS 插件</span>
+            <span class="tag">Windows</span>
+            <span class="tag lime">免费</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 决策树 -->
+    <div class="decision-panel">
+      <div class="decision-title">决策树 · 选哪条路</div>
+      <div class="branch">
+        <div class="branch-item">
+          <div class="branch-q">需要从文本生成带分层的可编辑 PSD？</div>
+          <div class="branch-a"><span class="branch-dot">→</span> OmniPSD Text-to-PSD <span class="tag" style="margin-left:4px;font-size:9px;padding:1px 5px">✅</span></div>
+        </div>
+        <div class="branch-item">
+          <div class="branch-q">已有图像要分层拆解？</div>
+          <div class="branch-a"><span class="branch-dot">→</span> Web 快速上手 → Lovart AI <span class="tag lime" style="margin-left:4px;font-size:9px;padding:1px 5px">✅</span></div>
+          <div class="branch-a"><span class="branch-dot">→</span> 本地精细控制 → Qwen-Image-Layered <span class="tag" style="margin-left:4px;font-size:9px;padding:1px 5px">✅</span></div>
+          <div class="branch-a"><span class="branch-dot">→</span> 直接出 PSD 文件 → OmniPSD Image-to-PSD <span class="tag" style="margin-left:4px;font-size:9px;padding:1px 5px">✅</span></div>
+        </div>
+        <div class="branch-item">
+          <div class="branch-q">只需要去除背景（单层分离）？</div>
+          <div class="branch-a"><span class="branch-dot">→</span> 快速批处理 → rembg <span class="tag lime" style="margin-left:4px;font-size:9px;padding:1px 5px">✅</span></div>
+          <div class="branch-a"><span class="branch-dot">→</span> 高精度电商级 → RMBG-2.0 <span class="tag cyan" style="margin-left:4px;font-size:9px;padding:1px 5px">✅</span></div>
+        </div>
+        <div class="branch-item">
+          <div class="branch-q">用 AI 生图工具 + 提示词？</div>
+          <div class="branch-a"><span class="branch-dot">→</span> GPT Image 2 + 精细 Prompt <span class="tag yellow" style="margin-left:4px;font-size:9px;padding:1px 5px">⚠️ 不稳定</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 对比矩阵 -->
+    <div class="matrix">
+      <table>
+        <thead>
+          <tr>
+            <th>工具</th>
+            <th>类型</th>
+            <th>PSD</th>
+            <th>RGBA</th>
+            <th>Web</th>
+            <th>本地</th>
+            <th>开源</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Qwen-Image-Layered</td><td>原生分层</td><td class="partial">部分</td><td class="ok">✅</td><td class="no">❌</td><td class="ok">✅</td><td class="ok">✅</td></tr>
+          <tr><td>OmniPSD</td><td>原生分层</td><td class="ok">✅</td><td class="ok">✅</td><td class="ok">✅</td><td class="ok">✅</td><td class="ok">✅</td></tr>
+          <tr><td>Lovart AI</td><td>Web 拆解</td><td class="no">❌</td><td class="ok">✅</td><td class="ok">✅</td><td class="no">❌</td><td class="no">❌</td></tr>
+          <tr><td>Canva Magic Layers</td><td>Web 拆解</td><td class="no">❌</td><td class="ok">✅</td><td class="ok">✅</td><td class="no">❌</td><td class="no">❌</td></tr>
+          <tr><td>rembg</td><td>背景移除</td><td class="no">❌</td><td class="partial">部分</td><td class="ok">CLI</td><td class="ok">✅</td><td class="ok">✅</td></tr>
+          <tr><td>RMBG-2.0</td><td>背景移除</td><td class="no">❌</td><td class="partial">部分</td><td class="ok">API</td><td class="ok">✅</td><td class="no">❌</td></tr>
+          <tr><td>GPT Image 2 Prompt</td><td>提示词工程</td><td class="warn">⚠️</td><td class="warn">⚠️</td><td class="ok">✅</td><td class="no">❌</td><td class="no">❌</td></tr>
+          <tr><td>psd-tools</td><td>后处理</td><td class="ok">✅</td><td class="ok">✅</td><td class="no">❌</td><td class="ok">✅</td><td class="ok">✅</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 坑点 -->
+    <div class="pitfalls">
+      <div class="decision-title">⚠ 关键坑点</div>
+      <div class="pitfall">
+        <span class="num">1</span>
+        <div>
+          <div class="text">白底残留：背景移除模型常误删元素内部的白色内容</div>
+          <div class="fix">→ 需要后处理蒙版修正，半透明区域建议用 RGBA 原生工具</div>
+        </div>
+      </div>
+      <div class="pitfall">
+        <span class="num">2</span>
+        <div>
+          <div class="text">半透明边缘：rembg 类工具只做二值蒙版，玻璃/烟雾/头发边缘质量差</div>
+          <div class="fix">→ 用 OmniPSD RGBA-VAE 或 Qwen-Image-Layered 原生支持</div>
+        </div>
+      </div>
+      <div class="pitfall">
+        <span class="num">3</span>
+        <div>
+          <div class="text">图层顺序漂移：GPT Image 2 Prompt 方法层级容易错位</div>
+          <div class="fix">→ 加自检句："请检查最终 PSD 预览是否避免图层偏移、顺序错误"</div>
+        </div>
+      </div>
+      <div class="pitfall">
+        <span class="num">4</span>
+        <div>
+          <div class="text">VAE 压缩失真：传统 VAE 处理半透明区域时丢失边缘细节</div>
+          <div class="fix">→ OmniPSD 用 RGBA-VAE 重训练解决，Qwen-Image-Layered 原生 RGBA</div>
+        </div>
+      </div>
+      <div class="pitfall">
+        <span class="num">5</span>
+        <div>
+          <div class="text">显存门槛：Qwen-Image-Layered 推荐 RTX 4090（24GB），OmniPSD 需要 Flux 生态 GPU</div>
+          <div class="fix">→ Web 路线（Lovart / Canva）零门槛绕过</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="source-note">
+        数据来源：arXiv:2512.09247（NUS+Lovart）、阿里通义实验室、danielgatis/rembg、BRIA AI、Canva、Adobe、lovart.ai · 调研时间：2026-06-14<br>
+        报告同步：docs/20260614-image-layer-report.md
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
