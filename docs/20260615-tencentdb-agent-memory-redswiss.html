@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TencentDB Agent Memory：把 Agent 记忆做成可追溯的本地分层系统</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#f5f2ec;
+      --paper:#fffdf9;
+      --ink:#0a0a0a;
+      --red:#c8102e;
+      --deep-red:#8f0c20;
+      --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --muted:#5f5a56;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;font-size:13px;line-height:1.68;text-align:center}
+    img{display:block;max-width:100%;height:auto}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 72px;text-align:left}
+    .topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .topbar-hero{padding:20px 18px 16px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff;min-width:0}
+    .kicker{display:inline-block;border:2px solid #fff;padding:4px 8px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;font-size:11px;background:rgba(0,0,0,.08)}
+    h1{margin:10px 0 8px;font-size:clamp(24px,3.4vw,41px);font-weight:900;letter-spacing:-.045em;line-height:1.03;max-width:820px}
+    .sub-line{font-size:13.5px;line-height:1.58;color:#fff8f8;margin:6px 0 0;max-width:58ch;font-weight:650}
+    .tagline{display:inline-block;padding:4px 9px;border:2px solid #fff;background:var(--red);color:#fff;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;margin-top:10px}
+    .topbar-meta{padding:10px 14px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto auto;gap:0;align-content:start;background:#f6f1f1}
+    .meta-row-high{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-low{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-fail{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+    .meta-pill-lg{border:2px solid var(--line);padding:8px 9px 6px;background:#fff;font-weight:900;font-size:15px;line-height:1.1}
+    .meta-pill-md{border:2px solid var(--line);border-left:4px solid var(--red);padding:5px 8px 4px;background:#fff;font-weight:850;font-size:12px;line-height:1.2}
+    .meta-pill-sm{border:2px solid var(--line);border-left:4px solid #666;padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.2px;color:#555;line-height:1.25}
+    .meta-pill-lg .sub,.meta-pill-md .sub,.meta-pill-sm .sub{display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}.meta-pill-sm .sub{font-size:8.5px;color:#aaa}
+    .overview{border:3px solid var(--line);background:var(--paper);padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+    .overview-sentence{font-size:16px;font-weight:900;color:var(--red);margin-bottom:8px;line-height:1.36;letter-spacing:-.01em}
+    .overview-body{font-size:13px;line-height:1.72;color:#2c2926}.overview-body b{color:#111}.overview-body em{font-style:normal;color:var(--red);font-weight:900}
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow);background:#fff}
+    .stat{flex:1;min-width:96px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}.stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:20px;font-weight:950;line-height:1;color:var(--ink);letter-spacing:-.02em}.stat span{font-size:10.5px;color:#666;font-weight:850;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;display:block}
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}.pill{padding:4px 10px;border:2px solid var(--line);font-size:11.4px;font-weight:900;background:#fff}.pill.red{background:var(--red);color:#fff;border-color:var(--red)}.pill.dark{background:var(--ink);color:#fff}.pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+    .section{border:2px solid var(--line);margin-bottom:12px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px}.sec-head .num{color:var(--red);font-size:14px;font-weight:950;letter-spacing:.02em}.sec-head .label{font-size:11.4px;font-weight:850;text-transform:uppercase;letter-spacing:.08em;text-align:right}
+    .sec-body{padding:12px 13px}h2{font-size:17px;font-weight:950;margin:0 0 7px;letter-spacing:-.02em}h3{font-size:14px;font-weight:900;margin:0 0 6px;letter-spacing:-.01em}p{font-size:12.8px;line-height:1.7;margin:0 0 9px;color:#333}small{font-size:11.4px;color:#666;line-height:1.55}.lead{font-size:10.5px;font-weight:950;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}.muted{color:#6b6660}.red{color:var(--red);font-weight:900}
+    .grid-2,.grid-3,.grid-4{display:grid;gap:10px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}.grid-2,.grid-3{margin-bottom:10px}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}.card h4{font-size:13.4px;font-weight:900;margin:0 0 5px;letter-spacing:-.01em}.card p{font-size:12.4px;margin:0;color:#444;line-height:1.65}.card.hot{border-color:var(--red);background:var(--soft-red)}.card.dark{background:#111;color:#fff}.card.dark p{color:#f0ece7}.card.dark .lead{color:#fff}.card.dark h4{color:#fff}
+    .bench-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 2px}.bench{border:2px solid var(--line);background:#fff;padding:10px}.bench .name{font-size:12px;font-weight:950}.bench .val{font-size:18px;font-weight:950;color:var(--red);line-height:1.1;margin:5px 0 3px}.bench .note{font-size:11.3px;color:#5d5552;line-height:1.42}
+    .flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:10px 0;box-shadow:var(--shadow)}.flow-item{border:2px solid var(--line);border-right:0;padding:9px 8px;text-align:center;font-weight:900;font-size:12px;background:#fff}.flow-item:last-child{border-right:2px solid var(--line)}.flow-item.red-bg{background:var(--red);color:#fff;border-color:var(--red)}.flow-item small{display:block;margin-top:3px;font-size:10.5px;color:#666}.flow-item.red-bg small{color:#fff}
+    .figure{border:2px solid var(--line);background:#fff;padding:10px;margin:10px 0 12px;box-shadow:var(--shadow)}.figure img{width:100%;border:1.5px solid var(--line);background:#fff}.figure figcaption{font-size:11.5px;color:#59534e;margin-top:8px;line-height:1.55}.figure.logo img{border:none;max-width:440px;margin:0 auto;background:#fff}.figure.logo{background:#fffdf9}
+    .code-box{background:#0a0a0a;color:#f2eee8;border:2px solid var(--line);padding:12px 14px;margin:10px 0 12px;overflow-x:auto;box-shadow:var(--shadow)}.code-box .comment{font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#8f8a84;margin-bottom:6px}.code-box pre{font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-word}.code-box b{color:#ffb6c0;font-weight:900}
+    .kv{display:grid;grid-template-columns:180px 1fr;border-top:1.5px solid var(--line);font-size:12.4px}.kv div{padding:8px 10px;border-bottom:1.5px solid var(--line)}.kv div:nth-child(odd){font-weight:900;background:#faf8f4;border-right:1.5px solid var(--line)}
+    .boundary{border:2px solid var(--red);background:var(--soft-red);padding:12px 14px;margin-top:10px}.boundary strong{display:block;color:var(--red);font-size:13px;margin-bottom:4px}.boundary p{margin:0;color:#4d181f}
+    .links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.link-card{border:2px solid var(--line);background:#fff;padding:10px;min-width:0}.link-card a{font-weight:900;color:var(--red);font-size:12.4px;word-break:break-all}.link-card p{font-size:11.8px;margin-top:5px;margin-bottom:0}
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.8px;line-height:1.62}.rule{height:3px;background:var(--ink);margin:12px 0}.download-wrap{display:flex;justify-content:center;margin:18px 0 0}.download-btn{border:2px solid var(--line);background:var(--red);color:#fff;padding:10px 16px;font:900 12px/1 Inter,system-ui,sans-serif;cursor:pointer;box-shadow:var(--shadow);letter-spacing:.06em;text-transform:uppercase}.download-btn:active{transform:translate(2px,2px);box-shadow:3px 3px 0 rgba(10,10,10,.12)}
+    @media(max-width:720px){
+      body{font-size:13px}.page{width:min(100% - 16px,1040px);padding:10px 0 58px}.topbar{grid-template-columns:1fr}.topbar-meta{border-left:0;border-top:3px solid var(--line)}.meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}.meta-row-fail{grid-template-columns:1fr 1fr}h1{font-size:clamp(25px,8vw,34px)}.sub-line{font-size:13.5px}.stats{display:grid;grid-template-columns:1fr 1fr}.stat{border-right:2px solid var(--line);border-bottom:2px solid var(--line)}.stat:nth-child(2n){border-right:0}.stat:nth-last-child(-n+2){border-bottom:0}.grid-2,.grid-3,.grid-4,.bench-grid,.links{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.flow-item{border-right:2px solid var(--line);border-bottom:0}.flow-item:last-child{border-bottom:2px solid var(--line)}.kv{grid-template-columns:1fr}.kv div:nth-child(odd){border-right:0}.sec-head{align-items:flex-start}.sec-head .label{text-align:right}.figure.logo img{max-width:100%}p{font-size:12.9px}.card p{font-size:12.6px}.code-box pre{font-size:12px}.download-btn{width:100%}
+    }
+  </style>
+</head>
+<body>
+  <main class="page" id="card">
+    <header class="topbar">
+      <div class="topbar-hero">
+        <div class="kicker">GITHUB · LOCAL-FIRST AGENT MEMORY</div>
+        <h1>TencentDB Agent Memory<br>把 Agent 记忆做成可追溯的本地分层系统</h1>
+        <p class="sub-line">它不是“把历史丢进向量库”，而是把短期任务压缩、长期画像、证据下钻和 OpenClaw / Hermes 接入做成一套 L0→L3 记忆流水线。</p>
+        <div class="tagline">OpenClaw Plugin · Hermes Gateway · SQLite / Vector Search</div>
+      </div>
+      <div class="topbar-meta">
+        <div class="meta-row-high">
+          <div class="meta-pill-lg">5.7k<span class="sub">GitHub Stars</span></div>
+          <div class="meta-pill-lg">0.3.6<span class="sub">npm version</span></div>
+        </div>
+        <div class="meta-row-low">
+          <div class="meta-pill-md">61.38%<span class="sub">token saved</span></div>
+          <div class="meta-pill-md">L0→L3<span class="sub">memory layers</span></div>
+          <div class="meta-pill-sm">Node ≥22.16<span class="sub">runtime</span></div>
+        </div>
+        <div class="meta-row-fail">
+          <div class="meta-pill-sm">OpenClaw<span class="sub">host</span></div>
+          <div class="meta-pill-sm">Hermes<span class="sub">gateway</span></div>
+          <div class="meta-pill-sm">SQLite<span class="sub">local</span></div>
+          <div class="meta-pill-sm">Mermaid<span class="sub">canvas</span></div>
+        </div>
+      </div>
+    </header>
+
+    <section class="overview">
+      <div class="overview-sentence">结论：这是一个“证据可恢复”的 Agent Memory 插件，把记忆从黑盒向量召回改成分层、符号化、可调试的本地系统。</div>
+      <div class="overview-body">TencentDB Agent Memory 的核心不是单点存储，而是两条链路：<em>符号化短期记忆</em>把厚重工具日志卸载成 Mermaid 任务画布，保留 node_id 下钻；<em>分层式长期记忆</em>把对话从 L0 原文沉淀为 L1 原子事实、L2 场景块、L3 Persona。它面向长程 Agent 的上下文累积压力，提供 OpenClaw 插件、Hermes Gateway、本地 SQLite / sqlite-vec、混合检索与导入导出脚本。</div>
+    </section>
+
+    <div class="stats" aria-label="repository stats">
+      <div class="stat"><strong>5,774</strong><span>Stars · 2026-06-15</span></div>
+      <div class="stat"><strong>498</strong><span>Forks</span></div>
+      <div class="stat"><strong>169</strong><span>Repo files</span></div>
+      <div class="stat"><strong>105</strong><span>src files</span></div>
+      <div class="stat"><strong>MIT</strong><span>package license</span></div>
+      <div class="stat"><strong>TypeScript</strong><span>primary language</span></div>
+    </div>
+
+    <div class="pills">
+      <span class="pill red">local-first memory</span>
+      <span class="pill dark">long-term memory</span>
+      <span class="pill soft">symbolic offload</span>
+      <span class="pill">OpenClaw plugin</span>
+      <span class="pill">Hermes Gateway</span>
+      <span class="pill">BM25 + vector + RRF</span>
+      <span class="pill">persona / scene / atom</span>
+    </div>
+
+    <figure class="figure logo">
+      <img src="assets/images/20260615-tencentdb-agent-memory-redswiss/logo.png" alt="TencentDB Agent Memory logo" loading="eager" decoding="async" />
+      <figcaption>源仓库 logo 已本地化。README 标语：Agents remember, Humans innovate / 让 Agent 沉淀经验，让人专注创造。</figcaption>
+    </figure>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">01</span><span class="label">BENCHMARK SIGNALS · WHY IT MATTERS</span></div>
+      <div class="sec-body">
+        <h2>它解决的不是“记得更多”，而是“长程任务中少丢证据、少烧上下文”。</h2>
+        <p>README 给出的效果数据来自 OpenClaw 插件接入后的长程 Session 评测：短期记忆压缩降低 token 消耗，同时在 WideSearch、SWE-bench、AA-LCR 上提升成功率；长期记忆在 PersonaMem 上从 48% 提升到 76%。这些数字应理解为项目自述 benchmark，不等同于第三方独立评测。</p>
+        <div class="bench-grid">
+          <div class="bench"><div class="name">WideSearch</div><div class="val">50%</div><div class="note">OpenClaw 33% → 插件 50%，相对 +51.52%；token 221.31M → 85.64M。</div></div>
+          <div class="bench"><div class="name">SWE-bench</div><div class="val">64.2%</div><div class="note">OpenClaw 58.4% → 插件 64.2%；README 标注每个 Session 连续 50 个任务。</div></div>
+          <div class="bench"><div class="name">AA-LCR</div><div class="val">47.5%</div><div class="note">OpenClaw 44.0% → 插件 47.5%；token 112.0M → 77.3M。</div></div>
+          <div class="bench"><div class="name">PersonaMem</div><div class="val">76%</div><div class="note">长期记忆准确率从 48% 提升到 76%，对应 Persona / Scene 画像链路。</div></div>
+        </div>
+        <div class="boundary"><strong>读数边界</strong><p>卡片保留 README 的 benchmark 口径：它证明项目关注“连续长任务”的上下文压力，但是否迁移到你的 Agent / 模型 / 工作负载，仍需用本地任务集复测。</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">02</span><span class="label">LAYERED MEMORY · L0 TO L3</span></div>
+      <div class="sec-body">
+        <h2>长期记忆采用语义金字塔：底层保留证据，高层保留结构。</h2>
+        <p>仓库明确反对“扁平向量堆砌”：对话不是直接切片丢进库里，而是逐层提炼、逐层召回。日常偏好走 L3 Persona / L2 Scenario；具体事实回查 L1 Atom / L0 Conversation；当前长任务继续执行则看 Active Mermaid 任务画布。</p>
+        <figure class="figure">
+          <img src="assets/images/20260615-tencentdb-agent-memory-redswiss/memory-pyramid.png" alt="L0 to L3 semantic pyramid" loading="eager" decoding="async" />
+          <figcaption>README 原图：碎片对话 → 结构事实 → 场景认知 → 服务画像。适合作为正文核心插图，而不是单纯装饰图。</figcaption>
+        </figure>
+        <div class="grid-4">
+          <article class="card"><div class="lead">L0</div><h4>Conversation / Raw Log</h4><p>保留原始对话和事件流，承担证据备份；压缩不是删除，而是可恢复抽象。</p></article>
+          <article class="card"><div class="lead">L1</div><h4>Atomic Memory</h4><p>抽取事实、偏好、约束、状态；供具体事实检索和冲突判断使用。</p></article>
+          <article class="card"><div class="lead">L2</div><h4>Scene Block</h4><p>按项目、主题、工作场景聚类，降低单轮召回误用。</p></article>
+          <article class="card"><div class="lead">L3</div><h4>Persona</h4><p>稳定用户偏好和服务风格画像，让 Agent 按用户习惯协作。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">03</span><span class="label">SYMBOLIC OFFLOAD · SHORT-TERM MEMORY</span></div>
+      <div class="sec-body">
+        <h2>短期记忆不是摘要一句话，而是“Mermaid 画布 + node_id 下钻”。</h2>
+        <p>长程任务中最耗 token 的通常是搜索结果、代码、错误日志和工具输出。TencentDB Agent Memory 的短期记忆链路会把完整工具日志卸载到外部文件系统，只把高密度 Mermaid 任务地图留在上下文里；当 Agent 需要核对细节时，再沿着 node_id / result_ref 找回原文。</p>
+        <div class="flow">
+          <div class="flow-item">繁重日志<small>tool calls / search / errors</small></div>
+          <div class="flow-item red-bg">外部卸载<small>refs/*.md</small></div>
+          <div class="flow-item">符号地图<small>Mermaid + node_id</small></div>
+          <div class="flow-item">按需下钻<small>recover evidence</small></div>
+        </div>
+        <div class="grid-3">
+          <article class="card hot"><div class="lead">Token Budget</div><h4>把上下文从“全文堆叠”改成“结构注入”</h4><p>README 中 WideSearch token 消耗从 221.31M 降至 85.64M，核心机制是把过程日志移出上下文。</p></article>
+          <article class="card"><div class="lead">Traceability</div><h4>摘要必须能回到证据</h4><p>压缩最大风险是丢事实；项目用 result_ref / node_id 链接高层符号与底层原文。</p></article>
+          <article class="card"><div class="lead">Human Readable</div><h4>Mermaid 同时给人和 Agent 看</h4><p>相比自然语言长摘要或扁平 JSON，拓扑图更适合表达任务流转、阻塞点和恢复入口。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">04</span><span class="label">ARCHITECTURE · HOST ADAPTERS</span></div>
+      <div class="sec-body">
+        <h2>工程形态：OpenClaw 插件 + Hermes Gateway + 本地后端，而不是单脚本 Demo。</h2>
+        <p>仓库目录显示它包含 TypeScript 主体、OpenClaw 插件描述、Hermes Python 插件、Docker 配置、CLI 脚本与迁移工具。核心包名为 <code>@tencentdb-agent-memory/memory-tencentdb</code>，版本 0.3.6，要求 Node.js ≥ 22.16.0。</p>
+        <div class="grid-3">
+          <article class="card dark"><div class="lead">Host Layer</div><h4>OpenClaw</h4><p>通过 <code>openclaw.plugin.json</code> 与 postinstall patch 接入工具调用后的消息流，可自动捕获、提取、召回。</p></article>
+          <article class="card dark"><div class="lead">Gateway Layer</div><h4>Hermes</h4><p><code>hermes-plugin/memory/memory_tencentdb/</code> 提供 client、supervisor、plugin.yaml 和恢复测试。</p></article>
+          <article class="card dark"><div class="lead">Storage Layer</div><h4>SQLite / TCVDB</h4><p>默认本地 SQLite + sqlite-vec；同时提供迁移到腾讯云向量数据库 TCVDB 的脚本。</p></article>
+        </div>
+        <div class="kv">
+          <div>npm package</div><div><code>@tencentdb-agent-memory/memory-tencentdb</code> · version <b>0.3.6</b></div>
+          <div>CLI bins</div><div><code>migrate-sqlite-to-tcvdb</code> · <code>export-tencent-vdb</code> · <code>read-local-memory</code></div>
+          <div>核心目录</div><div><code>src/core</code>、<code>src/adapters</code>、<code>src/storage</code>、<code>scripts</code>、<code>hermes-plugin</code>、<code>docker/opensource</code></div>
+          <div>检索策略</div><div>README 标注 <b>BM25 + 向量 + RRF</b> 混合召回；embedding 可配置，也可降级为非向量路径。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">05</span><span class="label">INSTALL PATH · TWO HOSTS</span></div>
+      <div class="sec-body">
+        <h2>上手路径分两类：OpenClaw 直接装插件，Hermes 走 Gateway / Docker。</h2>
+        <p>README 的 Quick Start 对 OpenClaw 和 Hermes 分开说明。OpenClaw 侧强调零配置启用与可选短期压缩；Hermes 侧提供 Docker 全新部署与挂到已有 Hermes 的路径。卡片不展开任何真实密钥，只保留结构化命令和检查点。</p>
+        <div class="code-box">
+          <div class="comment">// OpenClaw plugin path</div>
+          <pre>openclaw plugins install @tencentdb-agent-memory/memory-tencentdb
+# optional: enable short-term offload / configure recall / persona / embedding
+# verify: memory capture → L1 extraction → recall injection</pre>
+        </div>
+        <div class="code-box">
+          <div class="comment">// Hermes gateway path · values are placeholders, not credentials</div>
+          <pre>docker build -f docker/opensource/Dockerfile.hermes -t hermes-memory .
+docker run -d --name hermes-memory --restart unless-stopped \
+  -p 8420:8420 \
+  -e MODEL_API_KEY="&lt;YOUR_MODEL_KEY&gt;" \
+  -e MODEL_BASE_URL="&lt;OPENAI_COMPATIBLE_ENDPOINT&gt;" \
+  -e MODEL_NAME="&lt;MODEL_NAME&gt;" \
+  -v hermes_data:/opt/data hermes-memory
+curl http://127.0.0.1:8420/health</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">06</span><span class="label">CONFIG SURFACE · PRODUCTION KNOBS</span></div>
+      <div class="sec-body">
+        <h2>真正复杂的是参数面：捕获、提取、调度、召回、画像、embedding 都可拆层调。</h2>
+        <div class="grid-3">
+          <article class="card"><div class="lead">Capture</div><h4>对话捕获与保留</h4><p>控制是否捕获、排除哪些 Agent、L0/L1 文件保留天数、清理时间。</p></article>
+          <article class="card"><div class="lead">Extraction</div><h4>L1 提取与去重</h4><p>配置每个 session 最大记忆数、去重、提取模型，避免重复事实污染。</p></article>
+          <article class="card"><div class="lead">Pipeline</div><h4>L1→L2→L3 调度</h4><p>通过 everyNConversations、idle timeout、interval 控制提炼节奏。</p></article>
+          <article class="card"><div class="lead">Recall</div><h4>召回策略</h4><p>支持 keyword / embedding / hybrid，配置 topK、阈值和注入字符预算。</p></article>
+          <article class="card"><div class="lead">Persona</div><h4>用户画像触发</h4><p>控制每多少条新记忆触发 Persona，保留多少 scene 与备份。</p></article>
+          <article class="card"><div class="lead">Embedding</div><h4>向量服务边界</h4><p>可接 OpenAI 兼容 API；若 provider 为 none 或配置缺失，会降级为非向量模式。</p></article>
+        </div>
+        <div class="boundary"><strong>配置风险</strong><p>embedding、LLM、offload 后端涉及外部服务时，必须显式处理凭证、baseUrl、model、dimensions 和降级路径；不要把“插件能启动”误判为“向量召回已生效”。</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">07</span><span class="label">WHITE-BOX DEBUGGING · MEMORY IS NOT BLACK BOX</span></div>
+      <div class="sec-body">
+        <h2>最值得借鉴的设计：记忆产物可读、可查、可修。</h2>
+        <p>许多记忆系统的调试体验停留在“向量分数不对但不知道为什么”。TencentDB Agent Memory 把关键中间产物落到可读文件：L2 Scenario 是 Markdown，L3 Persona 是 <code>persona.md</code>，短期任务画布是 Mermaid，原文与摘要之间有 result_ref / node_id 关联。</p>
+        <figure class="figure">
+          <img src="assets/images/20260615-tencentdb-agent-memory-redswiss/flowchart1-cn.png" alt="Retrievable and recoverable drill-down chain" loading="eager" decoding="async" />
+          <figcaption>README 原图：高层符号可沿链路回到底层证据。对工程落地而言，这比“多召回几条”更关键。</figcaption>
+        </figure>
+        <div class="grid-2">
+          <article class="card hot"><div class="lead">适合谁</div><h4>长程 Agent / 多项目 / 反复 SOP 的工作流</h4><p>当用户偏好、项目背景、工具习惯和任务中间状态需要跨会话复用时，分层记忆的收益更明显。</p></article>
+          <article class="card"><div class="lead">不适合谁</div><h4>只做一次性问答或简单 RAG 的场景</h4><p>如果任务不需要长期画像、证据下钻或宿主框架接入，完整记忆流水线可能显得过重。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">08</span><span class="label">ROADMAP · WHAT TO WATCH</span></div>
+      <div class="sec-body">
+        <h2>Roadmap 暗示它要从“记忆插件”走向“经验迁移与 Skill 自动生成”。</h2>
+        <div class="grid-3">
+          <article class="card"><div class="lead">Done</div><h4>长期个性化记忆</h4><p>L0 → L3 已在 README Roadmap 标为完成。</p></article>
+          <article class="card"><div class="lead">Done</div><h4>短期记忆压缩</h4><p>Context Offload + Mermaid 画布已完成，并与 benchmark 绑定。</p></article>
+          <article class="card"><div class="lead">Done</div><h4>OpenClaw + Hermes</h4><p>插件与 Gateway 适配已完成，仓库中有对应目录和测试。</p></article>
+          <article class="card hot"><div class="lead">Next</div><h4>跨 Agent / 跨设备迁移</h4><p>记忆导入导出和热迁移仍在规划中，关系到多端使用。</p></article>
+          <article class="card hot"><div class="lead">Next</div><h4>Skill 自动生成</h4><p>从执行轨迹和错误日志沉淀 SOP / Skill，是它从“记忆”走向“能力”的关键。</p></article>
+          <article class="card hot"><div class="lead">Next</div><h4>可视化调试面板</h4><p>如果成型，会显著降低白盒记忆系统的运维成本。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="num">SRC</span><span class="label">SOURCES · VERIFIED BUNDLE</span></div>
+      <div class="sec-body">
+        <h2>来源与入口</h2>
+        <div class="links">
+          <div class="link-card"><a href="https://github.com/TencentCloud/TencentDB-Agent-Memory">GitHub 仓库</a><p>README、README_CN、源码目录、图片资产与 package 信息来源。</p></div>
+          <div class="link-card"><a href="https://www.npmjs.com/package/@tencentdb-agent-memory/memory-tencentdb">npm package</a><p>包名、版本、Node 要求、CLI 入口与插件安装路径。</p></div>
+          <div class="link-card"><a href="https://hermes-agent.nousresearch.com/docs/">Hermes Docs</a><p>README 中标注 Hermes Gateway 适配的宿主参考。</p></div>
+        </div>
+        <div class="rule"></div>
+        <p class="source-note">数据核查时间：2026-06-15 22:17 CST · GitHub API / Raw README / package.json / 仓库目录树 · 信息卡风格：infocard-redswiss-style</p>
+      </div>
+    </section>
+
+    <div class="download-wrap"><button class="download-btn" type="button" onclick="saveCardAsPng()">保存 PNG</button></div>
+  </main>
+  <script>
+    async function saveCardAsPng(){
+      const btn = document.querySelector('.download-btn');
+      const card = document.getElementById('card');
+      const oldText = btn.textContent;
+      btn.textContent = '生成中...';
+      try{
+        const canvas = await html2canvas(card, {backgroundColor:'#f5f2ec', scale: Math.min(2, window.devicePixelRatio || 1.5), useCORS:true, scrollX:0, scrollY:0});
+        const link = document.createElement('a');
+        link.download = '20260615-tencentdb-agent-memory-redswiss.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        btn.textContent = '已生成 PNG';
+      }catch(err){
+        console.error(err);
+        btn.textContent = '生成失败';
+      }finally{
+        setTimeout(()=>btn.textContent = oldText, 1800);
+      }
+    }
+  </script>
+</body>
+</html>
