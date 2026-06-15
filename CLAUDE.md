@@ -132,6 +132,24 @@ npm run verify
 - `docs/index.html` 是一个跳转壳，真正的首页实现位于仓库根目录 `index.html`。
 - `README.md` 明确要求不要手工编辑 `_index.yaml` 或 `index.html` 中的注入数据；任何发布异常优先检查 meta、HTML 路径与本地构建脚本，而不是直接改索引产物。
 
+## LLM Wiki 同步（2026-06-15）
+
+高价值 infocard 发布后必须同步到 LLM Wiki；wiki 同步失败 = 发布未完成。
+
+**Wiki 路径**：`/home/ccwq/hehome/hermes-data/home/wiki`（`WIKI_PATH` 在 `~/.hermes/.env` 中定义）
+
+**同步模型**：每张高价值卡生成两层
+1. **raw 记录**：`raw/articles/YYYY-MM-DD-infocard-<slug>.md`（不可变，修改时追加版本）
+2. **知识页**：根据内容类型放入 `entities/` / `concepts/` / `queries/` / `comparisons/`
+
+**高价值卡定义**：人物/调查卡、技术方法论卡、工具/工作流卡、科研/自动化卡、重要舆论/政策卡。
+
+**完整流程**：调研 → 生成 HTML/meta → build → verify → commit/push → 公网验证 → 写入 wiki（raw + 知识页 + index.md + log.md）→ 验证 wiki → 报告完成
+
+**修改/删除同步**：raw 保留版本；wiki 页加 `archived: true` 标记，不物理删除。
+
+详细规范见 `WIKI_SYNC.md` 和 `infocard-pub-publisher` skill。
+
 ## Style / content hints from the existing codebase
 
 - 首页与多张信息卡都在使用红黑瑞士风 / high-density archive 风格；如果修改首页或新增公共展示壳，先参考现有 `index.html` 的视觉与信息密度约定。
