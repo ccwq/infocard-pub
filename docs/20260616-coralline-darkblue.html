@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>coralline：Claude Code 的零 token 珊瑚状态线</title>
+  <meta name="description" content="coralline 是 Powerlevel10k-inspired 的 Claude Code statusline：一段本地 Bash 脚本读取 Claude Code session JSON，显示目录、Git、模型、上下文、限额、成本和时间；通过 AI 安装 playbook 采访用户后自动配置。">
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--red:#ff6b6b;--orange:#ff9f43;--shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box} html,body{margin:0;padding:0;overflow-x:hidden} img{display:block;max-width:100%;height:auto}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(circle at 18% 10%,rgba(88,195,255,.16) 0 10%,transparent 11%),radial-gradient(circle at 86% 8%,rgba(132,89,255,.18) 0 9%,transparent 10%),radial-gradient(circle at 72% 72%,rgba(45,179,106,.10) 0 13%,transparent 14%),radial-gradient(circle at 18% 78%,rgba(244,200,76,.08) 0 11%,transparent 12%),linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%)}
+    a{color:inherit;text-decoration:none}.page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 42px}.hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(280px,.95fr);gap:14px;color:#fff;margin-bottom:14px}.hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}.kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11.2px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}.source{max-width:280px;text-align:right;font:800 11.2px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}.title{margin:0;font-size:clamp(40px,7vw,84px);line-height:.92;letter-spacing:-.07em;font-weight:950}.subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}.subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}.pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}.pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}.pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}.pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}.pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}.hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}.hero-note strong{font-size:14px;line-height:1.35}.hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}.visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.36) 0 10%,transparent 11%),linear-gradient(135deg,var(--cyan) 0%,var(--blue) 34%,var(--purple) 68%,var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24),inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:23px;font-weight:950;letter-spacing:-.08em}.visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}.visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}.visual-meta .small{font:800 11.2px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}.visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}.mini-card .label{font-size:11.2px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}.mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}.mini-card .desc{font-size:11.6px;line-height:1.45;color:#c9d4f7}.visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%,#53a3ff 22%,var(--purple) 54%,var(--green) 80%,var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 24px rgba(88,195,255,.16)}
+    .screenshot{border-radius:16px;border:1.5px solid rgba(255,255,255,.09);background:#080b14;box-shadow:0 12px 26px rgba(0,0,0,.24);overflow:hidden}.screenshot img{width:100%;object-fit:cover}.screen-cap{font:800 11.2px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#9fb0de;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}.panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}.panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}.panel-kicker{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}.panel-row{display:grid;gap:8px}.feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}.feat .label{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}.feat .value{font-size:12.5px;font-weight:800;line-height:1.3;color:#eef4ff}.feat .note{font-size:11.2px;line-height:1.5;color:#95a5d4}.bar-row{display:flex;align-items:center;gap:8px}.bar-label{font:800 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;flex:0 0 92px}.bar-track{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}.bar-fill{height:100%;border-radius:999px;background:var(--cyan)}
+    .section{margin-bottom:14px}.section-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}.section-no{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(74,120,255,.28),rgba(88,195,255,.18));border:1.5px solid rgba(88,195,255,.28);box-shadow:0 8px 20px rgba(88,195,255,.14);font:950 18px/1 Georgia,"Times New Roman",serif;color:#fff;flex:0 0 auto}.section-label{font:900 11.2px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}.phase{padding:12px 10px 10px;border-right:1px solid rgba(255,255,255,.1);display:grid;gap:6px;min-width:0}.phase:last-child{border-right:none}.phase .n{display:block;font:950 22px/1 Georgia,"Times New Roman",serif}.phase .t{font:900 11.2px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}.phase .d{font-size:11.4px;line-height:1.52;color:#9fb0de}.phase:nth-child(1) .n{color:var(--cyan)}.phase:nth-child(2) .n{color:var(--blue)}.phase:nth-child(3) .n{color:var(--green)}.phase:nth-child(4) .n{color:var(--yellow)}.phase:nth-child(5) .n{color:var(--purple)}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}.card{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px;box-shadow:0 8px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:10px}.card-kicker{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}.card-title{margin:0;font-size:16px;font-weight:900;line-height:1.08;letter-spacing:-.03em}.card-body{display:grid;gap:8px;flex:1}.point{padding:7px 9px 6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;display:grid;gap:3px}.point .t{font-size:12.2px;font-weight:800;line-height:1.3}.point .d{font-size:11.6px;line-height:1.55;color:#9fb0de}.code-block{background:#080b14;border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px 14px;margin-bottom:14px;box-shadow:0 8px 20px rgba(0,0,0,.22)}.code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--cyan);font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}.code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;color:#c9d4f7;white-space:pre-wrap;overflow-wrap:anywhere}.code-block .c{color:#5a6380}.code-block .k{color:#a8c5ff}.code-block .s{color:#7de3d6}.code-block .fn{color:#c7a2ff}
+    .gallery{display:grid;grid-template-columns:1.25fr .75fr;gap:12px;margin-bottom:14px}.gallery-side{display:grid;gap:12px}.compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}.cmp{min-width:0;border-radius:18px;padding:14px;display:grid;gap:10px}.cmp.bad{background:rgba(255,107,107,.08);border:1.5px solid rgba(255,107,107,.2)}.cmp.good{background:rgba(45,179,106,.08);border:1.5px solid rgba(45,179,106,.2)}.cmp-head{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}.cmp.bad .cmp-head{color:var(--red)}.cmp.good .cmp-head{color:var(--green)}.cmp-body{display:grid;gap:7px}.cmp-item{font-size:12.5px;line-height:1.5;color:#c5d2f7;padding-left:14px;border-left:2px solid rgba(255,255,255,.1)}.cmp.good .cmp-item{border-left-color:rgba(45,179,106,.4)}.cmp.bad .cmp-item{border-left-color:rgba(255,107,107,.3)}.footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1.5px solid rgba(255,255,255,.09);background:rgba(9,12,22,.42);border-radius:18px;padding:12px 14px 10px;box-shadow:var(--shadow)}.footer .brand{font-weight:900;color:#fff;font-size:15px;letter-spacing:-.02em}.footer .links{display:flex;flex-wrap:wrap;gap:6px}.footer .link-item{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4}.footer .meta{font:800 11.2px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#6f7fad;text-align:right}
+    @media(max-width:960px){.hero,.shell,.compare,.gallery{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,minmax(0,1fr))}.grid3{grid-template-columns:1fr 1fr}.source{text-align:left}.footer{flex-direction:column}.footer .meta{text-align:left}}
+    @media(max-width:720px){.page{width:min(100% - 14px,1180px);padding:12px 0 32px}.hero,.flow,.grid3,.compare,.gallery{grid-template-columns:1fr}.shell{display:none}.title{font-size:clamp(36px,10vw,62px)}.section-head{align-items:flex-start}.gallery-side{grid-template-columns:1fr}.kicker{font-size:11.2px;letter-spacing:.12em}.pill{font-size:11.6px}.hero-visual{padding:10px}.mini-card .desc,.phase .d,.point .d,.cmp-item{font-size:11.2px}.footer .link-item{font-size:11.2px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">CLAUDE CODE · STATUSLINE · POWERLEVEL10K</span>
+          <span class="source">github.com/Nanako0129/coralline</span>
+        </div>
+        <h1 class="title">coralline</h1>
+        <p class="subtitle">Powerlevel10k-inspired statusline for Claude Code</p>
+        <p class="subcn">把 Claude Code 的工作状态做成一条<strong style="color:#d8f4ff">可定制、可响应式、零网络调用、零 token 消耗</strong>的珊瑚状态线：目录、Git、模型、上下文窗口、5h/7d 限额、成本和时钟都在同一行。</p>
+        <div class="pill-row">
+          <span class="pill cyan">282 Stars</span><span class="pill green">MIT</span><span class="pill yellow">Shell + Python</span><span class="pill purple">6 Themes</span><span class="pill">refreshInterval: 1</span><span class="pill">Nerd Fonts</span>
+        </div>
+        <div class="hero-note">
+          <strong>它最聪明的地方不是状态栏，而是“让 AI 采访你并安装”。</strong>
+          <p>用户只需把 INSTALL playbook 丢给 Claude Code。Claude 会询问主题、pill/lean 风格、显示哪些 segments、单行/多行布局、12h/24h 与 Nerd Font，再写入 <code>~/.claude/settings.json</code> 完成注册。</p>
+        </div>
+      </div>
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">CL</div>
+          <div class="visual-meta"><div class="big">local shell renderer</div><div class="small">no network · no API · no tokens</div></div>
+        </div>
+        <div class="screenshot"><img src="assets/images/20260616-coralline-darkblue/hero.png" alt="All six coralline themes rendered side by side" loading="eager" decoding="async"><div class="screen-cap">README hero：六种主题并排预览，本地化嵌入</div></div>
+        <div class="visual-grid">
+          <div class="mini-card"><div class="label">DEFAULT</div><div class="value">claude-coral</div><div class="desc">steel blue · mauve · Claude coral</div></div>
+          <div class="mini-card"><div class="label">LAYOUT</div><div class="value">fixed / auto</div><div class="desc">宽屏一行，窄屏按 COLUMNS 响应式折行</div></div>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <section class="shell">
+      <div class="panel"><div class="panel-head"><span class="panel-kicker">SEGMENTS</span></div><div class="panel-row">
+        <div class="feat"><div class="label">dir / project</div><div class="value">路径折叠 + worktree 稳定 repo 名</div><div class="note">长路径收束为 ~/a/…/z，project segment 在所有 worktree 里保持同名。</div></div>
+        <div class="feat"><div class="label">git</div><div class="value">branch + dirty + ahead/behind</div><div class="note">一次 git status --porcelain=v2 --branch 拉齐分支、改动、领先落后。</div></div>
+        <div class="feat"><div class="label">model / style</div><div class="value">Fable 5 / output style</div><div class="note">让当前模型与输出风格不用翻日志就能看见。</div></div>
+      </div></div>
+      <div class="panel"><div class="panel-head"><span class="panel-kicker">LIVE METERS</span></div><div class="panel-row">
+        <div class="bar-row"><div class="bar-label">Context</div><div class="bar-track"><div class="bar-fill" style="width:62%;background:var(--cyan)"></div></div></div>
+        <div class="bar-row"><div class="bar-label">5h Limit</div><div class="bar-track"><div class="bar-fill" style="width:41%;background:var(--green)"></div></div></div>
+        <div class="bar-row"><div class="bar-label">7d Limit</div><div class="bar-track"><div class="bar-fill" style="width:28%;background:var(--blue)"></div></div></div>
+        <div class="bar-row"><div class="bar-label">Cost</div><div class="bar-track"><div class="bar-fill" style="width:36%;background:var(--purple)"></div></div></div>
+        <div class="feat"><div class="label">Gauge Threshold</div><div class="value">green → yellow 50% → red 75%</div><div class="note">上下文和限额接近危险区时，视觉上立刻变色。</div></div>
+      </div></div>
+      <div class="panel"><div class="panel-head"><span class="panel-kicker">PERFORMANCE</span></div><div class="panel-row">
+        <div class="feat"><div class="label">Zero Token</div><div class="value">stdin JSON → shell output</div><div class="note">Claude Code 把 session JSON pipe 给本地脚本；脚本不请求模型。</div></div>
+        <div class="feat"><div class="label">One jq</div><div class="value">一次抽取所有字段</div><div class="note">避免每个 segment 启一个子进程，适配每秒刷新。</div></div>
+        <div class="feat"><div class="label">Bash 3.2</div><div class="value">macOS / Linux stock shell</div><div class="note">不依赖 bc，配置文件也是 plain bash。</div></div>
+      </div></div>
+    </section>
+
+    <section class="section"><div class="section-head"><div class="section-no">1</div><span class="section-label">AI INSTALLER LOOP — 从一句 prompt 到可验证配置</span></div>
+      <div class="flow">
+        <div class="phase"><div class="n">1</div><div class="t">FETCH</div><div class="d">让 Claude Code 读取 INSTALL.md playbook，而不是让用户手改 JSON。</div></div>
+        <div class="phase"><div class="n">2</div><div class="t">INTERVIEW</div><div class="d">选择主题、style、segments、layout、clock、Nerd Font。</div></div>
+        <div class="phase"><div class="n">3</div><div class="t">WRITE</div><div class="d">生成 coralline.conf，复制 statusline.sh 与 theme conf。</div></div>
+        <div class="phase"><div class="n">4</div><div class="t">WIRE</div><div class="d">更新 ~/.claude/settings.json 的 statusLine command。</div></div>
+        <div class="phase"><div class="n">5</div><div class="t">VERIFY</div><div class="d">用 sample input 跑真实脚本，确认输出可渲染。</div></div>
+      </div>
+    </section>
+
+    <section class="gallery">
+      <div class="screenshot"><img src="assets/images/20260616-coralline-darkblue/style-lean.png" alt="Lean style compared with pill style" loading="eager" decoding="async"><div class="screen-cap">Pill vs Lean：从 Powerline 胶囊到 p10k lean 纯文字强调</div></div>
+      <div class="gallery-side">
+        <div class="screenshot"><img src="assets/images/20260616-coralline-darkblue/theme-claude-coral.png" alt="claude-coral theme preview" loading="eager" decoding="async"><div class="screen-cap">默认 claude-coral 主题</div></div>
+        <div class="screenshot"><img src="assets/images/20260616-coralline-darkblue/theme-tokyo-night.png" alt="tokyo-night theme preview" loading="eager" decoding="async"><div class="screen-cap">tokyo-night 深蓝霓虹主题</div></div>
+      </div>
+    </section>
+
+    <section class="grid3">
+      <div class="card"><span class="card-kicker" style="color:var(--cyan)">WHAT IT SHOWS</span><h3 class="card-title">12 个状态片段</h3><div class="card-body">
+        <div class="point"><div class="t">dir / project / git</div><div class="d">目录、仓库名、分支、dirty 标记、ahead/behind。</div></div>
+        <div class="point"><div class="t">model / ctx / limits</div><div class="d">当前 Claude 模型、上下文窗口、5h 和 7d 限额重置倒计时。</div></div>
+        <div class="point"><div class="t">cost / lines / duration</div><div class="d">本次 session 成本、增删行、持续时间、stash、clock。</div></div>
+      </div></div>
+      <div class="card"><span class="card-kicker" style="color:var(--green)">WHY IT IS FAST</span><h3 class="card-title">零 token 的状态计算</h3><div class="card-body">
+        <div class="point"><div class="t">本地 Bash 脚本</div><div class="d">不打网络、不调用 API、不消耗任何模型 token。</div></div>
+        <div class="point"><div class="t">单 jq + 单 git call</div><div class="d">一次 JSON 抽取，一次 git status 取齐仓库状态。</div></div>
+        <div class="point"><div class="t">每秒刷新</div><div class="d">refreshInterval: 1，但没有逐字段 subprocess spam。</div></div>
+      </div></div>
+      <div class="card"><span class="card-kicker" style="color:var(--purple)">CONFIG SURFACE</span><h3 class="card-title">一份 bash 配置控制外观</h3><div class="card-body">
+        <div class="point"><div class="t">VL_STYLE / VL_LAYOUT</div><div class="d">pill 或 lean；fixed 或 auto responsive。</div></div>
+        <div class="point"><div class="t">VL_SEGMENTS*</div><div class="d">控制每一行显示哪些片段，最多三行固定布局。</div></div>
+        <div class="point"><div class="t">VL_BG_* / VL_FG_*</div><div class="d">256 色或 RGB，自定义主题就是改 conf。</div></div>
+      </div></div>
+    </section>
+
+    <section class="section"><div class="section-head"><div class="section-no">2</div><span class="section-label">RESPONSIVE STATUSLINE — COLUMNS 驱动的窄屏折行</span></div></section>
+    <div class="screenshot" style="margin-bottom:14px"><img src="assets/images/20260616-coralline-darkblue/wrap-demo.png" alt="responsive wrap demo" loading="eager" decoding="async"><div class="screen-cap">响应式 wrap demo：Claude Code v2.1.153+ 会把 COLUMNS 注入给 statusline</div></div>
+
+    <section class="compare">
+      <div class="cmp bad"><div class="cmp-head">普通状态栏脚本</div><div class="cmp-body">
+        <div class="cmp-item">用户手动编辑 settings.json 和脚本路径，容易漏依赖。</div>
+        <div class="cmp-item">每个字段单独调用命令，刷新频率高时 CPU 成本膨胀。</div>
+        <div class="cmp-item">只显示 Git/路径，不理解 Claude Code 的 context、limits、cost。</div>
+      </div></div>
+      <div class="cmp good"><div class="cmp-head">coralline</div><div class="cmp-body">
+        <div class="cmp-item">AI playbook 先采访用户，再安装、写配置、验证输出。</div>
+        <div class="cmp-item">session JSON 一次解析，Git 状态一次获取，零网络零 token。</div>
+        <div class="cmp-item">把 Claude Code 的 context、limit、cost 做成一眼可读的 gauges。</div>
+      </div></div>
+    </section>
+
+    <section class="code-block"><div class="tag">// PASTE INTO CLAUDE CODE</div><pre><span class="c"># Fun install path：让 AI 读 playbook 并完成采访式安装</span>
+<span class="fn">Please install coralline for me:</span>
+<span class="k">fetch</span> <span class="s">https://raw.githubusercontent.com/Nanako0129/coralline/main/INSTALL.md</span>
+<span class="fn">and follow the playbook in it.</span>
+
+<span class="c"># Manual install path：本地脚本 + settings.json statusLine command</span>
+<span class="k">git clone</span> <span class="s">https://github.com/Nanako0129/coralline ~/.claude/coralline-src</span>
+<span class="k">bash</span> <span class="s">~/.claude/coralline/statusline.sh</span></pre></section>
+
+    <footer class="footer">
+      <div><div class="brand">coralline · Claude Code statusline</div><div class="links"><a class="link-item" href="https://github.com/Nanako0129/coralline">GitHub</a><span class="link-item">Powerlevel10k tribute</span><span class="link-item">Bash 3.2+</span><span class="link-item">jq required</span></div></div>
+      <div class="meta">Nanako0129 · MIT<br>Created 2026-06-12 · Updated 2026-06-15<br>Card published 2026-06-16 07:30:21 +0800</div>
+    </footer>
+  </main>
+</body>
+</html>
