@@ -4,6 +4,7 @@
 - Captured at: 2026-06-17T06:57:15+08:00
 - Target card: docs/20260607-mattpocock-skills-redswiss.html
 - Embedded image: docs/assets/images/20260607-mattpocock-skills-redswiss/ai-driven-dev-7-stages.jpg
+- Theme: Blue Technical Manual
 
 ## GitHub metadata
 
