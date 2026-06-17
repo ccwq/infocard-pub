@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>OpenPi：给 Pi coding agent 的桌面工作台</title>
+  <meta name="description" content="OpenPi 是一个把 Pi coding agent、会话、扩展、文件搜索、源码控制、diff 和终端装进本地 Electron 桌面的工作台。">
+  <style>
+    :root{
+      --bg:#f4f6f8;--paper:#fff;--ink:#0b0d12;--muted:#66717f;--faint:#9aa5b2;
+      --line:#e2e7ee;--line2:#cdd5df;--blue:#003399;--blue2:#4b73bd;--blue3:#9db3dd;
+      --soft:#f6f8fb;--soft-blue:#eef4ff;--black:#05070a;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+    body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:13px;line-height:1.64}
+    img{max-width:100%;display:block}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 24px));margin:0 auto;padding:18px 0 72px}
+    .sheet{background:var(--paper);border:1px solid var(--line);box-shadow:0 18px 54px rgba(20,35,60,.08);padding:18px}
+    .topline{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:800}
+    .brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+    .brand:before{content:"";display:inline-block;width:22px;height:6px;background:var(--blue)}
+    .hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:18px;align-items:stretch;margin-bottom:18px}
+    .hero-copy{display:grid;align-content:space-between;gap:24px;min-height:360px}
+    .kicker{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+    h1{font-size:clamp(42px,7.8vw,92px);line-height:.9;letter-spacing:-.075em;margin:0;color:var(--ink);font-weight:900}
+    .lead{max-width:66ch;color:var(--muted);font-size:16px;line-height:1.72;margin:16px 0 0}
+    .hero-pills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .hero-pill{padding:13px 14px;border-right:1px solid var(--line)}
+    .hero-pill:last-child{border-right:0}
+    .mini-bar{width:34px;height:5px;background:var(--blue);margin-bottom:12px}
+    .hero-pill b{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}
+    .hero-pill span{font-size:12.5px;color:var(--muted);line-height:1.45}
+    .blue-block{background:var(--blue);color:#fff;min-height:360px;padding:22px;display:grid;align-content:space-between;position:relative;overflow:hidden}
+    .blue-block:after{content:"";position:absolute;inset:auto -16px -16px auto;width:120px;height:120px;border:1px solid rgba(255,255,255,.18);transform:rotate(15deg)}
+    .blue-block .label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:850;color:rgba(255,255,255,.75);position:relative;z-index:1}
+    .blue-block .big{font-size:clamp(76px,12vw,150px);line-height:.82;letter-spacing:-.085em;font-weight:900;position:relative;z-index:1}
+    .blue-block .caption{max-width:32ch;font-size:15px;color:rgba(255,255,255,.82);line-height:1.55;position:relative;z-index:1}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .panel{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;min-width:0}
+    .panel.gray{background:var(--soft)}
+    .panel.black{background:var(--black);color:#fff;border-color:var(--black)}
+    .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px}
+    .panel.black .head{border-color:rgba(255,255,255,.18)}
+    .label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:900;line-height:1.25}
+    .page-no{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:800;white-space:nowrap}
+    .panel h2{font-size:clamp(21px,2.5vw,34px);line-height:1.02;letter-spacing:-.055em;margin:0;font-weight:900}
+    .panel p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.7}
+    .panel.black p{color:rgba(255,255,255,.72)}
+    .metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .metric{background:#fff;border:1px solid var(--line);padding:13px;min-height:118px;display:grid;align-content:space-between}
+    .metric strong{font-size:42px;line-height:.9;letter-spacing:-.06em;color:var(--ink)}
+    .metric span{font-size:10.5px;color:var(--muted);font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+    .bar{height:8px;background:var(--line);margin-top:13px;overflow:hidden}
+    .bar i{display:block;height:100%;background:var(--blue)}
+    .rank{display:grid;gap:10px}
+    .rank-row{display:grid;grid-template-columns:124px minmax(0,1fr) 44px;gap:10px;align-items:center;font-size:12px}
+    .rank-row .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#323842;font-weight:700}
+    .track{height:10px;background:var(--soft);position:relative}
+    .fill{height:100%;background:var(--blue)}
+    .score{text-align:right;color:var(--ink);font-weight:850}
+    .feature{background:var(--soft);padding:14px;border:1px solid var(--line);display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:start}
+    .feature+.feature{margin-top:10px}
+    .feature.dark{background:var(--black);color:#fff;border-color:var(--black)}
+    .feature .num{font-size:30px;line-height:1;letter-spacing:-.04em;font-weight:900;color:var(--blue)}
+    .feature.dark .num{color:#fff}
+    .feature b{display:block;margin-bottom:4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+    .feature.dark p{color:rgba(255,255,255,.72)}
+    .list{display:grid;gap:10px}
+    .list-item{display:grid;grid-template-columns:56px 1fr 34px;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}
+    .list-item:last-child{border-bottom:0;padding-bottom:0}
+    .list-item strong{font-size:26px;line-height:1;letter-spacing:-.055em;color:var(--blue)}
+    .list-item b{display:block;font-size:14px;line-height:1.2}
+    .list-item span{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.45}
+    .icon{width:30px;height:30px;border:1px solid var(--line2);display:grid;place-items:center;color:var(--blue);font-weight:900;font-size:14px}
+    .wide{display:grid;grid-template-columns:1.15fr .85fr;gap:14px;margin-top:14px}
+    .chart-card,.note-panel,.shot-card{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;min-width:0}
+    .shot-card{padding:14px}
+    .shot{border:1px solid var(--line);background:#fff;overflow:hidden}
+    .shot img{width:100%;height:auto}
+    .note-panel{background:var(--soft-blue);border:1px solid #d7e6ff;align-content:space-between;gap:18px}
+    .note-panel .big{font-size:56px;line-height:.92;font-weight:900;letter-spacing:-.07em;color:var(--blue)}
+    .footer{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:800}
+    .meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .meta-box{background:#fff;border:1px solid var(--line);padding:13px;display:grid;gap:8px;min-height:94px}
+    .meta-box b{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
+    .meta-box span{font-size:13px;line-height:1.5;color:var(--muted)}
+    .source-list{display:grid;gap:8px}
+    .source-list a{color:var(--blue);text-decoration:underline;text-decoration-color:rgba(0,51,153,.22)}
+    .source-list a:hover{text-decoration-color:currentColor}
+    @media(max-width:980px){.hero,.wide{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}.hero-copy{min-height:auto}.blue-block{min-height:260px}.meta-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:720px){.page{width:min(100%,calc(100% - 14px));padding:10px 0 60px}.sheet{padding:12px}.topline,.footer{align-items:flex-start;flex-direction:column}.grid3,.metric-grid,.hero-pills,.meta-grid{grid-template-columns:1fr}.hero-pill{border-right:0;border-bottom:1px solid var(--line)}.hero-pill:last-child{border-bottom:0}h1{font-size:45px}.lead{font-size:14px}.blue-block .big{font-size:84px}.panel{padding:14px}.rank-row{grid-template-columns:90px minmax(0,1fr) 36px}.feature{grid-template-columns:1fr}.list-item{grid-template-columns:48px 1fr 28px}.chart-card,.note-panel,.shot-card{padding:14px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="sheet">
+      <div class="topline">
+        <div class="brand">OpenPi · GitHub Repo Card</div>
+        <div>2026.06.17 · SOURCE: heyhuynhgiabuu/openpi</div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div>
+            <div class="kicker">DESKTOP WORKBENCH · ELECTRON</div>
+            <h1>OpenPi</h1>
+            <p class="lead">OpenPi 不是把 Pi 的 agent runtime 重新写一遍，而是把 <code>@earendil-works/pi-coding-agent</code> 装进 Electron 主进程，再用本地桌面 UI 包住会话、扩展、文件搜索、源码控制、diff 和终端。它的价值在于：把 agent 能力从“网页里的聊天框”推进到“可持续工作的桌面工作台”。</p>
+          </div>
+          <div class="hero-pills">
+            <div class="hero-pill"><div class="mini-bar"></div><b>STACK</b><span>TypeScript + Electron + Vite，面向本地桌面体验。</span></div>
+            <div class="hero-pill"><div class="mini-bar"></div><b>MODEL</b><span>托管 Pi coding agent，边界清晰，不替代 SDK。</span></div>
+            <div class="hero-pill"><div class="mini-bar"></div><b>STATUS</b><span>Beta surface 已覆盖会话、Git、终端与子 agent。</span></div>
+          </div>
+        </div>
+        <aside class="blue-block">
+          <div class="label">GITHUB STARS</div>
+          <div class="big">133</div>
+          <div class="caption">Local desktop workbench for the Pi coding agent, with sessions, tools, diffs, terminals, and built-in subagents.</div>
+        </aside>
+      </section>
+
+      <section class="grid3">
+        <article class="panel">
+          <div class="head"><div class="label">DATA · 一眼看懂</div><div class="page-no">PAGE 01</div></div>
+          <h2>OpenPi 的公开信号</h2>
+          <div class="metric-grid">
+            <div class="metric"><div><strong>133</strong><span>GitHub stars</span></div><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="metric"><div><strong>11</strong><span>Forks</span></div><div class="bar"><i style="width:44%"></i></div></div>
+            <div class="metric"><div><strong>TS</strong><span>Language</span></div><div class="bar"><i style="width:84%"></i></div></div>
+            <div class="metric"><div><strong>MIT</strong><span>License</span></div><div class="bar"><i style="width:76%"></i></div></div>
+          </div>
+        </article>
+
+        <article class="panel gray">
+          <div class="head"><div class="label">ARCHITECTURE · 边界</div><div class="page-no">PAGE 02</div></div>
+          <h2>三条硬边界，决定它不是“又一个前端壳”</h2>
+          <div>
+            <div class="feature"><div class="num">01</div><div><b>Renderer only</b><p>界面只收集意图和渲染状态，不直接碰文件系统、Shell、Git 或 Pi 内部细节。</p></div></div>
+            <div class="feature dark"><div class="num">02</div><div><b>Electron main owns authority</b><p>主进程负责 PTY、Git、SQLite、文件搜索、应用元信息和原生对话框，确保桌面能力有真正的权限边界。</p></div></div>
+          </div>
+        </article>
+
+        <article class="panel black">
+          <div class="head"><div class="label">PI SDK · Semantics</div><div class="page-no">PAGE 03</div></div>
+          <h2>Pi SDK 仍然负责 agent 语义</h2>
+          <p>会话树、压缩、队列、tools、extensions、providers 和模型行为，继续由 Pi SDK 统一掌管。OpenPi 的策略不是抢语义，而是把语义包进更适合长期工作的桌面壳里。</p>
+          <p>这条边界很重要：它让 OpenPi 能快速接入 Pi 的能力，同时避免把一个桌面产品做成“重写 runtime”的高风险分叉。</p>
+        </article>
+      </section>
+
+      <section class="grid3">
+        <article class="panel">
+          <div class="head"><div class="label">BETA SURFACE · 功能面</div><div class="page-no">PAGE 04</div></div>
+          <h2>目前已经覆盖的工作台能力</h2>
+          <div class="list">
+            <div class="list-item"><strong>01</strong><div><b>Sessions</b><span>会话侧边栏、工作区分组、模型选择、conversation stream 和 token/cost 元数据。</span></div><div class="icon">◎</div></div>
+            <div class="list-item"><strong>02</strong><div><b>Source control</b><span>持久 Git 面板、文件树、搜索、分屏 diff 和文件查看，mutations 由主进程托管。</span></div><div class="icon">⇄</div></div>
+            <div class="list-item"><strong>03</strong><div><b>Terminal</b><span>本地 PTY 生命周期由 Electron main 统一管理，而不是让渲染层直接碰终端。</span></div><div class="icon">▣</div></div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="head"><div class="label">SUBAGENTS · 多 agent</div><div class="page-no">PAGE 05</div></div>
+          <h2>内置三种工具 + 五类 agent 角色</h2>
+          <div class="list">
+            <div class="list-item"><strong>05</strong><div><b>Agent / result / steer</b><span>内置的 Pi SDK-native tools 用于创建、接收结果和定向子 agent。</span></div><div class="icon">↗</div></div>
+            <div class="list-item"><strong>05</strong><div><b>Worker / Explorer / Scout / Planner / Reviewer</b><span>覆盖实施、勘察、外部研究、架构与代码审查五条常见工种。</span></div><div class="icon">✦</div></div>
+            <div class="list-item"><strong>@</strong><div><b>Autocomplete</b><span>在 composer 中用 @ 自动补全子 agent 与文件，降低多角色协作成本。</span></div><div class="icon">⌁</div></div>
+          </div>
+        </article>
+
+        <article class="panel gray">
+          <div class="head"><div class="label">WHY IT MATTERS · 判断</div><div class="page-no">PAGE 06</div></div>
+          <h2>它把“agent 产品”从聊天界面推进到桌面工作系统</h2>
+          <p>OpenPi 的关键价值，不在于更换模型，而在于重新分配职责：前端只做交互，主进程做权限，SDK 做语义。这样一来，agent 可以稳定地跟文件、Git、终端、扩展和子 agent 连在一起，形成真正的工作闭环。</p>
+          <p>对正在做 AI 桌面产品、开发者工具或 agent workbench 的团队，这种边界设计比某个单点功能更值得抄作业。</p>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="shot-card">
+          <div class="head"><div class="label">REFERENCE IMAGE · README</div><div class="page-no">PAGE 07</div></div>
+          <h2>README 里的桌面工作台截图</h2>
+          <div class="shot"><img src="assets/images/20260617-openpi-bigwhite/demo.png" alt="OpenPi desktop workbench screenshot"></div>
+          <p>这张图来自仓库 README 的公开演示图，已经本地化进卡片正文，用来对应“桌面工作台”的产品定位，而不是只放一行抽象描述。</p>
+        </article>
+        <aside class="note-panel">
+          <div>
+            <div class="label">INSTALL · 开始方式</div>
+            <div class="big">3</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-box"><b>Homebrew</b><span>macOS 上可直接 `brew tap` / `brew install --cask openpi`。</span></div>
+            <div class="meta-box"><b>Source</b><span>Node 22.19+、npm，`npm ci && npm run dev` 可本地跑起来。</span></div>
+            <div class="meta-box"><b>Release</b><span>支持 tag-trigger beta build，发布链路与 Changelog 绑定。</span></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="grid3" style="margin-top:14px;">
+        <article class="panel black">
+          <div class="head"><div class="label">TAKEAWAY</div><div class="page-no">PAGE 08</div></div>
+          <h2>如果你在做“桌面 + agent”产品，OpenPi 值得看两遍</h2>
+          <p>它给出的不是某个炫技特性，而是一个可复用的分层方法：UI 只负责表达，主进程负责动作，SDK 负责 agent 语义。这个结构，能把很多“看起来能演示”的 agent 产品，推向“真的能长期工作”的桌面工具。</p>
+        </article>
+        <article class="panel">
+          <div class="head"><div class="label">SOURCES / LINKS</div><div class="page-no">PAGE 09</div></div>
+          <h2>引用与核查入口</h2>
+          <div class="source-list">
+            <div>GitHub repo: <a href="https://github.com/heyhuynhgiabuu/openpi">https://github.com/heyhuynhgiabuu/openpi</a></div>
+            <div>README / features: sessions, source control, terminal, subagents, command palette.</div>
+            <div>Local asset: `assets/images/20260617-openpi-bigwhite/demo.png`.</div>
+          </div>
+        </article>
+        <article class="panel">
+          <div class="head"><div class="label">FACTS · 现场记录</div><div class="page-no">PAGE 10</div></div>
+          <h2>这张卡的重点</h2>
+          <p>白底、深蓝单强调、大数字、细灰线——这些大白风语法不是装饰，而是把 repo 的信息密度做成可扫读的商业报告。OpenPi 的叙述方式，恰好适合这种“先结构，再能力，再判断”的页式表达。</p>
+        </article>
+      </section>
+
+      <footer class="footer">
+        <div>SOURCE · https://github.com/heyhuynhgiabuu/openpi · captured 2026-06-17</div>
+        <div>STYLE · infocard-bigwhite-style · OPENPI REPO CARD</div>
+      </footer>
+    </div>
+  </main>
+</body>
+</html>
