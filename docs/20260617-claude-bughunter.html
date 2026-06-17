@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Claude BugHunter：把 Claude Code 变成外部红队技能包</title>
+  <style>
+    :root {
+      --bg: #f7f4ff;
+      --paper: #ffffff;
+      --paper-soft: #faf8ff;
+      --ink: #171322;
+      --muted: #655f79;
+      --line: #d7cfee;
+      --line-strong: #a78bfa;
+      --accent: #7c3aed;
+      --accent-2: #9f7aea;
+      --accent-soft: rgba(124, 58, 237, .08);
+      --accent-soft-2: rgba(124, 58, 237, .14);
+      --shadow: 0 20px 56px rgba(72, 43, 164, .12);
+      --shadow-soft: 0 8px 22px rgba(72, 43, 164, .08);
+      --radius: 24px;
+      --radius-sm: 16px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Segoe UI", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, SF Mono, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html {
+      font-size: clamp(14px, calc(100vw / 72), 16px);
+      background:
+        radial-gradient(circle at 10% 8%, rgba(124, 58, 237, .10) 0 10%, transparent 11%),
+        radial-gradient(circle at 90% 10%, rgba(159, 122, 234, .08) 0 9%, transparent 10%),
+        linear-gradient(180deg, #fcfbff 0%, var(--bg) 100%);
+    }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(124, 58, 237, .04) 0 1px, transparent 1px 22px),
+        linear-gradient(90deg, rgba(124, 58, 237, .03) 0 1px, transparent 1px 22px),
+        linear-gradient(180deg, #fcfbff 0%, var(--bg) 100%);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+      text-rendering: geometricPrecision;
+    }
+    img { display: block; max-width: 100%; }
+    a { color: var(--accent); text-decoration: none; }
+    code, pre {
+      font-family: var(--font-mono);
+      font-size: .86rem;
+    }
+
+    .page {
+      width: min(780px, 100%);
+      margin: 0 auto;
+      padding: .72rem .72rem 2rem;
+    }
+
+    .hero {
+      border: 2px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(124, 58, 237, .04), transparent 20%), var(--paper);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .hero-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .8rem;
+      padding: .72rem .95rem;
+      background: linear-gradient(90deg, #24114a 0%, #44278c 45%, #7c3aed 100%);
+      color: #fff;
+      border-bottom: 2px solid rgba(255, 255, 255, .12);
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      font-size: .72rem;
+      letter-spacing: .18em;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .brand .dot {
+      width: .64rem;
+      height: .64rem;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.12);
+      flex: 0 0 auto;
+    }
+    .hero-date {
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      color: rgba(255,255,255,.92);
+      white-space: nowrap;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap: .95rem;
+      padding: 1rem;
+      align-items: start;
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .28rem .72rem;
+      border: 1.6px solid var(--line-strong);
+      border-radius: 999px;
+      background: linear-gradient(180deg, #fff, #f6f1ff);
+      font-size: .72rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      color: #5c44db;
+      text-transform: uppercase;
+      box-shadow: var(--shadow-soft);
+    }
+    .kicker::before {
+      content: "";
+      width: .5rem;
+      height: .5rem;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(124, 58, 237, .12);
+      flex: 0 0 auto;
+    }
+    h1 {
+      margin: .55rem 0 .48rem;
+      font-size: clamp(1.95rem, 5vw, 3.1rem);
+      line-height: 1.05;
+      letter-spacing: -.05em;
+      font-weight: 950;
+    }
+    h1 .accent {
+      background: linear-gradient(90deg, #4f20f7, #9a6dff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .subtitle {
+      margin: 0;
+      font-size: .98rem;
+      line-height: 1.72;
+      color: #312b45;
+      max-width: 34rem;
+    }
+    .highlight-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      margin-top: .82rem;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: .32rem;
+      padding: .3rem .62rem;
+      border: 1.6px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: #342d4f;
+      font-size: .72rem;
+      font-weight: 800;
+      box-shadow: var(--shadow-soft);
+      white-space: nowrap;
+    }
+    .tag strong { color: var(--accent); font-weight: 900; }
+
+    .hero-panel {
+      border: 1.8px solid var(--line);
+      border-radius: 20px;
+      background: linear-gradient(180deg, var(--paper), var(--paper-soft));
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .hero-art {
+      padding: .74rem;
+      border-bottom: 1.8px solid var(--line);
+      background:
+        radial-gradient(circle at 12% 15%, rgba(124, 58, 237, .14) 0 12%, transparent 13%),
+        radial-gradient(circle at 88% 15%, rgba(159, 122, 234, .08) 0 11%, transparent 12%),
+        linear-gradient(180deg, #fff, #f8f6ff);
+    }
+    .hero-art:last-child {
+      border-bottom: none;
+      border-top: 1.8px solid var(--line);
+      border-radius: 0 0 20px 20px;
+    }
+    .hero-art img {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(124, 58, 237, .22);
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(72, 43, 164, .08);
+    }
+    .hero-note {
+      padding: .76rem .82rem .88rem;
+      font-size: .76rem;
+      line-height: 1.62;
+      color: #4b455f;
+    }
+    .hero-note b { color: var(--accent); }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .48rem;
+      margin-top: .82rem;
+    }
+    .metric {
+      border: 1.8px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fff, #f8f4ff);
+      box-shadow: var(--shadow-soft);
+      padding: .62rem .6rem .54rem;
+      min-height: 4.1rem;
+    }
+    .metric-k {
+      display: block;
+      font-size: .64rem;
+      letter-spacing: .08em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: .12rem;
+    }
+    .metric-v {
+      display: block;
+      font-size: 1.1rem;
+      font-weight: 950;
+      letter-spacing: -.03em;
+      color: var(--ink);
+      line-height: 1.1;
+    }
+    .metric-t {
+      display: block;
+      margin-top: .18rem;
+      font-size: .72rem;
+      line-height: 1.35;
+      color: #524d65;
+    }
+
+    .section {
+      margin-top: .82rem;
+      border: 2px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.88);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: .75rem;
+      padding: .86rem .95rem .72rem;
+      border-bottom: 1.8px solid var(--line);
+      background: linear-gradient(180deg, #fff, #faf7ff);
+    }
+    .section-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 950;
+      letter-spacing: -.02em;
+      color: var(--ink);
+    }
+    .section-sub {
+      font-size: .74rem;
+      color: var(--muted);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .section-body { padding: .95rem; }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .68rem;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .68rem;
+    }
+    .card {
+      border: 1.6px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff, var(--paper-soft));
+      box-shadow: var(--shadow-soft);
+      padding: .82rem .82rem .88rem;
+      min-height: 100%;
+    }
+    .mini-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .22rem .56rem;
+      border-radius: 999px;
+      border: 1px solid rgba(124, 58, 237, .26);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: .68rem;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .card h3 {
+      margin: .52rem 0 .38rem;
+      font-size: 1rem;
+      line-height: 1.26;
+      letter-spacing: -.02em;
+    }
+    .card p {
+      margin: 0;
+      color: #413a55;
+      font-size: .84rem;
+      line-height: 1.66;
+    }
+    .card ul {
+      margin: .42rem 0 0;
+      padding-left: 1.1rem;
+      color: #413a55;
+      font-size: .84rem;
+      line-height: 1.62;
+    }
+    .card li + li { margin-top: .26rem; }
+
+    .note {
+      margin-top: .68rem;
+      padding: .72rem .84rem;
+      border: 1.6px solid rgba(124, 58, 237, .22);
+      border-left: 4px solid var(--accent);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(124, 58, 237, .06), rgba(124, 58, 237, .02));
+      color: #352e4d;
+      font-size: .84rem;
+      line-height: 1.65;
+    }
+    .note strong { color: var(--accent); }
+
+    .command-box {
+      margin-top: .58rem;
+      border-radius: 16px;
+      border: 1.6px solid rgba(124, 58, 237, .20);
+      background: #100b1f;
+      color: #f7f3ff;
+      padding: .72rem .78rem;
+      overflow-x: auto;
+      box-shadow: var(--shadow-soft);
+    }
+    .command-box pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: .78rem;
+      line-height: 1.55;
+    }
+    .command-box code { color: #f3e8ff; }
+
+    .figure-block {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: .72rem;
+      align-items: start;
+      margin-top: .68rem;
+    }
+    .figure-box {
+      border: 1.6px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .figure-box img {
+      width: 100%;
+      display: block;
+      background: #fff;
+    }
+    .figure-caption {
+      padding: .64rem .76rem .72rem;
+      font-size: .76rem;
+      line-height: 1.6;
+      color: #51496a;
+    }
+    .figure-caption b { color: var(--accent); }
+
+    .footer {
+      margin-top: .82rem;
+      border: 2px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff, #f8f5ff);
+      box-shadow: var(--shadow-soft);
+      padding: .78rem .86rem;
+      display: flex;
+      justify-content: space-between;
+      gap: .7rem;
+      flex-wrap: wrap;
+      font-size: .74rem;
+      color: var(--muted);
+    }
+    .footer b { color: var(--ink); }
+    .footer a { word-break: break-all; }
+
+    @media (min-width: 780px) {
+      html { font-size: 16px; }
+    }
+    @media (max-width: 720px) {
+      .page { padding: .56rem .56rem 1.4rem; }
+      .hero-grid,
+      .figure-block,
+      .grid-3,
+      .grid-2 { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .section-head {
+        align-items: start;
+        flex-direction: column;
+      }
+      .hero-strip {
+        padding: .68rem .72rem;
+      }
+      .hero-grid { padding: .78rem; }
+      .section-body { padding: .78rem; }
+      .card h3 { font-size: .98rem; }
+      .card p, .card ul { font-size: .82rem; }
+      .subtitle { font-size: .94rem; }
+      .footer { padding: .7rem .78rem; }
+    }
+    @media (max-width: 400px) {
+      .metrics { grid-template-columns: 1fr; }
+      h1 { font-size: 1.82rem; }
+      .hero-note, .note, .footer { font-size: .76rem; }
+      .card { padding: .76rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-strip">
+        <div class="brand"><span class="dot"></span> WHITE / PURPLE WORKBENCH</div>
+        <div class="hero-date">2026-06-17 · GitHub Repo Card</div>
+      </div>
+
+      <div class="hero-grid">
+        <div>
+          <div class="kicker">Claude Code · Skill Bundle</div>
+          <h1>把 <span class="accent">Claude Code</span> 变成外部红队技能包</h1>
+          <p class="subtitle">
+            <b>Claude BugHunter</b> 不是单个脚本，而是一整套面向 bug hunting 与外部 red-team 的 Claude Code skills：
+            安装一次，Agent 就能按主题自动加载技巧、工具、规则与报告模板。
+          </p>
+          <div class="highlight-row">
+            <span class="tag"><strong>71</strong> skills</span>
+            <span class="tag"><strong>15</strong> slash commands</span>
+            <span class="tag"><strong>681</strong> patterns</span>
+            <span class="tag"><strong>24</strong> vulnerability classes</span>
+            <span class="tag"><strong>4</strong> harnesses</span>
+            <span class="tag"><strong>external-only</strong> scope</span>
+          </div>
+          <div class="metrics">
+            <div class="metric">
+              <span class="metric-k">Stars</span>
+              <span class="metric-v">2.5k</span>
+              <span class="metric-t">社区热度高，说明“可直接拿来用”的定位有效。</span>
+            </div>
+            <div class="metric">
+              <span class="metric-k">Forks</span>
+              <span class="metric-v">389</span>
+              <span class="metric-t">更像可复用的工作流资产，而不是演示仓库。</span>
+            </div>
+            <div class="metric">
+              <span class="metric-k">Language</span>
+              <span class="metric-v">Python</span>
+              <span class="metric-t">入口偏脚本化，便于把能力编排到现有流程。</span>
+            </div>
+            <div class="metric">
+              <span class="metric-k">Updated</span>
+              <span class="metric-v">06-16</span>
+              <span class="metric-t">README 与仓库元数据都在 2026-06 中旬活跃更新。</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-panel">
+          <div class="hero-art">
+            <img src="assets/images/20260617-claude-bughunter/banner-v2.svg" alt="Claude BugHunter banner" />
+          </div>
+          <div class="hero-note">
+            README 的主视觉把这套 bundle 的定位说得很清楚：<b>先是技能包，再是工具集</b>；
+            重点不在某一个 payload，而在能否让 Claude 在授权范围内持续保持“会搜、会判、会写报告”的状态。
+          </div>
+          <div class="hero-art">
+            <img src="assets/images/20260617-claude-bughunter/harness-routing.svg" alt="Claude BugHunter harness routing" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">一眼看懂：它到底卖什么</h2>
+        <div class="section-sub">定位 / 价值 / 边界</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="mini-kicker">定位</div>
+            <h3>把红队知识封装成可自动加载的 Claude 技能包</h3>
+            <p>
+              你不需要记住每个技能名再手动调用。只要描述目标和场景，系统就会按主题加载相应的 hunting、triage、reporting 与 hygiene 规则。
+            </p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">价值</div>
+            <h3>让 Agent 从“会聊天”变成“会按流程干活”</h3>
+            <p>
+              README 强调它面向 Claude Code、OpenCode、Codex CLI、Hermes Agent 等多种 harness。价值不只是覆盖更多工具，而是把同一套知识层同步到多种运行环境里。
+            </p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">边界</div>
+            <h3>只做外部攻击面，不碰内部 AD / C2 / 后渗透</h3>
+            <p>
+              这套 bundle 明确把内网 AD、C2、持久化、横向移动、EDR 绕过排除在外。它的设计目标是授权范围内的外部漏洞挖掘与红队前段工作，不是全链路渗透平台。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">四层能力：为什么它不是“技能堆”</h2>
+        <div class="section-sub">Think → Hunt → Hit → Ship</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="mini-kicker">01 思考层</div>
+            <h3>先把判断框架装进去，再谈具体 payload</h3>
+            <p>
+              README 把 `bb-methodology` 和 `redteam-mindset` 放在最前，意思很明确：先用 5-phase workflow、critical thinking、operator discipline 把思路定住，再去做验证。
+            </p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">02 狩猎层</div>
+            <h3>48 个 hunt-* 技能，覆盖 24 类核心漏洞</h3>
+            <p>
+              它不是一个泛化的“找洞机器人”，而是把 681 个 disclosed reports 提炼成分类化模式、payload、bypass table 与 chain template，重点是能复用的检测路径。
+            </p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">03 边界层</div>
+            <h3>把企业外部入口当作优先级最高的战场</h3>
+            <p>
+              M365/Entra、Okta、SharePoint、vCenter、SSL VPN、云 IAM、APK 红队都在范围内。它的叙事方式不是“列工具”，而是“按外部入口的真实风险面组织战术”。
+            </p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">04 交付层</div>
+            <h3>最终落点是 triage、报告与证据卫生</h3>
+            <p>
+              7-Question Gate、VRT-aware severity、OOS rebuttal、PII redaction 这些东西说明它不只想帮你找到问题，还想帮你把结果写成能交出去的 deliverable。
+            </p>
+          </div>
+        </div>
+        <div class="note"><strong>结论：</strong>它把“思考框架、检测模式、外部边界、交付模板”串成了一条链，所以更像一个外部红队操作系统，而不是一组散装命令。</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">怎么接入：Skill / MCP / CLI 三路并行</h2>
+        <div class="section-sub">自动化优先，手动可控</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="mini-kicker">Skill</div>
+            <h3>最适合让 Claude 自己决定何时加载能力</h3>
+            <p>安装成 Claude Code plugin 后，技能会按主题自动加载，适合想要“说人话、让 agent 自己干”的场景。</p>
+            <div class="command-box"><pre><code>/plugin marketplace add elementalsouls/Claude-BugHunter
+/plugin install claude-bughunter@elementalsouls</code></pre></div>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">MCP</div>
+            <h3>把能力挂成标准工具接口</h3>
+            <p>如果你的工作流已经接了 MCP，这条路最像“把知识层暴露成工具层”，便于 Claude Code / OpenCode / Codex 统一调用。</p>
+            <div class="command-box"><pre><code>bash scripts/install.sh --all --burp-mcp</code></pre></div>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">CLI</div>
+            <h3>适合试用、排错和小范围接入</h3>
+            <p>对于先想看效果的人，直接走命令式安装更直观；它也适合你把 bundle 复制到已有环境后做局部验证。</p>
+            <div class="command-box"><pre><code>git clone https://github.com/elementalsouls/Claude-BugHunter.git
+cd Claude-BugHunter
+bash scripts/install.sh</code></pre></div>
+          </div>
+        </div>
+        <div class="figure-block">
+          <div class="figure-box">
+            <img src="assets/images/20260617-claude-bughunter/harness-routing.svg" alt="Claude BugHunter multi-harness routing diagram" />
+          </div>
+          <div class="card">
+            <div class="mini-kicker">四个 harness</div>
+            <h3>Claude Code、OpenCode、Codex CLI、Hermes Agent</h3>
+            <p>
+              README 把这四个环境视为同一知识层的不同入口。对用户来说，真正重要的是“先把能力装进去，再决定在哪个 harness 上用”，而不是把平台差异当成内容差异。
+            </p>
+            <ul>
+              <li>知识层可迁移，命令层并不完全共享。</li>
+              <li>slash commands 和 `/hunt` 仍偏 Claude-Code 专用。</li>
+              <li>Burp MCP 可把外部验证环节继续挂到统一工具链上。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note"><strong>推荐顺序：</strong>先用 CLI 试跑，再挂 MCP，最后装成 plugin 让 Claude 自动加载。这样最容易在不打断现有工作流的前提下验证价值。</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">适用 / 不适用：先把边界说清</h2>
+        <div class="section-sub">授权范围内使用</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="mini-kicker">适用</div>
+            <h3>外部 bug bounty、授权红队、训练靶场</h3>
+            <ul>
+              <li>陌生目标的 recon、排序、验证与报告输出。</li>
+              <li>Web / API / GraphQL / OAuth / file upload / SSRF / IDOR 等常见外部面。</li>
+              <li>需要把技法、证据、结论统一到同一套交付模板的场景。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">不适用</div>
+            <h3>内部 AD、C2、后渗透、Evasion</h3>
+            <ul>
+              <li>内网域渗透、横向移动、持久化、EDR 绕过不在范围内。</li>
+              <li>它刻意不做 post-exploit 相关能力，以免把风险边界混在一起。</li>
+              <li>如果你的工作目标是全链路渗透，这套 bundle 只能覆盖前半段。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note"><strong>授权提醒：</strong>README 把“写授权、在 scope 内、按平台规则”写得很直白。这个边界不是附加条款，而是它能否被安全使用的前提。</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div><b>Source</b> · GitHub README + API metadata · <a href="https://github.com/elementalsouls/Claude-BugHunter">elementalsouls/Claude-BugHunter</a></div>
+      <div><b>Style</b> · infocard-white-purple-style · 白底 / 紫色强调 / 轻玻璃科技感</div>
+    </footer>
+  </main>
+</body>
+</html>
