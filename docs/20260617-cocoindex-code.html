@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>CocoIndex Code：AST 语义代码搜索 CLI</title>
+  <style>
+    :root {
+      --bg: #f6f4ff;
+      --paper: #ffffff;
+      --paper-soft: #faf8ff;
+      --ink: #16131f;
+      --muted: #625c75;
+      --line: #d8d0f3;
+      --line-strong: #a892f2;
+      --accent: #7b5cff;
+      --accent-2: #9a7bff;
+      --accent-soft: rgba(123, 92, 255, .08);
+      --accent-soft-2: rgba(123, 92, 255, .14);
+      --shadow: 0 20px 60px rgba(72, 43, 164, .12);
+      --shadow-soft: 0 8px 22px rgba(72, 43, 164, .08);
+      --radius: 24px;
+      --radius-sm: 16px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Segoe UI", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, SF Mono, Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html {
+      font-size: clamp(14px, calc(100vw / 72), 16px);
+      background:
+        radial-gradient(circle at 12% 10%, rgba(123, 92, 255, .11) 0 11%, transparent 12%),
+        radial-gradient(circle at 88% 8%, rgba(154, 123, 255, .09) 0 9%, transparent 10%),
+        linear-gradient(180deg, #fcfbff 0%, var(--bg) 100%);
+    }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(123, 92, 255, .04) 0 1px, transparent 1px 22px),
+        linear-gradient(90deg, rgba(123, 92, 255, .03) 0 1px, transparent 1px 22px),
+        linear-gradient(180deg, #fcfbff 0%, var(--bg) 100%);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+      text-rendering: geometricPrecision;
+    }
+    img { display: block; max-width: 100%; }
+    a { color: var(--accent); text-decoration: none; }
+    .page {
+      width: min(780px, 100%);
+      margin: 0 auto;
+      padding: .72rem .72rem 2.2rem;
+    }
+    .hero {
+      border: 2px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(123, 92, 255, .04), transparent 18%), var(--paper);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .hero-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .8rem;
+      padding: .72rem .95rem;
+      background: linear-gradient(90deg, #25194d 0%, #462d92 46%, #7b5cff 100%);
+      color: #fff;
+      border-bottom: 2px solid rgba(255, 255, 255, .12);
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      font-size: .72rem;
+      letter-spacing: .18em;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .brand .dot {
+      width: .64rem;
+      height: .64rem;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.12);
+      flex: 0 0 auto;
+    }
+    .hero-date {
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      color: rgba(255, 255, 255, .9);
+      white-space: nowrap;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap: .95rem;
+      padding: 1rem;
+      align-items: start;
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .28rem .72rem;
+      border: 1.6px solid var(--line-strong);
+      border-radius: 999px;
+      background: linear-gradient(180deg, #fff, #f6f1ff);
+      font-size: .72rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      color: #5c44db;
+      text-transform: uppercase;
+      box-shadow: var(--shadow-soft);
+    }
+    .kicker::before {
+      content: "";
+      width: .5rem;
+      height: .5rem;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(123, 92, 255, .12);
+      flex: 0 0 auto;
+    }
+    h1 {
+      margin: .55rem 0 .48rem;
+      font-size: clamp(1.95rem, 5vw, 3.1rem);
+      line-height: 1.05;
+      letter-spacing: -.05em;
+      font-weight: 950;
+    }
+    h1 .accent {
+      background: linear-gradient(90deg, #3a1fff, #8e69ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .subtitle {
+      margin: 0;
+      font-size: .98rem;
+      line-height: 1.72;
+      color: #302b42;
+      max-width: 34rem;
+    }
+    .highlight-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      margin-top: .82rem;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: .32rem;
+      padding: .3rem .62rem;
+      border: 1.6px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: #342d4f;
+      font-size: .72rem;
+      font-weight: 800;
+      box-shadow: var(--shadow-soft);
+      white-space: nowrap;
+    }
+    .tag strong { color: var(--accent); font-weight: 900; }
+    .hero-panel {
+      border: 1.8px solid var(--line);
+      border-radius: 20px;
+      background: linear-gradient(180deg, var(--paper), var(--paper-soft));
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .hero-art {
+      padding: .74rem;
+      border-bottom: 1.8px solid var(--line);
+      background:
+        radial-gradient(circle at 12% 15%, rgba(123, 92, 255, .14) 0 12%, transparent 13%),
+        radial-gradient(circle at 88% 15%, rgba(154, 123, 255, .08) 0 11%, transparent 12%),
+        linear-gradient(180deg, #fff, #f8f6ff);
+    }
+    .hero-art img {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(123, 92, 255, .22);
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(72, 43, 164, .08);
+    }
+    .hero-note {
+      padding: .78rem .82rem .86rem;
+      font-size: .76rem;
+      line-height: 1.62;
+      color: #463f59;
+    }
+    .hero-note b { color: var(--accent); }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .48rem;
+      margin-top: .82rem;
+    }
+    .metric {
+      border: 1.8px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fff, #f8f4ff);
+      box-shadow: var(--shadow-soft);
+      padding: .62rem .6rem .54rem;
+      min-height: 4.1rem;
+    }
+    .metric-k {
+      display: block;
+      font-size: .64rem;
+      letter-spacing: .08em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: .12rem;
+    }
+    .metric-v {
+      display: block;
+      font-size: .96rem;
+      line-height: 1.12;
+      font-weight: 950;
+      color: #1c1730;
+    }
+    .metric-v .soft { color: var(--accent); }
+    .section {
+      margin-top: .92rem;
+      border: 1.8px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.85);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .8rem;
+      padding: .72rem .9rem;
+      border-bottom: 1.8px solid var(--line);
+      background: linear-gradient(90deg, rgba(123, 92, 255, .08), rgba(255,255,255,0));
+    }
+    .section-title {
+      display: inline-flex;
+      align-items: center;
+      gap: .52rem;
+      margin: 0;
+      font-size: .92rem;
+      font-weight: 950;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: #25194d;
+    }
+    .section-title::before {
+      content: "";
+      width: .72rem;
+      height: .72rem;
+      border-radius: .18rem;
+      background: linear-gradient(180deg, var(--accent), #4120da);
+      box-shadow: 0 0 0 4px rgba(123, 92, 255, .12);
+    }
+    .section-sub {
+      font-size: .74rem;
+      color: var(--muted);
+      text-align: right;
+    }
+    .section-body {
+      padding: .92rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .72rem;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .72rem;
+    }
+    .card {
+      border: 1.6px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff, #fbf9ff);
+      box-shadow: var(--shadow-soft);
+      padding: .82rem .84rem .9rem;
+      min-width: 0;
+    }
+    .card h3 {
+      margin: 0 0 .38rem;
+      font-size: .92rem;
+      line-height: 1.28;
+      font-weight: 950;
+      color: #211a37;
+    }
+    .card .lead {
+      margin: 0;
+      font-size: .8rem;
+      line-height: 1.65;
+      color: #3f3852;
+    }
+    .list {
+      list-style: none;
+      padding: 0;
+      margin: .54rem 0 0;
+      display: grid;
+      gap: .38rem;
+    }
+    .list li {
+      position: relative;
+      padding-left: .92rem;
+      font-size: .8rem;
+      line-height: 1.55;
+      color: #403756;
+    }
+    .list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: .52rem;
+      width: .44rem;
+      height: .44rem;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(123, 92, 255, .12);
+    }
+    .command {
+      margin-top: .5rem;
+      padding: .62rem .72rem;
+      border-radius: 14px;
+      border: 1.6px solid rgba(123, 92, 255, .24);
+      background: linear-gradient(180deg, #f7f4ff, #fff);
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      line-height: 1.5;
+      color: #332b53;
+      white-space: pre-wrap;
+    }
+    .command b { color: var(--accent); }
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .62rem;
+    }
+    .step {
+      border: 1.6px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff, #f8f5ff);
+      padding: .76rem .8rem .86rem;
+      box-shadow: var(--shadow-soft);
+      min-width: 0;
+    }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.36rem;
+      height: 1.36rem;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--accent), #4c25d7);
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 950;
+      margin-bottom: .45rem;
+    }
+    .step h4 {
+      margin: 0 0 .28rem;
+      font-size: .84rem;
+      line-height: 1.3;
+      font-weight: 950;
+      color: #241c3d;
+    }
+    .step p {
+      margin: 0;
+      font-size: .76rem;
+      line-height: 1.58;
+      color: #443b59;
+    }
+    .split-note {
+      margin-top: .7rem;
+      padding: .72rem .82rem;
+      border-radius: 16px;
+      border: 1.6px solid rgba(123, 92, 255, .22);
+      background: linear-gradient(180deg, rgba(123, 92, 255, .08), rgba(255,255,255,.96));
+      font-size: .78rem;
+      line-height: 1.62;
+      color: #3e3457;
+    }
+    .split-note strong {
+      color: var(--accent);
+      font-weight: 950;
+    }
+    .compare {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .72rem;
+    }
+    .compare .card {
+      position: relative;
+      overflow: hidden;
+    }
+    .compare .card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto auto 0;
+      width: 100%;
+      height: .24rem;
+      background: linear-gradient(90deg, #2d1f63, var(--accent), #b39cff);
+    }
+    .mini-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .18rem .52rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: #5a43db;
+      font-size: .64rem;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: .45rem;
+    }
+    .mini-kicker::before {
+      content: "";
+      width: .34rem;
+      height: .34rem;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+    .footer {
+      margin-top: .92rem;
+      padding: .82rem .92rem .9rem;
+      border-radius: 18px;
+      border: 1.8px solid var(--line);
+      background: linear-gradient(180deg, #fff, #f6f3ff);
+      box-shadow: var(--shadow-soft);
+      font-size: .74rem;
+      line-height: 1.62;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: .8rem;
+      flex-wrap: wrap;
+    }
+    .footer b { color: #2f2350; }
+
+    @media (max-width: 720px) {
+      html { font-size: 15px; }
+      .page {
+        width: 100%;
+        max-width: 100%;
+        padding: .45rem .45rem 1.4rem;
+      }
+      .hero-grid,
+      .metrics,
+      .grid-3,
+      .grid-2,
+      .pipeline,
+      .compare {
+        grid-template-columns: 1fr;
+      }
+      .hero-strip,
+      .section-head,
+      .footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .hero-date,
+      .section-sub {
+        text-align: left;
+      }
+      .hero-grid { padding: .82rem; }
+      .section-body { padding: .82rem; }
+      .hero-art img { border-radius: 12px; }
+      .subtitle { font-size: .94rem; }
+      .kicker,
+      .brand,
+      .hero-date,
+      .metric-k,
+      .mini-kicker,
+      .section-sub {
+        font-size: .78rem;
+      }
+      .tag { font-size: .8rem; }
+      .metric, .card, .step { min-height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-strip">
+        <div class="brand"><span class="dot"></span> White / Purple Workbench</div>
+        <div class="hero-date">2026-06-17 · GitHub Repo Card</div>
+      </div>
+      <div class="hero-grid">
+        <div>
+          <div class="kicker">AST-based semantic code search</div>
+          <h1><span class="accent">CocoIndex Code</span><br />把代码搜索从“找名字”升级成“找意图”</h1>
+          <p class="subtitle">
+            这是一个面向代码库与 coding agent 的超轻量代码搜索 CLI：基于 AST 做语义检索，默认强调“零配置、1 分钟上手、为 agent 节省 70% token”，并同时提供 Skill 与 MCP 两条接入路径。
+          </p>
+          <div class="highlight-row">
+            <span class="tag"><strong>2063</strong> stars</span>
+            <span class="tag"><strong>Python</strong> 主语言</span>
+            <span class="tag"><strong>10</strong> 个 topics</span>
+            <span class="tag"><strong>1 min</strong> setup</span>
+            <span class="tag"><strong>70%</strong> token saving</span>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span class="metric-k">Repo size signal</span><span class="metric-v">2063 ★</span></div>
+            <div class="metric"><span class="metric-k">Integration</span><span class="metric-v">Skill / MCP / CLI</span></div>
+            <div class="metric"><span class="metric-k">Search model</span><span class="metric-v">AST + semantic</span></div>
+            <div class="metric"><span class="metric-k">Homepage</span><span class="metric-v"><span class="soft">cocoindex.io</span></span></div>
+          </div>
+        </div>
+
+        <div class="hero-panel">
+          <div class="hero-art">
+            <img src="assets/images/20260617-cocoindex-code/banner.png" alt="CocoIndex Code README banner" />
+          </div>
+          <div class="hero-note">
+            README 的主视觉同时展示了 <b>品牌横幅</b> 与 <b>效果图</b>：前者传达产品定位，后者强调它不是普通关键词搜索，而是面向代码结构的语义搜索工具。
+          </div>
+          <div class="hero-art" style="border-top:1.8px solid var(--line); border-bottom:none; border-radius: 0 0 20px 20px;">
+            <img src="assets/images/20260617-cocoindex-code/effect.gif" alt="CocoIndex Code effect preview" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">项目一句话</h2>
+        <div class="section-sub">Repo metadata + README facts</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="mini-kicker">定位</div>
+            <h3>给代码库做“能理解语义”的搜索层</h3>
+            <p class="lead">CocoIndex Code 的核心价值不是补一个 grep，而是让 agent 在陌生仓库里按功能、流程、实现意图去找代码，减少手动翻目录和硬记符号名的成本。</p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">价值</div>
+            <h3>面向 coding agent，目标是节省 token</h3>
+            <p class="lead">官方 README 明确把“节省 70% token”作为卖点：先把相关片段搜准，再把更少的上下文喂给 Claude / Codex / Cursor 这类工具。</p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">边界</div>
+            <h3>它是搜索引擎，不是完整 IDE</h3>
+            <p class="lead">它更像一个给 agent 和 CLI 服务的检索层：初始化、建索引、搜索、状态诊断都在 ccc 命令里，适合接到现有工作流，而不是替代编辑器本身。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">三条接入路径</h2>
+        <div class="section-sub">Skill / MCP / CLI</div>
+      </div>
+      <div class="section-body">
+        <div class="compare">
+          <div class="card">
+            <div class="mini-kicker">Skill 推荐</div>
+            <h3>把“会搜代码”交给 coding agent 自己判断</h3>
+            <p class="lead">README 把 Skill 作为首选：`npx skills add cocoindex-io/cocoindex-code` 后，agent 可以自动决定何时需要语义搜索，不必手动反复运行初始化与搜索命令。</p>
+            <div class="command">npx skills add cocoindex-io/cocoindex-code</div>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">MCP</div>
+            <h3>把 ccc 暴露成标准工具接口</h3>
+            <p class="lead">适合已经接了 MCP 的环境：Claude Code、Codex、OpenCode 都能用 `ccc mcp` 直接挂上搜索工具，把语义检索变成可调用能力。</p>
+            <div class="command">ccc mcp</div>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">CLI</div>
+            <h3>手动可控，适合先试、再接入</h3>
+            <p class="lead">如果你只想快速看看效果，直接用 `ccc init / ccc index / ccc search` 就能跑起来；这条路最适合试用、排错和局部调参。</p>
+            <div class="command">ccc init
+ccc index
+ccc search "authentication logic"</div>
+          </div>
+        </div>
+        <div class="split-note"><strong>结论：</strong>Skill 适合让 agent 自动化使用；MCP 适合标准工具接入；CLI 适合人工控制。三者不是互斥，而是从“自动”到“手动”的不同抽象层。</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">上手与实现链路</h2>
+        <div class="section-sub">安装 → 建索引 → 搜索 → 诊断</div>
+      </div>
+      <div class="section-body">
+        <div class="pipeline">
+          <div class="step">
+            <div class="step-num">1</div>
+            <h4>安装有两档</h4>
+            <p>README 提供 `cocoindex-code[full]` 和 slim 两种安装方式：前者内置 local embeddings，后者更轻，依赖云 embedding provider。</p>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <h4>先初始化，再建索引</h4>
+            <p>`ccc init` 会创建 settings，`ccc index` 会构建或更新索引；文档强调 daemon 会在首次使用时自动启动。</p>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <h4>按查询意图检索</h4>
+            <p>`ccc search` 支持自然语言或代码片段；可以按语言、路径过滤，还能在 agent 里把搜索结果直接作为上下文来源。</p>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <h4>状态与排错也在同一套命令里</h4>
+            <p>`ccc status / doctor / daemon status / restart / stop` 把索引健康、项目状态与守护进程管理统一起来，方便运维和日常排障。</p>
+          </div>
+        </div>
+        <div class="split-note"><strong>适合的使用场景：</strong>陌生代码库 onboarding、按行为/流程找实现、在大仓库里定位模糊需求对应的函数、给 coding agent 预先压缩上下文。</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">快速判断这项目值不值得试</h2>
+        <div class="section-sub">把优点和代价一起看</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="mini-kicker">推荐点</div>
+            <h3>零配置诉求明确，和 agent 工作流贴得很紧</h3>
+            <ul class="list">
+              <li>AST-based semantic search，比单纯关键词搜索更适合找实现。</li>
+              <li>Skill / MCP / CLI 三路接入，覆盖自动化与手动场景。</li>
+              <li>README 直接给出 1 分钟上手、70% token saving 的明确目标。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">注意点</div>
+            <h3>full 版依赖更重，cloud embedding 版则依赖外部服务</h3>
+            <ul class="list">
+              <li>full 版会带来更大的依赖体积，适合愿意换取本地 embeddings 的场景。</li>
+              <li>slim 版更轻，但要接 LiteLLM / 云 embedding provider。</li>
+              <li>如果仓库很大，索引与守护进程的维护成本也要纳入考量。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div><b>Source</b> · GitHub README + API metadata · <a href="https://github.com/cocoindex-io/cocoindex-code">cocoindex-io/cocoindex-code</a></div>
+      <div><b>Style</b> · infocard-white-purple-style · 白底 / 紫色强调 / 轻玻璃科技感</div>
+    </footer>
+  </main>
+</body>
+</html>
