@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>LLM Wiki：把知识库变成可积累、可引用的 Markdown 网络</title>
+  <style>
+    :root {
+      --bg: #f7f7fb;
+      --paper: #ffffff;
+      --paper-soft: #fbfbfe;
+      --ink: #111111;
+      --muted: #6b6b7a;
+      --line: rgba(91, 73, 255, 0.16);
+      --line-strong: rgba(91, 73, 255, 0.32);
+      --accent: #8a5cf5;
+      --accent-deep: #5b49ff;
+      --accent-soft: rgba(138, 92, 245, 0.10);
+      --glass: rgba(255, 255, 255, 0.72);
+      --shadow: 0 12px 40px rgba(91, 73, 255, 0.10);
+      --shadow-soft: 0 4px 16px rgba(91, 73, 255, 0.06);
+      --radius: 22px;
+      --radius-sm: 16px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Segoe UI", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html {
+      font-size: clamp(14px, calc(100vw / 72), 16px);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(91, 73, 255, .07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 8%, rgba(138, 92, 245, .06) 0 9%, transparent 10%),
+        linear-gradient(180deg, #fcfbff 0%, var(--bg) 100%);
+    }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(91, 73, 255, .04) 0 1px, transparent 1px 22px),
+        linear-gradient(90deg, rgba(91, 73, 255, .03) 0 1px, transparent 1px 22px),
+        linear-gradient(180deg, #fcfbff 0%, var(--bg) 100%);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+      text-rendering: geometricPrecision;
+    }
+    img { display: block; max-width: 100%; }
+    a { color: var(--accent-deep); text-decoration: none; }
+    code, pre { font-family: var(--font-mono); font-size: .84rem; }
+
+    .page {
+      width: min(780px, 100%);
+      margin: 0 auto;
+      padding: .72rem .72rem 2rem;
+    }
+
+    /* === HERO === */
+    .hero {
+      border: 2px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .hero-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .75rem;
+      padding: .72rem .95rem;
+      background: linear-gradient(90deg, #1a0e4a 0%, #2d1b7a 45%, #5b49ff 100%);
+      color: #fff;
+      border-bottom: 2px solid rgba(255,255,255,.10);
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      font-size: .70rem;
+      letter-spacing: .18em;
+      font-weight: 900;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.92);
+    }
+    .brand .dot {
+      width: .62rem;
+      height: .62rem;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.12);
+      flex: 0 0 auto;
+    }
+    .hero-date {
+      font-size: .70rem;
+      font-weight: 800;
+      letter-spacing: .06em;
+      color: rgba(255,255,255,.92);
+      white-space: nowrap;
+    }
+
+    .hero-body {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: .85rem;
+      padding: 1rem;
+      align-items: start;
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .26rem .68rem;
+      border: 1.6px solid rgba(91, 73, 255, .28);
+      border-radius: 999px;
+      background: linear-gradient(180deg, #fff, #f5f2ff);
+      font-size: .70rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      color: var(--accent-deep);
+      text-transform: uppercase;
+      box-shadow: var(--shadow-soft);
+    }
+    .kicker::before {
+      content: "";
+      width: .48rem;
+      height: .48rem;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(138, 92, 245, .14);
+      flex: 0 0 auto;
+    }
+
+    h1 {
+      margin: .52rem 0 .42rem;
+      font-size: clamp(1.85rem, 5vw, 2.9rem);
+      line-height: 1.05;
+      letter-spacing: -.05em;
+      font-weight: 950;
+    }
+    h1 .accent {
+      background: linear-gradient(90deg, #3b1fff, #8a5cf5);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .subtitle {
+      margin: 0;
+      font-size: .92rem;
+      line-height: 1.72;
+      color: #3a3558;
+      max-width: 34rem;
+    }
+    .subtitle b { color: var(--accent-deep); font-weight: 900; }
+    .highlight-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .38rem;
+      margin-top: .78rem;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: .28rem;
+      padding: .28rem .58rem;
+      border: 1.6px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: #2e2950;
+      font-size: .70rem;
+      font-weight: 800;
+      box-shadow: var(--shadow-soft);
+      white-space: nowrap;
+    }
+    .tag strong { color: var(--accent-deep); font-weight: 900; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .44rem;
+      margin-top: .78rem;
+    }
+    .metric {
+      border: 1.8px solid var(--line);
+      border-radius: 15px;
+      background: linear-gradient(180deg, #fff, #f8f5ff);
+      box-shadow: var(--shadow-soft);
+      padding: .58rem .55rem .52rem;
+      min-height: 4rem;
+    }
+    .metric-k {
+      display: block;
+      font-size: .62rem;
+      letter-spacing: .07em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: .1rem;
+    }
+    .metric-v {
+      display: block;
+      font-size: 1.05rem;
+      font-weight: 950;
+      letter-spacing: -.03em;
+      color: var(--ink);
+      line-height: 1.1;
+    }
+    .metric-t {
+      display: block;
+      margin-top: .16rem;
+      font-size: .68rem;
+      line-height: 1.35;
+      color: #524d65;
+    }
+
+    .hero-panel {
+      border: 1.8px solid var(--line);
+      border-radius: 20px;
+      background: linear-gradient(180deg, var(--paper), var(--paper-soft));
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .hero-art {
+      padding: .72rem;
+      border-bottom: 1.8px solid var(--line);
+      background:
+        radial-gradient(circle at 12% 14%, rgba(91, 73, 255, .13) 0 12%, transparent 13%),
+        radial-gradient(circle at 88% 14%, rgba(138, 92, 245, .08) 0 11%, transparent 12%),
+        linear-gradient(180deg, #fff, #f8f6ff);
+    }
+    .hero-art:last-child {
+      border-bottom: none;
+      border-top: 1.8px solid var(--line);
+      border-radius: 0 0 20px 20px;
+    }
+    .hero-art img {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(91, 73, 255, .20);
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(91, 73, 255, .08);
+    }
+    .hero-note {
+      padding: .72rem .80rem .84rem;
+      font-size: .76rem;
+      line-height: 1.62;
+      color: #4b4568;
+    }
+    .hero-note b { color: var(--accent-deep); }
+
+    /* === SECTION === */
+    .section {
+      margin-top: .78rem;
+      border: 2px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.90);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: .75rem;
+      padding: .82rem .92rem .68rem;
+      border-bottom: 1.8px solid var(--line);
+      background: linear-gradient(180deg, #fff, #faf8ff);
+    }
+    .section-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 950;
+      letter-spacing: -.02em;
+      color: var(--ink);
+    }
+    .section-sub {
+      font-size: .72rem;
+      color: var(--muted);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .section-body { padding: .92rem; }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .62rem;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .62rem;
+    }
+    .card {
+      border: 1.6px solid var(--line);
+      border-radius: 17px;
+      background: linear-gradient(180deg, #fff, var(--paper-soft));
+      box-shadow: var(--shadow-soft);
+      padding: .78rem .78rem .82rem;
+      min-height: 100%;
+    }
+    .mini-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .28rem;
+      padding: .20rem .52rem;
+      border-radius: 999px;
+      border: 1px solid rgba(91, 73, 255, .26);
+      background: var(--accent-soft);
+      color: var(--accent-deep);
+      font-size: .66rem;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .card h3 {
+      margin: .48rem 0 .36rem;
+      font-size: .96rem;
+      line-height: 1.26;
+      letter-spacing: -.02em;
+    }
+    .card p {
+      margin: 0;
+      color: #3e3a55;
+      font-size: .82rem;
+      line-height: 1.66;
+    }
+    .card ul {
+      margin: .38rem 0 0;
+      padding-left: 1.05rem;
+      color: #3e3a55;
+      font-size: .82rem;
+      line-height: 1.62;
+    }
+    .card li + li { margin-top: .24rem; }
+
+    .note {
+      margin-top: .64rem;
+      padding: .68rem .80rem;
+      border: 1.6px solid rgba(91, 73, 255, .20);
+      border-left: 4px solid var(--accent);
+      border-radius: 15px;
+      background: linear-gradient(180deg, rgba(138, 92, 245, .05), rgba(138, 92, 245, .02));
+      color: #352e4d;
+      font-size: .82rem;
+      line-height: 1.65;
+    }
+    .note strong { color: var(--accent-deep); }
+
+    .cmd-box {
+      margin-top: .55rem;
+      border-radius: 15px;
+      border: 1.6px solid rgba(91, 73, 255, .18);
+      background: #100b1f;
+      color: #f3f0ff;
+      padding: .68rem .75rem;
+      overflow-x: auto;
+      box-shadow: var(--shadow-soft);
+    }
+    .cmd-box pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: .76rem;
+      line-height: 1.55;
+    }
+    .cmd-box code { color: #e8deff; }
+
+    .flow-box {
+      margin-top: .62rem;
+      border: 1.8px solid var(--line);
+      border-radius: 17px;
+      background: linear-gradient(180deg, #fff, #f9f7ff);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .flow-header {
+      padding: .6rem .8rem;
+      background: linear-gradient(90deg, rgba(91, 73, 255, .08), rgba(138, 92, 245, .06));
+      border-bottom: 1.6px solid var(--line);
+      font-size: .70rem;
+      font-weight: 900;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--accent-deep);
+    }
+    .flow-body { padding: .78rem .85rem; }
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      font-size: .82rem;
+      line-height: 1.6;
+      color: #2e2a44;
+    }
+    .flow-row + .flow-row { margin-top: .44rem; }
+    .flow-step {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.4rem;
+      height: 1.4rem;
+      border-radius: 999px;
+      background: var(--accent-deep);
+      color: #fff;
+      font-size: .64rem;
+      font-weight: 950;
+      flex: 0 0 auto;
+    }
+    .flow-row code {
+      font-size: .74rem;
+      color: var(--accent-deep);
+      background: var(--accent-soft);
+      padding: .08rem .38rem;
+      border-radius: 6px;
+    }
+    .flow-arrow {
+      display: block;
+      text-align: center;
+      color: var(--accent);
+      font-size: 1.1rem;
+      line-height: 1;
+      margin: .22rem 0;
+    }
+
+    .compare-box {
+      margin-top: .62rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .62rem;
+    }
+    .compare-card {
+      border: 1.6px solid var(--line);
+      border-radius: 17px;
+      background: #fff;
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .compare-head {
+      padding: .58rem .72rem;
+      font-size: .72rem;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .compare-old .compare-head {
+      background: linear-gradient(90deg, rgba(200, 60, 60, .10), rgba(200, 60, 60, .05));
+      color: #a03030;
+      border-bottom: 1.6px solid rgba(200, 60, 60, .16);
+    }
+    .compare-new .compare-head {
+      background: linear-gradient(90deg, rgba(91, 73, 255, .12), rgba(91, 73, 255, .05));
+      color: var(--accent-deep);
+      border-bottom: 1.6px solid rgba(91, 73, 255, .18);
+    }
+    .compare-body { padding: .68rem .72rem; }
+    .compare-item {
+      display: flex;
+      gap: .38rem;
+      align-items: flex-start;
+      font-size: .78rem;
+      line-height: 1.58;
+      color: #3a3655;
+    }
+    .compare-item + .compare-item { margin-top: .38rem; }
+    .compare-icon { flex: 0 0 auto; font-size: .82rem; }
+    .compare-old .compare-icon { color: #e05050; }
+    .compare-new .compare-icon { color: var(--accent); }
+
+    .footer {
+      margin-top: .78rem;
+      border: 2px solid var(--line);
+      border-radius: 17px;
+      background: linear-gradient(180deg, #fff, #f8f6ff);
+      box-shadow: var(--shadow-soft);
+      padding: .74rem .82rem;
+      display: flex;
+      justify-content: space-between;
+      gap: .7rem;
+      flex-wrap: wrap;
+      font-size: .72rem;
+      color: var(--muted);
+    }
+    .footer b { color: var(--ink); }
+    .footer a { word-break: break-all; }
+
+    @media (min-width: 780px) { html { font-size: 16px; } }
+    @media (max-width: 720px) {
+      .page { padding: .54rem .54rem 1.4rem; }
+      .hero-body, .grid-3, .grid-2, .compare-box { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .section-head { align-items: start; flex-direction: column; }
+      .hero-strip { padding: .66rem .70rem; }
+      .hero-body { padding: .76rem; }
+      .section-body { padding: .76rem; }
+      .card h3 { font-size: .94rem; }
+      .card p, .card ul { font-size: .80rem; }
+      .subtitle { font-size: .90rem; }
+      .footer { padding: .68rem .76rem; }
+    }
+    @media (max-width: 400px) {
+      .metrics { grid-template-columns: 1fr; }
+      h1 { font-size: 1.78rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-strip">
+        <div class="brand"><span class="dot"></span> WHITE / PURPLE WORKBENCH</div>
+        <div class="hero-date">2026-06-18 · Hermes Agent Bundled Skill</div>
+      </div>
+
+      <div class="hero-body">
+        <div>
+          <div class="kicker">Hermes Agent · Research Skill</div>
+          <h1>把知识库变成<span class="accent">可积累</span>、可引用的 Markdown 网络</h1>
+          <p class="subtitle">
+            <b>LLM Wiki</b> 是 Hermes Agent 内置的知识积累技能：把一次性对话、报告、论文和文档转成三层结构的 Markdown 知识库，让 AI Agent 能够持续引用、更新和交叉推理，而不是每次都从零 RAG。
+          </p>
+          <div class="highlight-row">
+            <span class="tag"><strong>RAG</strong> 替代方案</span>
+            <span class="tag"><strong>三层架构</strong></span>
+            <span class="tag"><strong>交叉引用</strong></span>
+            <span class="tag"><strong>不可变源</strong></span>
+            <span class="tag"><strong>Karpathy</strong> 模式</span>
+            <span class="tag"><strong>自进化</strong></span>
+          </div>
+          <div class="metrics">
+            <div class="metric">
+              <span class="metric-k">分类</span>
+              <span class="metric-v">Research</span>
+              <span class="metric-t">Hermes 内置六类 Skill 之一，定位知识积累。</span>
+            </div>
+            <div class="metric">
+              <span class="metric-k">架构</span>
+              <span class="metric-v">3 层</span>
+              <span class="metric-t">Raw → Wiki → Schema，职责清晰，不可混用。</span>
+            </div>
+            <div class="metric">
+              <span class="metric-k">操作</span>
+              <span class="metric-v">3 类</span>
+              <span class="metric-t">Ingest / Query / Lint，覆盖知识摄入到维护全链路。</span>
+            </div>
+            <div class="metric">
+              <span class="metric-k">来源</span>
+              <span class="metric-v">Doc</span>
+              <span class="metric-t">hermes-agent.nousresearch.com 官方文档。</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-panel">
+          <div class="hero-art">
+            <img src="assets/images/20260618-llm-wiki-skill/wiki-arch.svg" alt="LLM Wiki 三层架构图" />
+          </div>
+          <div class="hero-note">
+            LLM Wiki 把传统 RAG 的"每次查询重新检索"变成了"一次性整理、持续引用"：<b>Wiki 编译一次，跨次对话都能用</b>，而且知识之间天然有交叉链接，矛盾在摄入时就已经被标记。
+          </div>
+          <div class="hero-art">
+            <img src="assets/images/20260618-llm-wiki-skill/wiki-ops.svg" alt="LLM Wiki 三操作流程" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- WHY NOT RAG -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">为什么不是 RAG：一次性整理 vs. 每次从零检索</h2>
+        <div class="section-sub">LLM Wiki 核心差异</div>
+      </div>
+      <div class="section-body">
+        <div class="compare-box">
+          <div class="compare-card compare-old">
+            <div class="compare-head">传统 RAG</div>
+            <div class="compare-body">
+              <div class="compare-item"><span class="compare-icon">✗</span>每次查询都重新从原始语料检索</div>
+              <div class="compare-item"><span class="compare-icon">✗</span>检索结果之间没有链接，推理链断裂</div>
+              <div class="compare-item"><span class="compare-icon">✗</span>矛盾内容被重复检索，Agent 难以判断优先级</div>
+              <div class="compare-item"><span class="compare-icon">✗</span>同一知识点在多个上下文中被重复处理</div>
+              <div class="compare-item"><span class="compare-icon">✗</span>检索质量依赖切分策略，不稳定</div>
+            </div>
+          </div>
+          <div class="compare-card compare-new">
+            <div class="compare-head">LLM Wiki</div>
+            <div class="compare-body">
+              <div class="compare-item"><span class="compare-icon">✓</span>知识一次性整理进 Wiki，后续直接引用已有页面</div>
+              <div class="compare-item"><span class="compare-icon">✓</span>交叉链接([[wikilink]])天然存在，推理链完整</div>
+              <div class="compare-item"><span class="compare-icon">✓</span>矛盾在摄入时被标记，Wiki 里已有处理结论</div>
+              <div class="compare-item"><span class="compare-icon">✓</span>新知识追加/更新，Wiki 页面长期累积</div>
+              <div class="compare-item"><span class="compare-icon">✓</span>结构由 Schema 约束，LLM 和人类共同维护</div>
+            </div>
+          </div>
+        </div>
+        <div class="note">
+          <strong>本质区别：</strong>RAG 是"搜索引擎"，Wiki 是"可编辑的参考书"。RAG 每次都在重新搜索，Wiki 已经在正确的位置写好了答案。
+        </div>
+      </div>
+    </section>
+
+    <!-- THREE LAYER -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">三层架构：每层职责清晰，不可跨层操作</h2>
+        <div class="section-sub">Raw → Wiki → Schema</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="mini-kicker">Layer 1</div>
+            <h3>Raw Sources · 不可变原始层</h3>
+            <p>存放原始文章、论文、图片、数据文件。Agent 只读不改，通过 <code>sha256</code> 检测内容漂移。</p>
+            <ul>
+              <li>位置：<code>~/wiki/raw/</code></li>
+              <li>不可变 — LLM 只读不改</li>
+              <li>有 frontmatter：source_url、ingested、sha256</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">Layer 2</div>
+            <h3>Wiki Pages · Agent 知识层</h3>
+            <p>LLM 拥有和维护的 Markdown 页面：实体、概念、比较、查询、综述。人类阅读，LLM 编写。</p>
+            <ul>
+              <li>位置：<code>~/wiki/entities/</code> 等</li>
+              <li>用 YAML frontmatter 搜索和过滤</li>
+              <li>用 <code>[[wikilink]]</code> 交叉引用</li>
+              <li>至少 2 个出站链接</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">Layer 3</div>
+            <h3>Schema Config · 约定配置层</h3>
+            <p>SCHEMA.md 定义工作流程、标签分类、页面阈值和更新策略，是整个 Wiki 的宪法。</p>
+            <ul>
+              <li>位置：<code>~/wiki/SCHEMA.md</code></li>
+              <li>定义 frontmatter 格式</li>
+              <li>定义标签分类法</li>
+              <li>定义页面何时创建/分割/归档</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note">
+          <strong>分工原则：</strong>人类负责策展来源、引导分析方向；Agent 负责总结、交叉引用、归档和维护一致性。<strong>永远不要修改 raw/ 层文件</strong>，纠正信息直接写在 Wiki 页面里。
+        </div>
+      </div>
+    </section>
+
+    <!-- CORE OPERATIONS -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">三个核心操作：从摄入到维护的全链路</h2>
+        <div class="section-sub">Ingest · Query · Lint</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="mini-kicker">01 Ingest</div>
+            <h3>把外部来源摄入进 Wiki</h3>
+            <p>URL → markdown 保存到 raw/ → 讨论要点 → 检查现有页面 → 写/更新 Wiki 页面 → 更新 index.md 和 log.md。</p>
+            <div class="cmd-box"><pre><code>web_extract → raw/articles/*.md
+写入 frontmatter（source_url/ingested/sha256）
+写 [[概念页]] / [[实体页]]
+更新 index.md + log.md</code></pre></div>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">02 Query</div>
+            <h3>在 Wiki 里查找并回答问题</h3>
+            <p>读 index.md → 搜索相关页面 → 读取页面内容 → 综合答案 → 按需写回 queries/ 或 comparisons/。</p>
+            <div class="cmd-box"><pre><code>读 index.md → search_files *.md
+读相关页面 → 综合答案
+如需持久化 → queries/*.md</code></pre></div>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">03 Lint</div>
+            <h3>定期检查 Wiki 健康状态</h3>
+            <p>孤立页面 → 失效链接 → Index 完整性 → frontmatter 校验 → 过期内容 → 矛盾标记 → 标签审核。</p>
+            <ul>
+              <li>孤立页面（无 inbound wikilink）</li>
+              <li>指向不存在页面的 wikilink</li>
+              <li>超过 200 行的页面（需拆分）</li>
+              <li>90 天以上未更新的过期页面</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- USAGE FLOW -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">从零启动：初始化 → 首次摄入 → 持续使用</h2>
+        <div class="section-sub">实操路径</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div class="flow-box">
+            <div class="flow-header">Step 1 · 确定路径</div>
+            <div class="flow-body">
+              <div class="flow-row"><span class="flow-step">1</span> 设置 <code>WIKI_PATH</code> 环境变量（如 <code>~/.hermes/wiki</code>）</div>
+              <div class="flow-row"><span class="flow-step">2</span> 创建目录结构：raw/、entities/、concepts/、comparisons/、queries/</div>
+            </div>
+          </div>
+          <div class="flow-box">
+            <div class="flow-header">Step 2 · 初始化 Schema</div>
+            <div class="flow-body">
+              <div class="flow-row"><span class="flow-step">1</span> 写 <code>SCHEMA.md</code>（标签分类、frontmatter 格式、页面阈值）</div>
+              <div class="flow-row"><span class="flow-step">2</span> 写 <code>index.md</code>（sectioned 目录）</div>
+              <div class="flow-row"><span class="flow-step">3</span> 写 <code>log.md</code>（append-only 操作记录）</div>
+            </div>
+          </div>
+          <div class="flow-box">
+            <div class="flow-header">Step 3 · 首次摄入</div>
+            <div class="flow-body">
+              <div class="flow-row"><span class="flow-step">1</span> 读 SCHEMA.md + index.md + 最近 log.md 做 Orientation</div>
+              <div class="flow-row"><span class="flow-step">2</span> 用 web_extract 获取 URL 内容，写入 <code>raw/articles/</code></div>
+              <div class="flow-row"><span class="flow-step">3</span> 检查现有页面避免重复，写/更新概念/实体页面</div>
+              <div class="flow-row"><span class="flow-step">4</span> 每页至少 2 个 <code>[[wikilink]]</code>，末尾加 <code>^[raw/...]</code> 出处标记</div>
+              <div class="flow-row"><span class="flow-step">5</span> 更新 index.md 总页数，更新 log.md</div>
+            </div>
+          </div>
+          <div class="flow-box">
+            <div class="flow-header">Step 4 · 与 Hermes 协同</div>
+            <div class="flow-body">
+              <div class="flow-row"><span class="flow-step">1</span> 在 Hermes 对话中说"把 XXX 写入 wiki"，触发 Ingest 操作</div>
+              <div class="flow-row"><span class="flow-step">2</span> 问"wiki 里关于 XXX 有什么"，触发 Query 操作</div>
+              <div class="flow-row"><span class="flow-step">3</span> 问"检查 wiki 健康状态"，触发 Lint 操作</div>
+              <div class="flow-row"><span class="flow-step">4</span> 可用 Obsidian 打开同一目录做图形化浏览和 Graph View</div>
+            </div>
+          </div>
+        </div>
+        <div class="note">
+          <strong>Obsidian 协同：</strong>Wiki 目录本身就是 Obsidian Vault。<code>[[wikilink]]</code> 自动渲染，Graph View 可视化知识网络，Dataview 插件支持 SQL 风格查询。<strong>在多台设备上用 Obsidian Sync 同步</strong>，Agent 写 Wiki，你在 Obsidian 里看。
+        </div>
+      </div>
+    </section>
+
+    <!-- KEY FEATURES -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">与记忆/skill 的边界：Wiki 在哪里</h2>
+        <div class="section-sub">各司其职</div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="mini-kicker">短期</div>
+            <h3>session_search · 恢复对话上下文</h3>
+            <p>查找过去说了什么、任务停在哪里、历史会话的中间状态。适合"上次那个调研结果在哪"。</p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">中期</div>
+            <h3>memory · 存储用户偏好和短期事实</h3>
+            <p>记"用户喜欢什么格式"、"项目用 pytest 而不是 unittest"这类可被下次对话直接引用的结构化偏好。</p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">长期</div>
+            <h3>skills · 存储可复用工作流程</h3>
+            <p>把"如何调查 X"这类程序性知识写成 Skill，下次同类任务直接调用而不重新描述。</p>
+          </div>
+          <div class="card">
+            <div class="mini-kicker">知识积累</div>
+            <h3>LLM Wiki · 知识网络</h3>
+            <p>论文结论、人物档案、概念解析、比较分析、舆情调研 — 大型、结构化、需要交叉引用的知识资产，不适合放在记忆里。</p>
+          </div>
+        </div>
+        <div class="note">
+          <strong>关键认知：</strong>LLM Wiki 不是"聊天记录同步"。prior sessions 是 Wiki 的 <strong>来源之一</strong>，但 Wiki 本身是经过整理、交叉引用、矛盾已标记的知识资产。把原始对话直接倒进 Wiki 是浪费，策展后写入才有价值。
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div><b>Source</b> · Hermes Agent 官方文档 · <a href="https://hermes-agent.nousresearch.com/docs/user-guide/skills/bundled/research/research-llm-wiki">hermes-agent.nousresearch.com</a></div>
+      <div><b>Style</b> · infocard-white-purple-style · 白底 / 紫色强调 / 轻玻璃科技感</div>
+    </footer>
+  </main>
+</body>
+</html>
