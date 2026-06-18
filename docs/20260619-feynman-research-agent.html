@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f1e8">
+  <title>Feynman：开源 AI research agent，把研究流程打包成工作台</title>
+  <style>
+    :root{
+      --bg:#f5f1e8;
+      --paper:#fffdf8;
+      --paper-2:#f9f7f0;
+      --ink:#111111;
+      --ink-soft:#2b2722;
+      --muted:#625b52;
+      --line:#151515;
+      --grid:rgba(17,17,17,.08);
+      --accent:#0d9668;
+      --accent-2:#0c7b56;
+      --warm:#f3d8a8;
+      --warn:#c83a2a;
+      --blue:#2058d4;
+      --max:1200px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0)),
+        repeating-linear-gradient(0deg, transparent 0 23px, var(--grid) 23px 24px),
+        repeating-linear-gradient(90deg, transparent 0 23px, var(--grid) 23px 24px),
+        var(--bg);
+      color:var(--ink);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+      line-height:1.68;
+      text-rendering:optimizeLegibility;
+    }
+    a{color:inherit;text-decoration:none}
+    code,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .page{width:min(var(--max),calc(100% - 28px));margin:0 auto;padding:18px 0 72px}
+    .shell{display:grid;gap:14px}
+    .box{
+      background:var(--paper);
+      border:2.5px solid var(--line);
+      box-shadow:6px 6px 0 rgba(17,17,17,.16);
+      position:relative;
+    }
+    .ribbon{
+      display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;
+      padding:10px 14px;background:#111;color:#fff;
+      font:800 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;
+      letter-spacing:.08em;text-transform:uppercase;
+    }
+    .ribbon .dot{display:inline-block;width:10px;height:10px;background:var(--accent);margin-right:8px;vertical-align:middle}
+    .hero{
+      padding:16px;
+      display:grid;
+      grid-template-columns:420px minmax(0,1fr);
+      gap:16px;
+      align-items:start;
+    }
+    .hero-media{overflow:hidden;background:#fff}
+    .hero-media img{display:block;width:100%;height:auto}
+    .hero-copy{padding:2px 2px 0}
+    .kicker{display:inline-flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+    .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1.5px solid var(--line);background:#fff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
+    h1{margin:0 0 10px;font-size:clamp(30px,4.7vw,56px);line-height:.96;letter-spacing:-.04em}
+    .lead{margin:0 0 12px;font-size:14.5px;line-height:1.78;color:var(--ink-soft);max-width:700px}
+    .lead b{color:#000}
+    .stats{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+    .stats span{padding:5px 8px;background:var(--paper-2);border:1.5px solid var(--line);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em}
+    .stats .hot{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+    .node{padding:9px 10px;background:#fff;border:1.5px solid var(--line)}
+    .node .n{display:block;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+    .node b{display:block;font-size:12.8px;line-height:1.3;color:var(--ink)}
+    .node p{margin:5px 0 0;font-size:11.8px;line-height:1.5;color:var(--muted)}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .section{padding:14px}
+    .section h2{margin:0 0 10px;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .section .sub{margin:0 0 10px;font-size:12px;line-height:1.5;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
+    .cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .mini{padding:10px 11px;background:#fff;border:1.5px solid var(--line)}
+    .mini h3{margin:0 0 6px;font-size:14px;line-height:1.25}
+    .mini p{margin:0;font-size:12.5px;line-height:1.65;color:var(--ink-soft)}
+    .code{padding:10px 11px;background:#101010;color:#f3efe7;border:1.5px solid var(--line);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;font-size:11.8px;line-height:1.52}
+    .code small{color:#d4cbbf}
+    .callouts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .call{padding:10px 11px;background:#fff;border:1.5px solid var(--line)}
+    .call b{display:block;margin-bottom:5px;font-size:13px;line-height:1.3}
+    .call p{margin:0;font-size:12.2px;line-height:1.6;color:var(--ink-soft)}
+    .skills{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .skill{padding:10px 11px;background:#fff;border:1.5px solid var(--line);min-height:104px}
+    .skill .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:6px}
+    .skill .top b{font-size:13px;line-height:1.25}
+    .skill .top span{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);letter-spacing:.06em;text-transform:uppercase}
+    .skill p{margin:0;font-size:12px;line-height:1.6;color:var(--ink-soft)}
+    .table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse;font-size:12.4px;line-height:1.55}
+    th,td{border:1.5px solid var(--line);padding:8px 9px;vertical-align:top;text-align:left}
+    th{background:#111;color:#fff;font:800 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
+    td:first-child{background:var(--paper-2);font-weight:800;white-space:nowrap}
+    .note{padding:12px 14px;background:#fff7e4;border-left:6px solid var(--warn)}
+    .note b{color:var(--warn)}
+    .footer{padding:11px 14px;background:var(--paper-2);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+    .footer code{color:var(--ink)}
+    @media(max-width:1080px){
+      .hero,.grid-2{grid-template-columns:1fr}
+      .flow,.skills,.callouts,.cols{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 16px,var(--max));padding:10px 0 28px}
+      .ribbon{font-size:10px;padding:9px 11px}
+      .hero{padding:12px}
+      h1{font-size:clamp(27px,9vw,42px)}
+      .flow,.skills,.callouts,.cols{grid-template-columns:1fr}
+      .section{padding:12px}
+      .footer{flex-direction:column;align-items:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <main class="page shell">
+    <div class="ribbon box">
+      <div><span class="dot"></span>infocard-graph-paper-style · Feynman · open source AI research agent</div>
+      <div>companion-inc/feynman · TypeScript · 7.9k★</div>
+    </div>
+
+    <section class="hero box">
+      <div class="hero-media box" style="box-shadow:none;border-width:1.5px">
+        <img src="./assets/images/20260619-feynman-research-agent/hero.png" alt="Feynman CLI hero" loading="eager">
+      </div>
+      <div class="hero-copy">
+        <div class="kicker">
+          <span class="tag">research agent</span>
+          <span class="tag">skills bundle</span>
+          <span class="tag">standalone app</span>
+          <span class="tag">repo-local install</span>
+        </div>
+        <h1>Feynman：把研究流程打包成<br>可安装的研究工作台</h1>
+        <p class="lead"><b>Feynman</b> 不是单个命令，而是一套面向研究任务的工作台：既有独立终端应用，也有可单独安装的 skills-only 路径。它把文献综述、来源比对、同行评审、实验复现、训练 recipe、持续 watch 这些研究动作，统一成可复用的命令与技能包。</p>
+        <div class="stats">
+          <span class="hot">20 skills</span>
+          <span>13 prompts</span>
+          <span>macOS / Linux / Windows</span>
+          <span>LM Studio / LiteLLM / Ollama / vLLM</span>
+          <span>standalone bundle</span>
+        </div>
+        <div class="flow">
+          <div class="node"><span class="n">step 1</span><b>输入问题</b><p>`feynman "what do we know about scaling laws"`</p></div>
+          <div class="node"><span class="n">step 2</span><b>并行搜索</b><p>paper / web / code / notes / outputs 协同查证</p></div>
+          <div class="node"><span class="n">step 3</span><b>结构化合成</b><p>brief, lit, audit, review, recipe, replicate</p></div>
+          <div class="node"><span class="n">step 4</span><b>产出可复用工件</b><p>artifact + skills + prompts + logs</p></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid-2">
+      <section class="section box">
+        <div class="sub">two access paths</div>
+        <h2>双入口：整机应用 / 仅技能包</h2>
+        <div class="cols">
+          <div class="mini">
+            <h3>完整应用</h3>
+            <p>下载独立 bundle，内置自己的 Node runtime 和环境管理。适合直接跑研究任务、会话、输出与本地模型配置。</p>
+            <div class="code">curl -fsSL https://feynman.is/install | bash
+
+# pin 版本
+curl -fsSL https://feynman.is/install | bash -s -- 0.2.35</div>
+          </div>
+          <div class="mini">
+            <h3>Skills only</h3>
+            <p>只装技能树，不装 terminal app。支持 Codex / Repo / OpenCode 三种投放位，适合把研究能力注入现有 agent。</p>
+            <div class="code">curl -fsSL https://feynman.is/install-skills | bash
+
+# repo-local
+curl -fsSL https://feynman.is/install-skills | bash -s -- --repo</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section box">
+        <div class="sub">command atlas</div>
+        <h2>你输入什么，系统怎么接住</h2>
+        <div class="callouts">
+          <div class="call"><b>/deepresearch</b><p>多代理并行研究 + 证据汇总，适合深挖一个主题。</p></div>
+          <div class="call"><b>/lit</b><p>文献综述式输出：共识、分歧、开放问题、引用链。</p></div>
+          <div class="call"><b>/audit /review /replicate</b><p>论文 vs 代码审计、模拟同行评审、实验复现与修正计划。</p></div>
+        </div>
+        <div style="margin-top:10px" class="callouts">
+          <div class="call"><b>/recipe /compare /draft</b><p>训练 recipe、主题对比、论文风草稿，把研究结果变成可执行方案。</p></div>
+          <div class="call"><b>/watch /outputs</b><p>持续监控主题，查看所有研究工件与历史输出。</p></div>
+          <div class="call"><b>CLI examples</b><p>`feynman`, `feynman deepresearch`, `feynman lit`, `feynman audit`。</p></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid-2">
+      <section class="section box">
+        <div class="sub">skill matrix</div>
+        <h2>20 个技能，13 个 prompts，按研究任务分层</h2>
+        <div class="skills">
+          <div class="skill"><div class="top"><b>研究发现</b><span>search</span></div><p>deep-research、literature-review、source-comparison、watch、session-search。</p></div>
+          <div class="skill"><div class="top"><b>论文工件</b><span>paper</span></div><p>paper-writing、paper-code-audit、peer-review、replication、autoresearch。</p></div>
+          <div class="skill"><div class="top"><b>写作输出</b><span>draft</span></div><p>draft、summarize、compare、recipe、jobs，生成可直接交付的研究文本。</p></div>
+          <div class="skill"><div class="top"><b>运行环境</b><span>compute</span></div><p>modal-compute、runpod-compute、docker、preview，把研究跑到可执行的基础设施上。</p></div>
+        </div>
+      </section>
+
+      <section class="section box">
+        <div class="sub">model and infra</div>
+        <h2>本地模型与环境接入，不只是一层 CLI</h2>
+        <table>
+          <thead>
+            <tr><th>维度</th><th>事实</th><th>意义</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>模型接入</td><td>LM Studio / LiteLLM Proxy / Ollama / vLLM</td><td>能接本地或自建 OpenAI-compatible 端点。</td></tr>
+            <tr><td>应用形态</td><td>standalone bundle + 自带 Node runtime</td><td>安装后就是一个完整研究工作台，而不是单脚本。</td></tr>
+            <tr><td>技能投放</td><td>Codex / Repo / OpenCode / current repo-local</td><td>研究能力可以注入现有 agent 环境。</td></tr>
+            <tr><td>仓库资产</td><td>AGENTS.md / skills-lock.json / prompts / website / tests</td><td>说明它是“流程包”，不是单纯的工具库。</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <section class="section box">
+      <div class="sub">why it matters</div>
+      <h2>这份仓库的核心不是“研究助手”，而是“研究流程系统”</h2>
+      <div class="callouts">
+        <div class="call"><b>输出导向</b><p>不是把答案发散成聊天，而是生成 brief、review、audit、recipe、replicate 这类可用工件。</p></div>
+        <div class="call"><b>边界清楚</b><p>README 把 app 安装和 skills-only 安装分开，适配不同 agent 运行时。</p></div>
+        <div class="call"><b>可组合</b><p>命令、skills、prompts、outputs 分层明确，适合复用、变体和二次集成。</p></div>
+      </div>
+    </section>
+
+    <div class="note box">
+      <b>适用结论</b>：Feynman 更像一个<b>研究工作台发行包</b>，而不是单一研究脚本。
+      如果要给它做信息卡，重点应放在“研究流程如何被打包、如何被安装、如何被复用、如何被验证”，而不是只写“一个 AI agent”。
+    </div>
+
+    <div class="footer box">
+      <div>source · <code>https://github.com/companion-inc/feynman</code> · <code>https://feynman.is</code></div>
+      <div>theme · <code>infocard-graph-paper-style</code> · card slug: <code>20260619-feynman-research-agent</code></div>
+    </div>
+  </main>
+</body>
+</html>
