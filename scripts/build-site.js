@@ -3,15 +3,15 @@ const { execFileSync } = require("child_process");
 const path = require("path");
 const { buildIndexData, runFixMetaDate, writeGeneratedArtifacts } = require("./index-build-lib");
 
-function runQuoteMetaDates() {
-  // Auto-quote bare wall-clock date/updated values before the build's strict
-  // assertion runs. Keeps "must be quoted strings" out of the human's hands.
-  const script = path.join(__dirname, "quote-meta-dates.js");
+function runFixMetaShape() {
+  // Normalize mechanical meta shape before strict index validation:
+  // date/updated quotes, description->desc, safe path correction.
+  const script = path.join(__dirname, "fix-meta-shape.js");
   execFileSync(process.execPath, [script, "--write"], { stdio: "inherit" });
 }
 
 function main() {
-  runQuoteMetaDates();
+  runFixMetaShape();
   runFixMetaDate();
   const indexData = buildIndexData();
   writeGeneratedArtifacts(indexData);
