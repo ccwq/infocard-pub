@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Yao Interpreter Skill：把已有 Agent Skill 解读成证据化审计报告</title>
+  <meta name="description" content="Yao Interpreter Skill 用静态分析读取本地 Skill 目录、SKILL.md 或安全 zip 归档，不执行目标脚本，输出中文优先的 HTML/JSON/Markdown 审计报告，给出 100 分评分、风险审查、使用指导和改进路线图。">
+  <style>
+    :root{
+      --bg:#f7f8fa;--paper:#fff;--ink:#0b0d12;--muted:#68717d;--faint:#aeb6c2;
+      --line:#e3e7ed;--line-strong:#cdd5df;--blue:#001a72;--blue2:#4b73bd;--blue3:#9db3dd;
+      --soft:#f6f8fb;--soft-blue:#eef4ff;--black:#05070a;--green:#0a7b4f;--red:#b42318;
+    }
+    *{box-sizing:border-box} html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+    body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:13px;line-height:1.64}
+    a{color:inherit;text-decoration:none} img{max-width:100%;display:block}
+    .page{width:min(1180px,calc(100% - 24px));margin:0 auto;padding:18px 0 72px}
+    .sheet{background:var(--paper);box-shadow:0 18px 54px rgba(20,35,60,.08);padding:18px}
+    .topline{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:800}
+    .brand{display:flex;align-items:center;gap:10px;color:var(--ink)} .brand:before{content:"";display:inline-block;width:22px;height:6px;background:var(--blue)}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);gap:18px;align-items:stretch;margin-bottom:18px}
+    .hero-copy{display:grid;align-content:space-between;gap:24px;min-height:360px}
+    .kicker{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+    h1{font-size:clamp(42px,7.8vw,92px);line-height:.9;letter-spacing:-.075em;margin:0;color:var(--ink);font-weight:900}
+    .lead{max-width:66ch;color:var(--muted);font-size:16px;line-height:1.72;margin:16px 0 0}
+    .hero-pills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .hero-pill{padding:13px 14px;border-right:1px solid var(--line)} .hero-pill:last-child{border-right:0}
+    .mini-bar{width:34px;height:5px;background:var(--blue);margin-bottom:12px}
+    .hero-pill b{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}
+    .hero-pill span{font-size:12.5px;color:var(--muted);line-height:1.45}
+    .blue-block{background:var(--blue);color:#fff;min-height:360px;padding:22px;display:grid;align-content:space-between;position:relative;overflow:hidden}
+    .blue-block:after{content:"";position:absolute;inset:auto -16px -16px auto;width:120px;height:120px;border:1px solid rgba(255,255,255,.18);transform:rotate(15deg)}
+    .blue-block .label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:850;color:rgba(255,255,255,.75);position:relative;z-index:1}
+    .blue-block .big{font-size:clamp(76px,12vw,150px);line-height:.82;letter-spacing:-.085em;font-weight:900;position:relative;z-index:1}
+    .blue-block .caption{max-width:34ch;font-size:15px;color:rgba(255,255,255,.82);line-height:1.55;position:relative;z-index:1}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .panel{background:var(--paper);padding:18px;display:grid;gap:14px;min-width:0}.panel.gray{background:var(--soft)}.panel.black{background:var(--black);color:#fff}
+    .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px}.panel.black .head{border-color:rgba(255,255,255,.18)}
+    .label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:900;line-height:1.25}.page-no{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:800;white-space:nowrap}
+    .panel h2{font-size:clamp(21px,2.5vw,34px);line-height:1.02;letter-spacing:-.055em;margin:0;font-weight:900}
+    .panel p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.7}.panel.black p{color:rgba(255,255,255,.72)}
+    .metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .metric{background:#fff;border:1px solid var(--line);padding:13px;min-height:118px;display:grid;align-content:space-between}
+    .metric strong{font-size:42px;line-height:.9;letter-spacing:-.06em;color:var(--ink)} .metric span{font-size:10.5px;color:var(--muted);font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+    .bar{height:8px;background:var(--line);margin-top:13px;overflow:hidden}.bar i{display:block;height:100%;background:var(--blue)}
+    .feature{background:var(--soft);padding:14px;border:1px solid var(--line);display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:start}.feature+.feature{margin-top:10px}.feature.dark{background:var(--black);color:#fff;border-color:var(--black)}
+    .feature .num{font-size:30px;line-height:1;letter-spacing:-.04em;font-weight:900;color:var(--blue)}.feature.dark .num{color:#fff}.feature b{display:block;margin-bottom:4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase}.feature.dark p{color:rgba(255,255,255,.72)}
+    .list{display:grid;gap:10px}.list-item{display:grid;grid-template-columns:56px 1fr 34px;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}.list-item:last-child{border-bottom:0;padding-bottom:0}
+    .list-item strong{font-size:26px;line-height:1;letter-spacing:-.055em;color:var(--blue)} .list-item b{display:block;font-size:14px;line-height:1.2}.list-item span{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.45}
+    .icon{width:30px;height:30px;border:1px solid var(--line-strong);display:grid;place-items:center;color:var(--blue);font-weight:900;font-size:14px}
+    .wide{display:grid;grid-template-columns:1.15fr .85fr;gap:14px;margin-top:14px}
+    .chart-card,.note-panel,.code-card{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;min-width:0}
+    .note-panel{background:var(--soft-blue);border:1px solid #d7e6ff;align-content:space-between;gap:18px}.note-panel .big{font-size:56px;line-height:.92;font-weight:900;letter-spacing:-.07em;color:var(--blue)}
+    .cmd{font-family:'Fira Code','Cascadia Code',monospace;font-size:12.5px;background:var(--soft);border:1px solid var(--line);padding:14px 16px;color:var(--ink);white-space:pre-wrap;overflow-x:auto;line-height:1.7;margin:0;border-radius:2px}
+    .meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.meta-box{background:#fff;border:1px solid var(--line);padding:13px;display:grid;gap:8px;min-height:94px}.meta-box b{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}.meta-box span{font-size:13px;line-height:1.5;color:var(--muted)}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .footer{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:800}
+    @media(max-width:980px){.hero,.wide{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}.hero-copy{min-height:auto}.blue-block{min-height:260px}.metric-grid,.meta-grid,.two-col{grid-template-columns:1fr 1fr}}
+    @media(max-width:720px){.page{width:min(100%,calc(100% - 14px));padding:10px 0 60px}.sheet{padding:12px}.topline,.footer{align-items:flex-start;flex-direction:column}.grid3,.metric-grid,.hero-pills,.meta-grid,.two-col{grid-template-columns:1fr}.hero-pill{border-right:0;border-bottom:1px solid var(--line)}.hero-pill:last-child{border-bottom:0}h1{font-size:45px}.lead{font-size:14px}.blue-block .big{font-size:84px}.panel,.chart-card,.note-panel,.code-card{padding:14px}.feature{grid-template-columns:1fr}.list-item{grid-template-columns:48px 1fr 28px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="sheet">
+      <div class="topline">
+        <div class="brand">Yao Open Skills · GitHub Skill 卡</div>
+        <div>2026.06.18 · SOURCE: yaojingang/yao-open-skills/skills/yao-interpreter-skill</div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div>
+            <div class="kicker">Skill 解释器 · 静态审计报告</div>
+            <h1>Yao Interpreter Skill</h1>
+            <p class="lead">这不是一个“执行 Skill”的工具，而是一个“解读已有 Skill”的解释器：把本地 Skill 目录、单个 <code>SKILL.md</code> 或安全 zip 归档当作不可信输入，做静态分析、证据链评分、风险审查和使用指导，最后输出中文优先、可切中英的 HTML 审计报告。</p>
+          </div>
+          <div class="hero-pills">
+            <div class="hero-pill"><div class="mini-bar"></div><b>输入对象</b><span>本地 skill 目录、SKILL.md、或安全 zip 归档。</span></div>
+            <div class="hero-pill"><div class="mini-bar"></div><b>关键边界</b><span>不执行目标脚本、不安装依赖、不访问目标外部服务。</span></div>
+            <div class="hero-pill"><div class="mini-bar"></div><b>主要产物</b><span>HTML / JSON / findings / QA / summary 多文件证据包。</span></div>
+          </div>
+        </div>
+        <aside class="blue-block">
+          <div class="label">评分维度</div>
+          <div class="big">9</div>
+          <div class="caption">从规范兼容、触发信号、上下文效率、结构资源、使用就绪、安全权限、测试评估、维护发布、学习价值九个维度打满 100 分，并按红线规则降级推荐动作。</div>
+        </aside>
+      </section>
+
+      <section class="grid3">
+        <article class="panel">
+          <div class="head"><div class="label">一眼看懂</div><div class="page-no">PAGE 01</div></div>
+          <h2>这个 Skill 的公开信号</h2>
+          <div class="metric-grid">
+            <div class="metric"><div><strong>1189</strong><span>仓库 Stars</span></div><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="metric"><div><strong>0.1.0</strong><span>Skill 版本</span></div><div class="bar"><i style="width:42%"></i></div></div>
+            <div class="metric"><div><strong>5</strong><span>默认输出文件</span></div><div class="bar"><i style="width:60%"></i></div></div>
+          </div>
+        </article>
+
+        <article class="panel gray">
+          <div class="head"><div class="label">产品定义</div><div class="page-no">PAGE 02</div></div>
+          <h2>把 Skill 变成可审计的“可读资产”</h2>
+          <div>
+            <div class="feature"><div class="num">01</div><div><b>静态读取</b><p>读取目录、脚本、references、examples、schemas 和 manifest，但不把目标内容当成本轮指令执行。</p></div></div>
+            <div class="feature dark"><div class="num">02</div><div><b>证据评分</b><p>每个扣分项都要求回溯到文件、章节、行号、摘录或缺失证据，不做空口判断。</p></div></div>
+          </div>
+        </article>
+
+        <article class="panel black">
+          <div class="head"><div class="label">核心定位</div><div class="page-no">PAGE 03</div></div>
+          <h2>它是 Skill 解释器，不是 Skill 运行器</h2>
+          <p>Yao Interpreter Skill 最重要的边界是：目标 Skill 一律按不可信输入处理。它评估“这个 Skill 值不值得学、能不能用、风险在哪、如何改”，而不是帮你去跑目标 Skill 的脚本、安装器、测试或模型提示。</p>
+        </article>
+      </section>
+
+      <section class="grid3">
+        <article class="panel">
+          <div class="head"><div class="label">默认产物</div><div class="page-no">PAGE 04</div></div>
+          <h2>一次分析，给出 5 份主输出</h2>
+          <div class="list">
+            <div class="list-item"><strong>01</strong><div><b>report.zh-CN.html</b><span>中文主报告，右上角可切换简体 / EN。</span></div><div class="icon">中</div></div>
+            <div class="list-item"><strong>02</strong><div><b>analysis.json</b><span>结构化事实、指标、分数、摘要。</span></div><div class="icon">{ }</div></div>
+            <div class="list-item"><strong>03</strong><div><b>findings.json</b><span>风险、扣分项、建议和证据链。</span></div><div class="icon">!</div></div>
+            <div class="list-item"><strong>04</strong><div><b>qa_report.json</b><span>语言、链接、数字一致性与生成状态。</span></div><div class="icon">✓</div></div>
+            <div class="list-item"><strong>05</strong><div><b>summary.md</b><span>可贴进 PR 或文档库的轻量摘要。</span></div><div class="icon">MD</div></div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="head"><div class="label">输入边界</div><div class="page-no">PAGE 05</div></div>
+          <h2>支持三类输入载体</h2>
+          <div class="feature"><div class="num">A</div><div><b>Skill 目录</b><p>完整读取一个带 <code>SKILL.md</code> 的本地目录，梳理文件类型、目录结构和脚本线索。</p></div></div>
+          <div class="feature"><div class="num">B</div><div><b>单个 SKILL.md</b><p>只分析入口文件，适合快速理解触发契约与能力边界。</p></div></div>
+          <div class="feature"><div class="num">C</div><div><b>安全 zip</b><p>支持 zip，但会拒绝路径穿越、异常大文件和可疑符号链接。</p></div></div>
+        </article>
+
+        <article class="panel gray">
+          <div class="head"><div class="label">近邻路由</div><div class="page-no">PAGE 06</div></div>
+          <h2>它负责“解读”，不负责“创建”或“导出学习报告”</h2>
+          <p>仓库里已经明确写了近邻边界：创建或重构 Skill 应改用 <code>yao-meta-skill</code>；如果只是想导出 Word/PDF 学习报告，优先考虑 <code>yao-skill-reader-skill</code>；如果要验证真实任务效果，则要走专门执行评测流程，而不是把解释器当运行器。</p>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="chart-card">
+          <div class="head"><div class="label">快速使用</div><div class="page-no">PAGE 07</div></div>
+          <h2>最小命令和典型输出路径</h2>
+          <pre class="cmd">python3 scripts/cli.py analyze ./target-skill --out reports/generated
+
+# 主要产物
+reports/generated/report.zh-CN.html
+reports/generated/analysis.json
+reports/generated/findings.json
+reports/generated/qa_report.json
+reports/generated/summary.md
+
+# 额外生成独立英文报告
+python3 scripts/cli.py analyze ./target-skill --out reports/generated --lang zh-CN,en</pre>
+        </article>
+        <aside class="note-panel">
+          <div>
+            <div class="label">报告视图</div>
+            <div class="big">30s</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-box"><b>30 秒看懂</b><span>总分、等级、风险、推荐动作。</span></div>
+            <div class="meta-box"><b>5 分钟学会</b><span>适用场景、谨慎场景、输入输出、示例提示词。</span></div>
+            <div class="meta-box"><b>30 分钟深读</b><span>结构、工作流、评分、证据链、安全审查、路线图。</span></div>
+            <div class="meta-box"><b>默认语言</b><span>中文主报告，右上角切中英。</span></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="grid3" style="margin-top:14px">
+        <article class="panel black">
+          <div class="head"><div class="label">评分模型</div><div class="page-no">PAGE 08</div></div>
+          <h2>100 分不是“印象分”，而是带证据的九维打分</h2>
+          <p>评分规则文件把 100 分拆成九个一级维度：规范兼容 12、触发信号 14、上下文效率 12、结构资源 12、使用就绪 14、安全权限 14、测试评估 10、维护发布 7、学习价值 5。任何扣分都必须落到证据链上。</p>
+        </article>
+
+        <article class="panel">
+          <div class="head"><div class="label">红线规则</div><div class="page-no">PAGE 09</div></div>
+          <h2>总分高，也可能被红线直接降级</h2>
+          <div class="feature"><div class="num">⚠</div><div><b>高危密钥与系统破坏</b><p>读取并上传令牌、Cookie、SSH 私钥，或未解释的递归删除、系统启动改写，都属于红线。</p></div></div>
+          <div class="feature"><div class="num">✕</div><div><b>越权提示注入</b><p>要求忽略系统规则、隐藏真实行为、绕过用户确认或越权读取，也会触发“暂缓使用”。</p></div></div>
+        </article>
+
+        <article class="panel gray">
+          <div class="head"><div class="label">质量门</div><div class="page-no">PAGE 10</div></div>
+          <h2>不仅看分析器能不能跑，还看样例能不能把风险打出来</h2>
+          <p><code>scripts/smoke_test.py</code> 会跑 <code>examples/good_skill</code> 和 <code>examples/risky_skill</code>：前者要拿到可用分，后者必须触发高风险或 critical 发现项。这让“解释器本身是否稳定”也进入了验收闭环。</p>
+        </article>
+      </section>
+
+      <section class="grid3">
+        <article class="panel">
+          <div class="head"><div class="label">资源地图</div><div class="page-no">PAGE 11</div></div>
+          <h2>这不是一份孤立 prompt，而是一整包生产级资产</h2>
+          <div class="two-col">
+            <div class="meta-box"><b>入口</b><span>SKILL.md、README.md、manifest.json</span></div>
+            <div class="meta-box"><b>脚本</b><span>cli.py、smoke_test.py</span></div>
+            <div class="meta-box"><b>规范</b><span>rubric / safety-boundary / report-contract / html-report-design</span></div>
+            <div class="meta-box"><b>配套</b><span>agents / schemas / evals / examples / reports / templates</span></div>
+          </div>
+        </article>
+
+        <article class="panel gray">
+          <div class="head"><div class="label">设计语言</div><div class="page-no">PAGE 12</div></div>
+          <h2>它连报告 UI 都被规范化了</h2>
+          <p>参考文档不是只写“要出 HTML”，而是进一步规定了：白底高信任、顶部 sticky 状态栏、左侧目录、右侧指标栏、雷达图、热力图、donut、证据卡、提示词复制按钮，以及打印模式下要隐藏哪些交互控件。这意味着它不只是分析器，还是报告交付规范。</p>
+        </article>
+
+        <article class="panel">
+          <div class="head"><div class="label">最适合谁</div><div class="page-no">PAGE 13</div></div>
+          <h2>适合 Skill 准入、学习、团队审核，不适合当执行沙箱</h2>
+          <p>如果你面对的是一个来源不明或质量未知的 Agent Skill，想先判断值不值得采用、哪些地方危险、如何在团队里落地，那它很有价值；如果你想的是“帮我跑起来看看”，那它故意不做。</p>
+        </article>
+      </section>
+
+      <footer class="footer">
+        <div>SOURCE · https://github.com/yaojingang/yao-open-skills/tree/main/skills/yao-interpreter-skill · captured 2026-06-18</div>
+        <div>STYLE · infocard-bigwhite-style · YAO INTERPRETER SKILL</div>
+      </footer>
+    </div>
+  </main>
+</body>
+</html>
