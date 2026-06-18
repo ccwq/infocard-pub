@@ -65,7 +65,10 @@ function formatLocalDate(dateValue) {
 function normalizeDateValue(value) {
   if (value == null) return value;
   if (value instanceof Date) {
-    return formatLocalDate(value);
+    // JS-YAML may coerce bare YAML timestamps into Date objects.
+    // We keep those as wall-clock strings by reading the UTC fields directly
+    // instead of applying an extra timezone shift.
+    return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")} ${String(value.getUTCHours()).padStart(2, "0")}:${String(value.getUTCMinutes()).padStart(2, "0")}:${String(value.getUTCSeconds()).padStart(2, "0")}`;
   }
   if (typeof value === "string") {
     const raw = value.trim().replace(/^["']|["']$/g, "");
@@ -83,6 +86,21 @@ function normalizeDateValue(value) {
     return raw;
   }
   return value;
+}
+
+function assertQuotedWallClockFields(raw, metaPath) {
+  const fields = [];
+  if (new RegExp(`^date:\\s*(?!["'])\\d{4}-\\d{2}-\\d{2}(?:[ T]\\d{2}:\\d{2}(?::\\d{2})?)?\\s*$`, "m").test(raw)) {
+    fields.push("date");
+  }
+  if (new RegExp(`^updated:\\s*(?!["'])\\d{4}-\\d{2}-\\d{2}(?:[ T]\\d{2}:\\d{2}(?::\\d{2})?)?\\s*$`, "m").test(raw)) {
+    fields.push("updated");
+  }
+  if (fields.length) {
+    throw new Error(
+      `${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: ${fields.join(", ")} must be quoted strings; bare wall-clock timestamps are parsed as YAML timestamps and can drift in the index`
+    );
+  }
 }
 
 function parseSortTsNs(value) {
@@ -129,9 +147,10 @@ function runFixMetaDate() {
 
 function loadMetaYaml(metaPath) {
   const raw = readText(metaPath);
+  assertQuotedWallClockFields(raw, metaPath);
   let data;
   try {
-    data = yaml.load(raw);
+    data = yaml.load(raw, { schema: yaml.FAILSAFE_SCHEMA });
   } catch (error) {
     if (!/duplicated mapping key/i.test(String(error && error.message))) {
       throw error;
@@ -152,7 +171,7 @@ function loadMetaYaml(metaPath) {
       if (!match) return true;
       return seen.get(match[1]) === index;
     });
-    data = yaml.load(filtered.join("\n"));
+    data = yaml.load(filtered.join("\n"), { schema: yaml.FAILSAFE_SCHEMA });
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: not a YAML object`);
