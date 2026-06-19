@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f6f2" />
+  <title>X To Obsidian Skill：把高浏览量推文变成 Obsidian 知识库</title>
+  <style>
+    :root{
+      --bg:#f7f6f2;
+      --paper:#fffdf8;
+      --paper-2:#f9f7f0;
+      --ink:#111111;
+      --ink-soft:#2b2722;
+      --muted:#625b52;
+      --line:#ddd7cb;
+      --grid:rgba(17,17,17,.075);
+      --accent:#2058d4;
+      --accent-soft:rgba(32,88,212,.10);
+      --accent-2:#0f172a;
+      --warn:#c83a2a;
+      --shadow:0 10px 28px rgba(17,17,17,.05);
+      --max:1200px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0)),
+        repeating-linear-gradient(0deg, transparent 0 23px, var(--grid) 23px 24px),
+        repeating-linear-gradient(90deg, transparent 0 23px, var(--grid) 23px 24px),
+        var(--bg);
+      color:var(--ink);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+      line-height:1.68;
+      text-rendering:optimizeLegibility;
+    }
+    a{color:inherit}
+    code,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .page{width:min(var(--max),calc(100% - 28px));margin:0 auto;padding:18px 0 72px}
+    .shell{display:grid;gap:14px}
+    .box{background:var(--paper);border:2.5px solid var(--ink);box-shadow:6px 6px 0 rgba(17,17,17,.16);position:relative}
+    .ribbon{
+      display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;
+      padding:10px 14px;background:#111;color:#fff;
+      font:800 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;
+      letter-spacing:.08em;text-transform:uppercase;
+    }
+    .ribbon .dot{display:inline-block;width:10px;height:10px;background:var(--accent);margin-right:8px;vertical-align:middle}
+    .hero{padding:16px;display:grid;grid-template-columns:1.02fr .98fr;gap:16px;align-items:start}
+    .hero-copy{padding:2px 2px 0;min-width:0}
+    .kicker{display:inline-flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+    .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1.5px solid var(--ink);background:#fff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
+    h1{margin:0 0 10px;font-size:clamp(30px,4.8vw,58px);line-height:.96;letter-spacing:-.04em}
+    .lead{margin:0 0 12px;font-size:14.5px;line-height:1.78;color:var(--ink-soft);max-width:700px}
+    .lead b{color:#000}
+    .stats{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+    .stats span{padding:5px 8px;background:var(--paper-2);border:1.5px solid var(--ink);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em}
+    .stats .hot{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .micro{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:.92rem;margin-top:2px}
+    .hero-right{min-width:0;display:grid;gap:12px}
+    .graph-shell{border:1.5px solid var(--ink);background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,255,255,.76));box-shadow:var(--shadow);padding:14px}
+    .graph-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+    .graph-title strong{color:var(--ink)}
+    svg{width:100%;height:auto;display:block}
+    .edges line{stroke:#d7d2c6;stroke-width:1.6}
+    .node rect{fill:var(--paper);stroke:var(--ink);stroke-width:1.5;rx:14}
+    .node text{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.6px;fill:var(--ink);dominant-baseline:middle}
+    .node.hot rect{fill:var(--accent-soft);stroke:var(--accent)}
+    .node.dim rect{fill:#fbf9f4}
+    .node:hover rect{fill:var(--ink)}
+    .node:hover text{fill:var(--paper)}
+    .hero-media{overflow:hidden;background:#fff}
+    .hero-media img{display:block;width:100%;height:auto}
+    .caption{padding:10px 12px;border-top:1.5px solid var(--ink);background:var(--paper-2);font-size:12.2px;line-height:1.55;color:var(--muted)}
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink)}
+    .metric{padding:18px 20px;border-inline-start:1.5px solid var(--ink);min-width:0}
+    .metric:first-child{border-inline-start:none}
+    .metric b{display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+    .metric strong{display:block;font-size:clamp(1.65rem,3.3vw,2.6rem);line-height:.92;letter-spacing:-.05em}
+    .metric span{display:block;margin-top:8px;color:var(--muted);font-size:.93rem;line-height:1.55}
+    .section{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1.5px solid var(--ink)}
+    .card{padding:28px 28px 30px;border-inline-start:1.5px solid var(--ink);min-width:0}
+    .card:first-child{border-inline-start:none}
+    .section-label{display:flex;align-items:center;gap:.55rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+    .section-label:before{content:"";width:18px;height:1px;background:var(--line)}
+    .card h2{font-size:1.38rem;line-height:1.08;letter-spacing:-.03em;margin:0 0 12px}
+    .card p{margin:0;color:var(--muted);line-height:1.68;font-size:.98rem}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+    .pill{border:1px solid var(--line);padding:7px 10px;font-size:.8rem;background:rgba(255,255,255,.48);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .list{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px}
+    .list li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:10px;font-size:.95rem}
+    .list span{color:var(--muted)}
+    .split{display:grid;grid-template-columns:1.04fr .96fr;border-bottom:1.5px solid var(--ink)}
+    .split .left,.split .right{padding:28px;min-width:0}
+    .split .right{border-inline-start:1.5px solid var(--ink);background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.45))}
+    .code{margin:14px 0 0;padding:16px 18px;border:1.5px solid var(--line);background:rgba(255,255,255,.62);white-space:pre-wrap;overflow:auto;font-size:12.8px;line-height:1.7;color:var(--ink)}
+    .flow{display:grid;gap:10px}
+    .step{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:12px 0;border-top:1px dashed var(--line)}
+    .step:first-child{border-top:none;padding-top:0}
+    .step b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent-2)}
+    .step p{margin:0;color:var(--muted);line-height:1.58}
+    .note{border:1.5px solid var(--line);background:var(--paper);padding:14px 16px;box-shadow:var(--shadow);margin-top:14px}
+    .note strong{display:block;margin-bottom:6px}
+    .warn{border-left:6px solid var(--warn);background:#fff7e4;padding:12px 14px}
+    .warn strong{display:block;color:var(--warn);margin-bottom:4px}
+    .matrix{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .mini-card{border:1.5px solid var(--line);background:rgba(255,255,255,.72);padding:12px 13px}
+    .mini-card b{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+    .mini-card span{display:block;color:var(--muted);font-size:13px;line-height:1.56}
+    .footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 28px;color:var(--muted);font-size:.88rem;background:var(--paper-2)}
+    .footer a{text-decoration:none;border-bottom:1px solid transparent}
+    .footer a:hover{border-bottom-color:var(--muted)}
+    @media (max-width: 980px){
+      .hero,.split{grid-template-columns:1fr}
+      .section{grid-template-columns:1fr}
+      .card{border-inline-start:none;border-top:1.5px solid var(--ink)}
+      .card:first-child{border-top:none}
+      .hero-right,.split .right{border-inline-start:none;border-top:1.5px solid var(--ink)}
+      .metrics{grid-template-columns:1fr 1fr}
+      .matrix{grid-template-columns:1fr 1fr}
+      .hero{padding:12px}
+      .split .left,.split .right{padding:24px}
+      .card{padding:24px}
+    }
+    @media (max-width: 720px){
+      .page{width:min(100% - 16px,var(--max));padding:10px 0 28px}
+      .ribbon{font-size:10px;padding:9px 11px}
+      h1{font-size:clamp(27px,9vw,42px)}
+      .metrics{grid-template-columns:1fr}
+      .metric{border-inline-start:none;border-top:1.5px solid var(--ink)}
+      .metric:first-child{border-top:none}
+      .matrix{grid-template-columns:1fr}
+      .footer{flex-direction:column;align-items:flex-start}
+      .micro{gap:10px}
+      .graph-shell{padding:12px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page shell">
+    <div class="ribbon box">
+      <div><span class="dot"></span>infocard-graph-paper-style · X To Obsidian Skill · workflow capture</div>
+      <div>hemoouren/X-to-Obsidian-SKill · Python · 16★</div>
+    </div>
+
+    <section class="hero box">
+      <div class="hero-copy">
+        <div class="kicker">
+          <span class="tag">x / twitter</span>
+          <span class="tag">obsidian</span>
+          <span class="tag">web clipper</span>
+          <span class="tag">knowledge base</span>
+        </div>
+        <h1>把高浏览量推文变成<br>Obsidian 里的长期素材库</h1>
+        <p class="lead"><b>X To Obsidian Skill</b> 不是帮你“收藏更多”，而是把 <b>X 博主链接 → 浏览量筛选 → 高表现推文 → 官方 Obsidian Web Clipper → Vault 归档</b> 这条链路自动化，方便内容创作者、独立开发者、产品经理和增长运营持续沉淀可复用的对标素材。</p>
+        <div class="stats">
+          <span class="hot">16★</span>
+          <span>Python</span>
+          <span>MIT 未声明</span>
+          <span>official Web Clipper</span>
+          <span>multi-account</span>
+        </div>
+        <div class="micro">
+          <span>目标：发现爆款推文</span>
+          <span>结果：自动归档到 Obsidian</span>
+          <span>重点：长期知识资产</span>
+        </div>
+      </div>
+
+      <div class="hero-right">
+        <div class="graph-shell">
+          <div class="graph-title"><span>workflow map</span><strong>4 stages</strong></div>
+          <svg viewBox="0 0 760 272" aria-label="X to Obsidian workflow graph">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L9,3 L0,6 z" fill="#d7d2c6"></path>
+              </marker>
+            </defs>
+            <g class="edges" marker-end="url(#arrow)">
+              <line x1="108" y1="136" x2="230" y2="136"></line>
+              <line x1="330" y1="136" x2="452" y2="96"></line>
+              <line x1="330" y1="136" x2="452" y2="176"></line>
+              <line x1="564" y1="96" x2="676" y2="96"></line>
+              <line x1="564" y1="176" x2="676" y2="176"></line>
+            </g>
+            <g class="node hot">
+              <rect x="28" y="106" width="160" height="60"></rect>
+              <text x="108" y="136" text-anchor="middle">X 博主链接</text>
+            </g>
+            <g class="node">
+              <rect x="232" y="106" width="196" height="60"></rect>
+              <text x="330" y="136" text-anchor="middle">浏览量筛选 / 去低质</text>
+            </g>
+            <g class="node dim">
+              <rect x="456" y="66" width="136" height="60"></rect>
+              <text x="524" y="96" text-anchor="middle">推文页面</text>
+            </g>
+            <g class="node hot">
+              <rect x="456" y="146" width="136" height="60"></rect>
+              <text x="524" y="176" text-anchor="middle">Web Clipper</text>
+            </g>
+            <g class="node">
+              <rect x="666" y="66" width="72" height="60"></rect>
+              <text x="702" y="96" text-anchor="middle">Vault</text>
+            </g>
+            <g class="node">
+              <rect x="644" y="146" width="112" height="60"></rect>
+              <text x="700" y="176" text-anchor="middle">知识沉淀</text>
+            </g>
+          </svg>
+        </div>
+        <div class="note warn">
+          <strong>依赖边界</strong>
+          这套 Skill 依赖 <b>官方 Obsidian Web Clipper</b>；README 明确要求先安装 Obsidian、启用 Clipper、打开目标 Vault，并确保 X 账号已经登录。
+        </div>
+      </div>
+    </section>
+
+    <section class="metrics">
+      <div class="metric"><b>筛选阈值</b><strong>10万+</strong><span>支持按浏览量过滤，README 里示例覆盖 10万+ / 20万+ / 50万+ / 100万+。</span></div>
+      <div class="metric"><b>目录落地</b><strong>自动</strong><span>按作者自动创建目录，把高表现推文分门别类存进 Vault。</span></div>
+      <div class="metric"><b>元数据</b><strong>8 字段</strong><span>tweet_id、views、likes、retweets、author、handle、publish_time、tweet_url。</span></div>
+      <div class="metric"><b>用途</b><strong>素材库</strong><span>服务对标研究、选题拆解、标题研究和长期知识沉淀。</span></div>
+    </section>
+
+    <section class="section">
+      <article class="card">
+        <div class="section-label">它解决什么</div>
+        <h2>把“收藏很多”改成“只保留高表现内容”</h2>
+        <p>很多 X 用户每天看到很多案例、增长技巧和 AI 经验，却很少真正沉淀。本 Skill 的目标是先按浏览量筛掉噪音，再把有价值的推文自动归档进 Obsidian，让收藏变成可复用知识资产。</p>
+        <div class="pill-row">
+          <span class="pill">content creators</span>
+          <span class="pill">indie hackers</span>
+          <span class="pill">product</span>
+          <span class="pill">growth</span>
+        </div>
+      </article>
+      <article class="card">
+        <div class="section-label">工作流骨架</div>
+        <h2>输入博主链接，沿真实链路自动保存</h2>
+        <ul class="list">
+          <li><strong>1. 输入</strong><span>X 博主链接 / 多个博主列表</span></li>
+          <li><strong>2. 筛选</strong><span>按浏览量保留高表现推文</span></li>
+          <li><strong>3. 剪藏</strong><span>调用官方 Obsidian Web Clipper</span></li>
+          <li><strong>4. 归档</strong><span>自动写入 Obsidian 并长期沉淀</span></li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="section-label">仓库信息</div>
+        <h2>它是一个 Python Skill，面向内容采集</h2>
+        <p>GitHub 元数据显示该仓库为 Python 项目、当前 16★、未声明 License；README 也强调支持 Chromium 系浏览器，并建议使用 Dia 浏览器。核心不是“做一个收藏夹”，而是做一个可持续的推文对标流水线。</p>
+      </article>
+    </section>
+
+    <section class="split">
+      <div class="left">
+        <div class="section-label">前置要求</div>
+        <h2 style="margin:0 0 12px;font-size:1.8rem;letter-spacing:-.03em;">先把运行环境搭好，再跑采集</h2>
+        <div class="flow">
+          <div class="step"><b>01</b><p><strong>安装 Obsidian</strong>：先准备好 Vault，才能让 Web Clipper 有落点。</p></div>
+          <div class="step"><b>02</b><p><strong>安装官方 Web Clipper</strong>：浏览器插件是自动保存的关键依赖。</p></div>
+          <div class="step"><b>03</b><p><strong>登录 X 账号</strong>：Skill 读取当前浏览器登录态获取推文信息。</p></div>
+          <div class="step"><b>04</b><p><strong>打开目标 Vault</strong>：确保剪藏后能直接进入正确的知识库目录。</p></div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="section-label">数据结构</div>
+        <h2 style="margin:0 0 12px;font-size:1.45rem;letter-spacing:-.03em;">每条笔记都要带元数据，方便后续检索和复盘</h2>
+        <pre class="code">tweet_id:
+views:
+likes:
+retweets:
+author:
+handle:
+publish_time:
+tweet_url:</pre>
+        <div class="note" style="margin-top:14px;">
+          <strong>目录策略</strong>
+          README 给出的思路是按作者自动建目录，例如 <code>Levelsio</code>、<code>Danny Postma</code> 这样的文件夹，方便长期管理和主题回看。
+        </div>
+      </div>
+    </section>
+
+    <section class="split">
+      <div class="left">
+        <div class="section-label">适合谁</div>
+        <h2 style="margin:0 0 12px;font-size:1.8rem;letter-spacing:-.03em;">这是一张为“研究型素材库”设计的卡</h2>
+        <div class="matrix">
+          <div class="mini-card"><b>内容创作者</b><span>研究爆款选题、表达方式和内容结构，把灵感变成可复盘素材。</span></div>
+          <div class="mini-card"><b>独立开发者</b><span>跟踪发布案例、增长技巧和创业经验，建立对标库。</span></div>
+          <div class="mini-card"><b>AI 创业者</b><span>持续收集头部 AI 博主案例，形成研究数据库。</span></div>
+          <div class="mini-card"><b>产品 / 增长</b><span>沉淀产品观点、竞品内容和传播规律，便于复盘。</span></div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="section-label">证据截图</div>
+        <h2 style="margin:0 0 12px;font-size:1.45rem;letter-spacing:-.03em;">README 里已经把流程画出来了</h2>
+        <div class="hero-media box" style="box-shadow:none;border-width:1.5px">
+          <img src="./assets/images/20260619-x-to-obsidian-skill/workflow-overview.png" alt="X To Obsidian Skill 工作流程截图" loading="eager">
+        </div>
+        <div class="caption">来源截图说明了完整链路：博主链接 → 获取推文 → 按浏览量筛选 → 只保留高表现内容 → Web Clipper → Obsidian → 长期知识沉淀。</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <article class="card">
+        <div class="section-label">一句话结论</div>
+        <h2>这不是“收藏工具”，而是“高表现推文的知识资产流水线”</h2>
+        <p>X To Obsidian Skill 的价值在于把 X 上的高浏览量内容变成 Obsidian 里的可检索素材库：它既保留社媒信号，又能把内容沉淀到长期知识系统中，适合做对标研究、选题拆解和长期观察。</p>
+      </article>
+      <article class="card">
+        <div class="section-label">视觉语法</div>
+        <h2>graph-paper 风格用图谱讲链路，不用海报讲口号</h2>
+        <p>这张卡沿用图纸 / 图谱 / 研究手册的语法：米白纸底、黑灰细线、等宽标记、节点与连线。视觉主角是 workflow map，正文负责补证据和解释，不把页面推成宣传页。</p>
+      </article>
+      <article class="card">
+        <div class="section-label">来源</div>
+        <h2>仓库与 README</h2>
+        <ul class="list">
+          <li><strong>GitHub</strong><span>hemoouren/X-to-Obsidian-SKill</span></li>
+          <li><strong>README</strong><span>发现爆款推文 · 自动归档知识库</span></li>
+          <li><strong>主题</strong><span>graph-paper-style</span></li>
+        </ul>
+      </article>
+    </section>
+
+    <footer class="footer">
+      <div>Source · <a href="https://github.com/hemoouren/X-to-Obsidian-SKill" target="_blank" rel="noreferrer">hemoouren/X-to-Obsidian-SKill</a> · README + GitHub metadata</div>
+      <div>graph-paper-style · X to Obsidian · workflow capture</div>
+    </footer>
+  </main>
+</body>
+</html>
