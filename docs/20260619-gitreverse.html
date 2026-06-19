@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GitReverse — 把代码库逆练成可构建的 Prompt</title>
+  <style>
+    :root{
+      --bg:#f7f6f2;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#6c6a63;
+      --line:#ddd7cb;
+      --accent:#3f6cff;
+      --accent-soft:rgba(63,108,255,.10);
+      --accent-2:#0f172a;
+      --shadow:0 10px 28px rgba(17,17,17,.05);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+    a{color:inherit}
+    .page{max-width:1180px;margin:0 auto;padding:18px 12px 72px}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border:1px solid var(--line);background:rgba(255,253,248,.86);backdrop-filter:blur(6px);margin-bottom:18px}
+    .wordmark{font-weight:800;font-size:1.1rem;letter-spacing:-.04em}
+    .nav-meta{display:flex;gap:14px;font-size:.88rem;color:var(--muted);font-variant-numeric:tabular-nums;flex-wrap:wrap;align-items:center}
+    .hero{display:grid;grid-template-columns:1.08fr .92fr;border:1px solid var(--line);background:var(--paper);margin-bottom:18px}
+    .hero-left{padding:38px 32px 36px}
+    .eyebrow{display:inline-flex;align-items:center;gap:.55rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+    .eyebrow::before{content:"";width:42px;height:1px;background:var(--line)}
+    h1{font-size:clamp(2.4rem,5.8vw,4.6rem);line-height:.94;font-weight:800;letter-spacing:-.05em;margin:0 0 16px;max-width:12ch}
+    .lede{font-size:clamp(1rem,1.4vw,1.18rem);line-height:1.62;color:var(--muted);max-width:40ch;margin:0 0 22px}
+    .flow{display:grid;gap:10px;margin-bottom:18px}
+    .flow-step{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start}
+    .flow-step .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:3px 7px;border:1px solid var(--accent);width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+    .flow-step p{margin:0;font-size:.93rem;color:var(--muted);line-height:1.55;padding-top:2px}
+    .hero-right{border-inline-start:1px solid var(--line);padding:24px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,.4))}
+    .graph-shell{width:100%;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.7));box-shadow:var(--shadow);padding:18px}
+    .graph-shell h3{font-size:.8rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+    .graph-shell pre{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;line-height:1.7;color:var(--ink);margin:0;white-space:pre-wrap;background:var(--paper);border:1px solid var(--line);padding:12px}
+    .graph-shell pre .prompt{color:var(--accent);font-weight:600}
+    .graph-shell pre .comment{color:var(--muted)}
+    .section{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);background:var(--paper);margin-bottom:18px}
+    .card{padding:22px 24px;border-inline-start:1px solid var(--line);min-width:0}
+    .card:first-child{border-inline-start:none}
+    .section-label{display:flex;align-items:center;gap:.55rem;font-size:.75rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+    .section-label::before{content:"";width:18px;height:1px;background:var(--line)}
+    .card h2{font-size:1.25rem;line-height:1.15;letter-spacing:-.03em;margin:0 0 10px}
+    .card p{margin:0;color:var(--muted);line-height:1.62;font-size:.95rem}
+    .list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+    .list li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:8px;font-size:.88rem}
+    .list span{color:var(--muted)}
+    .pill-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+    .pill{border:1px solid var(--line);padding:5px 8px;font-size:.78rem;background:rgba(255,255,255,.48);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+    .notes{display:grid;grid-template-columns:1.1fr .9fr;border:1px solid var(--line);background:var(--paper);margin-bottom:18px}
+    .notes-left,.notes-right{padding:24px 26px}
+    .notes-right{border-inline-start:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.45))}
+    .callout{border:1px solid var(--line);background:var(--paper);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:14px}
+    .callout strong{display:block;margin-bottom:6px;font-size:.95rem}
+    .callout p{margin:0;font-size:.88rem;color:var(--muted);line-height:1.55}
+    .share-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+    .share-item{background:var(--bg);border:1px solid var(--line);padding:10px 12px}
+    .share-item b{display:block;font-size:.82rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);margin-bottom:4px}
+    .share-item p{margin:0;font-size:.8rem;color:var(--muted);line-height:1.5}
+    .footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 18px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;margin-top:18px}
+    .footer a{text-decoration:none;color:var(--accent)}
+    .footer a:hover{text-decoration:underline}
+    @media(max-width:980px){
+      .hero,.notes,.section{grid-template-columns:1fr}
+      .hero-right,.notes-right{border-inline-start:none;border-top:1px solid var(--line)}
+      .card{border-inline-start:none;border-top:1px solid var(--line)}
+      .card:first-child{border-top:none}
+      .share-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:480px){
+      h1{font-size:2.2rem}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <!-- nav -->
+  <div class="nav">
+    <div class="wordmark">GitReverse</div>
+    <div class="nav-meta">
+      <span>1,087 ★</span>
+      <span>206 forks</span>
+      <span>TypeScript</span>
+      <span>prompt engineering</span>
+    </div>
+  </div>
+
+  <!-- hero -->
+  <div class="hero">
+    <div class="hero-left">
+      <div class="eyebrow">Reverse Engineering · Prompt Craft</div>
+      <h1>把代码库<br>逆练成<br>可构建的 Prompt</h1>
+      <p class="lede">粘贴任意 GitHub 仓库 URL，获得一段自然语言编码 Prompt，可直接粘贴到 Cursor、Claude Code、Codex 等 Agent 中复刻这个项目。</p>
+      <div class="flow">
+        <div class="flow-step">
+          <span class="num">1</span>
+          <p>粘贴 GitHub URL 或 <code>owner/repo</code></p>
+        </div>
+        <div class="flow-step">
+          <span class="num">2</span>
+          <p>LLM 分析仓库元数据、文件树和 README，生成结构化 Prompt</p>
+        </div>
+        <div class="flow-step">
+          <span class="num">3</span>
+          <p>将 Prompt 粘贴进 Cursor / Claude Code / Codex，直接开干</p>
+        </div>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="graph-shell">
+        <h3>Generated Prompt Preview</h3>
+        <pre><span class="comment"># /vercel/next.js — synthetic prompt</span>
+<span class="prompt">Build a full-stack React framework</span> with:
+  - File-based routing (/app, /pages)
+  - API routes + serverless functions
+  - SSG + SSR + ISR
+  - TypeScript + Tailwind
+  - Image/Font optimization
+  - Fast refresh dev server
+
+<span class="comment">// Constraints</span>
+  - Use App Router by default
+  - No jQuery or legacy deps
+  - Support edge runtime</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- section: 3 columns -->
+  <div class="section">
+    <!-- model providers -->
+    <div class="card">
+      <div class="section-label">LLM Backends</div>
+      <h2>4 家模型支持</h2>
+      <p>支持 Grok (xAI)、OpenRouter、Google AI Studio、Azure OpenAI，自动选择可用 key 或指定固定模型。</p>
+      <ul class="list">
+        <li>Grok / xAI <span>grok-3</span></li>
+        <li>OpenRouter <span>gemini-2.5-pro</span></li>
+        <li>Azure OpenAI <span>gpt-5.4</span></li>
+        <li>Google AI <span>gemini-2.5-pro</span></li>
+      </ul>
+    </div>
+    <!-- what it extracts -->
+    <div class="card">
+      <div class="section-label">Context Extraction</div>
+      <h2>仓库分析维度</h2>
+      <p>提取仓库元数据、根目录文件树（一级深度）和 README，结合 LLM 生成精准、自然的构建 Prompt。</p>
+      <div class="pill-row">
+        <span class="pill">repo metadata</span>
+        <span class="pill">file tree (depth 1)</span>
+        <span class="pill">README</span>
+        <span class="pill">LLM synthesis</span>
+      </div>
+    </div>
+    <!-- sharing -->
+    <div class="card">
+      <div class="section-label">Share · Library · Focus</div>
+      <h2>分享与聚焦</h2>
+      <p>分享反向链接、浏览提示词库、自定义聚焦区域。支持将 GitHub URL 中的 <code>hub</code> 替换为 <code>reverse</code> 直接跳转。</p>
+      <ul class="list">
+        <li><code>/owner/repo</code> <span>快速反向</span></li>
+        <li><code>/owner/repo/deep</code> <span>深度反向</span></li>
+        <li><code>/library</code> <span>提示词库</span></li>
+        <li>Supabase <span>可选缓存</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- notes: two columns -->
+  <div class="notes">
+    <div class="notes-left">
+      <div class="section-label">Use Cases · 适用场景</div>
+      <div class="callout">
+        <strong>学习一个陌生代码库</strong>
+        <p>粘贴任何公开仓库 URL，快速获得"如果你要从零构建这个项目，你会怎么写 Prompt"的参考。</p>
+      </div>
+      <div class="callout">
+        <strong>生成你自己的 Agent 构建 Prompt</strong>
+        <p>在开始一个新项目前，先用 GitReverse 分析同类项目，获得更好的起始 Prompt。</p>
+      </div>
+      <div class="callout">
+        <strong>Vibe Coding 加速</strong>
+        <p>用自然语言 Prompt 驱动 Cursor / Claude Code，比手动写规格文档更快进入状态。</p>
+      </div>
+    </div>
+    <div class="notes-right">
+      <div class="section-label">Shareable Links · 示例仓库</div>
+      <div class="share-grid">
+        <div class="share-item">
+          <b>/vercel/next.js</b>
+          <p>Next.js 全栈框架</p>
+        </div>
+        <div class="share-item">
+          <b>/opencode/...</b>
+          <p>OpenCode Agent</p>
+        </div>
+        <div class="share-item">
+          <b>/facebook/react</b>
+          <p>React UI 库</p>
+        </div>
+        <div class="share-item">
+          <b>/supabase/supabase</b>
+          <p>Supabase BaaS</p>
+        </div>
+      </div>
+      <p style="margin-top:12px;font-size:.85rem;color:var(--muted)">在任意 GitHub URL 中把 <code>github.com</code> 替换为 <code>gitreverse.com</code>，即可直接生成对应 Prompt。</p>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div class="footer">
+    <div>
+      <a href="https://www.gitreverse.com/">gitreverse.com</a> ·
+      <a href="https://github.com/filiksyos/gitreverse">github.com/filiksyos/gitreverse</a> ·
+      <a href="https://discord.gg/AYnCD68WCr">Discord</a>
+    </div>
+    <div>HERMES · graph-paper-style · 2026-06-19</div>
+  </div>
+</div>
+</body>
+</html>
