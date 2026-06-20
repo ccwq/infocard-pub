@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DevSpace：把 ChatGPT 变成本地 Codex 风格编码工作流</title>
+  <style>
+    :root{--bg:#eef3fb;--paper:#fffdf8;--ink:#111;--muted:#5c6673;--line:#111;--black:#0a0a0a;--red:#d11f2d;--blue:#1849c6;--cyan:#0ea5e9;--green:#16a34a;--amber:#f59e0b;--shadow:6px 6px 0 rgba(17,17,17,.1)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;font-size:12.8px;line-height:1.64}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(800px,100%);margin:0 auto;padding-bottom:80px}
+    .header{background:linear-gradient(135deg,var(--black) 0%,#0f172a 68%,#131313 68%,#131313 100%);color:#fff;border-bottom:3px solid var(--line);padding:16px}
+    .kicker{font-size:.62rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.68);margin-bottom:.45rem}
+    .title{font-size:clamp(1.38rem,4.8vw,2.15rem);line-height:1.06;font-weight:900;letter-spacing:-.04em;margin-bottom:.35rem}
+    .subtitle{font-size:.82rem;max-width:60ch;color:rgba(255,255,255,.84);line-height:1.56;margin-bottom:.72rem}
+    .chips{display:flex;flex-wrap:wrap;gap:6px}
+    .chip{display:inline-block;padding:.22rem .55rem;border:1.5px solid rgba(255,255,255,.28);border-radius:2px;font-size:.62rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.08)}
+    .chip.red{background:rgba(209,31,45,.2);border-color:rgba(209,31,45,.5)}
+    .chip.blue{background:rgba(24,73,198,.18);border-color:rgba(24,73,198,.45)}
+    .chip.cyan{background:rgba(14,165,233,.18);border-color:rgba(14,165,233,.45)}
+    .chip.green{background:rgba(22,163,74,.18);border-color:rgba(22,163,74,.45)}
+
+    .hero{padding:10px 10px 0}
+    .hero-card{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:10px}
+    .hero-card img{display:block;width:100%;border:1.5px solid var(--line);background:#fff}
+    .hero-caption{font-size:10px;color:#777;text-align:center;line-height:1.45;margin-top:6px}
+
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:10px}
+    .stat{background:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:8px 8px 7px;text-align:center}
+    .stat strong{display:block;font-size:1rem;line-height:1.08;margin-bottom:2px}
+    .stat strong.red{color:var(--red)}
+    .stat strong.blue{color:var(--blue)}
+    .stat strong.cyan{color:var(--cyan)}
+    .stat strong.green{color:var(--green)}
+    .stat span{display:block;font-size:.58rem;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+
+    .section{margin:0 10px 10px;background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+    .sec-head{background:var(--black);color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .sec-no{background:var(--black);color:var(--red);padding:2px 6px;border:1px solid var(--red);font-size:.62rem;font-weight:900;letter-spacing:.08em}
+    .sec-label{font-size:.63rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.76)}
+    .sec-body{padding:10px 12px}
+
+    .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .card{background:#fff;border:1.5px solid var(--line);padding:8px 9px;border-radius:2px}
+    .card h3{font-size:.79rem;line-height:1.25;margin-bottom:4px;font-weight:900}
+    .card p{font-size:.7rem;line-height:1.5;color:#444}
+    .tagline{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+    .tag{font-size:.58rem;font-weight:700;border:1px solid var(--line);padding:.15rem .42rem;border-radius:2px;background:#fff}
+    .tag.red{background:#fff1f2;border-color:var(--red);color:var(--red)}
+    .tag.blue{background:#eff6ff;border-color:var(--blue);color:var(--blue)}
+    .tag.cyan{background:#ecfeff;border-color:var(--cyan);color:var(--cyan)}
+    .tag.green{background:#ecfdf5;border-color:var(--green);color:var(--green)}
+    .tag.amber{background:#fffbeb;border-color:var(--amber);color:var(--amber)}
+
+    .quote{border-left:4px solid var(--red);padding:8px 10px;background:#fff7f7;color:#231f20;font-size:.75rem;line-height:1.6}
+    .quote strong{color:var(--red)}
+
+    .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .step{background:#fff;border:1.5px solid var(--line);padding:8px 9px;border-radius:2px}
+    .step .n{display:inline-block;background:var(--black);color:#fff;font-size:.58rem;font-weight:900;letter-spacing:.08em;padding:2px 5px;margin-bottom:6px}
+    .step h4{font-size:.72rem;margin-bottom:4px}
+    .step p{font-size:.68rem;line-height:1.5;color:#444}
+
+    .table{width:100%;border-collapse:collapse;font-size:.68rem}
+    .table th,.table td{border:1px solid var(--line);padding:6px 7px;vertical-align:top}
+    .table th{background:#111;color:#fff;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase}
+    .table td:first-child{font-weight:700}
+    .table .ok{color:var(--green);font-weight:700}
+    .table .warn{color:var(--amber);font-weight:700}
+
+    .callout{background:#0a0a0a;color:#fff;border:2px solid var(--line);padding:10px 12px;font-size:.74rem;line-height:1.65}
+    .callout .red{color:#ff8fa1}.callout .blue{color:#a5b4fc}.callout .cyan{color:#67e8f9}.callout .green{color:#86efac}
+
+    .footer{padding:10px 12px 0;font-size:.62rem;color:#888;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .footer a{color:#888}
+
+    @media(max-width:560px){.stats,.grid2,.grid3,.flow{grid-template-columns:1fr 1fr}.title{font-size:1.45rem}}
+    @media(max-width:390px){.stats,.grid2,.grid3,.flow{grid-template-columns:1fr}body{font-size:12px}.sec-head{align-items:flex-start}}
+  </style>
+</head>
+<body>
+<div class="page">
+  <header class="header">
+    <div class="kicker">Self-hosted MCP · Local Workspace Control · ChatGPT Coding Workflow</div>
+    <div class="title">DevSpace：把 ChatGPT 变成本地 Codex 风格编码工作流</div>
+    <div class="subtitle">这是一个自托管 MCP server，把你允许打开的本地项目目录、安全连接、文件操作、终端执行和工作树管理收进同一条工作流里，让 ChatGPT 直接在本机项目上做事。</div>
+    <div class="chips">
+      <span class="chip red">MCP Server</span>
+      <span class="chip blue">TypeScript</span>
+      <span class="chip cyan">Self-hosted</span>
+      <span class="chip green">MIT</span>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div class="hero-card">
+      <img src="assets/images/20260620-devspace-chatgpt-coding-hardblue/devspace-logo-light.png" alt="DevSpace logo" />
+      <div class="hero-caption">README 直接给出最关键的公共信号：secure connection to your own machine、bring a Codex-style coding workflow to ChatGPT、以及对本地项目的 scoped edit / shell / search / git 能力。</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><strong class="red">1.6k</strong><span>stars</span></div>
+    <div class="stat"><strong class="blue">147</strong><span>forks</span></div>
+    <div class="stat"><strong class="cyan">TypeScript</strong><span>language</span></div>
+    <div class="stat"><strong class="green">MIT</strong><span>license</span></div>
+    <div class="stat"><strong>ChatGPT</strong><span>target</span></div>
+  </div>
+
+  <section class="section">
+    <div class="sec-head"><span class="sec-no">01</span><span class="sec-label">核心定位</span></div>
+    <div class="sec-body">
+      <div class="quote"><strong>DevSpace 不是云端代理，而是“把本地机器变成 ChatGPT 可审查、可批准、可执行的工作区”。</strong>它的关键不是聊天，而是把读写文件、搜索代码、运行命令、git 乃至工作树管理都变成受控工具。</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><span class="sec-no">02</span><span class="sec-label">工作流链路</span></div>
+    <div class="sec-body">
+      <div class="flow">
+        <div class="step"><span class="n">01</span><h4>本地初始化</h4><p>devspace init 设定允许打开的项目根目录、端口和 owner password。</p></div>
+        <div class="step"><span class="n">02</span><h4>安全连接</h4><p>通过你控制的 HTTPS tunnel 暴露 /mcp，再由 MCP 客户端连接。</p></div>
+        <div class="step"><span class="n">03</span><h4>审批授权</h4><p>连接后需要 Owner password，确保 ChatGPT 不能绕过你的本机授权。</p></div>
+        <div class="step"><span class="n">04</span><h4>工作区执行</h4><p>在已批准的 workspace 中读写文件、跑命令、用 git worktree 并行工作。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><span class="sec-no">03</span><span class="sec-label">README 暴露的关键能力</span></div>
+    <div class="sec-body">
+      <div class="grid3">
+        <div class="card"><h3>读写本地项目</h3><p>在已打开的工作区里，ChatGPT 可以检查仓库结构、编辑文件和查看改动。</p></div>
+        <div class="card"><h3>执行本地命令</h3><p>支持 shell 执行，用于测试、构建、搜索和 git 流程。</p></div>
+        <div class="card"><h3>隔离工作树</h3><p>能为并行编码会话创建独立 worktree，减少互相污染。</p></div>
+        <div class="card"><h3>加载项目规则</h3><p>会读取 AGENTS.md / CLAUDE.md，让项目约定自动进入工作流。</p></div>
+        <div class="card"><h3>本地技能发现</h3><p>能够从技能目录发现本地 agent skills，把流程带进 ChatGPT。</p></div>
+        <div class="card"><h3>变更摘要</h3><p>在兼容宿主中展示工具卡与改动摘要，便于复核。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><span class="sec-no">04</span><span class="sec-label">安装与门槛</span></div>
+    <div class="sec-body">
+      <div class="grid2">
+        <div class="card">
+          <h3>最低安装路径</h3>
+          <p><code>npm install -g @waishnav/devspace</code>，然后 <code>devspace init</code> + <code>devspace serve</code>。</p>
+          <div class="tagline"><span class="tag blue">Node 22 推荐</span><span class="tag red">owner password</span></div>
+        </div>
+        <div class="card">
+          <h3>连接方式</h3>
+          <p>默认本地端点是 <code>http://127.0.0.1:7676/mcp</code>；实际使用通常通过你控制的 HTTPS tunnel 暴露。</p>
+          <div class="tagline"><span class="tag cyan">/mcp</span><span class="tag green">tunnel-controlled</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><span class="sec-no">05</span><span class="sec-label">安全边界与风险</span></div>
+    <div class="sec-body">
+      <table class="table">
+        <thead><tr><th>项目</th><th>判断</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>安全模型</td><td class="ok">明确</td><td>你决定允许哪些 root，权限边界是可见的，不是黑盒。</td></tr>
+          <tr><td>风险点</td><td class="warn">较高</td><td>一旦连接，MCP 客户端在已打开工作区内拥有很强本地能力，要把它视为可信 coding partner。</td></tr>
+          <tr><td>适用范围</td><td class="ok">局部、受控</td><td>最适合你希望 ChatGPT 直接操作本地项目但又不想把文件上传到第三方的场景。</td></tr>
+          <tr><td>不适用</td><td class="warn">纯云端协作</td><td>如果你不想管理 tunnel、owner password 和本机权限，这套方案会偏重。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head"><span class="sec-no">06</span><span class="sec-label">一句话总结</span></div>
+    <div class="sec-body">
+      <div class="callout">DevSpace 的本质是：<span class="red">把“对本地项目的受控访问”产品化</span>，再把它包装成 ChatGPT 的 <span class="blue">代码工作流入口</span>。它更像一个本机权限与工作区控制层，而不只是一个 MCP demo。</div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <span>★ 1.6k · MIT · TypeScript · self-hosted MCP</span>
+    <a href="https://github.com/Waishnav/devspace" target="_blank">github.com/Waishnav/devspace →</a>
+  </div>
+</div>
+</body>
+</html>
