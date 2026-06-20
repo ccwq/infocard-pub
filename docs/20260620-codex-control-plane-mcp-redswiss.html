@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex Control Plane MCP — 面向长任务的 Codex Desktop 控制平面</title>
+  <style>
+    :root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#0a0a0a;--red:#c8102e;--soft-red:#fff5f6;--line:#0a0a0a;--shadow:6px 6px 0 rgba(10,10,10,.10);--violet:#7c5cff;--cyan:#0ea5e9;--green:#16a34a;--amber:#f59e0b;--blue:#1d4ed8}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.8px;line-height:1.6}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(780px,100%);margin:0 auto;padding:0 0 80px}
+
+    .topbar{display:grid;grid-template-columns:1.2fr .8fr;border-bottom:3px solid var(--line);margin-bottom:10px;overflow:hidden}
+    .topbar-hero{padding:14px 16px 12px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+    .kicker{font-size:0.62rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.65);margin-bottom:0.4rem}
+    .demo-title{margin:0 0 0.35rem;font-size:clamp(1.35rem,4.8vw,2.1rem);line-height:1.05;font-weight:900;letter-spacing:-0.03em}
+    .sub-line{margin:0;font-size:0.8rem;color:rgba(255,255,255,0.75);line-height:1.45;max-width:44ch;margin-bottom:0.65rem}
+    .tagline{display:flex;gap:0.35rem;flex-wrap:wrap}
+    .tagline span{font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:0.15rem 0.45rem;border-radius:2px}
+    .tag-purple{background:rgba(124,92,255,0.18);border:1px solid rgba(124,92,255,0.35);color:#fff}
+    .tag-cyan{background:rgba(14,165,233,0.18);border:1px solid rgba(14,165,233,0.35);color:#fff}
+    .tag-green{background:rgba(22,163,74,0.18);border:1px solid rgba(22,163,74,0.35);color:#fff}
+    .tag-amber{background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.35);color:#fff}
+
+    .topbar-meta{padding:10px 12px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto;gap:0;align-content:start;background:#f6f1f1}
+    .meta-row-high{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding-bottom:5px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-low{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+    .meta-pill-lg{border:2px solid var(--line);padding:6px 8px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1}
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-md{border:2px solid var(--line);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11px;line-height:1.2}
+    .meta-pill-md .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+    .meta-pill-sm{border:2px solid var(--line);padding:3px 6px 2px;background:#fff;font-weight:700;font-size:10px;color:#666;line-height:1.3}
+    .meta-pill-sm .sub{display:block;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+
+    .stats{display:flex;border:2px solid var(--line);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow);background:var(--paper)}
+    .stat{flex:1;min-width:60px;padding:8px 10px 6px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:15px;font-weight:900;line-height:1.1;color:var(--ink)}
+    .stat strong.red{color:var(--red)}
+    .stat strong.violet{color:var(--violet)}
+    .stat strong.cyan{color:var(--cyan)}
+    .stat span{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+
+    .pills{padding:0 10px 10px;display:flex;flex-wrap:wrap;gap:5px}
+    .pill{display:inline-block;padding:0.2rem 0.55rem;font-size:10px;font-weight:700;border:1.5px solid var(--line);border-radius:2px;letter-spacing:0.04em}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .pill.soft{background:#fff;color:var(--red)}
+
+    .section{border:2px solid var(--line);margin:0 10px 10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:12px;font-weight:900}
+    .sec-head .label{font-size:9.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase}
+    .sec-body{padding:10px 12px}
+
+    .hero-image{padding:0 10px 10px}
+    .hero-image img{display:block;width:100%;border:2px solid var(--line);box-shadow:var(--shadow);background:#fff}
+    .img-caption{font-size:10px;color:#777;margin-top:5px;text-align:center;line-height:1.45}
+
+    .feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+    .feature-card{border:1.5px solid var(--line);background:#fff;padding:7px 9px 8px;border-radius:2px}
+    .feature-card p{margin:0;font-size:10.5px;color:#444;line-height:1.4}
+    .feature-title{font-weight:900;font-size:11px;line-height:1.2;margin-bottom:3px;color:var(--ink)}
+    .feature-title .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:middle}
+    .feature-card.violet{background:linear-gradient(180deg,#fff,rgba(124,92,255,0.04))}
+    .feature-card.cyan{background:linear-gradient(180deg,#fff,rgba(14,165,233,0.04))}
+    .feature-card.green{background:linear-gradient(180deg,#fff,rgba(22,163,74,0.04))}
+
+    .list-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+    .list-item{border:1.5px solid var(--line);background:#fff;padding:7px 9px;border-radius:2px}
+    .list-item h4{font-size:11px;font-weight:900;margin-bottom:3px}
+    .list-item p{font-size:10.5px;line-height:1.45;color:#444}
+
+    .install-block{background:#0a0a0a;border-radius:2px;overflow:hidden}
+    .install-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;line-height:1.7;padding:10px 12px;color:#abb2bf;white-space:pre-wrap;word-break:break-all}
+    .install-code .kw{color:#c678dd}
+    .install-code .str{color:#98c379}
+    .install-code .cmt{color:#5c6370}
+    .install-code .cmd{color:#e06c75}
+
+    .footer{padding:8px 12px;font-size:10px;color:#888;display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .footer a{color:#888}
+    .footer a:hover{color:var(--red)}
+
+    @media(max-width:540px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line);grid-template-rows:auto auto auto}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .feature-grid,.list-grid{grid-template-columns:1fr 1fr}
+      .stats{flex-wrap:wrap}
+    }
+    @media(max-width:390px){
+      .feature-grid,.list-grid{grid-template-columns:1fr}
+      body{font-size:12px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">Durable MCP Control Plane · Python</div>
+      <h1 class="demo-title">Codex Control Plane MCP</h1>
+      <p class="sub-line">面向长任务的 Codex Desktop 控制平面：把多小时工作变成可轮询、可恢复、可审批的持久工作流。</p>
+      <div class="tagline">
+        <span class="tag-purple">MCP Server</span>
+        <span class="tag-cyan">Python</span>
+        <span class="tag-green">Apache-2.0</span>
+        <span class="tag-amber">Local-first</span>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">211<span class="sub">Stars</span></div>
+        <div class="meta-pill-lg">4<span class="sub">Forks</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">568<span class="sub">Tests? 未披露</span></div>
+        <div class="meta-pill-md">长期任务<span class="sub">定位</span></div>
+        <div class="meta-pill-md">Windows<span class="sub">Live Target</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><strong class="red">operationId</strong><span>即刻返回</span></div>
+    <div class="stat"><strong class="violet">workflowId</strong><span>工作流追踪</span></div>
+    <div class="stat"><strong class="cyan">approval</strong><span>可轮询审批</span></div>
+    <div class="stat"><strong class="blue">SQLite</strong><span>持久状态</span></div>
+    <div class="stat"><strong>async</strong><span>多小时任务</span></div>
+  </div>
+
+  <div class="pills">
+    <span class="pill red">codex desktop</span>
+    <span class="pill">workflow</span>
+    <span class="pill dark">retry-safe</span>
+    <span class="pill">duplicate prompt protection</span>
+    <span class="pill soft">plan mode</span>
+    <span class="pill dark">hooks</span>
+    <span class="pill">heartbeats</span>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="num">01</span><span class="label">控制平面工作流</span></div>
+    <div class="sec-body">
+      <div class="feature-grid">
+        <div class="feature-card violet"><div class="feature-title"><span class="dot"></span>异步队列</div><p>提交任务后立即返回 operationId / workflowId，避免把 MCP 调用挂成长连接。</p></div>
+        <div class="feature-card cyan"><div class="feature-title"><span class="dot"></span>可恢复执行</div><p>支持 restart recovery、thread/turn 追踪、审批恢复和 duplicate prompt 保护。</p></div>
+        <div class="feature-card green"><div class="feature-title"><span class="dot"></span>本地持久化</div><p>SQLite 记录 operations、workflows、turns、hooks、diagnostics、leases。</p></div>
+        <div class="feature-card"><div class="feature-title"><span class="dot"></span>Plan Mode</div><p>先计划，再审批，再执行；支持轮询、审批与最终报告读取。</p></div>
+        <div class="feature-card violet"><div class="feature-title"><span class="dot"></span>多客户端适配</div><p>OpenClaw、Hermes 是一等客户端，也适合任何本地 orchestrator。</p></div>
+        <div class="feature-card cyan"><div class="feature-title"><span class="dot"></span>安全边界</div><p>Local-first，默认不对公网开放；读写权限、沙箱与审批状态可控。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="num">02</span><span class="label">为什么比薄封装更稳</span></div>
+    <div class="sec-body">
+      <div class="list-grid">
+        <div class="list-item"><h4>1. 不阻塞数小时</h4><p>把长任务拆成可轮询的操作，而不是把 MCP 调用卡死在现场。</p></div>
+        <div class="list-item"><h4>2. 重试不重复提交</h4><p>通过 client_request_id、活跃 prompt 检测和状态持久化避免重复 turn。</p></div>
+        <div class="list-item"><h4>3. 可追踪的审批</h4><p>问答、审批、计划模式状态都暴露为可查询结构，而不是日志里猜。</p></div>
+        <div class="list-item"><h4>4. 恢复与修复</h4><p>诊断、健康检查、修复工具和局部历史都作为一等能力输出。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="num">03</span><span class="label">支持能力</span></div>
+    <div class="sec-body">
+      <div class="list-grid">
+        <div class="list-item"><h4>运行时</h4><p>Windows 作为完整 live target；Linux / macOS 当前偏协议检查。</p></div>
+        <div class="list-item"><h4>命令入口</h4><p>codex-control-plane-mcp、admin init、hooks install / status / doctor。</p></div>
+        <div class="list-item"><h4>MCP 协议</h4><p>stdio 服务器，适合本地 orchestrator 驱动 Codex Desktop。</p></div>
+        <div class="list-item"><h4>安全模型</h4><p>不建议暴露到公网；推荐 read-only 或 on-request 的第一运行姿态。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="num">04</span><span class="label">快速安装</span></div>
+    <div class="sec-body">
+      <div class="install-block">
+        <div class="install-code"><span class="cmt"># 推荐安装方式</span>
+<span class="kw">pipx</span> install <span class="str">codex-control-plane-mcp</span>
+
+<span class="cmt"># 直接运行</span>
+<span class="kw">uvx</span> <span class="str">codex-control-plane-mcp</span>
+
+<span class="cmt"># 生成客户端配置</span>
+<span class="kw">codex-control-plane-mcp-admin</span> init --state-db .\state\codex-mcp-state.sqlite3 --projects-root C:\Users\you\Projects
+
+<span class="cmt"># 启动 stdio server</span>
+<span class="kw">codex-control-plane-mcp</span>
+
+<span class="cmt"># 安装 hooks</span>
+<span class="kw">codex-control-plane-mcp-hooks</span> install --state-db .\state\codex-mcp-state.sqlite3</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="num">05</span><span class="label">技术规格</span></div>
+    <div class="sec-body">
+      <div class="list-grid">
+        <div class="list-item"><h4>语言</h4><p>Python 3.11+</p></div>
+        <div class="list-item"><h4>协议</h4><p>MCP stdio</p></div>
+        <div class="list-item"><h4>许可证</h4><p>Apache-2.0</p></div>
+        <div class="list-item"><h4>仓库定位</h4><p>Durable MCP control plane for long-running Codex Desktop tasks</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>★ 211 · Apache-2.0 · Python · Local-first</span>
+    <a href="https://github.com/aresyn/codex-control-plane-mcp" target="_blank">github.com/aresyn/codex-control-plane-mcp →</a>
+  </div>
+</div>
+</body>
+</html>
