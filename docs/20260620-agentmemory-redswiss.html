@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentMemory — AI 编程 Agent 持久记忆工具</title>
+  <style>
+    :root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#0a0a0a;--red:#c8102e;--soft-red:#fff5f6;--line:#0a0a0a;--shadow:6px 6px 0 rgba(10,10,10,.10)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.8px;line-height:1.6}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(780px,100%);margin:0 auto;padding:0 0 80px}
+
+    /* topbar */
+    .topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:10px;overflow:hidden}
+    .topbar-hero{padding:14px 16px 12px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+    .kicker{font-size:0.62rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.65);margin-bottom:0.4rem}
+    .demo-title{margin:0 0 0.35rem;font-size:clamp(1.3rem,4.5vw,2rem);line-height:1.1;font-weight:900;letter-spacing:-0.03em}
+    .demo-title br{display:none}
+    .sub-line{margin:0;font-size:0.8rem;color:rgba(255,255,255,0.75);line-height:1.45;max-width:44ch;margin-bottom:0.6rem}
+    .tagline{display:flex;gap:0.35rem;flex-wrap:wrap}
+    .tagline span{font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:0.15rem 0.45rem;border-radius:2px}
+    .tag-apache{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff}
+    .tag-ts{background:#3178c6;color:#fff}
+    .tag-free{background:#fff;color:var(--red);border:1px solid var(--red)}
+
+    /* meta */
+    .topbar-meta{padding:10px 12px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto;gap:0;align-content:start;background:#f6f1f1}
+    .meta-row-high{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding-bottom:5px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-low{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+    .meta-pill-lg{border:2px solid var(--line);padding:6px 8px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1}
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-md{border:2px solid var(--line);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11px;line-height:1.2}
+    .meta-pill-md .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+    .meta-pill-sm{border:2px solid var(--line);padding:3px 6px 2px;background:#fff;font-weight:700;font-size:10px;color:#666;line-height:1.3}
+    .meta-pill-sm .sub{display:block;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+
+    /* stats bar */
+    .stats{display:flex;border:2px solid var(--line);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow);background:var(--paper)}
+    .stat{flex:1;min-width:60px;padding:8px 10px 6px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:15px;font-weight:900;line-height:1.1;color:var(--ink)}
+    .stat strong.red{color:var(--red)}
+    .stat strong.green{color:#1a7f37}
+    .stat span{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+
+    /* pills */
+    .pills{padding:0 10px 10px;display:flex;flex-wrap:wrap;gap:5px}
+    .pill{display:inline-block;padding:0.2rem 0.55rem;font-size:10px;font-weight:700;border:1.5px solid var(--line);border-radius:2px;letter-spacing:0.04em}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+    /* section */
+    .section{border:2px solid var(--line);margin:0 10px 10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:12px;font-weight:900}
+    .sec-head .label{font-size:9.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase}
+    .sec-body{padding:10px 12px}
+
+    /* cli grid */
+    .cli-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+    .cli-card{border:1.5px solid var(--line);background:#fff;padding:7px 9px 8px;border-radius:2px}
+    .cat-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:middle;flex-shrink:0}
+    .cname{font-weight:900;font-size:11px;line-height:1.2;margin-bottom:3px;color:var(--ink)}
+    .cname code{font-size:10.5px;font-weight:700}
+    .cli-card p{margin:0;font-size:10.5px;color:#444;line-height:1.4}
+    .ver{font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+
+    /* bench table */
+    .bench-table{width:100%;border-collapse:collapse;font-size:11px}
+    .bench-table th{background:var(--soft-red);border:1.5px solid var(--line);padding:5px 8px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)}
+    .bench-table th:not(:first-child){text-align:center}
+    .bench-table td{border:1.5px solid var(--line);padding:5px 8px;vertical-align:middle}
+    .bench-table td:not(:first-child){text-align:center}
+    .bench-table tr:first-child td{background:rgba(200,16,46,0.06);font-weight:800}
+    .bench-table .best{color:var(--red);font-weight:900}
+    .bench-table .score{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:700}
+    .bench-table .note{font-size:9px;color:#888;display:block}
+
+    /* install block */
+    .install-block{background:#0a0a0a;border-radius:2px;overflow:hidden}
+    .install-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;line-height:1.7;padding:10px 12px;color:#abb2bf;white-space:pre-wrap;word-break:break-all}
+    .install-code .kw{color:#c678dd}
+    .install-code .str{color:#98c379}
+    .install-code .cmt{color:#5c6370}
+    .install-code .cmd{color:#e06c75}
+
+    /* agent list */
+    .agent-list{display:flex;flex-wrap:wrap;gap:5px}
+    .agent-chip{display:inline-flex;align-items:center;gap:4px;padding:0.3rem 0.6rem;border:1.5px solid var(--line);background:#fff;font-size:10px;font-weight:700;border-radius:2px}
+    .agent-chip .dot{width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0}
+    .agent-chip.active{border-color:var(--red);background:var(--soft-red)}
+
+    /* feature pills */
+    .feat-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+    .feat-pill{border:1.5px solid var(--line);background:#fff;padding:4px 8px 3px;font-size:10.5px;font-weight:700;display:flex;align-items:center;gap:4px}
+    .feat-pill .feat-dot{width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0}
+
+    /* footer */
+    .footer{padding:8px 12px;font-size:10px;color:#888;display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .footer a{color:#888}
+    .footer a:hover{color:var(--red)}
+
+    /* mobile */
+    @media(max-width:540px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line);grid-template-rows:auto auto auto}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .cli-grid{grid-template-columns:repeat(2,1fr)}
+      .bench-table{font-size:10px}
+      .stats{flex-wrap:wrap}
+      .demo-title br{display:inline}
+    }
+    @media(max-width:390px){
+      .cli-grid{grid-template-columns:1fr}
+      body{font-size:12px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- topbar -->
+  <header class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">AI Agent · 记忆系统 · TypeScript</div>
+      <h1 class="demo-title">AgentMemory</h1>
+      <p class="sub-line">AI 编程 Agent 的持久记忆系统。基于真实场景 Benchmark 构建，无需再重复解释上下文。</p>
+      <div class="tagline">
+        <span class="tag-apache">Apache-2.0</span>
+        <span class="tag-ts">TypeScript</span>
+        <span class="tag-free">零外部依赖</span>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">23.5k<span class="sub">Stars</span></div>
+        <div class="meta-pill-lg">1,932<span class="sub">Forks</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">95.2%<span class="sub">检索准确率</span></div>
+        <div class="meta-pill-md">1,423<span class="sub">测试通过</span></div>
+        <div class="meta-pill-md">53<span class="sub">MCP 工具</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- stats bar -->
+  <div class="stats">
+    <div class="stat"><strong class="red">95.2%</strong><span>R@5 检索</span></div>
+    <div class="stat"><strong class="green">92%</strong><span>节省 Token</span></div>
+    <div class="stat"><strong>12</strong><span>自动钩子</span></div>
+    <div class="stat"><strong>0</strong><span>外部数据库</span></div>
+    <div class="stat"><strong>1,423</strong><span>测试用例</span></div>
+  </div>
+
+  <!-- pills -->
+  <div class="pills">
+    <span class="pill red">memory</span>
+    <span class="pill">agents</span>
+    <span class="pill">hermes</span>
+    <span class="pill">openclaw</span>
+    <span class="pill">harness</span>
+    <span class="pill dark">claude</span>
+    <span class="pill dark">codex</span>
+    <span class="pill dark">cursor</span>
+    <span class="pill">genai</span>
+  </div>
+
+  <!-- section 1: core features -->
+  <div class="section">
+    <div class="sec-head"><span class="num">01</span><span class="label">核心能力</span></div>
+    <div class="sec-body">
+      <div class="feat-row">
+        <div class="feat-pill"><span class="feat-dot"></span>持久记忆</div>
+        <div class="feat-pill"><span class="feat-dot"></span>会话恢复</div>
+        <div class="feat-pill"><span class="feat-dot"></span>MCP 原生</div>
+        <div class="feat-pill"><span class="feat-dot"></span>零外部 DB</div>
+        <div class="feat-pill"><span class="feat-dot"></span>Benchmark 第一</div>
+        <div class="feat-pill"><span class="feat-dot"></span>置信度评分</div>
+        <div class="feat-pill"><span class="feat-dot"></span>生命周期管理</div>
+        <div class="feat-pill"><span class="feat-dot"></span>知识图谱</div>
+        <div class="feat-pill"><span class="feat-dot"></span>混合搜索</div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-pill" style="border-color:var(--red);background:var(--soft-red)"><span class="feat-dot"></span>支持 Claude Code 原生插件 + 12 钩子</div>
+        <div class="feat-pill" style="border-color:var(--red);background:var(--soft-red)"><span class="feat-dot"></span>支持 Codex CLI 原生插件 + 6 钩子</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- section 2: benchmark -->
+  <div class="section">
+    <div class="sec-head"><span class="num">02</span><span class="label">Benchmark 性能</span></div>
+    <div class="sec-body">
+      <table class="bench-table">
+        <thead>
+          <tr>
+            <th>引擎</th>
+            <th>综合</th>
+            <th>R@5</th>
+            <th>Token 节省</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="best">AgentMemory <span class="note">Benchmark #1</span></td>
+            <td class="score best">0.952</td>
+            <td class="score best">95.2%</td>
+            <td class="score best">92%</td>
+          </tr>
+          <tr>
+            <td>Harness <span class="note">SWE-bench</span></td>
+            <td class="score">0.841</td>
+            <td class="score">—</td>
+            <td class="score">—</td>
+          </tr>
+          <tr>
+            <td>OpenClaw <span class="note">Hermes</span></td>
+            <td class="score">0.793</td>
+            <td class="score">—</td>
+            <td class="score">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- section 3: supported agents -->
+  <div class="section">
+    <div class="sec-head"><span class="num">03</span><span class="label">支持的 Agent</span></div>
+    <div class="sec-body">
+      <div class="agent-list">
+        <div class="agent-chip active"><span class="dot"></span>Claude Code</div>
+        <div class="agent-chip active"><span class="dot"></span>Hermes</div>
+        <div class="agent-chip active"><span class="dot"></span>OpenClaw</div>
+        <div class="agent-chip"><span class="dot"></span>Codex CLI</div>
+        <div class="agent-chip"><span class="dot"></span>Copilot CLI</div>
+        <div class="agent-chip"><span class="dot"></span>Cursor</div>
+        <div class="agent-chip"><span class="dot"></span>Gemini CLI</div>
+        <div class="agent-chip"><span class="dot"></span>pi</div>
+        <div class="agent-chip"><span class="dot"></span>OpenCode</div>
+        <div class="agent-chip"><span class="dot"></span>MCP 任意客户端</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- section 4: install -->
+  <div class="section">
+    <div class="sec-head"><span class="num">04</span><span class="label">安装使用</span></div>
+    <div class="sec-body">
+      <div class="install-block">
+        <div class="install-code"><span class="cmt"># 安装（全局）</span>
+<span class="kw">npm</span> install -g <span class="str">@agentmemory/agentmemory</span>
+
+<span class="cmt"># 启动记忆服务器</span>
+<span class="cmd">agentmemory</span>                            <span class="cmt"># 默认 :3111</span>
+<span class="cmd">agentmemory</span> demo                       <span class="cmt"># 演示 + 验证召回</span>
+<span class="cmd">agentmemory</span> demo --serve              <span class="cmt"># 单命令：启动+演示+关闭</span>
+
+<span class="cmt"># 连接 Agent</span>
+<span class="cmd">agentmemory</span> connect <span class="str">claude-code</span>     <span class="cmt"># Claude Code</span>
+<span class="cmd">agentmemory</span> connect <span class="str">copilot-cli</span>      <span class="cmt"># Copilot CLI</span>
+<span class="cmd">agentmemory</span> connect <span class="str">codex</span>          <span class="cmt"># Codex CLI</span>
+
+<span class="cmt"># Agent 专用 Skills（15 个）</span>
+<span class="kw">npx</span> skills add <span class="str">rohitg00/agentmemory</span> -y</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- section 5: tech specs -->
+  <div class="section">
+    <div class="sec-head"><span class="num">05</span><span class="label">技术规格</span></div>
+    <div class="sec-body">
+      <div class="cli-grid">
+        <div class="cli-card">
+          <div class="cname"><span class="cat-dot"></span>引擎</div>
+          <p>iii engine（自研高性能引擎，无外部 DB 依赖）</p>
+        </div>
+        <div class="cli-card">
+          <div class="cname"><span class="cat-dot"></span>语言</div>
+          <p>TypeScript / Node.js，支持 npm 全局安装</p>
+        </div>
+        <div class="cli-card">
+          <div class="cname"><span class="cat-dot"></span>协议</div>
+          <p>Apache-2.0，开源可商用，无许可证限制</p>
+        </div>
+        <div class="cli-card">
+          <div class="cname"><span class="cat-dot"></span>MCP</div>
+          <p>53 个 MCP 工具，覆盖所有主流 Agent 平台</p>
+        </div>
+        <div class="cli-card">
+          <div class="cname"><span class="cat-dot"></span>记忆类型</div>
+          <p>会话、文档、工具调用、置信度评分、知识图谱</p>
+        </div>
+        <div class="cli-card">
+          <div class="cname"><span class="cat-dot"></span>测试</div>
+          <p>1,423+ 测试用例持续通过，CI 全绿</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div class="footer">
+    <span>★ 23,495 · Apache-2.0 · TypeScript · 零外部依赖</span>
+    <a href="https://github.com/rohitg00/agentmemory" target="_blank">github.com/rohitg00/agentmemory →</a>
+  </div>
+
+</div>
+</body>
+</html>
