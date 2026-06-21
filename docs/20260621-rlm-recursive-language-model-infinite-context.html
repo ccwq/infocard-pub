@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RLM：让大模型一口气读完千万 token 的推理库</title>
+  <style>
+    :root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12);}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;}
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    .hdr{position:relative;background:var(--paper);border:1.5px solid var(--line);box-shadow:var(--shadow);padding:24px 28px 20px;margin-bottom:20px}
+    .hdr-badge{display:inline-flex;align-items:center;gap:6px;background:var(--red);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 10px 2px;border-radius:2px}
+    .hdr-title{font-size:clamp(22px,3.5vw,30px);font-weight:800;line-height:1.2;margin:10px 0 8px;letter-spacing:-.02em}
+    .hdr-sub{color:var(--muted);font-size:14px;line-height:1.5}
+    .hdr-meta{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:12px;color:var(--muted)}
+    .hdr-meta span{display:flex;align-items:center;gap:4px}
+    .hdr-label{position:absolute;top:-1px;right:20px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 10px 2px}
+    .tagbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px}
+    .tag{background:var(--paper);border:1px solid rgba(17,17,17,.25);font-size:11.5px;padding:2px 9px;border-radius:2px;color:var(--ink)}
+    .card{background:var(--paper);border:1.5px solid var(--line);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+    .card-head{background:var(--ink);color:#fff;padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+    .card-body{padding:18px 20px}
+    .sec{margin-bottom:14px}
+    .sec:last-child{margin-bottom:0}
+    .sec-hd{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(17,17,17,.12)}
+    .sec p{font-size:13.5px;margin-bottom:8px;color:#2a2a2a}
+    .sec p:last-child{margin-bottom:0}
+    ul,ol{padding-left:20px;margin:6px 0;font-size:13.5px}
+    li{margin-bottom:5px;padding-left:2px}
+    li:last-child{margin-bottom:0}
+    .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin-top:6px}
+    .kv dt{font-weight:700;color:var(--ink);white-space:nowrap;align-self:baseline;padding-top:1px}
+    .kv dd{color:#333;margin:0}
+    pre{background:#1c1c1e;color:#d4d4d4;border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:14px 16px;font-size:12.5px;line-height:1.65;overflow-x:auto;margin:8px 0;white-space:pre}
+    code{background:rgba(17,17,17,.07);padding:1px 5px;border-radius:3px;font-size:.88em}
+    pre code{background:none;padding:0;border-radius:0;font-size:inherit}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+    th{background:var(--ink);color:#fff;text-align:left;padding:7px 12px;font-weight:700;letter-spacing:.04em}
+    td{padding:7px 12px;border-bottom:1px solid rgba(17,17,17,.1)}
+    tr:last-child td{border-bottom:none}
+    tr:nth-child(even) td{background:rgba(17,17,17,.03)}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:620px){.two-col{grid-template-columns:1fr}}
+    .highlight{background:var(--soft-blue);border-left:3px solid var(--blue);padding:10px 14px;font-size:13.5px;border-radius:0 4px 4px 0;margin:10px 0}
+    .quote{background:var(--soft-ink);border-left:3px solid var(--muted);padding:10px 14px;font-size:13.5px;border-radius:0 4px 4px 0;margin:10px 0;font-style:italic;color:#444}
+    .arch{background:#1c1c1e;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:20px;margin:12px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.7;color:#c9d1d9;overflow-x:auto;white-space:pre}
+    .arch .c1{color:#79c0ff}.arch .c2{color:#a5d6ff}.arch .c3{color:#7ee787}.arch .c4{color:#ffa657}.arch .c5{color:#d2a8ff}.arch .cm{color:#8b949e}
+    .footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:18px;font-size:12px;color:var(--muted);padding-top:12px;border-top:1px solid rgba(17,17,17,.1)}
+    /* paradigm compare */
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media(max-width:580px){.compare{grid-template-columns:1fr}}
+    .cmp{background:var(--paper);border:1.5px solid var(--line);padding:14px 16px;font-size:13px}
+    .cmp-hd{font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(17,17,17,.15)}
+    .cmp-old .cmp-hd{color:var(--muted)}
+    .cmp-new .cmp-hd{color:var(--blue)}
+    .cmp li{margin-bottom:4px;font-size:12.5px}
+    @media(max-width:720px){pre{font-size:11.5px;padding:10px 12px}.card-body{padding:14px 14px}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══ HEADER ═══ -->
+  <div class="hdr">
+    <div class="hdr-badge">AI RESEARCH</div>
+    <div class="hdr-label">PAPER + CODE</div>
+    <div class="hdr-title">RLM<br>让大模型一口气读完千万 token 的推理库</div>
+    <div class="hdr-sub">Recursive Language Models — MIT CSAIL OASYS Lab</div>
+    <div class="hdr-meta">
+      <span>⭐&nbsp;5,051</span>
+      <span>🍴&nbsp;839</span>
+      <span>📦&nbsp;pip install rlms</span>
+      <span>🔧&nbsp;Python · MIT</span>
+      <span>🔗&nbsp;alexzhang13/rlm · arXiv:2512.24601</span>
+    </div>
+  </div>
+
+  <!-- ═══ TAGS ═══ -->
+  <div class="tagbar">
+    <span class="tag">RLM</span>
+    <span class="tag">Recursive Language Models</span>
+    <span class="tag">Long Context</span>
+    <span class="tag">MIT CSAIL</span>
+    <span class="tag">REPL Harness</span>
+    <span class="tag">CodeAct</span>
+    <span class="tag">Tool-Augmented LLM</span>
+  </div>
+
+  <!-- ═══ WHY WORTH LOOKING ═══ -->
+  <div class="card">
+    <div class="card-head">📖 为什么值得看</div>
+    <div class="card-body">
+      <div class="sec">
+        <p>来自 MIT CSAIL 的 OASYS Lab，背后站着 DSPy 和 ColBERT 的作者 Omar Khattab——VentureBeat 专门报道，开源即冲上 5k ⭐，论文已挂 arXiv（arXiv:2512.24601）。</p>
+        <p>核心洞察：**上下文窗口的尽头，从来不是模型的极限，而是工具的边界。**</p>
+        <p>普通模型处理超长文本有个死穴：一本书、一整个代码库、几百页报告，要么塞不进上下文窗口，要么读到后面忘前面。RLM 的思路完全不一样。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ONE SENTENCE ═══ -->
+  <div class="card">
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">一句话</div>
+        <p>RLM 不靠把窗口撑大，而是让模型把整份上下文当 REPL 里的变量，自己写代码去分块、grep、递归调子模型查——就像程序员在 REPL 里调试，而不是一次把所有代码背进脑子。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PARADIGM COMPARE ═══ -->
+  <div class="card">
+    <div class="card-head">🔄 两种范式对比</div>
+    <div class="card-body">
+      <div class="compare">
+        <div class="cmp cmp-old">
+          <div class="cmp-hd">❌ 传统 LLM Completion</div>
+          <ul>
+            <li>上下文全部塞进 prompt</li>
+            <li>窗口有硬上限，超出就截断或报错</li>
+            <li>模型被动接收，无法主动查询局部</li>
+            <li>长文本越靠后的内容越容易被"忘记"</li>
+            <li>调用：<code>llm.completion(prompt, model)</code></li>
+          </ul>
+        </div>
+        <div class="cmp cmp-new">
+          <div class="cmp-hd">✅ RLM：上下文当变量</div>
+          <ul>
+            <li>上下文作为对象存在于 REPL 命名空间</li>
+            <li>模型可写代码分块、grep、切片</li>
+            <li>递归调子模型处理局部片段</li>
+            <li>处理范围超出原生窗口 10–100×</li>
+            <li>调用：<code>rlm.completion(prompt, model)</code></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CORE MECHANISM ═══ -->
+  <div class="card">
+    <div class="card-head">⚙️ 底层原理</div>
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">运行模型</div>
+        <div class="arch"><span class="cm"># 模型在 REPL 中执行自己生成的代码</span>
+<span class="c5">context_doc</span><span class="cm"> = </span><span class="c4">"加载的长文本"</span>
+<span class="c5">chunks</span><span class="cm"> = </span><span class="c3">chunk(context_doc)</span>
+<span class="cm"># 模型可自由调用子模型处理每个分块</span>
+<span class="c5">result</span><span class="cm"> = </span><span class="c3">sub_rlm</span><span class="cm">(</span><span class="c5">chunks</span><span class="cm">[</span><span class="c4">0</span><span class="cm">])</span>
+<span class="c5">answer</span><span class="cm"> = </span><span class="c3">sub_rlm</span><span class="cm">(</span><span class="c5">chunks</span><span class="cm">[</span><span class="c4">1</span><span class="cm">:</span><span class="c4">5</span><span class="cm">])</span>
+<span class="c5">final</span><span class="cm"> = </span><span class="c3">root_rlm</span><span class="cm">(</span><span class="c5">answer</span><span class="cm">)</span></div>
+        <ul>
+          <li>把 <code>llm.completion()</code> 替换成 <code>rlm.completion()</code> 即可，API 完全对齐。</li>
+          <li>REPL 环境中，上下文是一等公民——模型可以用 <code>grep</code> / <code>filter</code> / <code>sub_rlm()</code> 自由探索。</li>
+          <li>子模型调用也是 <code>rlm.completion()</code>，天然支持无限递归嵌套。</li>
+          <li>内置日志（<code>RLMLogger</code>）记录完整轨迹，可回放任意节点。</li>
+          <li>支持 RL 训练：直接插入 <a href="https://github.com/PrimeIntellect-ai/prime-rl" target="_blank">prime-rl</a> 的训练框架。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ INSTALLATION ═══ -->
+  <div class="card">
+    <div class="card-head">📦 安装</div>
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">pip 一行安装</div>
+        <pre><code>pip install rlms</code></pre>
+        <div class="highlight">Python ≥ 3.11。无需改动模型，替换掉原来的 <code>llm.completion()</code> 为 <code>rlm.completion()</code> 即可。</div>
+      </div>
+      <div class="sec">
+        <div class="sec-hd">源码 + uv 开发</div>
+        <pre><code>curl -LsSf https://astral.sh/uv/install.sh | sh
+uv init && uv venv --python 3.12
+uv pip install -e .</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CODE EXAMPLE ═══ -->
+  <div class="card">
+    <div class="card-head">💻 接入示例</div>
+    <div class="card-body">
+      <div class="sec">
+        <pre><code>from rlm import RLM
+
+rlm = RLM(
+    backend="openai",
+    backend_kwargs={"model_name": "gpt-5-nano"},
+    verbose=True,
+)
+
+print(rlm.completion(
+    "Print me the first 100 powers of two, each on a newline."
+).response)</code></pre>
+        <div class="highlight">只需把 <code>llm.completion()</code> 替换成 <code>rlm.completion()</code>。模型换成任何支持的 provider 即可。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ENVIRONMENTS ═══ -->
+  <div class="card">
+    <div class="card-head">🔒 运行环境</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>环境</th><th>类型</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>local</code>（默认）</td><td>同进程 Python exec</td><td>无隔离，与 host 共享 venv，适合本地安全基准测试</td></tr>
+          <tr><td><code>ipython</code></td><td>IPython 会话</td><td>支持 subprocess 隔离 + cell_timeout，pip install 'rlms[ipython]'</td></tr>
+          <tr><td><code>docker</code></td><td>Docker 镜像</td><td>完全隔离，默认 python:3.11-slim，可自定义镜像</td></tr>
+          <tr><td><code>modal</code></td><td>Modal Sandboxes</td><td>云端隔离，需要 Modal 账号认证</td></tr>
+          <tr><td><code>prime</code></td><td>Prime Sandboxes</td><td>Prime Intellect 云端隔离（beta，速度偏慢）</td></tr>
+          <tr><td><code>daytona</code></td><td>Daytona Sandboxes</td><td>云端隔离</td></tr>
+          <tr><td><code>e2b</code></td><td>E2B Sandboxes</td><td>云端隔离</td></tr>
+        </tbody>
+      </table>
+      <div class="sec" style="margin-top:14px">
+        <div class="sec-hd">模型 Provider</div>
+        <p>OpenAI / Anthropic / OpenRouter / Portkey 全支持；本地模型推荐用 <a href="https://github.com/vllm-project/vllm" target="_blank">vLLM</a>（走 OpenAI 兼容接口接入）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ECOSYSTEM ═══ -->
+  <div class="card">
+    <div class="card-head">🌏 RLM 生态</div>
+    <div class="card-body">
+      <div class="sec">
+        <p>已有多个知名项目基于 RLM 范式构建：</p>
+        <ul>
+          <li><a href="https://github.com/stanfordnlp/dspy" target="_blank">DSPy.RLM</a> — DSPy 官方集成 RLM</li>
+          <li><a href="https://github.com/ax-llm/ax" target="_blank">Ax</a> — LLM agent 框架</li>
+          <li><a href="https://github.com/context-labs/halo" target="_blank">HALO</a> — context-labs 的 RLM 自动优化循环</li>
+          <li><a href="https://github.com/viplismism/rlm-cli" target="_blank">rlm-cli</a> — RLM 命令行工具</li>
+          <li><a href="https://www.symbolica.ai/blog/arcgentica" target="_blank">Symbolica</a> — ARC-AGI-2 SOTA 结果</li>
+          <li>Google Cloud ADK — 官方集成 RLM</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TRAINING ═══ -->
+  <div class="card">
+    <div class="card-head">🏋️ RL 训练</div>
+    <div class="card-body">
+      <div class="sec">
+        <p>训练代码在 <code>training/</code> 目录，基于 <a href="https://github.com/PrimeIntellect-ai/prime-rl" target="_blank">Prime Intellect prime-rl</a> 的 <a href="https://github.com/PrimeIntellect-ai/verifiers" target="_blank">verifiers</a> 环境接口，可直接插入 RL 训练循环：</p>
+        <pre><code># 训练自己的 RLM
+cd training/
+# 参考 training/environments/oolong/ 中的示例 .toml 启动</code></pre>
+        <div class="highlight">训练 harness 使用 subprocess 隔离的 local REPL（无云沙箱），与推理引擎的 <code>environment="local"</code> 完全对齐。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LOGGING ═══ -->
+  <div class="card">
+    <div class="card-head">🖥️ 轨迹调试与可视化</div>
+    <div class="card-body">
+      <div class="sec">
+        <pre><code>from rlm.logger import RLMLogger
+from rlm import RLM
+
+logger = RLMLogger(log_dir="./logs")
+rlm = RLM(..., logger=logger)</code></pre>
+        <p>每次 completion 写出一条 JSONL，日志可通过内置可视化器回放：</p>
+        <pre><code>cd visualizer/
+npm run dev        # localhost:3001</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ BOUNDARY ═══ -->
+  <div class="card">
+    <div class="card-head">📌 边界说明</div>
+    <div class="card-body">
+      <div class="sec">
+        <ul>
+          <li><strong>本地 REPL 无生产级隔离</strong>：默认 local 环境在同一进程执行代码，适合内部基准测试，不适合处理不可信输入。</li>
+          <li><strong>Prime Sandboxes 速度偏慢</strong>：官方已知问题，beta 阶段限制。</li>
+          <li><strong>子模型调用成本叠加</strong>：递归调用子 RLM 会累积 token 消耗，需要配合 budget 控制。</li>
+          <li><strong>训练 harness 仅 local REPL</strong>：production RL 训练建议换用云沙箱隔离。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="footer">
+    <span>数据来源：arxiv.org/abs/2512.24601 · github.com/alexzhang13/rlm · MIT License · 2025-12-20</span>
+    <span>构建：hermes-agent · infocard-pub</span>
+  </div>
+
+</div>
+</body>
+</html>
