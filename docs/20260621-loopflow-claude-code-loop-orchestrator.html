@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LoopFlow：让 Claude Code 自己跑验证循环</title>
+  <style>
+    :root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12);}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;}
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    .hdr{position:relative;background:var(--paper);border:1.5px solid var(--line);box-shadow:var(--shadow);padding:24px 28px 20px;margin-bottom:20px}
+    .hdr-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .hdr-badge{display:inline-flex;align-items:center;gap:6px;background:var(--red);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 10px 2px;border-radius:2px}
+    .hdr-title{font-size:clamp(22px,3.5vw,30px);font-weight:800;line-height:1.2;margin:10px 0 8px;letter-spacing:-.02em}
+    .hdr-sub{color:var(--muted);font-size:14px;line-height:1.5}
+    .hdr-meta{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:12px;color:var(--muted)}
+    .hdr-meta span{display:flex;align-items:center;gap:4px}
+    .hdr-label{position:absolute;top:-1px;right:20px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 10px 2px}
+    .tagbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px}
+    .tag{background:var(--paper);border:1px solid rgba(17,17,17,.25);font-size:11.5px;padding:2px 9px;border-radius:2px;color:var(--ink)}
+    .card{background:var(--paper);border:1.5px solid var(--line);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+    .card-head{background:var(--ink);color:#fff;padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+    .card-body{padding:18px 20px}
+    .sec{margin-bottom:14px}
+    .sec:last-child{margin-bottom:0}
+    .sec-hd{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(17,17,17,.12)}
+    .sec h3{font-size:15px;font-weight:700;margin:0 0 6px}
+    .sec p{font-size:13.5px;margin-bottom:6px;color:#2a2a2a}
+    .sec p:last-child{margin-bottom:0}
+    ul,ol{padding-left:20px;margin:6px 0;font-size:13.5px}
+    li{margin-bottom:4px;padding-left:2px}
+    li:last-child{margin-bottom:0}
+    .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin-top:6px}
+    .kv dt{font-weight:700;color:var(--ink);white-space:nowrap;align-self:baseline;padding-top:1px}
+    .kv dd{color:#333;margin:0}
+    pre{background:#1c1c1e;color:#d4d4d4;border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:14px 16px;font-size:12.5px;line-height:1.65;overflow-x:auto;margin:8px 0;white-space:pre}
+    code{background:rgba(17,17,17,.07);padding:1px 5px;border-radius:3px;font-size:.88em}
+    pre code{background:none;padding:0;border-radius:0;font-size:inherit}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+    th{background:var(--ink);color:#fff;text-align:left;padding:7px 12px;font-weight:700;letter-spacing:.04em}
+    td{padding:7px 12px;border-bottom:1px solid rgba(17,17,17,.1)}
+    tr:last-child td{border-bottom:none}
+    tr:nth-child(even) td{background:rgba(17,17,17,.03)}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:620px){.two-col{grid-template-columns:1fr}}
+    .highlight{background:var(--soft-blue);border-left:3px solid var(--blue);padding:10px 14px;font-size:13.5px;border-radius:0 4px 4px 0;margin:8px 0}
+    .warn{background:var(--soft-red);border-left:3px solid var(--red);padding:10px 14px;font-size:13.5px;border-radius:0 4px 4px 0;margin:8px 0}
+    .arch{background:#1c1c1e;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:20px;margin:12px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.7;color:#c9d1d9;overflow-x:auto}
+    .arch .c1{color:#79c0ff}.arch .c2{color:#a5d6ff}.arch .c3{color:#7ee787}.arch .c4{color:#ffa657}.arch .c5{color:#d2a8ff}.arch .cm{color:#8b949e}
+    .footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:18px;font-size:12px;color:var(--muted);padding-top:12px;border-top:1px solid rgba(17,17,17,.1)}
+    @media(max-width:720px){pre{font-size:11.5px;padding:10px 12px}.card-body{padding:14px 14px}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hdr">
+    <div class="hdr-badge">AI ENGINEERING</div>
+    <div class="hdr-label">NEW</div>
+    <div class="hdr-title">LoopFlow<br>让 Claude Code 自己跑验证循环</div>
+    <div class="hdr-sub">Stop prompting your coding agent. Design the loop that prompts it.</div>
+    <div class="hdr-meta">
+      <span>⭐&nbsp;13</span>
+      <span>📦&nbsp;@loopflow/cli · npm</span>
+      <span>🔧&nbsp;TypeScript · MIT</span>
+      <span>🔗&nbsp;faisalishfaq2005/loopflow</span>
+    </div>
+  </div>
+
+  <div class="tagbar">
+    <span class="tag">Claude Code</span>
+    <span class="tag">Loop Orchestrator</span>
+    <span class="tag">AI Agent</span>
+    <span class="tag">TypeScript</span>
+    <span class="tag">Self-Verifying Loop</span>
+    <span class="tag">YAML-Driven</span>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">一句话</div>
+        <p>LoopFlow 用一个 YAML 文件定义"目标 → 多 Agent 流水线 → 验收 gate"，让 Claude Code 自动迭代直到 gate 通过、花完预算，或达到重试上限。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">🎯 解决什么问题</div>
+    <div class="card-body">
+      <div class="sec">
+        <p>纯 Prompt 循环有三条硬边缘，LoopFlow 对症下药：</p>
+        <table>
+          <thead><tr><th>问题</th><th>LoopFlow 答案</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Agent 自己给自己打分</strong></td><td><strong>Gate</strong>：独立 agent 输出 <code>VERDICT: PASS</code> 才算过</td></tr>
+            <tr><td><strong>无人值守烧钱</strong></td><td><strong>Budget</strong>：runner 和 Claude Code 双端美元硬上限</td></tr>
+            <tr><td><strong>每次运行失忆</strong></td><td><strong>Memory</strong>：Markdown 文件记录每次结果，下一次比上一次更聪明</td></tr>
+            <tr><td><strong>Git 分支冲突</strong></td><td><strong>Worktree</strong>：可选 git worktree 隔离，多循环互不打架</td></tr>
+            <tr><td><strong>过程不可追溯</strong></td><td><strong>Session ID</strong>：每步留存 transcript，<code>claude --resume &lt;id&gt;</code> 随时回放</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">⚙️ 底层原理</div>
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">运行模型</div>
+        <div class="arch"><span class="cm"># 每次迭代（≤ max_iterations）</span>
+<span class="c5">memory</span><span class="cm"> ──▶  </span><span class="c3">step: fix</span><span class="cm"> ──▶ </span><span class="c3">step: review (gate)</span><span class="cm"> ──┐</span>
+ <span class="cm">▲      │                                        │</span>
+ <span class="cm">│      └── reviewer feedback ◀────────────── FAIL ┤</span>
+ <span class="cm">└───────────────── run record ◀─────────────────┘</span>
+                                        <span class="c4">PASS → success</span></div>
+        <ul>
+          <li>每步是一次独立的 Claude Code 静默调用（<code>claude -p</code>），不是 API 调。</li>
+          <li>Gate 必须以 <code>VERDICT: PASS</code> 或 <code>VERDICT: FAIL</code> 结尾；无 verdicts 视同 FAIL。</li>
+          <li>FAIL 时，下一轮把 gate 反馈注入所有 prompt 的 system prompt 上下文。</li>
+          <li>每次运行结果（outcome / cost / summary）追加写入 <code>.loopflow/memory/&lt;loop&gt;.md</code>，下次读取。</li>
+          <li>无守护进程、无云服务、无额外 API key；本地 Claude Code 能跑，LoopFlow 就能跑。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">📦 安装</div>
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">前置条件</div>
+        <ul>
+          <li>Node.js ≥ 18</li>
+          <li>Claude Code 已安装并完成认证（<a href="https://claude.com/claude-code" target="_blank">claude.com/claude-code</a>）</li>
+        </ul>
+      </div>
+      <div class="sec">
+        <div class="sec-hd">npm 安装</div>
+        <pre><code>npm install -g @loopflow/cli   # 或
+npx @loopflow/cli</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">🔧 使用流程</div>
+    <div class="card-body">
+      <div class="two-col">
+        <div>
+          <div class="sec">
+            <div class="sec-hd">初始化</div>
+            <pre><code>cd your-project
+loopflow init</code></pre>
+            <p>生成 <code>.loopflow/</code> 目录，内含三条 starter loops：</p>
+            <ul>
+              <li><strong>test-and-fix</strong>：修复 + gate 验收</li>
+              <li><strong>debt-audit</strong>：代码债务发现循环</li>
+              <li><strong>docs-sync</strong>：文档与代码一致性验证</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div class="sec">
+            <div class="sec-hd">运行循环</div>
+            <pre><code># 预览（不实际调用）
+loopflow run test-and-fix --dry-run
+
+# 正式运行
+loopflow run test-and-fix</code></pre>
+            <div class="highlight">推荐先用 <code>--dry-run</code> 确认 prompt 组合正确，再真正执行。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">📋 Loop 配置结构</div>
+    <div class="card-body">
+      <div class="sec">
+        <pre><code># .loopflow/loops/test-and-fix.yaml
+name: test-and-fix
+description: Run the test suite, fix failures, verify the fix.
+
+budget:
+  max_usd: 2.00        # 全局美元硬上限
+  max_iterations: 3    # gate 可拒绝的最大次数
+
+worktree: false        # true = git worktree 隔离运行
+
+defaults:
+  permission_mode: acceptEdits
+
+steps:
+  - id: fix
+    role: >
+      You are a careful maintainer. Make the smallest change
+      that fixes the problem.
+    prompt: |
+      Run this project's test suite. Diagnose and fix the root
+      cause of any failure. Summarize what you changed.
+
+  - id: review
+    gate: true          # ← 必须 VERDICT: PASS 才能结束循环
+    role: >
+      You are a skeptical senior engineer reviewing a change
+      you did not write.
+    prompt: |
+      A previous agent claims to have fixed failing tests.
+      Inspect the diff, re-run the suite yourself.</code></pre>
+        <div class="warn">Gate 步的 <code>role</code> 必须独立于 Fix 步，避免同一模型自我放行。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">⌨️ CLI 参考</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>命令</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>loopflow init [--force]</code></td><td>初始化 .loopflow/ 目录</td></tr>
+          <tr><td><code>loopflow list</code></td><td>列出所有 loops（步骤数 / gate 数 / 预算）</td></tr>
+          <tr><td><code>loopflow validate [name]</code></td><td>校验 loop 定义合法性</td></tr>
+          <tr><td><code>loopflow run &lt;name&gt;</code></td><td>运行指定 loop</td></tr>
+          <tr><td><code>--dry-run</code></td><td>打印所有合成后的 prompt，不实际调用</td></tr>
+          <tr><td><code>-i, --iterations &lt;n&gt;</code></td><td>覆盖 max_iterations</td></tr>
+          <tr><td><code>-b, --budget &lt;usd&gt;</code></td><td>覆盖 max_usd</td></tr>
+          <tr><td><code>-v, --verbose</code></td><td>打印完整步骤输出</td></tr>
+        </tbody>
+      </table>
+      <div class="sec" style="margin-top:14px">
+        <div class="sec-hd">Exit Codes</div>
+        <div class="kv">
+          <dt>0</dt><dd>成功 — gate 通过</dd>
+          <dt>1</dt><dd>循环失败 — gate 耗尽 / 超预算 / 异常</dd>
+          <dt>2</dt><dd>配置错误</dd>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-hd">Programmatic API</div>
+        <pre><code>import { loadLoop, runLoop } from "@loopflow/cli";
+
+const loop = loadLoop(process.cwd(), "test-and-fix");
+const result = await runLoop(loop, { root: process.cwd() });
+console.log(result.outcome, result.costUsd);</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">⏰ 调度方式</div>
+    <div class="card-body">
+      <div class="sec">
+        <p>LoopFlow 不内置守护进程；用已有的调度工具：</p>
+        <pre><code># Linux/macOS — 每周一 9 点跑债务审计
+0 9 * * 1  cd /path/to/project && loopflow run debt-audit
+
+# CI — GitHub Action 每周运行 docs-sync 并开 PR</code></pre>
+        <div class="highlight">有意为之的设计：无状态 CLI + 外部调度 = 不需要额外的后台进程或云依赖。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">📌 边界与路线图</div>
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">当前能力边界</div>
+        <ul>
+          <li>仅支持 Claude Code（不支持 Codex CLI 等其他 headless agent）</li>
+          <li>Step 之间为串行，非并行</li>
+          <li>Gate verdict 仅支持纯文本判断，尚无 <code>--json-schema</code> 结构化输出</li>
+          <li>无内置历史日志查看器（<code>loopflow logs</code> 规划中）</li>
+        </ul>
+      </div>
+      <div class="sec">
+        <div class="sec-hd">Roadmap</div>
+        <ul>
+          <li>🔜 <code>loopflow daemon</code> — 内置调度器，支持 cron 表达式</li>
+          <li>🔜 Parallel steps — fan-out across worktrees</li>
+          <li>🔜 Structured gate verdicts via <code>--json-schema</code></li>
+          <li>🔜 <code>loopflow logs</code> — 循环运行历史</li>
+          <li>🔜 其他 headless agent 适配器（Codex CLI 等）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>数据来源：github.com/faisalishfaq2005/loopflow · MIT License · 2026-06-10</span>
+    <span>构建：hermes-agent · infocard-pub</span>
+  </div>
+
+</div>
+</body>
+</html>
