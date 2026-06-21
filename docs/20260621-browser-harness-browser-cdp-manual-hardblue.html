@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Browser Harness：把 LLM 接到真实浏览器的薄壳 CDP harness</title>
+  <style>
+    :root{
+      --bg:#f7f4ee;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#6f6a63;
+      --line:#111111;
+      --black:#090909;
+      --red:#d11f2d;
+      --soft-red:#fff1f2;
+      --blue:#3b82f6;
+      --green:#16a34a;
+      --yellow:#ca8a04;
+      --shadow:6px 6px 0 rgba(17,17,17,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      font-size:12.8px;
+      line-height:1.65;
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(780px,100%);margin:0 auto;padding-bottom:88px}
+
+    .header{
+      background:var(--black);
+      color:#fff;
+      padding:18px 16px 14px;
+      border-bottom:3px solid var(--line);
+    }
+    .kicker{
+      font-size:0.62rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;
+      color:rgba(255,255,255,.68);margin-bottom:0.45rem
+    }
+    .title{font-size:clamp(1.35rem,4.6vw,2.15rem);line-height:1.06;font-weight:900;letter-spacing:-0.03em;margin-bottom:0.35rem}
+    .subtitle{font-size:0.82rem;max-width:60ch;color:rgba(255,255,255,.8);line-height:1.55;margin-bottom:0.85rem}
+    .chips{display:flex;flex-wrap:wrap;gap:6px}
+    .chip{display:inline-block;padding:0.22rem 0.55rem;border:1.5px solid rgba(255,255,255,.3);border-radius:2px;font-size:0.62rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.08)}
+    .chip.red{background:rgba(209,31,45,.18);border-color:rgba(209,31,45,.5)}
+    .chip.blue{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.5)}
+    .chip.green{background:rgba(22,163,74,.18);border-color:rgba(22,163,74,.5)}
+    .chip.yellow{background:rgba(202,138,4,.18);border-color:rgba(202,138,4,.5)}
+
+    .hero-image{padding:10px 10px 0}
+    .hero-image .card{
+      background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:10px 10px 8px;
+    }
+    .hero-image img{display:block;width:100%;border:1.5px solid var(--line);background:#fff}
+    .img-caption{font-size:10px;color:#777;text-align:center;margin-top:6px}
+
+    .stats{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+      padding:10px;
+    }
+    .stat{
+      background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:8px 8px 7px;text-align:center;
+    }
+    .stat strong{display:block;font-size:1rem;line-height:1.1;margin-bottom:2px}
+    .stat strong.red{color:var(--red)}
+    .stat strong.blue{color:var(--blue)}
+    .stat strong.green{color:var(--green)}
+    .stat strong.yellow{color:var(--yellow)}
+    .stat span{display:block;font-size:0.58rem;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+
+    .section{margin:0 10px 10px;background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+    .sec-head{background:var(--black);color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-no{background:var(--black);color:var(--red);padding:2px 6px;border:1px solid var(--red);font-size:0.62rem;font-weight:900;letter-spacing:.08em}
+    .sec-label{font-size:0.63rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.75)}
+    .sec-body{padding:10px 12px}
+
+    .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .card{
+      background:#fff;border:1.5px solid var(--line);padding:8px 9px;border-radius:2px
+    }
+    .card h3{font-size:0.78rem;line-height:1.25;margin-bottom:4px;font-weight:900}
+    .card p{font-size:0.7rem;line-height:1.5;color:#444}
+    .tagline{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+    .tag{font-size:0.58rem;font-weight:700;border:1px solid var(--line);padding:0.15rem 0.42rem;border-radius:2px;background:#fff}
+    .tag.red{background:var(--soft-red);border-color:var(--red);color:var(--red)}
+    .tag.blue{background:#eff6ff;border-color:var(--blue);color:var(--blue)}
+    .tag.green{background:#ecfdf5;border-color:var(--green);color:var(--green)}
+    .tag.yellow{background:#fffbeb;border-color:var(--yellow);color:var(--yellow)}
+
+    .quote{
+      border-left:4px solid var(--red);padding:8px 10px;background:#fff7f7;color:#231f20;font-size:0.75rem;line-height:1.6
+    }
+    .quote strong{color:var(--red)}
+
+    .checklist{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .check{border:1.5px solid var(--line);background:#fff;padding:8px 9px;border-radius:2px}
+    .check h4{font-size:0.72rem;margin-bottom:4px}
+    .check p{font-size:0.68rem;line-height:1.5;color:#444}
+
+    .table{width:100%;border-collapse:collapse;font-size:0.68rem}
+    .table th,.table td{border:1px solid var(--line);padding:6px 7px;vertical-align:top}
+    .table th{background:#111;color:#fff;font-size:0.58rem;letter-spacing:.08em;text-transform:uppercase}
+    .table td:first-child{font-weight:700}
+    .table .ok{color:var(--green);font-weight:700}
+    .table .warn{color:var(--yellow);font-weight:700}
+    .table .bad{color:var(--red);font-weight:700}
+
+    .footer{padding:10px 12px 0;font-size:0.62rem;color:#888;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .footer a{color:#888}
+
+    @media(max-width:540px){
+      .stats,.grid2,.grid3,.checklist{grid-template-columns:1fr 1fr}
+      .title{font-size:1.45rem}
+      .section,.hero-image{padding-left:0;padding-right:0}
+    }
+    @media(max-width:390px){
+      .stats,.grid2,.grid3,.checklist{grid-template-columns:1fr}
+      body{font-size:12px}
+      .header{padding:16px 12px 12px}
+      .sec-head,.sec-body{padding-left:10px;padding-right:10px}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="kicker">WORKFLOW BUNDLE · BROWSER CONTROL</div>
+      <h1 class="title">Browser Harness：把 LLM 接到真实浏览器</h1>
+      <p class="subtitle">它的定位不是“再造一个浏览器”，而是提供一层很薄、可编辑的 CDP harness：一条 websocket 连到 Chrome，LLM 在执行中补缺失的辅助代码与站点技能，适合需要真实浏览器、需要持续自我修复的任务。</p>
+      <div class="chips">
+        <span class="chip red">薄壳 CDP</span>
+        <span class="chip yellow">真实浏览器</span>
+        <span class="chip blue">安装 / 使用</span>
+        <span class="chip green">自我修复</span>
+      </div>
+    </header>
+
+    <section class="stats">
+      <div class="stat"><strong class="red">1</strong><span>条 websocket</span></div>
+      <div class="stat"><strong class="blue">4</strong><span>核心文件</span></div>
+      <div class="stat"><strong class="green">2</strong><span>连接方式</span></div>
+      <div class="stat"><strong class="yellow">0</strong><span>额外 manager</span></div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-no">01</span><span class="sec-label">一句话结论</span></div>
+      <div class="sec-body">
+        <div class="quote"><strong>结论：</strong>Browser Harness 的核心价值，是把 LLM 直接接到真实浏览器和 CDP 上，同时保留一个很薄的、可编辑的执行壳，让 agent 在运行中补 helper、补 site skill、补它自己欠缺的那部分。</div>
+        <div class="tagline">
+          <span class="tag red">真实浏览器</span>
+          <span class="tag blue">可编辑执行壳</span>
+          <span class="tag green">运行时补缺</span>
+          <span class="tag yellow">适合复杂任务</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-no">02</span><span class="sec-label">安装流程</span></div>
+      <div class="sec-body">
+        <div class="grid2">
+          <div class="card">
+            <h3>推荐安装方式</h3>
+            <p>先把仓库克隆到一个稳定路径，再用 editable 模式安装，这样命令全局可用，但修改仓库里的 helper 后，下一次运行会立即生效。</p>
+          </div>
+          <div class="card">
+            <h3>安装命令</h3>
+            <p><code>git clone ...</code> → <code>cd browser-harness</code> → <code>uv tool install -e .</code> → <code>command -v browser-harness</code>。稳定目录比临时目录更适合长期维护。</p>
+          </div>
+          <div class="card">
+            <h3>权限与依赖</h3>
+            <p>Python 需要 3.11+；核心依赖是 cdp-use、fetch-use、pillow 和 websockets。API key 不是必需，只有使用云浏览器时才需要。</p>
+          </div>
+          <div class="card">
+            <h3>首次校验</h3>
+            <p>安装后先跑 <code>browser-harness --doctor</code> 或 stdin demo，先确认命令能启动，再进入浏览器连接流程，避免一上来就调复杂任务。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-no">03</span><span class="sec-label">连接浏览器的两条路</span></div>
+      <div class="sec-body">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>方式</th>
+              <th>怎么连</th>
+              <th>适合什么</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>方式一：连接现有 Chrome</td>
+              <td>在 `chrome://inspect/#remote-debugging` 勾选允许远程调试；Chrome 144+ 首次连接可能弹确认窗。</td>
+              <td class="ok">适合真实日常浏览器、已有登录状态、需要复用个人配置</td>
+            </tr>
+            <tr>
+              <td>方式二：命令行启动独立 Chrome</td>
+              <td>用 `--remote-debugging-port=9222 --user-data-dir=<非默认路径>` 启动；再用 `BU_CDP_URL` 指向该端口。</td>
+              <td class="warn">适合自动化、无弹窗、无头或 CI 场景</td>
+            </tr>
+            <tr>
+              <td>云浏览器</td>
+              <td>用 Browser Use Cloud 和 `BROWSER_USE_API_KEY`，可同步 cookies，适合分布式或 headless 任务。</td>
+              <td class="blue">适合更稳的托管执行</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tagline">
+          <span class="tag red">本地 Chrome 优先</span>
+          <span class="tag blue">云浏览器可选</span>
+          <span class="tag green">cookies 可同步</span>
+          <span class="tag yellow">默认不需要 key</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-no">04</span><span class="sec-label">日常使用方法</span></div>
+      <div class="sec-body">
+        <div class="grid3">
+          <div class="card">
+            <h3>最短起步</h3>
+            <p>用 heredoc 喂给 <code>browser-harness</code>，先执行一个很小的页面操作，确认 daemon、浏览器和 CDP 三者已经连上。</p>
+          </div>
+          <div class="card">
+            <h3>先看再点</h3>
+            <p>这套工具强调截图先行：先看页面，再判断是点坐标、写 selector，还是直接用 DOM 读取。它偏向真实浏览器行为，不偏向抽象 UI 测试框架。</p>
+          </div>
+          <div class="card">
+            <h3>任务外编排</h3>
+            <p>任务相关代码放在 `agent-workspace/agent_helpers.py` 和 `domain-skills/`，让站点专用经验沉淀下来，而不是写死在主流程里。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-no">05</span><span class="sec-label">底层原理</span></div>
+      <div class="sec-body">
+        <div class="grid2">
+          <div class="card">
+            <h3>执行链路</h3>
+            <p>仓库的架构非常短：Chrome 或 Browser Use Cloud → CDP websocket → daemon → IPC → run.py。run.py 负责入口，daemon 负责持久会话，helpers 负责动作原语。</p>
+          </div>
+          <div class="card">
+            <h3>为什么叫“薄壳”</h3>
+            <p>它不内建一堆管理层；反而把最少的控制逻辑保留下来，把复杂度丢给浏览器本身和 agent 自己学到的技能。这样更容易自我修复，也更容易被编辑。</p>
+          </div>
+          <div class="card">
+            <h3>为什么能“自我修复”</h3>
+            <p>agent 可以在运行过程中写 helper、写 domain skill，下一次执行就能利用新代码。这意味着它会把成功的动作模式沉淀到工作区，而不是每次重新摸索。</p>
+          </div>
+          <div class="card">
+            <h3>协议与状态</h3>
+            <p>IPC 走单行 JSON；状态上区分 session、target、events 和 dialog。daemon 负责让页面会话不至于每次都重来，从而更适合长任务。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-no">06</span><span class="sec-label">边界与风险</span></div>
+      <div class="sec-body">
+        <div class="checklist">
+          <div class="check">
+            <h4>适合</h4>
+            <p>真实浏览器里需要登录态、页面交互、重复任务、站点特例和持续学习的场景；尤其适合你愿意让 agent 越跑越懂的工作流。</p>
+          </div>
+          <div class="check">
+            <h4>不适合</h4>
+            <p>你只想做一次性静态抓取、或者想要一个大而全的自动化框架时，它可能太薄了；它更像浏览器控制面，不像万能中间件。</p>
+          </div>
+          <div class="check">
+            <h4>注意</h4>
+            <p>Chrome 版本、远程调试开关、popup 确认窗、云 key、默认 profile 限制，都会影响连接体验。先诊断连接，再谈复杂任务。</p>
+          </div>
+          <div class="check">
+            <h4>维护建议</h4>
+            <p>把共通 helper 保持短，把站点技能沉到 domain-skills；这样更新不会互相污染，任务也更容易复用。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>来源：<a href="https://github.com/browser-use/browser-harness" target="_blank" rel="noreferrer">browser-use/browser-harness</a> · <a href="https://browser-harness.com" target="_blank" rel="noreferrer">项目主页</a></div>
+      <div>提示：核心事实来自 README、install.md、SKILL.md、run.py、daemon.py、helpers.py</div>
+    </footer>
+  </div>
+</body>
+</html>
