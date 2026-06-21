@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Loop 落地指南：7个最高可用场景</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+
+    /* hero */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%,var(--blue) 34%,var(--purple) 68%,var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%,#53a3ff 22%,var(--purple) 54%,var(--green) 80%,var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 24px rgba(88,195,255,.16)}
+
+    /* shell */
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%,#141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .panel-head .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#dfe8ff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .term{background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#111831;border-bottom:1px solid rgba(255,255,255,.08);color:#dfe8ff;font-size:11px}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8f59f;font-size:12px;line-height:1.7;min-height:100px;white-space:pre-wrap}
+    .term .url{color:#7ad9ff}
+    .term .cm{color:#8b949e}
+    .status-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.08);background:#0f1424;padding:9px 10px;border-radius:12px;font-size:12px;color:#d8e2ff}
+    .status-item .left{display:grid;gap:2px}
+    .status-item .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
+    .status-item .tag{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:10.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+    .tag.cyan{background:rgba(88,195,255,.14);color:#7ad9ff;border:1px solid rgba(88,195,255,.32)}
+    .tag.green{background:rgba(45,179,106,.14);color:#7fe1a2;border:1px solid rgba(45,179,106,.32)}
+    .tag.purple{background:rgba(132,89,255,.14);color:#c9a3ff;border:1px solid rgba(132,89,255,.32)}
+    .tag.yellow{background:rgba(244,200,76,.14);color:#ffe17a;border:1px solid rgba(244,200,76,.32)}
+    .code{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dbe5ff;font-size:11.8px;line-height:1.7;white-space:pre-wrap}
+    .code .kw{color:#7ad9ff}
+    .code .fn{color:#f4c84c}
+    .code .str{color:#90f0a8}
+    .code .cm{color:#8b949e}
+    .status-item strong{color:#fff}
+    .highlight{background:rgba(88,195,255,.08);border-left:3px solid var(--cyan);padding:10px 14px;font-size:12.5px;border-radius:0 6px 6px 0;margin:4px 0;color:#c9d4f7;line-height:1.65}
+    .quote{background:rgba(132,89,255,.08);border-left:3px solid var(--purple);padding:10px 14px;font-size:12.5px;border-radius:0 6px 6px 0;margin:4px 0;color:#c9d4f7;line-height:1.65;font-style:italic}
+
+    /* scenario grid */
+    .scenario-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .scenario{background:#171c2b;border:1.5px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 13px;display:grid;gap:8px}
+    .scenario .num{font:900 22px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--cyan);letter-spacing:-.04em}
+    .scenario .name{font-size:13.5px;font-weight:900;color:#fff;line-height:1.3}
+    .scenario .body{font-size:11.8px;line-height:1.6;color:#c5d2f7;display:grid;gap:3px}
+    .scenario .body span{color:#9fb0de;font-size:10.5px;letter-spacing:.04em}
+    .scenario .boundary{font-size:11px;color:#9fb0de;padding:6px 9px;background:rgba(244,200,76,.06);border:1px solid rgba(244,200,76,.2);border-radius:8px;line-height:1.5}
+
+    /* rule strip */
+    .rule-strip{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .rule{background:linear-gradient(135deg,rgba(88,195,255,.15),rgba(132,89,255,.12));border:1.5px solid rgba(255,255,255,.14);border-radius:16px;padding:14px 16px;display:grid;gap:8px}
+    .rule .rule-hd{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
+    .rule p{font-size:12.5px;line-height:1.65;color:#d8e2ff;margin:0}
+
+    /* download */
+    .download{margin:16px auto 0;display:flex;justify-content:center;gap:12px}
+    .download-btn{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--purple),#6a4cff 54%,var(--blue));color:#fff;border:0;border-radius:18px;padding:16px 24px;box-shadow:0 16px 36px rgba(132,89,255,.34);font-weight:950;letter-spacing:.02em;font-size:18px}
+    .download-btn small{display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em}
+    .download-btn.ghost{display:inline-flex;align-items:center;gap:12px;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.18);color:#fff;border-radius:18px;padding:16px 24px;font-weight:900;letter-spacing:.02em;font-size:18px}
+
+    /* footer */
+    .footer{margin-top:14px;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#dfe8ff;font-size:12px;flex-wrap:wrap}
+    .footer .stars{font-weight:900}
+
+    @media (max-width:1080px){
+      .hero,.shell,.scenario-grid,.rule-strip{grid-template-columns:1fr}
+      .download{flex-direction:column;align-items:center}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .shell{padding:10px;gap:10px}
+      .scenario-grid{grid-template-columns:1fr}
+      .rule-strip{grid-template-columns:1fr}
+      .download-btn,.download-btn.ghost{width:100%;justify-content:center;text-align:center;font-size:16px;padding:14px 16px;border-radius:16px}
+      .footer{font-size:11.5px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">🤖 AI ENGINEERING · METHOD GUIDE</div>
+        <div class="source">@elliotchen100 · X/Twitter · 2026-06-20</div>
+      </div>
+      <h1 class="title">Agent<br>Loop</h1>
+      <p class="subtitle">7 High-Value Use Cases &amp; the Core Judgment Rule</p>
+      <p class="subcn">Loop engineering 本质是把"人不断 prompt agent"替换成系统自己 prompt agent。一个 loop = reason + act + observe，然后 repeat，直到验证通过。关键是 observe——没有验证的 loop，只是更贵的瞎忙。</p>
+      <div class="pill-row">
+        <span class="pill cyan">7 场景</span>
+        <span class="pill green">Reason → Act → Observe</span>
+        <span class="pill yellow">Stop Condition</span>
+        <span class="pill purple">验证即停止条件</span>
+      </div>
+      <div class="hero-note">
+        <strong>核心判断标准：先问它能不能被检查</strong>
+        <p>一个任务适合 loop 的五个特征：目标可以描述清楚，过程可以拆成多轮，结果可以被工具观察，失败可以被定位，停止条件可以写出来。如果连什么叫 done 都说不清，就不要急着做 loop——那不是自动化，只是把不确定性放大。</p>
+      </div>
+    </div>
+
+    <aside class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">⟳</div>
+        <div class="visual-meta">
+          <div class="big">Agent Loop Core</div>
+          <div class="small">reason · act · observe · repeat</div>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <article class="mini-card">
+          <div class="mini-icon cyan" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M6 9l6-6 6 6"></path><path d="M6 15l6 6 6-6"></path></svg>
+          </div>
+          <div class="label">Action</div>
+          <div class="value">Reason → Act</div>
+          <div class="desc">Agent 生成内容或代码</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </div>
+          <div class="label">Observe</div>
+          <div class="value">工具检查结果</div>
+          <div class="desc">浏览器截图 / console / 测试</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon yellow" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+          <div class="label">Verify</div>
+          <div class="value">VERDICT: PASS</div>
+          <div class="desc">没给裁决 = FAIL，必须显式通过</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon green" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </div>
+          <div class="label">Stop</div>
+          <div class="value">停止条件</div>
+          <div class="desc">验证失败或超预算则退出</div>
+        </article>
+      </div>
+      <div class="visual-strip"></div>
+    </aside>
+  </section>
+
+  <!-- ═══ LOOP MODEL ═══ -->
+  <section class="shell">
+    <aside class="panel">
+      <div class="panel-head"><h3>Loop 定义</h3><span class="badge">Definition</span></div>
+      <div class="panel-body">
+        <div class="term">
+          <div class="term-top"><span>Nate Herkelman</span></div>
+          <div class="term-body">Agent Loop = Reason + Act + Observe
+重复，直到验证通过
+
+<span class="cm">不是 repeat，而是 observe
+没有验证 = 更贵的瞎忙</span></div>
+        </div>
+        <div class="highlight">最关键的不是 repeat，而是 observe。</div>
+      </div>
+    </aside>
+
+    <section class="panel" style="background:transparent;border:none;box-shadow:none;display:grid;grid-template-rows:auto auto;gap:12px;padding:0">
+      <div class="panel">
+        <div class="panel-head"><h3>Loop 三要素</h3><span class="badge">Anatomy</span></div>
+        <div class="panel-body" style="grid-template-columns:repeat(3,minmax(0,1fr));display:grid;gap:10px">
+          <div class="status-item" style="flex-direction:column;align-items:flex-start"><div class="left"><span class="small">1</span><strong>目标</strong></div><span class="tag cyan">Goal</span></div>
+          <div class="status-item" style="flex-direction:column;align-items:flex-start"><div class="left"><span class="small">2</span><strong>动作</strong></div><span class="tag purple">Action</span></div>
+          <div class="status-item" style="flex-direction:column;align-items:flex-start"><div class="left"><span class="small">3</span><strong>停止条件</strong></div><span class="tag green">Stop</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>与普通 Prompt 的区别</h3></div>
+        <div class="panel-body">
+          <div class="code"><span class="cm"># 普通 Prompt</span>
+人 prompt → agent 一次回答 → 结束
+
+<span class="cm"># Agent Loop</span>
+系统 prompt → agent act
+→ 工具 observe（截图/测试/console）
+→ 检查结果 → 继续或停止
+→ 重复，直到验证通过</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head"><h3>判断标准</h3><span class="badge">Check First</span></div>
+      <div class="panel-body">
+        <div class="highlight" style="margin:0">在设计多 agent 架构之前，先问：<strong>这个任务能不能被检查？</strong></div>
+        <div class="quote" style="margin:8px 0 0">从 prompt 到 loop，本质上是从"让模型回答"走向"让系统交付"。</div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ═══ 7 SCENARIOS ═══ -->
+  <div class="scenario-grid">
+    <article class="scenario">
+      <div class="num">01</div>
+      <div class="name">调研到产物的循环</div>
+      <div class="body">
+        <span>Research → Output Loop</span>
+        <span>读来源 → 整理 → 生成产物 → 检查遗漏 → 补资料 → 再改结构</span>
+        <span>适用：竞品分析、技术趋势、课程大纲</span>
+      </div>
+      <div class="boundary">⚡ 检查项设计是关键：还有哪些来源没看？哪些观点重复？哪些结论没有证据？</div>
+    </article>
+
+    <article class="scenario">
+      <div class="num">02</div>
+      <div class="name">封面、缩略图和广告创意</div>
+      <div class="body">
+        <span>Thumbnail / Creative Loop</span>
+        <span>生成 10 个方案 → 打分 → 选出前 3 → 找弱点 → 改 → 重新打分 → 收敛</span>
+        <span>适用：YouTube 缩略图、广告概念、Banner 设计</span>
+      </div>
+      <div class="boundary">⚠ 评分有主观性，不能"改到你满意"。建议：拆细评分维度，或用独立 checker agent 做评审，防止自己给自己打高分。</div>
+    </article>
+
+    <article class="scenario">
+      <div class="num">03</div>
+      <div class="name">前端、3D 和可视化代码</div>
+      <div class="body">
+        <span>Code → Render → Inspect Loop</span>
+        <span>写代码 → 跑浏览器 → 截图检查 → 修布局 → 再截图</span>
+        <span>适用：Landing page、Dashboard、Three.js 场景、数据可视化</span>
+      </div>
+      <div class="boundary">✓ 验证工具最明确：浏览器、截图、console、测试。Agent 能看到结果，就能进入"我看过了，再改"的循环。</div>
+    </article>
+
+    <article class="scenario">
+      <div class="num">04</div>
+      <div class="name">视觉复刻和设计实现</div>
+      <div class="body">
+        <span>Visual Recreation Loop</span>
+        <span>目标图片 → 拆解元素 → 生成 HTML/CSS → 截图对比 → 继续改</span>
+        <span>适用：布局结构、颜色关系、元素近似实现</span>
+      </div>
+      <div class="boundary">⚠ Loop 不是魔法。Abbey Road 复刻例子说明：验证标准不够强，循环再多轮也只能把错误变得更有条理。</div>
+    </article>
+
+    <article class="scenario">
+      <div class="num">05</div>
+      <div class="name">视频剪辑和内容后期</div>
+      <div class="body">
+        <span>Video Editing Loop</span>
+        <span>Transcript → 剪错误/停顿 → 做 beats → 同步节奏 → 渲染 → 检查每个 beat 边界</span>
+        <span>适用：字幕对齐、转场检查、画面/脚本一致性验证</span>
+      </div>
+      <div class="boundary">✓ 大量"人类很烦、机器可查"的细节。Nate 最常用的 loop 之一。</div>
+    </article>
+
+    <article class="scenario">
+      <div class="num">06</div>
+      <div class="name">脚本、文章和播客提纲</div>
+      <div class="body">
+        <span>Writing / Script Loop</span>
+        <span>写草稿 → 按审稿表逐项检查 → 改 → 再检查</span>
+        <span>适用：Script、Article、Podcast outline</span>
+      </div>
+      <div class="boundary">📋 审稿表：开头有没有说清矛盾？段落有没有断？语气是否一致？有没有 unsupported claim？结尾是否能落到行动建议？</div>
+    </article>
+
+    <article class="scenario" style="grid-column:1/-1;background:linear-gradient(135deg,rgba(88,195,255,.12),rgba(132,89,255,.10))">
+      <div class="num">07</div>
+      <div class="name">团队代码库的持续开发循环（重度工程场景）</div>
+      <div class="body">
+        <span>Continuous Codebase Development</span>
+        <span>长时间跑测试 → 修 bug → 开 PR → 检查回归 → 持续交付</span>
+        <span>适用：真实代码库、大型项目、团队协作、高频集成</span>
+      </div>
+      <div class="boundary">⚡ 和普通内容创作者需求完全不同。个人 30 分钟 - 2 小时够用；团队长时间 agent 跑测试和 PR 检查更合理。Peter Steinberger 重度工程场景 vs 普通知识工作者：需求差异极大。</div>
+    </article>
+  </div>
+
+  <!-- ═══ CORE RULES ═══ -->
+  <section class="rule-strip">
+    <div class="rule">
+      <div class="rule-hd">✓ 适合 Loop 的任务特征</div>
+      <p>目标可以描述清楚 · 过程可以拆成多轮 · 结果可以被工具观察 · 失败可以被定位 · 停止条件可以写出来</p>
+    </div>
+    <div class="rule" style="background:linear-gradient(135deg,rgba(244,200,76,.12),rgba(132,89,255,.10))">
+      <div class="rule-hd" style="color:var(--yellow)">✗ 不适合 Loop 的任务</div>
+      <p>连什么叫 done 都说不清 · agent 没有工具检查结果 · 停止条件无法量化 · 纯主观无法拆解评分维度的创意评估</p>
+    </div>
+  </section>
+
+  <!-- ═══ SOURCES ═══ -->
+  <section class="shell" style="grid-template-columns:1fr 1fr">
+    <div class="panel">
+      <div class="panel-head"><h3>资料来源</h3><span class="badge">Sources</span></div>
+      <div class="panel-body">
+        <div class="term">
+          <div class="term-top"><span>Nate Herkelman 视频</span></div>
+          <div class="term-body"><span class="url">youtube.com/watch?v=EuzYhzB0vbI</span></div>
+        </div>
+        <div class="term">
+          <div class="term-top"><span>LinkedIn</span></div>
+          <div class="term-body"><span class="url">linkedin.com/posts/nateherkelman_finally-agent-loops...</span></div>
+        </div>
+        <div class="term">
+          <div class="term-top"><span>X/Twitter 原帖</span></div>
+          <div class="term-body"><span class="url">x.com/elliotchen100/status/2068322513600602297</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>核心金句</h3></div>
+      <div class="panel-body">
+        <div class="quote" style="margin:0">"Loop 不是魔法。只要验证标准和工具不够强，循环再多轮也只能把错误变得更有条理。"</div>
+        <div class="highlight" style="margin:8px 0 0">"AI 产品真正的分水岭可能不只是模型多强，而是谁能把这些 loop 做成稳定工作流。"</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ═══ -->
+  <section class="footer">
+    <div>🟦 infocard-darkblue-style</div>
+    <div class="stars">@elliotchen100 · Agent Loop 方法论</div>
+    <div>X/Twitter · 2026-06-20 · 18h 前</div>
+  </section>
+
+</main>
+</body>
+</html>
