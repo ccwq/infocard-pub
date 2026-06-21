@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ORG2：开源版 Cursor 风格的 Agent IDE，可审计、可协作、可持久</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+
+    /* hero */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%,var(--blue) 34%,var(--purple) 68%,var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%,#53a3ff 22%,var(--purple) 54%,var(--green) 80%,var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 24px rgba(88,195,255,.16)}
+
+    /* shell */
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%,#141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .panel-head .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#dfe8ff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .term{background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#111831;border-bottom:1px solid rgba(255,255,255,.08);color:#dfe8ff;font-size:11px}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8f59f;font-size:12px;line-height:1.7;min-height:120px;white-space:pre-wrap}
+    .term .url{color:#7ad9ff}
+    .code{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dbe5ff;font-size:11.8px;line-height:1.7;white-space:pre-wrap}
+    .code .kw{color:#7ad9ff}
+    .code .fn{color:#f4c84c}
+    .code .str{color:#90f0a8}
+    .code .cm{color:#8b949e}
+    .status-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.08);background:#0f1424;padding:9px 10px;border-radius:12px;font-size:12px;color:#d8e2ff}
+    .status-item .left{display:grid;gap:2px}
+    .status-item .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
+
+    /* two col within shell */
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+    /* feature row */
+    .feature-row{margin-top:14px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+    .feature{background:#171c2b;border:1.5px solid rgba(255,255,255,.08);border-radius:16px;padding:11px 9px;color:#e8edf8;text-align:center;display:grid;gap:7px;min-width:0}
+    .icon{width:28px;height:28px;margin:0 auto;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;font-size:14px;color:#fff}
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+
+    /* download */
+    .download{margin:16px auto 0;display:flex;justify-content:center}
+    .download-btn{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--purple),#6a4cff 54%,var(--blue));color:#fff;border:0;border-radius:18px;padding:16px 24px;box-shadow:0 16px 36px rgba(132,89,255,.34);font-weight:950;letter-spacing:.02em;font-size:18px}
+    .download-btn small{display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em}
+
+    /* footer */
+    .footer{margin-top:14px;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#dfe8ff;font-size:12px;flex-wrap:wrap}
+    .footer .stars{font-weight:900}
+
+    @media (max-width:1080px){
+      .hero,.shell{grid-template-columns:1fr}
+      .feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .shell{padding:10px;gap:10px}
+      .feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .download-btn{width:100%;justify-content:center;text-align:center;font-size:16px;padding:14px 16px;border-radius:16px}
+      .footer{font-size:11.5px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">🤖 AGENT-FIRST IDE · DARK BLUE WORKBENCH</div>
+        <div class="source">yorgai/ORG2 · AGPL-3.0 · 2026-06</div>
+      </div>
+      <h1 class="title">ORG-II</h1>
+      <p class="subtitle">Open-source Cursor-style agent IDE — built for reviewability, traceability, and control.</p>
+      <p class="subcn">开源的 Cursor 风格 Agent IDE：用 Rust + Tauri 本地运行 < 100MB，支持 Agent 轨迹直播与回放、跨会话记忆、AI blame，配 Issues/Projects 做 org 级对齐。</p>
+      <div class="pill-row">
+        <span class="pill cyan">Rust + Tauri</span>
+        <span class="pill green">轨迹回放</span>
+        <span class="pill yellow">跨会话记忆</span>
+        <span class="pill purple">Org 级对齐</span>
+        <span class="pill">本地优先</span>
+      </div>
+      <div class="hero-note">
+        <strong>不只是另一个 AI 编程工具——而是人/Agent 组织与 org 级对齐的实验</strong>
+        <p>Cursor、Claude Code 把 agent 当外包助手：输出有用，但难以审计、协调、对齐或系统级演化。ORG-II 把 agent 当持久、可观察的同事：Replayable 轨迹、跨会话记忆、AI blame，让人类、agent 和团队围绕共享上下文与对齐目标协作。</p>
+      </div>
+    </div>
+
+    <aside class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">O2</div>
+        <div class="visual-meta">
+          <div class="big">Agent Control Center</div>
+          <div class="small">GUI / CLI / terminal / scheduling / memory</div>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <article class="mini-card">
+          <div class="mini-icon cyan" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 6.5h16v11H4z"></path><path d="M4 10h16"></path><path d="M7 14h4"></path></svg>
+          </div>
+          <div class="label">Runtime</div>
+          <div class="value">Rust + Tauri</div>
+          <div class="desc">本地运行，磁盘占用 &lt; 100MB</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M6 9l6-6 6 6"></path><path d="M6 15l6 6 6-6"></path></svg>
+          </div>
+          <div class="label">Execution</div>
+          <div class="value">轨迹回放与直播</div>
+          <div class="desc">可审计、可 review、可调试的长会话执行</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon yellow" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"></path><path d="M7 10l3 3-3 3"></path><path d="M12 16h5"></path></svg>
+          </div>
+          <div class="label">Memory</div>
+          <div class="value">跨会话 & 跨 Agent</div>
+          <div class="desc">共享工作区状态，知识在 agent 间传递</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon green" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 19h16"></path><path d="M6 15l3-4 3 2 4-6 2 2"></path></svg>
+          </div>
+          <div class="label">Alignment</div>
+          <div class="value">Org 级对齐</div>
+          <div class="desc">Issues/Projects 管理面，人机目标与问责对齐</div>
+        </article>
+      </div>
+      <div class="visual-strip"></div>
+    </aside>
+  </section>
+
+  <!-- ═══ SHELL ═══ -->
+  <section class="shell">
+    <!-- Left: philosophy -->
+    <aside class="panel">
+      <div class="panel-head"><h3>定位对比</h3><span class="badge">Philosophy</span></div>
+      <div class="panel-body">
+        <div class="term">
+          <div class="term-top"><span>ORG2 vs 传统工具</span></div>
+          <div class="term-body">Cursor / Claude Code
+<span class="cm">  → stateless 外包助手</span>
+  输出有用，难审计
+  难协调，难演化
+
+ORG-II
+<span class="cm">  → 持久可观察的同事</span>
+  Replayable 轨迹
+  跨会话记忆
+  AI blame + org 对齐</div>
+        </div>
+        <div class="term">
+          <div class="term-top"><span>核心命题</span></div>
+          <div class="term-body">Agent 越来越强
+协作 / 可观测性 / 结构
+/ 共同问责却在退步
+
+ORG-II 探索新模型：
+Agent = 持久可观察同事
+在结构化组织内协作</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center: capabilities + architecture -->
+    <section class="panel" style="background:transparent;border:none;box-shadow:none;display:grid;grid-template-rows:auto auto auto;gap:12px;padding:0">
+      <div class="panel">
+        <div class="panel-head"><h3>核心能力</h3><span class="badge">Capabilities</span></div>
+        <div class="panel-body" style="grid-template-columns:repeat(2,minmax(0,1fr));display:grid;gap:10px">
+          <div class="status-item"><div class="left"><span class="small">CAPABILITY</span><strong>Replayable 轨迹</strong></div><span>▶</span></div>
+          <div class="status-item"><div class="left"><span class="small">CAPABILITY</span><strong>跨会话记忆</strong></div><span>▶</span></div>
+          <div class="status-item"><div class="left"><span class="small">CAPABILITY</span><strong>AI Blame</strong></div><span>▶</span></div>
+          <div class="status-item"><div class="left"><span class="small">CAPABILITY</span><strong>Org 级对齐</strong></div><span>▶</span></div>
+          <div class="status-item"><div class="left"><span class="small">CAPABILITY</span><strong>定时任务</strong></div><span>▶</span></div>
+          <div class="status-item"><div class="left"><span class="small">CAPABILITY</span><strong>多工具链</strong></div><span>▶</span></div>
+        </div>
+      </div>
+
+      <div class="term">
+        <div class="term-top"><span>pnpm tauri:dev</span><span>bash</span></div>
+        <div class="term-body">➜  org2 agent --schedule "nightly"
+<span class="cm">[ORG-II] Session started: s_abc123</span>
+<span class="cm">[memory] loaded context from prev sessions</span>
+<span class="cm">[blame] tracing authorship → Claude Code</span>
+<span class="cm">[org-align] goals synced: 3 tasks, 1 blocker</span>
+<span class="cm">[schedule] next run: tomorrow 09:00</span></div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel" style="flex:1">
+          <div class="panel-head"><h3>技术栈</h3></div>
+          <div class="panel-body">
+            <div class="code"><span class="kw">runtime</span>: <span class="fn">Rust + Tauri</span>
+<span class="kw">size</span>:      <span class="str">&lt; 100MB on disk</span>
+<span class="kw">agents</span>:   Rust-based
+<span class="kw">keys</span>:     你的 API Key
+<span class="kw">lang</span>:     TypeScript</div>
+          </div>
+        </div>
+        <div class="panel" style="flex:1">
+          <div class="panel-head"><h3>工具链</h3></div>
+          <div class="panel-body">
+            <div class="code"><span class="kw">GUI</span>:   桌面界面
+<span class="kw">CLI</span>:   命令行
+<span class="kw">Terminal</span>: 终端
+<span class="kw">Git</span>:   版本控制
+<span class="kw">Browser</span>: 浏览器
+<span class="kw">LSP</span>:   语言服务
+<span class="kw">Timeline</span>: 时间线
+<span class="kw">Database</span>: 数据库</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: scheduling + install -->
+    <aside class="panel">
+      <div class="panel-head"><h3>调度 &amp; 安装</h3><span class="badge">Scheduling</span></div>
+      <div class="panel-body">
+        <div class="term">
+          <div class="term-top"><span>Scheduling</span></div>
+          <div class="term-body">定时任务 / 离身运行
+Agent 可过夜继续工作
+或在你离开时自动启动</div>
+        </div>
+        <div class="term">
+          <div class="term-top"><span>源码构建</span></div>
+          <div class="term-body">pnpm install
+pnpm run download:sidecars
+pnpm run tauri:dev</div>
+        </div>
+        <div class="term">
+          <div class="term-top"><span>下载桌面版</span></div>
+          <div class="term-body"><span class="url">github.com/YORG-AI/ORGII/releases</span>
+v1.0.1.23 (2026-06-21)</div>
+        </div>
+        <div class="term">
+          <div class="term-top"><span>可选 Native Sidecars</span></div>
+          <div class="term-body">agent-browser
+  → vercel-labs/agent-browser
+  Browser Use 自动化
+peekaboo
+  → steipete/peekaboo
+  macOS 屏幕自动化</div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ═══ FEATURE ROW ═══ -->
+  <section class="feature-row">
+    <div class="feature">
+      <div class="icon" aria-hidden="true">▶</div>
+      <span>轨迹回放</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">🧠</div>
+      <span>跨会话记忆</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">🔍</div>
+      <span>AI Blame</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">⏰</div>
+      <span>定时调度</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">🏢</div>
+      <span>Org 对齐</span>
+    </div>
+  </section>
+
+  <!-- ═══ DOWNLOAD ═══ -->
+  <div class="download">
+    <a href="https://github.com/YORG-AI/ORGII/releases" target="_blank" class="download-btn">
+      ⬇ <span>Download ORG-II<small>GitHub Releases · v1.0.1.23</small></span>
+    </a>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <section class="footer">
+    <div>🟦 infocard-darkblue-style</div>
+    <div class="stars">⭐ 830</div>
+    <div>yorgai/ORG2 · AGPL-3.0</div>
+  </section>
+
+</main>
+</body>
+</html>
