@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>微信公众号文章转 Markdown：用 Camoufox 抓取并清洗内容</title>
+  <style>
+    :root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12);}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;}
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    .hdr{position:relative;background:var(--paper);border:1.5px solid var(--line);box-shadow:var(--shadow);padding:24px 28px 20px;margin-bottom:20px}
+    .hdr-badge{display:inline-flex;align-items:center;gap:6px;background:var(--red);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 10px 2px;border-radius:2px}
+    .hdr-title{font-size:clamp(22px,3.5vw,30px);font-weight:800;line-height:1.2;margin:10px 0 8px;letter-spacing:-.02em}
+    .hdr-sub{color:var(--muted);font-size:14px;line-height:1.5}
+    .hdr-meta{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:12px;color:var(--muted)}
+    .hdr-meta span{display:flex;align-items:center;gap:4px}
+    .hdr-label{position:absolute;top:-1px;right:20px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 10px 2px}
+    .tagbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px}
+    .tag{background:var(--paper);border:1px solid rgba(17,17,17,.25);font-size:11.5px;padding:2px 9px;border-radius:2px;color:var(--ink)}
+    .card{background:var(--paper);border:1.5px solid var(--line);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+    .card-head{background:var(--ink);color:#fff;padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+    .card-body{padding:18px 20px}
+    .sec{margin-bottom:14px}
+    .sec:last-child{margin-bottom:0}
+    .sec-hd{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(17,17,17,.12)}
+    .sec p{font-size:13.5px;margin-bottom:8px;color:#2a2a2a}
+    .sec p:last-child{margin-bottom:0}
+    ul,ol{padding-left:20px;margin:6px 0;font-size:13.5px}
+    li{margin-bottom:5px;padding-left:2px}
+    li:last-child{margin-bottom:0}
+    .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin-top:6px}
+    .kv dt{font-weight:700;color:var(--ink);white-space:nowrap;align-self:baseline;padding-top:1px}
+    .kv dd{color:#333;margin:0}
+    pre{background:#1c1c1e;color:#d4d4d4;border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:14px 16px;font-size:12.5px;line-height:1.65;overflow-x:auto;margin:8px 0;white-space:pre}
+    code{background:rgba(17,17,17,.07);padding:1px 5px;border-radius:3px;font-size:.88em}
+    pre code{background:none;padding:0;border-radius:0;font-size:inherit}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+    th{background:var(--ink);color:#fff;text-align:left;padding:7px 12px;font-weight:700;letter-spacing:.04em}
+    td{padding:7px 12px;border-bottom:1px solid rgba(17,17,17,.1)}
+    tr:last-child td{border-bottom:none}
+    tr:nth-child(even) td{background:rgba(17,17,17,.03)}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:620px){.two-col{grid-template-columns:1fr}}
+    .highlight{background:var(--soft-blue);border-left:3px solid var(--blue);padding:10px 14px;font-size:13.5px;border-radius:0 4px 4px 0;margin:10px 0}
+    .quote{background:var(--soft-ink);border-left:3px solid var(--muted);padding:10px 14px;font-size:13.5px;border-radius:0 4px 4px 0;margin:10px 0;font-style:italic;color:#444}
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media(max-width:580px){.compare{grid-template-columns:1fr}}
+    .cmp{background:var(--paper);border:1.5px solid var(--line);padding:14px 16px;font-size:13px}
+    .cmp-hd{font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(17,17,17,.15)}
+    .cmp-old .cmp-hd{color:var(--muted)}
+    .cmp-new .cmp-hd{color:var(--blue)}
+    .cmp li{margin-bottom:4px;font-size:12.5px}
+    .footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:18px;font-size:12px;color:var(--muted);padding-top:12px;border-top:1px solid rgba(17,17,17,.1)}
+    @media(max-width:720px){pre{font-size:11.5px;padding:10px 12px}.card-body{padding:14px 14px}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hdr">
+    <div class="hdr-badge">CONTENT TOOLS</div>
+    <div class="hdr-label">WECHAT → MD</div>
+    <div class="hdr-title">微信公众号文章转 Markdown<br>用 Camoufox 抓取并清洗内容</div>
+    <div class="hdr-sub">wechat-article-to-markdown — 抓取公众号文章并转换为干净 Markdown 的 Python 工具</div>
+    <div class="hdr-meta">
+      <span>⭐&nbsp;779</span>
+      <span>🍴&nbsp;99</span>
+      <span>📦&nbsp;uv tool install</span>
+      <span>🔧&nbsp;Python · MIT</span>
+      <span>🔗&nbsp;jackwener/wechat-article-to-markdown</span>
+    </div>
+  </div>
+
+  <div class="tagbar">
+    <span class="tag">WeChat</span>
+    <span class="tag">Markdown</span>
+    <span class="tag">Camoufox</span>
+    <span class="tag">Python</span>
+    <span class="tag">Content Extraction</span>
+    <span class="tag">Open Source</span>
+  </div>
+
+  <div class="card">
+    <div class="card-head">📖 为什么值得看</div>
+    <div class="card-body">
+      <div class="sec">
+        <p>微信公众号文章抓取最烦的不是解析 HTML，而是微信的反检测和页面结构飘忽。这个工具直接把 Camoufox 融进抓取链路：先拿到文章，再清洗成 Markdown，图片下沉到本地，代码块也尽量保留语言标签。</p>
+        <p>它的定位很明确：把公众号长文变成可检索、可归档、可再加工的内容资产。</p>
+      </div>
+      <div class="quote">
+        抓文章只是开始，真正值钱的是把内容变成结构化 Markdown。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">一句话</div>
+        <p>wechat-article-to-markdown 是一个带 Camoufox 抗检测抓取的公众号文章转 Markdown 工具：提取标题、公众号名、发布时间、原文链接，下载图片到本地 images/，并把 code-snippet 转成带语言标记的 Markdown 代码块。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">🛠 核心能力</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>能力</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><strong>抗检测抓取</strong></td><td>使用 Camoufox 规避公众号页面的自动化检测</td></tr>
+          <tr><td><strong>元信息提取</strong></td><td>标题 / 公众号名称 / 发布时间 / 原文链接</td></tr>
+          <tr><td><strong>Markdown 转换</strong></td><td>把文章 HTML 结构清洗成干净 Markdown</td></tr>
+          <tr><td><strong>图片本地化</strong></td><td>下载图片到 output/<article>/images/ 并重写链接</td></tr>
+          <tr><td><strong>代码块保真</strong></td><td>处理微信 code-snippet，尽量保留语言 fence</td></tr>
+          <tr><td><strong>AI Skill 集成</strong></td><td>自带 SKILL.md，可直接安装进 agent runtime</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">🔄 流程</div>
+    <div class="card-body">
+      <div class="compare">
+        <div class="cmp cmp-old">
+          <div class="cmp-hd">❌ 手工复制公众号文章</div>
+          <ul>
+            <li>排版乱</li>
+            <li>图片丢失</li>
+            <li>代码块格式崩坏</li>
+            <li>后续难检索 / 难归档</li>
+          </ul>
+        </div>
+        <div class="cmp cmp-new">
+          <div class="cmp-hd">✅ 工具链输出</div>
+          <ul>
+            <li>抓取 → 清洗 → Markdown</li>
+            <li>图片下载到本地</li>
+            <li>代码块语言保留</li>
+            <li>输出可直接进知识库 / 笔记系统</li>
+          </ul>
+        </div>
+      </div>
+      <div class="highlight">输出目录固定为 <code>output/&lt;article-title&gt;/</code>，方便批量归档与二次处理。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">📦 安装</div>
+    <div class="card-body">
+      <div class="two-col">
+        <div>
+          <div class="sec">
+            <div class="sec-hd">推荐安装</div>
+            <pre><code>uv tool install wechat-article-to-markdown
+
+# 或
+pipx install wechat-article-to-markdown</code></pre>
+          </div>
+        </div>
+        <div>
+          <div class="sec">
+            <div class="sec-hd">源码安装</div>
+            <pre><code>git clone git@github.com:jackwener/wechat-article-to-markdown.git
+cd wechat-article-to-markdown
+uv sync</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">💻 使用示例</div>
+    <div class="card-body">
+      <div class="sec">
+        <div class="sec-hd">CLI</div>
+        <pre><code>wechat-article-to-markdown "https://mp.weixin.qq.com/s/xxxxxxxx"
+
+# 或
+uv run wechat-article-to-markdown "https://mp.weixin.qq.com/s/xxxxxxxx"
+
+# 兼容入口
+uv run main.py "https://mp.weixin.qq.com/s/xxxxxxxx"</code></pre>
+      </div>
+      <div class="sec">
+        <div class="sec-hd">输出结构</div>
+        <pre><code>output/
+└── &lt;article-title&gt;/
+    ├── &lt;article-title&gt;.md
+    └── images/
+        ├── img_001.png
+        ├── img_002.png
+        └── ...</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">🧪 测试</div>
+    <div class="card-body">
+      <div class="sec">
+        <table>
+          <thead><tr><th>场景</th><th>命令</th></tr></thead>
+          <tbody>
+            <tr><td>单元测试</td><td><code>uv run --with pytest pytest -q -m "not e2e"</code></td></tr>
+            <tr><td>真实公众号 E2E</td><td><code>WECHAT_E2E_URLS=... uv run --with pytest pytest -q -m e2e -s</code></td></tr>
+          </tbody>
+        </table>
+        <div class="highlight">E2E 依赖网络与浏览器运行时，仓库把它放进手动 GitHub Actions 工作流。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">🤖 作为 AI Skill</div>
+    <div class="card-body">
+      <div class="sec">
+        <p>项目自带 <code>SKILL.md</code>，可直接作为 AI Agent Skill 安装，支持 Skills CLI 和手动安装两条路。</p>
+        <pre><code>npx skills add jackwener/wechat-article-to-markdown</code></pre>
+        <p>手动安装也很直接：把 <code>SKILL.md</code> 放进 <code>~/.claude/skills/wechat-article-to-markdown</code> 即可。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">📌 边界说明</div>
+    <div class="card-body">
+      <div class="sec">
+        <ul>
+          <li><strong>依赖 Camoufox</strong>：公众号反检测抓取能力来自 Camoufox，抓取链路对浏览器和网络条件有要求。</li>
+          <li><strong>网络可用性</strong>：E2E 测试和实时抓取都需要网络；离线只能处理已抓取好的 HTML。</li>
+          <li><strong>不等于全站镜像</strong>：它的目标是内容提取和转换，不是完整爬取公众号站点。</li>
+          <li><strong>输出后还要再加工</strong>：适合进笔记、知识库、RAG 索引，不是最终发表版排版工具。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>数据来源：github.com/jackwener/wechat-article-to-markdown · MIT License · 2025-10-11</span>
+    <span>构建：hermes-agent · infocard-pub</span>
+  </div>
+
+</div>
+</body>
+</html>
