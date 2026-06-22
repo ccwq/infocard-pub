@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#07120d" />
+<title>Oh my tmux!：把 tmux 默认配置升级成可调、可主题、可恢复的终端工作台</title>
+<meta name="description" content="gpakosz/.tmux 是一份自带主题、双前缀、Powerline 状态栏、TPM 集成和受控自定义入口的 tmux 配置；本卡梳理它相对原生 tmux 的提升、全部快捷键、可调变量、安装与卸载方式。" />
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+:root{
+  --bg:#07120d;--bg2:#0b1711;--panel:#102018;--panel2:#15261d;
+  --ink:#eaf7ef;--muted:#9fbeab;--dim:#6b8276;
+  --line:rgba(180,255,210,.15);--line2:rgba(180,255,210,.08);
+  --green:#33d17a;--mint:#78f2b0;--lime:#b7f171;--cyan:#57d7c0;
+  --yellow:#f2d45c;--red:#ff7474;--pink:#ff7aa8;--black:#020604;
+}
+*{box-sizing:border-box}
+html,body{margin:0;overflow-x:hidden}
+body{
+  font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  background:
+    radial-gradient(circle at 12% 0%,rgba(51,209,122,.18),transparent 30%),
+    radial-gradient(circle at 92% 8%,rgba(87,215,192,.13),transparent 28%),
+    linear-gradient(135deg,var(--bg),#050906 62%,#0a130d);
+  color:var(--ink);-webkit-font-smoothing:antialiased;
+  font-size:14px;line-height:1.65;
+}
+.page{width:min(920px,calc(100% - 16px));margin:0 auto;padding:12px 0 96px;min-width:0}
+.shell{
+  background:linear-gradient(180deg,rgba(16,32,24,.96),rgba(8,18,12,.98));
+  border:1px solid var(--line);border-radius:24px;
+  box-shadow:0 28px 90px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
+  overflow:hidden;min-width:0
+}
+.shell>*{min-width:0;max-width:100%}
+
+/* topbar */
+.topbar{
+  height:42px;display:flex;align-items:center;gap:9px;padding:0 16px;
+  border-bottom:1px solid var(--line);background:rgba(0,0,0,.28);
+  font:800 11.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:var(--muted);letter-spacing:.08em;text-transform:uppercase
+}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 22px rgba(51,209,122,.72)}
+.dot.y{background:var(--yellow);box-shadow:0 0 22px rgba(242,212,92,.6)}
+.dot.r{background:var(--red);box-shadow:0 0 22px rgba(255,116,116,.55)}
+.topbar .path{margin-left:auto;color:var(--dim);text-transform:none;letter-spacing:.02em}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:18px;padding:22px}
+.kicker{
+  display:inline-flex;width:fit-content;gap:8px;align-items:center;
+  border:1px solid rgba(120,242,176,.35);background:rgba(51,209,122,.08);
+  border-radius:999px;padding:6px 11px;color:var(--mint);
+  font:900 11.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  letter-spacing:.1em;text-transform:uppercase
+}
+.kicker:before{content:"DOTFILE";color:#06120b;background:var(--green);border-radius:999px;padding:3px 7px;font-weight:900}
+h1{
+  margin:14px 0 10px;font-size:clamp(28px,5.8vw,52px);line-height:1;
+  letter-spacing:-.04em;color:var(--ink);font-weight:900
+}
+.lead{font-size:15px;line-height:1.65;color:var(--muted);margin:0 0 14px;max-width:60ch}
+.lead b{color:var(--mint);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{
+  font:800 11px/1 ui-monospace,monospace;letter-spacing:.05em;
+  border:1px solid rgba(120,242,176,.32);color:var(--mint);
+  background:rgba(51,209,122,.06);border-radius:6px;padding:5px 9px
+}
+.chip.ok{border-color:rgba(120,242,176,.55);background:rgba(51,209,122,.16);color:#aef5cc}
+.chip.warn{border-color:rgba(242,212,92,.45);color:var(--yellow);background:rgba(242,212,92,.08)}
+.chip.cyan{border-color:rgba(87,215,192,.45);color:var(--cyan);background:rgba(87,215,192,.08)}
+
+/* hero side panel */
+.panel{
+  background:linear-gradient(180deg,rgba(21,38,29,.85),rgba(11,23,17,.92));
+  border:1px solid var(--line);border-radius:14px;overflow:hidden
+}
+.panel-h{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 14px;border-bottom:1px solid var(--line2);
+  font:800 11px/1 ui-monospace,monospace;color:var(--mint);
+  letter-spacing:.1em;text-transform:uppercase
+}
+.panel-h .status{color:var(--green)}
+.panel-h .status:before{content:"● ";color:var(--green)}
+.panel-b{padding:14px}
+.metric-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.metric{
+  border:1px solid var(--line2);border-radius:10px;padding:10px;
+  background:rgba(7,18,13,.6)
+}
+.metric .k{font:800 10.5px/1 ui-monospace,monospace;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.metric .v{font-size:22px;font-weight:900;color:var(--mint);letter-spacing:-.02em;line-height:1}
+.metric .d{font-size:11px;color:var(--muted);margin-top:4px}
+
+.terminal{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12px;line-height:1.75;color:var(--mint);
+  background:rgba(0,0,0,.45);border:1px solid var(--line2);
+  border-radius:10px;padding:10px 12px;white-space:pre-wrap;word-break:break-all;
+  min-width:0;max-width:100%;overflow-x:auto
+}
+.terminal b{color:var(--green);font-weight:700}
+.terminal .c{color:var(--dim)}
+.terminal .y{color:var(--yellow)}
+
+/* sections */
+.section{padding:0 22px 22px}
+.section + .section{border-top:1px dashed var(--line2);padding-top:22px}
+.head{display:grid;grid-template-columns:64px 1fr;gap:14px;margin-bottom:14px}
+.no{
+  font:900 28px/1 ui-monospace,monospace;color:var(--green);
+  border:1px solid rgba(120,242,176,.4);border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(51,209,122,.06)
+}
+.label{font:800 11px/1 ui-monospace,monospace;color:var(--mint);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+h2{margin:0 0 6px;font-size:clamp(20px,3.6vw,28px);font-weight:900;letter-spacing:-.02em;color:var(--ink)}
+.head p{margin:6px 0 0;color:var(--muted);font-size:13.5px;line-height:1.6}
+
+/* comparison */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.compare .col{
+  border:1px solid var(--line);border-radius:12px;padding:14px;
+  background:rgba(7,18,13,.5)
+}
+.compare .col h3{margin:0 0 8px;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+.compare .col.native h3{color:var(--dim)}
+.compare .col.omt h3{color:var(--green)}
+.compare .col ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.7}
+.compare .col.omt ul{color:var(--ink)}
+.compare .col li b{color:var(--mint);font-weight:700}
+
+/* feature grid */
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.fcard{
+  border:1px solid var(--line);border-radius:12px;padding:12px;
+  background:rgba(7,18,13,.5)
+}
+.fcard .tag{
+  display:inline-block;font:800 10px/1 ui-monospace,monospace;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--green);
+  background:rgba(51,209,122,.12);border:1px solid rgba(120,242,176,.3);
+  border-radius:5px;padding:3px 6px;margin-bottom:7px
+}
+.fcard h3{margin:0 0 5px;font-size:13.5px;font-weight:800;color:var(--ink);line-height:1.3}
+.fcard p{margin:0;font-size:12px;color:var(--muted);line-height:1.55}
+
+/* keybinding table */
+.kbtbl{
+  width:100%;border-collapse:separate;border-spacing:0;
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  font-size:12.5px
+}
+.kbtbl th,.kbtbl td{
+  padding:9px 11px;text-align:left;vertical-align:top;
+  border-bottom:1px solid var(--line2)
+}
+.kbtbl tr:last-child td{border-bottom:none}
+.kbtbl th{
+  background:rgba(0,0,0,.32);color:var(--mint);
+  font:800 10.5px/1 ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase
+}
+.kbtbl td.k{
+  font-family:ui-monospace,monospace;color:var(--lime);
+  font-weight:700;white-space:nowrap;width:34%
+}
+.kbtbl td.d{color:var(--muted)}
+.kbtbl tr:nth-child(even) td{background:rgba(0,0,0,.16)}
+.kbsplit{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* route / install steps */
+.route{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.step{
+  border:1px solid var(--line);border-radius:12px;padding:12px;
+  background:rgba(7,18,13,.5)
+}
+.step .cmd{
+  font:900 12px/1.4 ui-monospace,monospace;color:var(--green);
+  background:rgba(51,209,122,.1);border:1px solid rgba(120,242,176,.3);
+  border-radius:6px;padding:6px 8px;display:inline-block;margin-bottom:8px;
+  word-break:break-all;max-width:100%
+}
+.step .txt{font-size:12.5px;color:var(--muted);line-height:1.6}
+.step .txt b{color:var(--mint);font-weight:700}
+
+/* variable list */
+.vars{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.var{
+  border:1px solid var(--line2);border-radius:9px;padding:9px 11px;
+  background:rgba(7,18,13,.5)
+}
+.var code{
+  display:block;font:800 12px/1.4 ui-monospace,monospace;color:var(--lime);
+  margin-bottom:3px;word-break:break-all
+}
+.var span{font-size:11.5px;color:var(--muted);line-height:1.5}
+
+/* warnings */
+.warnbox{
+  border:1px solid rgba(242,212,92,.4);background:rgba(242,212,92,.07);
+  border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--yellow);
+  line-height:1.6
+}
+.warnbox b{color:#ffe89a}
+.alertbox{
+  border:1px solid rgba(255,116,116,.4);background:rgba(255,116,116,.07);
+  border-radius:10px;padding:11px 13px;font-size:12.5px;color:#ffb3b3;
+  line-height:1.6
+}
+.alertbox b{color:#ffd1d1}
+.okbox{
+  border:1px solid rgba(120,242,176,.4);background:rgba(51,209,122,.07);
+  border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--mint);
+  line-height:1.6
+}
+
+/* footer */
+.footer{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  padding:18px 22px;border-top:1px solid var(--line);
+  background:rgba(0,0,0,.24);gap:14px;flex-wrap:wrap
+}
+.footer .small{font-size:11.5px;color:var(--dim);line-height:1.6}
+.footer a{color:var(--mint);text-decoration:none}
+
+/* save button */
+.actions{display:flex;justify-content:center;margin-top:18px}
+.save{
+  background:var(--green);color:#06120b;border:none;
+  font-weight:900;font-size:13px;padding:10px 22px;border-radius:10px;
+  cursor:pointer;letter-spacing:.04em;
+  box-shadow:0 8px 24px rgba(51,209,122,.35)
+}
+.save:hover{background:var(--mint)}
+
+/* responsive */
+@media(max-width:720px){
+  .hero{grid-template-columns:1fr;gap:14px;padding:18px}
+  .compare,.kbsplit,.route,.vars{grid-template-columns:1fr}
+  .fgrid{grid-template-columns:1fr 1fr}
+  .head{grid-template-columns:48px 1fr;gap:10px}
+  .no{font-size:22px}
+  .section{padding:0 18px 18px}
+  .section + .section{padding-top:18px}
+}
+@media(max-width:420px){
+  .fgrid{grid-template-columns:1fr}
+  .metric-grid{grid-template-columns:1fr 1fr}
+  h1{font-size:26px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <main class="shell" id="card">
+
+    <div class="topbar">
+      <span class="dot"></span><span class="dot y"></span><span class="dot r"></span>
+      <span>oh-my-tmux / gpakosz/.tmux</span>
+      <span class="path">~/.tmux.conf.local · ready</span>
+    </div>
+
+    <!-- HERO -->
+    <header class="hero">
+      <div>
+        <div class="kicker">tmux configuration</div>
+        <h1>Oh my tmux! 把 tmux 默认配置升级成可调主题工作台</h1>
+        <p class="lead"><b>gpakosz/.tmux</b> 是一份自带主题、双前缀键、Powerline 状态栏、TPM 集成和受控自定义入口的 tmux 配置；它不替换 tmux，只是把它最常被吐槽的"裸默认体验"补齐：状态栏、复制、面板、SSH、剪贴板、电池、负载都开箱可用。</p>
+        <div class="chips">
+          <span class="chip ok">25.1k stars</span>
+          <span class="chip">3.59k forks</span>
+          <span class="chip ok">MIT + WTFPL v2</span>
+          <span class="chip cyan">tmux ≥ 2.6</span>
+          <span class="chip">Linux / macOS / OpenBSD / WSL</span>
+          <span class="chip warn">单一 .local 自定义入口</span>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="panel-h"><span>session info</span><span class="status">stable</span></div>
+        <div class="panel-b">
+          <div class="metric-grid">
+            <div class="metric"><div class="k">Stars</div><div class="v">25.1k</div><div class="d">GitHub 显示</div></div>
+            <div class="metric"><div class="k">Forks</div><div class="v">3.59k</div><div class="d">广泛 fork</div></div>
+            <div class="metric"><div class="k">License</div><div class="v">MIT</div><div class="d">+ WTFPL v2 双协议</div></div>
+            <div class="metric"><div class="k">tmux</div><div class="v">≥ 2.6</div><div class="d">长期向后兼容</div></div>
+          </div>
+          <div class="terminal"><b>$</b> curl -fsSL https://github.com/gpakosz/.tmux/raw/refs/heads/master/install.sh#$(date +%s) | bash
+<span class="c"># 自动备份旧配置，clone 到 ~/.local/share/tmux/oh-my-tmux</span>
+<b>$</b> tmux
+<b>(tmux)</b> <span class="y">C-a e</span>  <span class="c"># 打开 .tmux.conf.local 自定义文件</span>
+<b>(tmux)</b> <span class="y">C-a r</span>  <span class="c"># 重新加载配置</span></div>
+        </div>
+      </aside>
+    </header>
+
+    <!-- 01 相对原生 tmux 的提升 -->
+    <section class="section">
+      <div class="head">
+        <div class="no">01</div>
+        <div>
+          <div class="label">vs. vanilla tmux</div>
+          <h2>相对原生 tmux 提供了什么</h2>
+          <p>tmux 自身只给出一个最小可用的状态栏和默认绑定。Oh my tmux! 在不替换 tmux 本身的前提下，补齐了视觉、复制粘贴、面板、会话、SSH、扩展几乎全部"日常会用到"的能力。</p>
+        </div>
+      </div>
+      <div class="compare">
+        <div class="col native">
+          <h3>原生 tmux 默认体验</h3>
+          <ul>
+            <li>只有 <b>C-b</b> 一个前缀键，与终端常用快捷键冲突频繁</li>
+            <li>裸默认状态栏，无电池/负载/SSH/主机名/时钟</li>
+            <li>复制需手动配 vi-mode；选区与系统剪贴板隔离</li>
+            <li>面板分割键不直观（<code>"</code>、<code>%</code>）</li>
+            <li>无内建主题，需要自己写大量 <code>set -g status-*</code></li>
+            <li>新会话/窗口/面板不会自动继承当前工作目录或 SSH</li>
+            <li>没有"最大化单个面板到新窗口"概念，只有 zoom</li>
+          </ul>
+        </div>
+        <div class="col omt">
+          <h3>Oh my tmux! 加成</h3>
+          <ul>
+            <li><b>C-a 作为第二前缀</b>，<b>C-b</b> 保留，迁移零成本</li>
+            <li><b>Powerline 风格</b>状态栏：电池、负载、SSH 主机名、用户名、时钟、运行时长</li>
+            <li><b>copy-mode-vi</b> 默认开启，<b>y</b> 直接拷到系统剪贴板（xsel/xclip/wl-copy）</li>
+            <li><b>vim 风格</b>面板导航 <code>h j k l</code>、调整 <code>H J K L</code>、交换 <code>&lt; &gt;</code></li>
+            <li>把任意面板"<b>最大化到新窗口</b>"<code>&lt;prefix&gt; +</code>，比 zoom 更灵活</li>
+            <li>新窗口/面板可<b>保留当前路径</b>、<b>SSH 自动重连</b>到远端服务器</li>
+            <li>内建 <b>TPM 支持</b>，并提供 4 位十六进制 Unicode、Urlscan/PathPicker 集成</li>
+            <li>所有可调项集中在 <b>.tmux.conf.local</b>，主配置不可改，升级不会丢自定义</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 核心特性 -->
+    <section class="section">
+      <div class="head">
+        <div class="no">02</div>
+        <div>
+          <div class="label">core features</div>
+          <h2>核心增强功能一览</h2>
+          <p>这些是 Oh my tmux! 默认就开启或随手可启用的能力。它不是简单的"换皮"，而是把 tmux 当成一个可编排的会话内 OS 来配置。</p>
+        </div>
+      </div>
+      <div class="fgrid">
+        <article class="fcard">
+          <span class="tag">prefix</span>
+          <h3>C-a 双前缀</h3>
+          <p>C-a 作为第二前缀，C-b 仍然可用，与 GNU screen 习惯兼容，且不破坏 tmux 默认体验。</p>
+        </article>
+        <article class="fcard">
+          <span class="tag">theme</span>
+          <h3>Powerline 状态栏</h3>
+          <p>开箱即用的 Powerline 主题，可配电池条 / 百分比 / 充放电、负载、运行时长、SSH 主机、用户、天气 (wttr.in) 等。</p>
+        </article>
+        <article class="fcard">
+          <span class="tag">pane</span>
+          <h3>最大化到新窗口</h3>
+          <p><code>&lt;prefix&gt; +</code> 把当前面板"提升"成新窗口，可继续在里面分割面板；再按一次还原，比 <code>resize-pane -Z</code> 灵活。</p>
+        </article>
+        <article class="fcard">
+          <span class="tag">copy</span>
+          <h3>系统剪贴板复制</h3>
+          <p>copy-mode-vi 默认启用：<code>v</code> 选区、<code>C-v</code> 切块选、<code>y</code> 复制到 paste-buffer，并自动通过 xsel/xclip/wl-copy 同步到系统剪贴板。</p>
+        </article>
+        <article class="fcard">
+          <span class="tag">mouse</span>
+          <h3>可切换的鼠标模式</h3>
+          <p><code>&lt;prefix&gt; m</code> 一键开关鼠标：调整面板、切换窗口、自动进 copy-mode 选文本，需要纯键盘时再关掉。</p>
+        </article>
+        <article class="fcard">
+          <span class="tag">ssh</span>
+          <h3>SSH/Mosh 感知</h3>
+          <p>状态栏 <code>#{username}</code> / <code>#{hostname}</code> 自动识别 SSH/Mosh；新面板/窗口可自动重连到远端服务器，不必再手动 ssh。</p>
+        </article>
+        <article class="fcard">
+          <span class="tag">path</span>
+          <h3>保留当前路径</h3>
+          <p>新窗口、新面板可配置<b>继承当前 pane 的工作目录</b>，避免每开一个面板都要 <code>cd</code> 回项目根目录。</p>
+        </article>
+        <article class="fcard">
+          <span class="tag">url</span>
+          <h3>URL / 路径提取</h3>
+          <p>集成 <b>Urlscan</b>（首选）/ <b>Urlview</b> 抓取终端可见 URL，<b>Facebook PathPicker</b> 抓取文件路径，分别用 <code>&lt;prefix&gt; U</code> 和 <code>&lt;prefix&gt; F</code>。</p>
+        </article>
+        <article class="fcard">
+          <span class="tag">tpm</span>
+          <h3>内建 TPM 支持</h3>
+          <p>直接 <code>set -g @plugin ...</code> 启用插件即可，不需要再添加 TPM 自身或 <code>run '~/.tmux/plugins/tpm/tpm'</code>；安装/卸载/更新绑定也被改造过。</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- 03 安装 -->
+    <section class="section">
+      <div class="head">
+        <div class="no">03</div>
+        <div>
+          <div class="label">install</div>
+          <h2>安装方式</h2>
+          <p>可装到三处之一：<code>~</code>、<code>$XDG_CONFIG_HOME/tmux</code>、<code>~/.config/tmux</code>。安装脚本会自动备份已有 tmux 配置，再把仓库 clone 到 <code>~/.local/share/tmux/oh-my-tmux</code>，并 symlink 主配置、复制 <code>.local</code> 自定义文件。</p>
+        </div>
+      </div>
+
+      <div class="warnbox" style="margin-bottom:12px">
+        <b>⚠️ 前置条件：</b>tmux <b>≥ 2.6</b>，awk / perl（含 Time::HiRes）/ grep / sed；终端 <code>TERM</code> 应设为 <code>xterm-256color</code>。安装前建议先 <b>备份现有配置</b>，并且 <b>tmux 当前没有 client/server 在运行</b>（脚本本身也会检查）。
+      </div>
+
+      <div class="route">
+        <div class="step">
+          <div class="cmd">curl -fsSL .../install.sh | bash</div>
+          <div class="txt">
+            <b>自动安装（推荐）</b>：完整命令 →<br>
+            <code>curl -fsSL "https://github.com/gpakosz/.tmux/raw/refs/heads/master/install.sh#$(date +%s)" | bash</code><br>
+            脚本会备份 <code>~/.tmux/</code>、<code>~/.tmux.conf</code>、<code>.local</code> 等旧文件为 <code>*.YYYYDDMMSS</code> 后缀，再 clone 到 <code>$XDG_DATA_HOME/tmux/oh-my-tmux</code> 并 symlink 主配置。
+          </div>
+        </div>
+        <div class="step">
+          <div class="cmd">manual @ ~</div>
+          <div class="txt">
+            <b>手动安装到 <code>~</code></b>：<br>
+            <code>cd && git clone --single-branch https://github.com/gpakosz/.tmux.git</code><br>
+            <code>ln -s -f .tmux/.tmux.conf</code><br>
+            <code>cp .tmux/.tmux.conf.local .</code>
+          </div>
+        </div>
+        <div class="step">
+          <div class="cmd">manual @ $XDG_CONFIG_HOME/tmux</div>
+          <div class="txt">
+            <code>git clone --single-branch https://github.com/gpakosz/.tmux.git /path/to/oh-my-tmux</code><br>
+            <code>mkdir -p "$XDG_CONFIG_HOME/tmux"</code><br>
+            <code>ln -s /path/to/oh-my-tmux/.tmux.conf "$XDG_CONFIG_HOME/tmux/tmux.conf"</code><br>
+            <code>cp /path/to/oh-my-tmux/.tmux.conf.local "$XDG_CONFIG_HOME/tmux/tmux.conf.local"</code><br>
+            <b>注意</b>：XDG 路径下文件名<b>没有前导点</b>（<code>tmux.conf</code> 而非 <code>.tmux.conf</code>）。
+          </div>
+        </div>
+        <div class="step">
+          <div class="cmd">manual @ ~/.config/tmux</div>
+          <div class="txt">
+            <code>git clone --single-branch https://github.com/gpakosz/.tmux.git /path/to/oh-my-tmux</code><br>
+            <code>mkdir -p ~/.config/tmux</code><br>
+            <code>ln -s /path/to/oh-my-tmux/.tmux.conf ~/.config/tmux/tmux.conf</code><br>
+            <code>cp /path/to/oh-my-tmux/.tmux.conf.local ~/.config/tmux/tmux.conf.local</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="alertbox" style="margin-top:12px">
+        🚨 <b>永远不要修改主配置 <code>.tmux.conf</code> / <code>tmux.conf</code></b>。所有自定义都写在 <code>.tmux.conf.local</code> / <code>tmux.conf.local</code> 里；这是这个项目能"平滑升级"的根基，破坏它就只能自负其责。
+      </div>
+    </section>
+
+    <!-- 04 卸载 -->
+    <section class="section">
+      <div class="head">
+        <div class="no">04</div>
+        <div>
+          <div class="label">uninstall / restore</div>
+          <h2>卸载与还原</h2>
+          <p>项目本身没有提供 <code>uninstall.sh</code>；卸载等于"把 Oh my tmux! 留下的 symlink、clone 目录和复制出来的 <code>.local</code> 撤掉"。如果安装时让脚本做过备份，可以直接还原。</p>
+        </div>
+      </div>
+
+      <div class="kbsplit">
+        <div>
+          <div class="okbox" style="margin-bottom:10px"><b>第一步</b>：先彻底退出 tmux server，避免被运行中的 server 占用<br><code>tmux kill-server</code></div>
+
+          <table class="kbtbl">
+            <thead><tr><th>对象</th><th>清理动作</th></tr></thead>
+            <tbody>
+              <tr><td class="k">~/.tmux.conf <span style="color:var(--dim)">(symlink)</span></td><td class="d">删除：<code>rm ~/.tmux.conf</code></td></tr>
+              <tr><td class="k">~/.tmux.conf.local</td><td class="d">删除或备份：<code>rm ~/.tmux.conf.local</code></td></tr>
+              <tr><td class="k">$XDG_CONFIG_HOME/tmux/tmux.conf*</td><td class="d">同上，包括 <code>tmux.conf</code> 与 <code>tmux.conf.local</code></td></tr>
+              <tr><td class="k">~/.config/tmux/tmux.conf*</td><td class="d">同上</td></tr>
+              <tr><td class="k">~/.local/share/tmux/oh-my-tmux</td><td class="d">删除 clone 目录：<code>rm -rf ~/.local/share/tmux/oh-my-tmux</code></td></tr>
+              <tr><td class="k">~/.tmux/plugins/*</td><td class="d">如果之前装过 TPM 插件想一并清理：<code>rm -rf ~/.tmux/plugins</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <div class="warnbox" style="margin-bottom:10px"><b>恢复你原来的 tmux 配置</b>：自动安装脚本会把旧文件改名为带时间戳后缀（形如 <code>.tmux.conf.YYYYDDMMSS</code>、<code>.tmux.YYYYDDMMSS/</code>、<code>oh-my-tmux.YYYYDDMMSS</code>）。卸载后逐个把它们 <code>mv</code> 回原名即可。</div>
+
+          <div class="terminal"><span class="c"># 1) 关掉所有 tmux server</span>
+<b>$</b> tmux kill-server
+
+<span class="c"># 2) 移除 Oh my tmux! 留下的入口</span>
+<b>$</b> rm -f ~/.tmux.conf ~/.tmux.conf.local
+<b>$</b> rm -rf ~/.local/share/tmux/oh-my-tmux
+
+<span class="c"># 3) 如果用的是 XDG 路径</span>
+<b>$</b> rm -f "$XDG_CONFIG_HOME/tmux/tmux.conf" \
+      "$XDG_CONFIG_HOME/tmux/tmux.conf.local"
+
+<span class="c"># 4) 还原安装脚本备份过的旧配置</span>
+<b>$</b> ls -1 ~/.tmux* ~/.config/tmux/* 2&gt;/dev/null
+<b>$</b> mv ~/.tmux.conf.<span class="y">YYYYDDMMSS</span> ~/.tmux.conf
+<b>$</b> mv ~/.tmux.conf.local.<span class="y">YYYYDDMMSS</span> ~/.tmux.conf.local</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 主前缀快捷键 -->
+    <section class="section">
+      <div class="head">
+        <div class="no">05</div>
+        <div>
+          <div class="label">prefix bindings</div>
+          <h2>主前缀快捷键（<code>&lt;prefix&gt;</code> = C-a 或 C-b）</h2>
+          <p>这是 Oh my tmux! 重新组织过的常用绑定。<code>&lt;prefix&gt; c</code> 表示先按前缀，再按 <code>c</code>；<code>&lt;prefix&gt; C-c</code> 表示先按前缀，再按 <kbd>Ctrl</kbd>+<kbd>c</kbd>。</p>
+        </div>
+      </div>
+
+      <div class="kbsplit">
+        <table class="kbtbl">
+          <thead><tr><th>键位</th><th>动作</th></tr></thead>
+          <tbody>
+            <tr><td class="k">&lt;prefix&gt; e</td><td class="d">在 <code>$VISUAL</code> / <code>$EDITOR</code>（默认 vim）里打开 <code>.tmux.conf.local</code></td></tr>
+            <tr><td class="k">&lt;prefix&gt; r</td><td class="d">重新加载配置</td></tr>
+            <tr><td class="k">C-l</td><td class="d">清屏 <b>并</b> 清掉 tmux 滚动历史（不是前缀键，直接按）</td></tr>
+            <tr><td class="k">&lt;prefix&gt; C-c</td><td class="d">新建一个 session</td></tr>
+            <tr><td class="k">&lt;prefix&gt; C-f</td><td class="d">按名字切换到另一个 session</td></tr>
+            <tr><td class="k">&lt;prefix&gt; C-h</td><td class="d">切到上一个窗口（接管原 <code>&lt;prefix&gt; p</code>）</td></tr>
+            <tr><td class="k">&lt;prefix&gt; C-l</td><td class="d">切到下一个窗口（接管原 <code>&lt;prefix&gt; n</code>）</td></tr>
+            <tr><td class="k">&lt;prefix&gt; Tab</td><td class="d">切回最后活跃窗口</td></tr>
+            <tr><td class="k">&lt;prefix&gt; -</td><td class="d">垂直分割当前面板</td></tr>
+            <tr><td class="k">&lt;prefix&gt; _</td><td class="d">水平分割当前面板</td></tr>
+          </tbody>
+        </table>
+        <table class="kbtbl">
+          <thead><tr><th>键位</th><th>动作</th></tr></thead>
+          <tbody>
+            <tr><td class="k">&lt;prefix&gt; h j k l</td><td class="d">vim 风格切换面板（左 / 下 / 上 / 右）</td></tr>
+            <tr><td class="k">&lt;prefix&gt; H J K L</td><td class="d">调整面板大小</td></tr>
+            <tr><td class="k">&lt;prefix&gt; &lt; &gt;</td><td class="d">在父容器内交换面板位置</td></tr>
+            <tr><td class="k">&lt;prefix&gt; +</td><td class="d">把当前面板<b>最大化到新窗口</b>，可在新窗口内继续分屏；再按一次还原</td></tr>
+            <tr><td class="k">&lt;prefix&gt; m</td><td class="d">切换鼠标模式</td></tr>
+            <tr><td class="k">&lt;prefix&gt; U</td><td class="d">启动 Urlscan（若可用）/ Urlview 抓 URL</td></tr>
+            <tr><td class="k">&lt;prefix&gt; F</td><td class="d">启动 Facebook PathPicker（若可用）</td></tr>
+            <tr><td class="k">&lt;prefix&gt; Enter</td><td class="d">进入 copy-mode</td></tr>
+            <tr><td class="k">&lt;prefix&gt; b</td><td class="d">列出 paste-buffers</td></tr>
+            <tr><td class="k">&lt;prefix&gt; p</td><td class="d">粘贴最顶的 paste-buffer</td></tr>
+            <tr><td class="k">&lt;prefix&gt; P</td><td class="d">从指定 paste-buffer 粘贴</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 06 copy-mode-vi + TPM -->
+    <section class="section">
+      <div class="head">
+        <div class="no">06</div>
+        <div>
+          <div class="label">copy-mode-vi & TPM</div>
+          <h2>copy-mode-vi 绑定 与 TPM 行为差异</h2>
+          <p>复制模式默认是 vi 风格，并对齐了作者本人的 vim 配置。TPM 也内建了，但绑定和官方略有不同，使用前要看一眼。</p>
+        </div>
+      </div>
+
+      <div class="kbsplit">
+        <table class="kbtbl">
+          <thead><tr><th>copy-mode-vi 键位</th><th>动作</th></tr></thead>
+          <tbody>
+            <tr><td class="k">v</td><td class="d">开始选区 / 进入 visual 模式</td></tr>
+            <tr><td class="k">C-v</td><td class="d">在 blockwise visual 与 visual 模式间切换</td></tr>
+            <tr><td class="k">H</td><td class="d">跳到行首</td></tr>
+            <tr><td class="k">L</td><td class="d">跳到行尾</td></tr>
+            <tr><td class="k">y</td><td class="d">把选区复制到最顶 paste-buffer（并尝试同步到系统剪贴板）</td></tr>
+            <tr><td class="k">Escape</td><td class="d">取消当前操作</td></tr>
+          </tbody>
+        </table>
+        <table class="kbtbl">
+          <thead><tr><th>TPM 键位（已修改）</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="k">&lt;prefix&gt; + I</td><td class="d">安装插件（注意是<b>大写 I + 大写 +</b>）</td></tr>
+            <tr><td class="k">&lt;prefix&gt; u</td><td class="d">更新插件</td></tr>
+            <tr><td class="k">&lt;prefix&gt; + Alt + u</td><td class="d">卸载插件</td></tr>
+            <tr><td class="k">⚠ <code>set -g @plugin 'tmux-plugins/tpm'</code></td><td class="d"><b>不要写</b>，TPM 已内建</td></tr>
+            <tr><td class="k">⛔ <code>run '~/.tmux/plugins/tpm/tpm'</code></td><td class="d"><b>不要写</b>，会造成冲突</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="okbox" style="margin-top:12px">
+        如果你需要 <b>保留原生 tmux 的全部默认绑定</b>，可以在 <code>.tmux.conf.local</code> 里设置 <code>tmux_conf_preserve_stock_bindings=true</code>。Oh my tmux! 不会再覆盖原生的 <code>&lt;prefix&gt; n</code>、<code>&lt;prefix&gt; p</code> 等。
+      </div>
+    </section>
+
+    <!-- 07 配置变量速查 -->
+    <section class="section">
+      <div class="head">
+        <div class="no">07</div>
+        <div>
+          <div class="label">.tmux.conf.local · key knobs</div>
+          <h2>常用可调变量（在 <code>.tmux.conf.local</code> 里改）</h2>
+          <p>主要分四类：会话/窗口/面板的行为、复制粘贴、24bit 颜色、主题颜色与状态栏。它们都暴露在 <code>.tmux.conf.local</code>，主配置不需要动。</p>
+        </div>
+      </div>
+
+      <div class="vars">
+        <div class="var"><code>tmux_conf_preserve_stock_bindings</code><span>设为 <code>true</code> 保留原生 tmux 全部默认绑定，不被 Oh my tmux! 覆盖。</span></div>
+        <div class="var"><code>tmux_conf_new_session_prompt</code><span>新建 session 时是否提示输入名字。</span></div>
+        <div class="var"><code>tmux_conf_new_session_retain_current_path</code><span>新 session 是否继承当前 pane 的工作目录。</span></div>
+        <div class="var"><code>tmux_conf_new_window_retain_current_path</code><span>新窗口是否保留当前路径。</span></div>
+        <div class="var"><code>tmux_conf_new_window_reconnect_ssh</code><span>新窗口里是否自动 SSH 重连到远端服务器。</span></div>
+        <div class="var"><code>tmux_conf_new_pane_retain_current_path</code><span>新面板默认是否继承路径（默认 <code>true</code>）。</span></div>
+        <div class="var"><code>tmux_conf_new_pane_reconnect_ssh</code><span>新面板里是否自动 SSH 重连。</span></div>
+        <div class="var"><code>tmux_conf_24b_colour</code><span>24bit (true color) 支持开关，<code>auto</code> / <code>true</code> / <code>false</code>。</span></div>
+        <div class="var"><code>tmux_conf_theme</code><span>设为 <code>enabled</code> 启用内建主题，<code>disabled</code> 关掉以便自配。</span></div>
+        <div class="var"><code>tmux_conf_theme_colour_1..17</code><span>主题调色板，覆盖背景、前景、边框、激活窗口、强调色等。</span></div>
+        <div class="var"><code>tmux_conf_theme_pane_border_style</code><span>面板边框风格，<code>thin</code> / <code>fat</code>。</span></div>
+        <div class="var"><code>tmux_conf_theme_status_left</code> / <code>_right</code><span>状态栏左/右内容模板，可塞 <code>#{battery_*}</code>、<code>#{hostname}</code>、<code>#(...)</code>。</span></div>
+        <div class="var"><code>tmux_conf_theme_left_separator_main</code> / <code>_sub</code><span>左侧主/次分隔符；启用 Powerline 时改成 <code>\uE0B0</code> / <code>\uE0B1</code>。</span></div>
+        <div class="var"><code>tmux_conf_theme_right_separator_main</code> / <code>_sub</code><span>右侧主/次分隔符，对应 <code>\uE0B2</code> / <code>\uE0B3</code>。</span></div>
+        <div class="var"><code>tmux_conf_theme_highlight_focused_pane</code><span>是否高亮当前聚焦面板的背景。</span></div>
+        <div class="var"><code>tmux_conf_copy_to_os_clipboard</code><span>是否把 copy-mode 的选区同步到系统剪贴板（需 xsel/xclip/wl-copy）。</span></div>
+      </div>
+
+      <div class="okbox" style="margin-top:12px">
+        状态栏支持的内置变量包括：<code>#{battery_bar}</code> / <code>#{battery_percentage}</code> / <code>#{battery_status}</code>、<code>#{loadavg}</code>、<code>#{uptime_y/d/h/m/s}</code>、<code>#{hostname}</code> / <code>#{hostname_ssh}</code>、<code>#{username}</code> / <code>#{username_ssh}</code>、<code>#{prefix}</code>、<code>#{pairing}</code>、<code>#{synchronized}</code>、<code>#{root}</code>、<code>#{circled_session_name}</code>、<code>#{pretty_pane_current_path}</code>。
+      </div>
+    </section>
+
+    <!-- 08 边界 + 故障排查 -->
+    <section class="section">
+      <div class="head">
+        <div class="no">08</div>
+        <div>
+          <div class="label">limits & troubleshooting</div>
+          <h2>边界、坑点与故障排查</h2>
+          <p>Oh my tmux! 适合大多数日常 tmux 用户，但有几件事需要你提前知道。</p>
+        </div>
+      </div>
+
+      <div class="kbsplit">
+        <div>
+          <div class="warnbox" style="margin-bottom:10px"><b>不要修改主配置：</b>所有自定义只能写到 <code>.tmux.conf.local</code> / <code>tmux.conf.local</code>。直接改主 <code>.tmux.conf</code> 不被支持，升级时会丢失。</div>
+          <div class="warnbox" style="margin-bottom:10px"><b>本地 <code>set/bind/unbind</code> 被覆盖：</b>在 <code>.local</code> 里加 <code>set / bind / unbind</code> 时，行尾追加 <code>#!important</code>，否则会被主配置覆盖。例：<code>bind c new-window -c '#{pane_current_path}' #!important</code>。</div>
+          <div class="warnbox"><b>Windows：</b>作者不推荐 Cygwin（fork 太慢，本配置 <code>run-shell</code> 频繁）；推荐 <b>WSL + Windows Terminal</b>，或 <b>wsltty</b>。</div>
+        </div>
+        <div>
+          <div class="alertbox" style="margin-bottom:10px"><b>状态栏字符串错位 / 行重复：</b>多见于 Linux 上 glib 已升级 Unicode 9.0 但 glibc 没升级（glib ≥ 2.50.1 而 glibc &lt; 2.26），或 iTerm2 的 "Unicode 9 character widths" 开关；样本 <code>.local</code> 现在已经避开 8.0→9.0 间变宽的字符与 emoji。</div>
+          <div class="alertbox" style="margin-bottom:10px"><b>怀疑行为异常：</b>先 <code>tmux -f /dev/null -L test</code> 启动一个不加载任何配置的纯净 tmux，确认问题是 tmux 自身还是本配置。</div>
+          <div class="okbox"><b>Powerline 看不到符号：</b>你不需要装 Powerline 整个包，只要：① 用 Source Code Pro 或 ② Powerline patched 字体 或 ③ 单独装 <code>PowerlineSymbols.otf</code>；然后把 <code>tmux_conf_theme_*_separator_*</code> 设成 <code>\uE0B0</code>~<code>\uE0B3</code>。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- footer -->
+    <footer class="footer">
+      <div class="small">
+        Source: <a href="https://github.com/gpakosz/.tmux">github.com/gpakosz/.tmux</a><br/>
+        Author: <a href="https://github.com/gpakosz">@gpakosz</a> · License: MIT + WTFPL v2<br/>
+        Compatible with tmux ≥ 2.6 · Linux / macOS / OpenBSD / WSL
+      </div>
+      <div class="small">
+        Theme: darkgreen monitor dashboard<br/>
+        Card: oh-my-tmux feature & keybinding reference<br/>
+        Created: 2026-06-22 09:48 UTC+8
+      </div>
+    </footer>
+  </main>
+  <div class="actions"><button class="save" onclick="saveCard()">保存 PNG</button></div>
+</div>
+<script>
+async function saveCard(){
+  const node=document.getElementById('card');
+  const canvas=await html2canvas(node,{backgroundColor:null,scale:2,useCORS:true});
+  const a=document.createElement('a');
+  a.download='20260622-oh-my-tmux.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+}
+</script>
+</body>
+</html>
