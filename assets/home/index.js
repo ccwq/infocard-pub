@@ -30,6 +30,7 @@
   }
   const INTERSECTION_ROOT_MARGIN = '0px 0px 480px 0px';
   const COLLAPSED_FULL_ROWS = 3;
+  const TAG_COLLAPSED_ROWS = 1;
   const COLLAPSED_EXTRA_PX = 24;
   const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
   const DATETIME_MINUTE_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?:Z|[+-]\d{2}:?\d{2})?$/;
@@ -209,6 +210,7 @@
       const tagFilterRef = ref(null);
       const tagToggleRef = ref(null);
       const tagNeedsCollapse = ref(false);
+      const tagHiddenCount = ref(0);
       const collapsedMaxHeight = ref('none');
       const observerRef = ref(null);
 
@@ -411,10 +413,11 @@
         const filterEl = tagFilterRef.value;
         if (!viewport || !filterEl) return;
 
-        const buttons = Array.from(filterEl.querySelectorAll('button'));
+        const buttons = Array.from(filterEl.querySelectorAll('button.tag-chip-mini, button.tag-label-mini'));
         if (!buttons.length) {
           collapsedMaxHeight.value = 'none';
           tagNeedsCollapse.value = false;
+          tagHiddenCount.value = 0;
           return;
         }
 
@@ -429,22 +432,27 @@
         });
 
         const shouldExpand = tagsExpanded.value;
-        tagNeedsCollapse.value = rows.length > COLLAPSED_FULL_ROWS;
+        tagNeedsCollapse.value = rows.length > TAG_COLLAPSED_ROWS;
 
         if (!tagNeedsCollapse.value || shouldExpand) {
           collapsedMaxHeight.value = `${filterEl.scrollHeight}px`;
+          tagHiddenCount.value = 0;
           return;
         }
 
         const baseTop = rows[0] || 0;
-        const visibleRows = rows.slice(0, COLLAPSED_FULL_ROWS);
+        const visibleRows = rows.slice(0, TAG_COLLAPSED_ROWS);
         let lastBottom = 0;
+        let hidden = 0;
         buttons.forEach((button) => {
           if (visibleRows.includes(button.offsetTop)) {
             lastBottom = Math.max(lastBottom, button.offsetTop + button.offsetHeight);
+          } else {
+            hidden += 1;
           }
         });
-        collapsedMaxHeight.value = `${Math.max(0, lastBottom - baseTop + COLLAPSED_EXTRA_PX)}px`;
+        tagHiddenCount.value = Math.max(0, hidden);
+        collapsedMaxHeight.value = `${Math.max(0, lastBottom - baseTop + 6)}px`;
       };
 
       const ensureAutoFill = () => {
@@ -598,7 +606,7 @@
         saveSessionState();
       }, { deep: true });
 
-      const renderTagLabel = (tag) => `${tag.tag} (${tag.count})`;
+      const renderTagLabel = (tag) => tag.tag;
       const renderFacetLabel = (item) => `${item.value} (${item.count})`;
       const serialOf = (card) => pad2(card.__order + 1);
 
@@ -630,6 +638,7 @@
         listProgressText,
         loadingNoteText,
         tagNeedsCollapse,
+        tagHiddenCount,
         collapsedMaxHeight,
         sentinelRef,
         tagViewportRef,
@@ -752,11 +761,12 @@
               </div>
             </div>
 
-            <div class="tag-row tag-row-layered" style="margin-top:12px">
+            <div class="tag-row tag-row-layered tag-row-mini" style="margin-top:12px">
               <div class="tag-viewport-wrap" :class="{ expanded: tagsExpanded, collapsed: tagNeedsCollapse && !tagsExpanded }">
-                <div ref="tagViewportRef" class="tag-viewport layered" :style="{ maxHeight: collapsedMaxHeight }">
-                  <div ref="tagFilterRef" class="tag-filter">
+                <div ref="tagViewportRef" class="tag-viewport layered mini" :style="{ maxHeight: collapsedMaxHeight }">
+                  <div ref="tagFilterRef" class="tag-filter tag-filter-mini">
                     <button
+                      class="tag-label-mini"
                       :class="{ active: !selectedTags.length }"
                       type="button"
                       @click="clearSelectedTags"
@@ -766,31 +776,27 @@
                     <button
                       v-for="tag in sortedTags"
                       :key="tag.tag"
+                      class="tag-chip-mini"
                       :class="{ active: activeTagClass(tag.tag) }"
                       type="button"
                       @click="toggleTag(tag.tag)"
                     >
-                      {{ renderTagLabel(tag) }}
+                      <span class="tag-chip-mini-text">{{ renderTagLabel(tag) }}</span>
+                      <span class="tag-chip-mini-count">{{ tag.count }}</span>
                     </button>
                   </div>
                 </div>
                 <button
                   v-if="tagNeedsCollapse"
                   ref="tagToggleRef"
-                  class="tag-toggle-mini"
+                  class="tag-toggle-mini tag-toggle-inline"
                   :class="{ active: tagsExpanded }"
                   type="button"
                   @click.stop="toggleTagsExpanded"
                   :aria-label="tagsExpanded ? '收起关键词标签' : '展开关键词标签'"
                 >
-                  {{ tagsExpanded ? '−' : '+' }}
+                  {{ tagsExpanded ? '−' : '+' + tagHiddenCount }}
                 </button>
-                <div
-                  v-if="tagNeedsCollapse && !tagsExpanded"
-                  class="tag-fade"
-                  aria-hidden="true"
-                  @click.stop.prevent
-                ></div>
               </div>
             </div>
           </section>
