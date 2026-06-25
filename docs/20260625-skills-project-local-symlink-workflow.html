@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skills 只装项目里：用软链接管理 Agent Skills 的极客工作流</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --paper: #f6f1e8;
+      --paper-2: #efe7d8;
+      --ink: #111111;
+      --muted: #5e5a54;
+      --line: #1e1e1e;
+      --soft-line: rgba(30,30,30,.18);
+      --accent: #b31919;
+      --accent-2: #1d4ed8;
+      --accent-3: #0f766e;
+      --shadow: 0 18px 42px rgba(0,0,0,.14);
+      --mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      --sans: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #e9e3d6; font-family: var(--sans); color: var(--ink); }
+    body { text-align: center; }
+    .page {
+      width: min(100%, 780px);
+      margin: 0 auto;
+      text-align: left;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.58), rgba(255,255,255,.28)),
+        repeating-linear-gradient(0deg, transparent 0 27px, rgba(0,0,0,.032) 27px 28px),
+        repeating-linear-gradient(90deg, transparent 0 27px, rgba(0,0,0,.028) 27px 28px),
+        var(--paper);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      padding-bottom: 84px;
+    }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 14px 18px 10px;
+      border-bottom: 2px solid var(--line);
+      background: rgba(255,255,255,.45);
+      font: 11px/1.2 var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .hero {
+      padding: 20px 18px 14px;
+      display: grid;
+      grid-template-columns: 1.45fr .9fr;
+      gap: 14px;
+      border-bottom: 2px solid var(--line);
+    }
+    .kicker {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font: 11px/1 var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      box-shadow: 3px 3px 0 rgba(0,0,0,.08);
+      margin-bottom: 12px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 5.2vw, 46px);
+      line-height: .98;
+      letter-spacing: -.04em;
+    }
+    .lead {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #24211d;
+      max-width: 40em;
+    }
+    .hero-side {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+    .statbox, .note, .diagram, .section, .warning, .footer-box {
+      border: 2px solid var(--line);
+      background: rgba(255,255,255,.56);
+      box-shadow: 5px 5px 0 rgba(0,0,0,.08);
+    }
+    .statbox {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;
+      overflow: hidden;
+    }
+    .stat {
+      padding: 10px 10px 9px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .stat:nth-child(2n) { border-right: 0; }
+    .stat:nth-last-child(-n+2) { border-bottom: 0; }
+    .stat .label { display:block; font: 10px/1.2 var(--mono); letter-spacing:.08em; text-transform:uppercase; color: var(--muted); margin-bottom:6px; }
+    .stat .value { display:block; font-size: 19px; line-height:1.08; font-weight: 800; }
+    .note {
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+    .warning {
+      margin: 14px 18px 0;
+      padding: 12px 14px;
+      border-left: 8px solid var(--accent);
+      background: #111;
+      color: #f2ece3;
+      box-shadow: none;
+    }
+    .warning strong { color: #fff; }
+    .diagram {
+      margin: 14px 18px 0;
+      padding: 14px;
+    }
+    .diagram h3, .section h3 { margin: 0 0 10px; font-size: 18px; line-height: 1.2; }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+    .node {
+      position: relative;
+      padding: 10px 10px 11px;
+      border: 2px solid var(--line);
+      background: #fff;
+      min-height: 102px;
+    }
+    .node:after {
+      content: "→";
+      position: absolute;
+      right: -18px;
+      top: 50%;
+      transform: translateY(-50%);
+      font: 18px/1 var(--mono);
+      color: var(--accent);
+    }
+    .node:last-child:after { content: none; }
+    .node .n { display:block; font: 10px/1.2 var(--mono); letter-spacing:.08em; text-transform:uppercase; color: var(--muted); margin-bottom: 7px; }
+    .node .t { display:block; font-size: 15px; font-weight: 800; margin-bottom: 6px; }
+    .node .d { display:block; font-size: 12px; line-height: 1.6; color: #2b2925; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 14px;
+      padding: 14px 18px 0;
+    }
+    .section {
+      padding: 14px 14px 12px;
+    }
+    .section-head {
+      display:flex; align-items:center; gap:10px; margin-bottom: 10px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--soft-line);
+    }
+    .section-no {
+      width: 30px; height: 30px; display:inline-flex; align-items:center; justify-content:center;
+      border: 2px solid var(--line); background: #fff; font: 11px/1 var(--mono); box-shadow: 3px 3px 0 rgba(0,0,0,.08);
+    }
+    .section-head h3 { margin: 0; font-size: 17px; }
+    .section p, .section li { font-size: 13px; line-height: 1.72; color: #24221f; }
+    .section p { margin: 0 0 8px; }
+    .section ul, .section ol { margin: 0; padding-left: 18px; }
+    .section li + li { margin-top: 6px; }
+    .mini-table {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 112px 1fr;
+      gap: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(0,0,0,.18);
+    }
+    .row:first-child { border-top: 0; padding-top: 0; }
+    .row .k { font: 10px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .chipline { display:flex; flex-wrap:wrap; gap:6px; margin-top: 8px; }
+    .chip {
+      display:inline-flex; align-items:center; gap:6px;
+      padding: 4px 7px;
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: 2px 2px 0 rgba(0,0,0,.06);
+      font: 10px/1 var(--mono);
+    }
+    .footer-box {
+      margin: 14px 18px 0;
+      padding: 12px 14px;
+    }
+    .footer-box p { margin: 0; font-size: 12px; line-height: 1.68; color: #2a2824; }
+    .footer-box p + p { margin-top: 6px; }
+    .save-btn {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 999;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      background: linear-gradient(135deg, #b31919, #7f1111);
+      color: #fff;
+      font: 12px/1 var(--mono);
+      letter-spacing: .08em;
+      box-shadow: 0 8px 22px rgba(0,0,0,.24);
+      cursor: pointer;
+    }
+    .save-btn:hover { filter: brightness(1.06); }
+    @media (max-width: 720px) {
+      .page { width: 100%; box-shadow: none; padding-bottom: 92px; }
+      .topbar { padding: 12px 14px 9px; font-size: 10px; }
+      .hero { grid-template-columns: 1fr; padding: 16px 14px 12px; gap: 12px; }
+      .warning, .diagram, .footer-box { margin-left: 14px; margin-right: 14px; }
+      .grid { grid-template-columns: 1fr; padding: 12px 14px 0; gap: 12px; }
+      .flow { grid-template-columns: 1fr; }
+      .node:after {
+        content: '↓'; right: auto; left: 50%; top: auto; bottom: -18px; transform: translateX(-50%);
+      }
+      .node:last-child:after { content: none; }
+      .row { grid-template-columns: 1fr; gap: 4px; }
+      .section-head { gap: 8px; }
+      .section-no { width: 28px; height: 28px; }
+      .save-btn { right: 12px; bottom: 12px; padding: 9px 12px; }
+      .section p, .section li, .footer-box p { font-size: 12.6px; }
+    }
+  </style>
+</head>
+<body>
+  <main id="card" class="page">
+    <div class="topbar">
+      <span>personal workflow / skills management</span>
+      <span>2026-06-25 22:11:28 / china standard time</span>
+    </div>
+
+    <section class="hero">
+      <div>
+        <div class="kicker">skills / symlink / project-local only</div>
+        <h1>Skills 只装在项目里：<br>用软链接管理 Agent Skills 的极客工作流</h1>
+        <p class="lead">这套方法的核心不是“花哨”，而是把 Skills 当成项目级依赖来管理：只在当前项目暴露需要的能力，把上下文窗口、更新成本和 bug 修复路径都收紧到一条更可控的链路里。</p>
+      </div>
+      <div class="hero-side">
+        <div class="statbox">
+          <div class="stat"><span class="label">核心选择</span><span class="value">项目内安装</span></div>
+          <div class="stat"><span class="label">安装方式</span><span class="value">软链接</span></div>
+          <div class="stat"><span class="label">目标</span><span class="value">省上下文</span></div>
+          <div class="stat"><span class="label">维护收益</span><span class="value">单点更新</span></div>
+        </div>
+        <div class="note">适合已经同时维护多个项目、多个技能仓、并且愿意把 Agent 当工程工具来管理的人；不一定适合所有人，但非常适合作为一套“低复制、低漂移”的思路。</div>
+      </div>
+    </section>
+
+    <section class="warning">
+      <strong>一句话结论：</strong>把 Skills 全装全局，看起来方便；但从上下文成本、误触发概率和后续维护来看，把真正需要的 Skills 只挂进当前项目，往往更像一个可长期扩展的工程化方案。
+    </section>
+
+    <section class="diagram">
+      <h3>这套链路到底怎么跑</h3>
+      <div class="flow">
+        <div class="node">
+          <span class="n">step 01</span>
+          <span class="t">统一存放原件</span>
+          <span class="d">把开源 skills 仓库集中放进 `~/GitHub`，原件只保留一份，避免每个项目复制一套。</span>
+        </div>
+        <div class="node">
+          <span class="n">step 02</span>
+          <span class="t">项目内创建软链接</span>
+          <span class="d">在 `.agents/skills/` 下把需要的 skill 链进来，让项目只暴露当前真正用得到的能力。</span>
+        </div>
+        <div class="node">
+          <span class="n">step 03</span>
+          <span class="t">再给 Claude Code 一个入口</span>
+          <span class="d">用 `.claude/skills -> .agents/skills` 再接一层，让 Agent 顺着链找到项目内技能。</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="section">
+        <div class="section-head"><span class="section-no">01</span><h3>为什么不装全局</h3></div>
+        <p>最直接的理由是节约上下文窗口。Skill 默认不会一开始就把全文全部塞进去，但名称、描述、触发条件这些摘要会一直存在；全局装得越多，工作台上就越容易堆满“现在不需要但一直占地方”的资料。</p>
+        <p>更麻烦的是误触发。全局 skills 越多，模型越容易把边缘相关的 skill 也拉进来；一旦完整内容被加载，消耗的就不是几个 token 的摘要，而是一大块真正的上下文预算。</p>
+        <div class="chipline">
+          <span class="chip">context budget</span>
+          <span class="chip">误触发成本</span>
+          <span class="chip">只留当前项目需要的资料</span>
+        </div>
+      </article>
+
+      <article class="section">
+        <div class="section-head"><span class="section-no">02</span><h3>软链接方案的三层结构</h3></div>
+        <div class="mini-table">
+          <div class="row"><div class="k">原件仓</div><div><p>`~/GitHub/baoyu-skills`、`~/GitHub/baoyu-design` 这类目录，负责保存可更新的原始 skill 内容。</p></div></div>
+          <div class="row"><div class="k">项目层</div><div><p>在项目里建 `.agents/skills/baoyu-comic -> ~/GitHub/baoyu-skills/skills/baoyu-comic` 这种链接，把项目依赖显式写出来。</p></div></div>
+          <div class="row"><div class="k">Agent 入口</div><div><p>再做 `.claude/skills -> .agents/skills`，让 Claude Code 顺着这层入口读取项目技能集合。</p></div></div>
+        </div>
+      </article>
+
+      <article class="section">
+        <div class="section-head"><span class="section-no">03</span><h3>真正省心的是后续维护</h3></div>
+        <ol>
+          <li><strong>更新只做一次：</strong>所有项目都指向同一份原件，拉一次最新代码，就等于所有项目同步升级。</li>
+          <li><strong>修 bug 可以直接反哺：</strong>在某个项目里发现 skill 有问题，修掉的其实就是原始仓库文件，顺手就能提交回上游。</li>
+          <li><strong>降低复制漂移：</strong>如果每个项目都复制一份 skill，半年后通常会出现“同名 skill 在 4 个地方各不相同”的灾难。</li>
+        </ol>
+      </article>
+
+      <article class="section">
+        <div class="section-head"><span class="section-no">04</span><h3>命令记不住怎么办</h3></div>
+        <p>这套工作流很适合交给 Agent 自己处理。你不需要手记 `ln -s` 这种命令，只要用自然语言说清楚“把哪个 skill 从哪里链接到哪里”，让 Claude Code / Codex 去干脏活就行。</p>
+        <p>例如：<br>“帮我把 `~/GitHub/baoyu-skills/skills/baoyu-comic` 软链接到 `.agents/skills/baoyu-comic`。”<br>或者更口语化一点：<br>“帮我把 baoyu-skills 项目里的 baoyu-comic 这个 skill 链接到当前项目。”</p>
+      </article>
+
+      <article class="section">
+        <div class="section-head"><span class="section-no">05</span><h3>这套方法最适合谁</h3></div>
+        <p>适合同时满足以下几个条件的人：</p>
+        <ul>
+          <li>你会同时维护多个项目，而不是只在一个全局沙箱里玩。</li>
+          <li>你会长期复用技能仓，关心“更新一次、全局生效”的维护效率。</li>
+          <li>你在意 Agent 的上下文窗口，不想让一堆全局技能摘要长期占台面。</li>
+        </ul>
+        <p>如果你只是偶尔试几个 skill、项目数量也少，直接全局安装其实更省事。</p>
+      </article>
+
+      <article class="section">
+        <div class="section-head"><span class="section-no">06</span><h3>可复用的判断标准</h3></div>
+        <div class="mini-table">
+          <div class="row"><div class="k">优先项目内</div><div><p>当前项目依赖明确、技能数量多、上下文预算紧、后续希望集中更新。</p></div></div>
+          <div class="row"><div class="k">优先全局</div><div><p>个人常驻小工具、几乎任何项目都会用、触发边界非常明确、摘要数量很少。</p></div></div>
+          <div class="row"><div class="k">关键取舍</div><div><p>全局更省初次安装时间；项目内更省长期维护和上下文空间。</p></div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="footer-box">
+      <p><strong>可转述版结论：</strong>把 Skills 当成项目依赖，而不是全局插件。原件集中放仓库里，项目内用软链接暴露真正需要的部分，最后再给 Claude Code 一个统一入口。这会让上下文更干净，更新更轻，修 bug 还能顺手回馈上游。</p>
+      <p><strong>边界：</strong>这是偏极客、偏工程化的管理方式；如果你不在意上下文预算，也不维护多个项目，全局安装依然可能是更低摩擦的选择。</p>
+      <p><strong>来源：</strong>用户提供的一手工作流说明（无外部 URL）。</p>
+    </section>
+  </main>
+
+  <button class="save-btn" onclick="saveCardAsPng()">保存 PNG</button>
+  <script>
+    async function saveCardAsPng() {
+      const target = document.getElementById('card');
+      const canvas = await html2canvas(target, {
+        backgroundColor: '#e9e3d6',
+        scale: 2,
+        useCORS: true,
+        scrollY: -window.scrollY,
+        windowWidth: document.documentElement.scrollWidth,
+        windowHeight: document.documentElement.scrollHeight
+      });
+      const link = document.createElement('a');
+      link.download = 'skills-project-local-symlink-workflow.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
