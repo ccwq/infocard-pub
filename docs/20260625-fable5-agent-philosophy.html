@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fable 5 系统提示词泄露：1597 行背后的 Agent 工程哲学</title>
+<style>
+  :root{--bg:#090d17;--surface:#0e1524;--border:#1b2844;--accent:#60a5fa;--accent2:#818cf8;--gold:#fbbf24;--green:#34d399;--red:#f87171;--text:#e2e8f0;--muted:#94a3b8;--dim:#475569;--font:"PingFang SC","Microsoft YaHei",sans-serif;--mono:"JetBrains Mono","Fira Code",monospace}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;line-height:1.6;min-height:100vh}
+  .wrap{max-width:720px;margin:0 auto;padding:24px 16px 80px}
+  /* ── HERO ── */
+  .hero{border:1.5px solid var(--accent);border-radius:12px;padding:28px 28px 20px;margin-bottom:20px;background:linear-gradient(135deg,#080d1a 0%,#0f1929 100%);position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;top:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(96,165,250,.06) 0%,transparent 70%);pointer-events:none}
+  .hero-badge{display:inline-block;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.25);color:var(--accent);font-size:10px;padding:3px 10px;border-radius:20px;margin-bottom:12px;font-family:var(--mono);letter-spacing:.04em}
+  .hero h1{font-size:21px;font-weight:700;line-height:1.35;margin-bottom:8px;color:#fff}
+  .hero h1 span{color:var(--gold)}
+  .hero-sub{color:var(--muted);font-size:12px;margin-bottom:14px;line-height:1.5}
+  .hero-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:14px}
+  .hero-meta span{display:flex;align-items:center;gap:4px}
+  .hero-meta .dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block}
+  .hero-notice{border:1px solid rgba(251,191,36,.35);border-radius:8px;padding:10px 14px;background:rgba(251,191,36,.05)}
+  .hero-notice p{font-size:11.5px;color:var(--gold);font-weight:600}
+  .hero-notice small{color:var(--muted);font-size:10.5px;font-weight:400;display:block;margin-top:2px}
+  /* ── SECTION ── */
+  .section{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;background:var(--surface)}
+  .section-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+  .section-num{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0}
+  .section-title{font-size:13px;font-weight:600;color:#fff}
+  .section-body{padding:14px 16px}
+  /* ── CARD ── */
+  .card{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:rgba(255,255,255,.012)}
+  .card h3{font-size:12px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px;color:#fff}
+  .card h3 .icon{font-size:14px}
+  .card p,.card li{font-size:11.5px;color:var(--muted);line-height:1.55}
+  .card ul{padding-left:14px;margin-top:4px}
+  .card li{margin-bottom:2px}
+  .card-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  /* ── CORE FULL ── */
+  .core-full{border:1px solid var(--border);border-radius:8px;padding:14px 16px;background:rgba(255,255,255,.012);margin-bottom:10px}
+  .core-full h3{font-size:12px;font-weight:600;color:#fff;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .core-full h3 .icon{font-size:14px}
+  .core-full p{font-size:11.5px;color:var(--muted);margin-bottom:5px}
+  .core-full p:last-child{margin-bottom:0}
+  .core-full p strong{color:#fff}
+  /* ── COMPARE ── */
+  .compare-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .compare-box{border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+  .compare-box h4{font-size:11px;font-weight:600;margin-bottom:5px}
+  .compare-box.against{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.04)}
+  .compare-box.against h4{color:var(--red)}
+  .compare-box.for{border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.04)}
+  .compare-box.for h4{color:var(--green)}
+  .compare-box ul{padding-left:12px}
+  .compare-box li{font-size:11px;color:var(--muted);margin-bottom:2px}
+  /* ── ALERT ── */
+  .alert{border:1px solid var(--gold);border-radius:8px;padding:12px 16px;margin:10px 0;background:rgba(251,191,36,.06)}
+  .alert.red{border-color:var(--red);background:rgba(248,113,113,.06)}
+  .alert.blue{border-color:var(--accent);background:rgba(96,165,250,.06)}
+  .alert-title{font-size:11px;font-weight:700;color:var(--gold);margin-bottom:6px;font-family:var(--mono)}
+  .alert.red .alert-title{color:var(--red)}
+  .alert.blue .alert-title{color:var(--accent)}
+  .alert p{font-size:11.5px;color:var(--muted);margin-bottom:0}
+  /* ── TAG ── */
+  .tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+  .tag-blue{background:rgba(96,165,250,.1);color:var(--accent);border:1px solid rgba(96,165,250,.2)}
+  .tag-green{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.2)}
+  .tag-gold{background:rgba(251,191,36,.1);color:var(--gold);border:1px solid rgba(251,191,36,.2)}
+  .tag-red{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.2)}
+  .tag-purple{background:rgba(129,140,248,.1);color:var(--accent2);border:1px solid rgba(129,140,248,.2)}
+  /* ── FLOW ── */
+  .flow-wrap{display:flex;flex-direction:column;gap:0}
+  .flow-step{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-left:2px solid var(--accent);margin-left:8px;padding-left:14px;position:relative}
+  .flow-step::before{content:"";position:absolute;left:-5px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+  .flow-step.green{border-color:var(--green)}
+  .flow-step.green::before{background:var(--green)}
+  .flow-step.gold{border-color:var(--gold)}
+  .flow-step.gold::before{background:var(--gold)}
+  .flow-step.red{border-color:var(--red)}
+  .flow-step.red::before{background:var(--red)}
+  .flow-step.purple{border-color:var(--accent2)}
+  .flow-step.purple::before{background:var(--accent2)}
+  .flow-label{font-size:11px;font-weight:600;color:#fff;margin-bottom:2px;font-family:var(--mono)}
+  .flow-desc{font-size:11px;color:var(--muted)}
+  /* ── TABLE ── */
+  .t{border-collapse:collapse;width:100%;margin-top:8px}
+  .t th,.t td{padding:7px 10px;border:1px solid var(--border);font-size:11px;text-align:left;vertical-align:top}
+  .t th{background:rgba(255,255,255,.03);color:#fff;font-weight:600}
+  .t td{color:var(--muted)}
+  .t tr:nth-child(even) td{background:rgba(255,255,255,.01)}
+  /* ── SOURCE BAR ── */
+  .source-bar{border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .source-bar a{color:var(--accent);text-decoration:none;font-size:11.5px;font-family:var(--mono)}
+  .source-bar a:hover{text-decoration:underline}
+  .source-tags{display:flex;gap:6px;flex-wrap:wrap}
+  /* ── DOWNLOAD ── */
+  .download-btn{display:block;width:100%;text-align:center;background:linear-gradient(135deg,#1d4ed8,#4f46e5);color:#fff;font-size:13px;font-weight:600;padding:12px 20px;border-radius:8px;text-decoration:none;border:none;cursor:pointer;margin-top:10px;font-family:var(--font)}
+  .download-btn:hover{opacity:.88}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">ANTHROPIC · FABLE 5 · SYSTEM PROMPT LEAKED</div>
+  <h1>Fable 5 <span>1597 行系统提示词</span><br>泄露背后的 Agent 工程哲学</h1>
+  <p class="hero-sub">Anthropic Mythos 级模型 Fable 5 的 1597 行系统提示词意外泄露，揭示了顶级 Agent 框架的三大核心设计原则：极简单发推断、绝对安全与环境解耦、无状态与零持久化。</p>
+  <div class="hero-meta">
+    <span><span class="dot"></span> Anthropic Fable 5</span>
+    <span>·</span>
+    <span>1597 行系统提示词</span>
+    <span>·</span>
+    <span>Mythos Grade</span>
+    <span>·</span>
+    <span>2026-06</span>
+  </div>
+  <div class="hero-notice">
+    <p>⚠️ 这是一份工程考古报告 — 不是使用方法，不是攻略</p>
+    <small>系统提示词已于 2026-06-10 前后被公开，Anthropic 随后更新了 Safety Classifier。本报告仅供 Agent 架构研究与安全分析。</small>
+  </div>
+</div>
+
+<!-- SECTION 01: THREE CORE PRINCIPLES -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">01</span>
+    <span class="section-title">三大核心设计原则 — 与当前主流框架的背离</span>
+  </div>
+  <div class="section-body">
+
+    <div class="core-full">
+      <h3><span class="icon">⚡</span> 极简单发推断 — 摒弃复杂 Agent 循环</h3>
+      <p><strong>核心主张：</strong>依靠强大基座模型进行一次性推理，摒弃复杂的智能体循环与多智能体协作。</p>
+      <p><strong>底层逻辑：</strong>当基座模型能力跨越自验证与推理阈值时，果断废弃作为过渡补丁的外挂规划器。</p>
+      <p><strong>工程意义：</strong>减少循环调用带来的 Token 浪费与不确定性积累，让模型直接给出最终答案。</p>
+    </div>
+    <div class="compare-row">
+      <div class="compare-box against">
+        <h4>✗ 当前主流 Agent 框架</h4>
+        <ul>
+          <li>ReAct / Plan-Execute 循环</li>
+          <li>多智能体协作与角色分工</li>
+          <li>外挂规划器（Planner）主导</li>
+          <li>长程状态记忆与持久化</li>
+          <li>工具调用自动化执行</li>
+        </ul>
+      </div>
+      <div class="compare-box for">
+        <h4>✓ Fable 5 哲学</h4>
+        <ul>
+          <li>极简单发推断</li>
+          <li>无多智能体协作层</li>
+          <li>基座模型自主规划</li>
+          <li>无状态设计（零持久化）</li>
+          <li>用户授权阻断外部操作</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="core-full" style="margin-top:12px">
+      <h3><span class="icon">🛡️</span> 绝对安全与环境解耦 — 零信任架构</h3>
+      <p><strong>三层防护机制：</strong></p>
+      <table class="t">
+        <tr><th>机制</th><th>具体实现</th><th>目的</th></tr>
+        <tr><td><span class="tag tag-red">强制弹窗审批</span></td><td>所有第三方操作必须通过弹窗等待用户确认</td><td>熔断潜在事故，阻断自主行动</td></tr>
+        <tr><td><span class="tag tag-red">上下文注入约束</span></td><td>强制读取环境变量文件（ScaleMD）</td><td>避免硬编码撑爆上下文窗口</td></tr>
+        <tr><td><span class="tag tag-red">严格白名单沙盒</span></td><td>仅允许访问受限的约 30 个网络域名</td><td>防范未知风险，控制攻击面</td></tr>
+      </table>
+    </div>
+
+    <div class="core-full">
+      <h3><span class="icon">📦</span> 无状态与零持久化 — 消除状态爆炸</h3>
+      <p><strong>架构设计：</strong>采用无副作用的只读挂载点，消除跨会话持久记忆带来的状态爆炸和不稳定。</p>
+      <p><strong>商业考量：</strong>每次交互需重传历史上下文 — 确保逻辑连贯，同时增加 Token 消耗（有意为之）。</p>
+      <p><strong>前端约束：</strong>严格禁用本地存储（localStorage），不留任何客户端持久化痕迹。</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- SECTION 02: PRACTICAL GUIDANCE -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">02</span>
+    <span class="section-title">实践指导与最佳实践 — 从泄露中提炼工程方法</span>
+  </div>
+  <div class="section-body">
+
+    <div class="flow-wrap">
+      <div class="flow-step red">
+        <div>
+          <div class="flow-label">① 终止黑盒调用 — 用户意图授权前置阻断</div>
+          <div class="flow-desc">在工程实现中，必须将用户意图授权作为外部交互的前置阻断点。任何工具调用都要经过授权审批链路，而非 SDK 自动执行。</div>
+        </div>
+      </div>
+      <div class="flow-step green">
+        <div>
+          <div class="flow-label">② 拥抱无状态设计 — 最小权限 + 最干净运行时</div>
+          <div class="flow-desc">为模型提供最小权限和最干净的运行时环境，减少外部依赖。无状态 = 无记忆泄漏 = 可预测性。</div>
+        </div>
+      </div>
+      <div class="flow-step gold">
+        <div>
+          <div class="flow-label">③ 框架做减法 — 跨越阈值即废弃外挂规划器</div>
+          <div class="flow-desc">当基座模型能力已覆盖自验证与推理时，果断移除作为过渡补丁的外挂规划器。不要用复杂框架弥补模型能力的不足。</div>
+        </div>
+      </div>
+      <div class="flow-step purple">
+        <div>
+          <div class="flow-label">④ 上下文约束前置化 — 外部读取替代硬编码</div>
+          <div class="flow-desc">通过强制读取环境变量文件（而非硬编码在 Prompt 中）注入上下文约束，保持 Prompt 本身的纯净与可审计性。</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div>
+          <div class="flow-label">⑤ 白名单沙盒 — 主动限制而非被动防御</div>
+          <div class="flow-desc">不是在运行时防御危险行为，而是从架构上让危险行为在沙盒外无法发生。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert blue" style="margin-top:12px">
+      <div class="alert-title">🔑 核心洞察：Tool Call ≠ Function Call</div>
+      <p>整个行业用 "function calling" 描述工具调用，让开发者下意识把它当函数调用处理。但工具背后是数据库、文件系统、邮件服务、生产 API — 每一次工具调用本质上是资源授权请求，必须进入授权 → 审批 → 审计链路，而不是被 SDK 自动执行。</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- SECTION 03: CONSTRAINTS & RED LINES -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">03</span>
+    <span class="section-title">约束与红线 — Fable 5 安全边界的工程实现</span>
+  </div>
+  <div class="section-body">
+
+    <table class="t">
+      <tr>
+        <th style="width:130px">约束类型</th>
+        <th>具体规定</th>
+        <th>工程实现方式</th>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">版权限制</span></td>
+        <td>单一来源引用严禁超过 15 个单词</td>
+        <td>内容长度监控 + 来源去重检测</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">内容安全</span></td>
+        <td>绝对禁止爆炸物等红线内容；禁止勒索软件生成（含教学）</td>
+        <td>Safety Classifier 实时拦截 + 硬拒绝规则</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">存储限制</span></td>
+        <td>前端环境严格禁用 localStorage</td>
+        <td>沙盒环境强制策略 + 运行时注入</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-gold">网络访问</span></td>
+        <td>仅允许访问约 30 个严格白名单域名</td>
+        <td>网络层白名单 + DNS 拦截</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-blue">上下文管理</span></td>
+        <td>环境变量必须从 ScaleMD 文件读取，禁止硬编码</td>
+        <td>强制读取约束 + 上下文注入审计</td>
+      </tr>
+    </table>
+
+    <div class="alert red" style="margin-top:12px">
+      <div class="alert-title">🚨 关键教训：从泄露到被破解</div>
+      <p>2026-06-12，华人团队在 Fable 5 发布仅 2 天后即破解其 Safety Classifier — 不是通过提示注入，不是角色扮演，而是利用智能体自主完成任务过程中的风险窗口。这印证了 Fable 5 设计哲学的正确性：强制弹窗审批是必要的，而非可选的装饰。</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- SECTION 04: REFLECTION ON AGENT FRAMEWORKS -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">04</span>
+    <span class="section-title">对当前 Agent 框架的反思 — 1597 行的工程批判</span>
+  </div>
+  <div class="section-body">
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="icon">🔄</span> ReAct/Loop 的过度设计</h3>
+        <p>Fable 5 选择极简单发推断，意味着当模型足够强时，ReAct 循环和 Plan-Execute 框架只是增加 Token 消耗和不确定性的人为复杂性。</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🧠</span> 记忆系统的幻觉</h3>
+        <p>跨会话持久化记忆带来状态爆炸和不稳定性。Fable 5 的零持久化选择，用 Token 换取可预测性和可审计性。</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">⚡</span> 工具调用的权限盲区</h3>
+        <p>当前 Agent 框架将工具调用视为"函数执行"，而忽视了背后是数据库、API、Shell 等生产资源的授权请求。授权链路不可跳过。</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🏗️</span> 外挂规划器的终点</h3>
+        <p>外挂规划器（Planner）是模型能力不足时的过渡方案。一旦模型跨越自验证阈值，这些中间层应当被果断移除。</p>
+      </div>
+    </div>
+    <div class="alert" style="margin-top:12px">
+      <div class="alert-title">💡 核心反思</div>
+      <p>当前 Agent 框架设计者混淆了两件事：让模型"能做什么"（工具丰富度）和让模型"不该做什么"（安全边界）。Fable 5 的 1597 行大部分在说后者 — 而这恰恰是主流框架忽视最多的部分。</p>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 05: APPLICABLE SCENARIOS -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">05</span>
+    <span class="section-title">适用场景 — 哪些情况下值得借鉴 Fable 5 哲学</span>
+  </div>
+  <div class="section-body">
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="icon">🛡️</span> 高风险 Agent 系统</h3>
+        <p>涉及数据库写入、文件操作、外部 API 调用、邮件发送等具有不可逆副作用的操作。</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🏢</span> 企业级 Agent 部署</h3>
+        <p>需要合规审计、操作溯源、权限分级的生产环境，必须建立授权审批链路。</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🤖</span> 高价值模型落地</h3>
+        <p>当使用 GPT-4.5、Claude 4 Opus、Fable 5 等顶级模型时，优先考虑简化框架而非堆叠复杂度。</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🔒</span> 安全敏感场景</h3>
+        <p>金融、医疗、法律、政府等高监管行业，严格白名单沙盒和用户授权阻断是合规必要条件。</p>
+      </div>
+    </div>
+    <div class="alert blue" style="margin-top:12px">
+      <div class="alert-title">📌 什么时候不适合照搬</div>
+      <p>对于低风险、长程任务、多步骤探索类场景，保留 ReAct 循环和记忆系统仍有价值。Fable 5 哲学是安全优先的工程选择，不是银弹。</p>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE BAR -->
+<div class="source-bar">
+  <div>
+    <span style="color:var(--dim);font-size:11px">Anthropic Fable 5 · Mythos Grade · 系统提示词泄露 · 2026-06</span>
+  </div>
+  <div class="source-tags">
+    <span class="tag tag-blue">Agent架构</span>
+    <span class="tag tag-green">安全设计</span>
+    <span class="tag tag-gold">零持久化</span>
+    <span class="tag tag-red">安全约束</span>
+    <span class="tag tag-purple">系统提示词</span>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
