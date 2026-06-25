@@ -710,13 +710,12 @@
             </label>
           </section>
 
-          <section class="tag-stack compact-taxonomy-stack">
-            <div class="tag-stack-top">
-              <div class="tag-stack-title-wrap">
-                <div class="tag-stack-kicker">archive / taxonomy / compact rows</div>
-                <div class="tag-stack-title">标签 + taxonomy 紧凑筛选</div>
+          <section class="tag-stack compact-taxonomy-stack compact-filter-strip">
+            <div class="tag-stack-top compact-filter-top">
+              <div class="tag-stack-title-wrap compact-filter-head">
+                <div class="tag-stack-kicker compact-filter-kicker">taxonomy / keywords</div>
+                <div class="tag-stack-title compact-filter-title">紧凑筛选</div>
               </div>
-              <div class="tag-stack-note">保留原有紧凑档案馆节奏：taxonomy 每个维度仅占 1 行，默认只显示高频项，按行单独展开。</div>
             </div>
 
             <div v-if="selectedTags.length || Object.values(selectedFacets).some(v => v.length)" class="current-filter banded">
@@ -765,14 +764,6 @@
               <div class="tag-viewport-wrap" :class="{ expanded: tagsExpanded, collapsed: tagNeedsCollapse && !tagsExpanded }">
                 <div ref="tagViewportRef" class="tag-viewport layered mini" :style="{ maxHeight: collapsedMaxHeight }">
                   <div ref="tagFilterRef" class="tag-filter tag-filter-mini">
-                    <button
-                      class="tag-label-mini"
-                      :class="{ active: !selectedTags.length }"
-                      type="button"
-                      @click="clearSelectedTags"
-                    >
-                      全部关键词
-                    </button>
                     <button
                       v-for="tag in sortedTags"
                       :key="tag.tag"
