@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GStack 协作工作流：Token 最大化 × 人置环路</title>
+<style>
+  :root{--bg:#0b0f1a;--surface:#141928;--border:#1e2640;--accent:#60a5fa;--accent2:#818cf8;--gold:#fbbf24;--green:#34d399;--red:#f87171;--text:#e2e8f0;--muted:#94a3b8;--dim:#475569;--font:"PingFang SC","Microsoft YaHei",sans-serif;--mono:"JetBrains Mono","Fira Code",monospace}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;line-height:1.6;min-height:100vh}
+  .wrap{max-width:720px;margin:0 auto;padding:24px 16px 80px}
+  /* ── HERO ── */
+  .hero{border:1.5px solid var(--accent);border-radius:12px;padding:28px 28px 20px;margin-bottom:20px;background:linear-gradient(135deg,#0d1528 0%,#111827 100%);position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(96,165,250,.08) 0%,transparent 70%);pointer-events:none}
+  .hero-badge{display:inline-block;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);color:var(--accent);font-size:10px;padding:3px 10px;border-radius:20px;margin-bottom:12px;font-family:var(--mono);letter-spacing:.05em}
+  .hero h1{font-size:22px;font-weight:700;line-height:1.3;margin-bottom:8px;color:#fff}
+  .hero h1 span{color:var(--gold)}
+  .hero-sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  .hero-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .hero-meta span{display:flex;align-items:center;gap:4px}
+  .hero-meta .dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block}
+  .hero-claim{border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-top:14px;background:rgba(251,191,36,.05)}
+  .hero-claim p{font-size:12px;color:var(--gold);font-weight:600}
+  .hero-claim small{color:var(--muted);font-size:10.5px;font-weight:400;display:block;margin-top:2px}
+  /* ── SECTION ── */
+  .section{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;background:var(--surface)}
+  .section-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);cursor:pointer}
+  .section-num{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0}
+  .section-title{font-size:13px;font-weight:600;color:#fff}
+  .section-body{padding:14px 16px}
+  /* ── CARD GRID ── */
+  .card-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .card{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:rgba(255,255,255,.015)}
+  .card h3{font-size:12px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .card h3 .icon{font-size:14px}
+  .card p,.card li{font-size:11.5px;color:var(--muted);line-height:1.55}
+  .card ul{padding-left:14px;margin-top:4px}
+  .card li{margin-bottom:2px}
+  /* ── CORE IDEA (full width) ── */
+  .core-full{border:1px solid var(--border);border-radius:8px;padding:14px 16px;background:rgba(255,255,255,.015);margin-bottom:10px}
+  .core-full h3{font-size:12px;font-weight:600;color:#fff;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .core-full h3 .icon{font-size:14px}
+  .core-full p{font-size:11.5px;color:var(--muted);margin-bottom:6px}
+  .core-full p:last-child{margin-bottom:0}
+  /* ── TAG ── */
+  .tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+  .tag-blue{background:rgba(96,165,250,.1);color:var(--accent);border:1px solid rgba(96,165,250,.2)}
+  .tag-green{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.2)}
+  .tag-gold{background:rgba(251,191,36,.1);color:var(--gold);border:1px solid rgba(251,191,36,.2)}
+  .tag-red{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.2)}
+  .tag-purple{background:rgba(129,140,248,.1);color:var(--accent2);border:1px solid rgba(129,140,248,.2)}
+  /* ── DIVIDER ── */
+  .divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+  /* ── ALERT ── */
+  .alert{border:1px solid var(--gold);border-radius:8px;padding:12px 16px;margin:14px 0;background:rgba(251,191,36,.06)}
+  .alert-title{font-size:11px;font-weight:700;color:var(--gold);margin-bottom:6px;font-family:var(--mono)}
+  .alert p{font-size:11.5px;color:var(--muted);margin-bottom:0}
+  /* ── FLOW ── */
+  .flow-wrap{display:flex;flex-direction:column;gap:0}
+  .flow-step{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-left:2px solid var(--accent);margin-left:8px;padding-left:14px;position:relative}
+  .flow-step::before{content:"";position:absolute;left:-5px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+  .flow-step.green{border-color:var(--green)}
+  .flow-step.green::before{background:var(--green)}
+  .flow-step.gold{border-color:var(--gold)}
+  .flow-step.gold::before{background:var(--gold)}
+  .flow-step.red{border-color:var(--red)}
+  .flow-step.red::before{background:var(--red)}
+  .flow-step.purple{border-color:var(--accent2)}
+  .flow-step.purple::before{background:var(--accent2)}
+  .flow-label{font-size:11px;font-weight:600;color:#fff;margin-bottom:2px;font-family:var(--mono)}
+  .flow-desc{font-size:11px;color:var(--muted)}
+  /* ── COMPARE ── */
+  .compare-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .compare-box{border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+  .compare-box h4{font-size:11px;font-weight:600;margin-bottom:6px}
+  .compare-box.against{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.04)}
+  .compare-box.against h4{color:var(--red)}
+  .compare-box.for{border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.04)}
+  .compare-box.for h4{color:var(--green)}
+  .compare-box ul{padding-left:12px}
+  .compare-box li{font-size:11px;color:var(--muted);margin-bottom:2px}
+  /* ── SOURCE ── */
+  .source-bar{border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .source-bar a{color:var(--accent);text-decoration:none;font-size:11.5px;font-family:var(--mono)}
+  .source-bar a:hover{text-decoration:underline}
+  .source-tags{display:flex;gap:6px;flex-wrap:wrap}
+  /* ── DOWNLOAD ── */
+  .download-btn{display:block;width:calc(100% - 0px);text-align:center;background:linear-gradient(135deg,#1d4ed8,#4f46e5);color:#fff;font-size:13px;font-weight:600;padding:12px 20px;border-radius:8px;text-decoration:none;border:none;cursor:pointer;margin-top:10px;font-family:var(--font)}
+  .download-btn:hover{opacity:.88}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">GStack COLLABORATION WORKFLOW</div>
+  <h1>Token 最大化 × <span>人置于环路</span></h1>
+  <p class="hero-sub">Garry Tan 公开的 AI 虚拟工程团队协作方法论 — 把 Claude Code 变成一个可量产的 810× 效率放大器</p>
+  <div class="hero-meta">
+    <span><span class="dot"></span> 2026 年实践数据驱动</span>
+    <span>·</span>
+    <span>来源：Garry Tan / YC / gstack-OpenCode</span>
+    <span>·</span>
+    <span>Github: TMFNK/gstack-OpenCode</span>
+  </div>
+  <div class="hero-claim">
+    <p>"810× 逻辑代码产量" — 2026 年运行速率 vs 2013 年同期</p>
+    <small>按逻辑变更行数（非原始 LOC）计算，跨 40 个公开 + 私有仓库，YC 内部数据截至 2026-04-18</small>
+  </div>
+</div>
+
+<!-- SECTION 01: TOKEN MAXIMIZATION -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">01</span>
+    <span class="section-title">Token 最大化 — 用算力买回生命时间</span>
+  </div>
+  <div class="section-body">
+    <div class="core-full">
+      <h3><span class="icon">⚡</span> 什么是 Token 最大化</h3>
+      <p><strong style="color:#fff">定义：</strong>不计成本消磨算力与 Token，换取全面、深度的极度完整成果。</p>
+      <p><strong style="color:#fff">实质：</strong>用 Token 买回时间 — 向机器借用时间以延伸个人生命价值。</p>
+      <p><strong style="color:#fff">核心原则：</strong>消除对 Token 成本的吝啬。每日在算力上的投入，是换取超高生产力最划算的资产投入。</p>
+    </div>
+    <div class="compare-row">
+      <div class="compare-box against">
+        <h4>✗ 传统观念</h4>
+        <ul>
+          <li>Token 是成本，要压到最低</li>
+          <li>一次性指令 + 最小上下文</li>
+          <li>追求"差不多就行"</li>
+          <li>人类手工补全低效环节</li>
+        </ul>
+      </div>
+      <div class="compare-box for">
+        <h4>✓ Token 最大化</h4>
+        <ul>
+          <li>Token 是投资，追求 ROI</li>
+          <li>全量上下文 + 深度迭代</li>
+          <li>追求极度完整的成果</li>
+          <li>机器包揽脏活，人类专注价值</li>
+        </ul>
+      </div>
+    </div>
+    <div class="alert" style="margin-top:12px">
+      <div class="alert-title">💡 关键洞察</div>
+      <p>Garry Tan："每天花 2 美元在 Claude Code 上，远比雇实习生便宜，而且它不请假、不出错、24 小时待命。"</p>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 02: HUMAN IN THE LOOP -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">02</span>
+    <span class="section-title">人置于环路 — 机器做脏活，人类控价值</span>
+  </div>
+  <div class="section-body">
+    <div class="flow-wrap">
+      <div class="flow-step gold">
+        <div>
+          <div class="flow-label">规划阶段：CEO 审查 + 董事会时间</div>
+          <div class="flow-desc">启动时先问：目标用户是谁？核心价值是什么？机器可以规划，但方向必须人类注入</div>
+        </div>
+      </div>
+      <div class="flow-step purple">
+        <div>
+          <div class="flow-label">设计审查：体验 × 工程双重门</div>
+          <div class="flow-desc">涉及 UI 或开发者调用时，前置进行体验审查与工程审查 — 机器画图，人类把关</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div>
+          <div class="flow-label">状态建模：先画上下文，再写代码</div>
+          <div class="flow-desc">让 AI 在写代码前先画出数据流、用户动线及状态机 — 预载完整上下文，消除随机幻觉</div>
+        </div>
+      </div>
+      <div class="flow-step green">
+        <div>
+          <div class="flow-label">执行：AI 角色演练（CEO/设计/开发/测试）</div>
+          <div class="flow-desc">让 AI 同时扮演多重角色，人在每个角色切换节点做最终判断</div>
+        </div>
+      </div>
+      <div class="flow-step green">
+        <div>
+          <div class="flow-label">验证：Playwright 自动化测试（80-90% 覆盖）</div>
+          <div class="flow-desc">封装 Playwright 测试框架，保持 80%–90% 最佳覆盖率 — 机器验证，人类读报告</div>
+        </div>
+      </div>
+    </div>
+    <div class="compare-row" style="margin-top:12px">
+      <div class="compare-box against">
+        <h4>✗ 纯 AI 自主</h4>
+        <ul>
+          <li>AI 全权决策，人类旁观</li>
+          <li>无边界探索，成本失控</li>
+          <li>缺乏主观价值判断</li>
+          <li>结果不可解释</li>
+        </ul>
+      </div>
+      <div class="compare-box for">
+        <h4>✓ 人置于环路</h4>
+        <ul>
+          <li>人类把控方向，AI 执行细节</li>
+          <li>明确"非确定性"边界</li>
+          <li>全局理解 + 核心需求注入</li>
+          <li>主权保障：基于开源自建</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 03: PSEUDO SKILL + LOGIC DENSITY -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">03</span>
+    <span class="section-title">伪技能与逻辑密度 — 重新定义生产力</span>
+  </div>
+  <div class="section-body">
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="icon">📋</span> 伪技能 = 执行清单</h3>
+        <p>用自然语言 Markdown 编写非确定性意图 — 这不是"技能"，而是给 AI 助手的执行清单。</p>
+        <ul>
+          <li>格式：Markdown 结构化任务</li>
+          <li>优势：人类可读、可版本化</li>
+          <li>本质：用自然语言定义边界</li>
+          <li>效果：减少 AI 随机发散</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="icon">📊</span> 逻辑密度衡量生产力</h3>
+        <p>衡量生产力的核心不是代码行数（LOC），而是<strong style="color:#fff">逻辑上的有效代码密度</strong>。</p>
+        <ul>
+          <li>原始 LOC 会被 AI 膨胀</li>
+          <li>逻辑行 = 有意义的变更量</li>
+          <li>11,417 逻辑行/天 = 810× 基准</li>
+          <li>质量 > 数量，密度 > 体积</li>
+        </ul>
+      </div>
+    </div>
+    <div class="alert" style="margin-top:12px">
+      <div class="alert-title">📐 技术约束原则</div>
+      <p>明确划分大语言模型处理的"非确定性范围"与 传统代码处理的"确定性 API 范围" — 让 AI 做它擅长的，让确定性代码做它可靠的。</p>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 04: TOOL COMPLEMENT STRATEGY -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">04</span>
+    <span class="section-title">主力工具分工 — Cline / Codex 各司其职</span>
+  </div>
+  <div class="section-body">
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="icon">🧠</span> Cline / Code</h3>
+        <p><span class="tag tag-blue">统筹规划型</span></p>
+        <ul>
+          <li>适合统筹规划、拆解任务</li>
+          <li>管理任务队列</li>
+          <li>契合发散性工作模式</li>
+          <li>适合需求探索与迭代</li>
+          <li>GitHub Copilot Agent 模式</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="icon">⚙️</span> Cursor / Codex</h3>
+        <p><span class="tag tag-purple">CTO 深度型</span></p>
+        <ul>
+          <li>高智商 CTO 角色</li>
+          <li>擅长硬核复杂问题</li>
+          <li>深度排 Bug 与重构</li>
+          <li>解决确定性技术挑战</li>
+          <li>擅长多模型协同（Claude + Codex）</li>
+        </ul>
+      </div>
+    </div>
+    <div class="alert" style="margin-top:12px">
+      <div class="alert-title">🤝 工具互补逻辑</div>
+      <p>Cline 发散探索，Cline + Cursor/Codex 收敛执行 — 用发散工具找方向，用深度工具交付质量。</p>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 05: SOVEREIGNTY -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">05</span>
+    <span class="section-title">主权保障 — 基于开源工具自建专属 AI 系统</span>
+  </div>
+  <div class="section-body">
+    <div class="core-full">
+      <h3><span class="icon">🔐</span> 为什么必须自主可控</h3>
+      <p><strong style="color:#fff">数据主权：</strong>自己的代码、需求文档、提示词不能放到第三方服务器。</p>
+      <p><strong style="color:#fff">提示词主权：</strong>提示词是核心竞争力，必须私有化管理和迭代。</p>
+      <p><strong style="color:#fff">技术主权：</strong>基于开源工具链（Claude Code / Codex / nanostack）搭建，不依赖单一平台锁定。</p>
+    </div>
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="icon">✅</span> 推荐工具链</h3>
+        <ul>
+          <li>Claude Code / Codex CLI</li>
+          <li>nanostack（轻量级多代理）</li>
+          <li>GStack（YC 虚拟工程团队）</li>
+          <li>OpenClaw（Peter Steinberger）</li>
+          <li>nanostackconductor</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🔧</span> 关键基础设施</h3>
+        <ul>
+          <li>MCP（Model Context Protocol）</li>
+          <li>git worktree（并行隔离环境）</li>
+          <li>Playwright（自动化质量验证）</li>
+          <li>CLAUDE.md（项目宪法）</li>
+          <li>DESIGN.md（设计契约）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 06: QUANTIFIED RESULTS -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">06</span>
+    <span class="section-title">量化成果 — Garry Tan 的实测数据</span>
+  </div>
+  <div class="section-body">
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="icon">📈</span> 效率倍率</h3>
+        <p>810×</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">2026 年逻辑代码产量 vs 2013 年同期（按逻辑变更行数）</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🏆</span> 年度超越</h3>
+        <p>240×</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">截至 2026-04-18 的产出，已超过 2013 年全年总量</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">📂</span> 仓库规模</h3>
+        <p>40 个</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">跨公开 + 私有仓库，含 Bookface（YC 内部社交网络）</p>
+      </div>
+      <div class="card">
+        <h3><span class="icon">⚡</span> 日均产出</h3>
+        <p>11,417 逻辑行/天</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">基准：2013 年同期 14 逻辑行/天</p>
+      </div>
+    </div>
+    <div class="alert" style="margin-top:12px">
+      <div class="alert-title">🎯 实操验证</div>
+      <p>Andrej Karpathy（2026 年 3 月）："我大概从去年 12 月开始就基本没自己打过一行代码了。" — No Priors Podcast</p>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE BAR -->
+<div class="source-bar">
+  <div>
+    <a href="https://github.com/TMFNK/gstack-OpenCode" target="_blank">github.com/TMFNK/gstack-OpenCode</a>
+    <span style="color:var(--dim);margin:0 8px">·</span>
+    <a href="https://github.com/garagon/nanostack" target="_blank">nanostack</a>
+    <span style="color:var(--dim);margin:0 8px">·</span>
+    <a href="https://blog.csdn.net/danielxu158/article/details/159696836" target="_blank">GStack CSDN 详解</a>
+  </div>
+  <div class="source-tags">
+    <span class="tag tag-blue">Token</span>
+    <span class="tag tag-green">Human Loop</span>
+    <span class="tag tag-gold">Logic Density</span>
+    <span class="tag tag-purple">GStack</span>
+    <span class="tag tag-blue">AI Workflow</span>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
