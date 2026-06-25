@@ -143,16 +143,16 @@
   };
 
   const PRIMARY_DIMENSIONS = [
-    { key: 'domains', label: '平台 / 领域' },
-    { key: 'tool_types', label: '工具类型' },
-    { key: 'stages', label: '使用阶段' },
-    { key: 'interaction', label: '交互形态' },
-    { key: 'content_type', label: '内容类型' }
+    { key: 'domains', label: '平台 / 领域', limit: 8 },
+    { key: 'tool_types', label: '工具类型', limit: 8 },
+    { key: 'stages', label: '使用阶段', limit: 8 },
+    { key: 'interaction', label: '交互形态', limit: 8 },
+    { key: 'content_type', label: '内容类型', limit: 8 }
   ];
   const ADVANCED_DIMENSIONS = [
-    { key: 'source', label: '来源' },
-    { key: 'style', label: '风格' },
-    { key: 'risk', label: '风险' }
+    { key: 'source', label: '来源', limit: 6 },
+    { key: 'style', label: '风格', limit: 6 },
+    { key: 'risk', label: '风险', limit: 6 }
   ];
 
   const normalizeFacetArray = (value) => Array.isArray(value)
@@ -161,16 +161,6 @@
 
   const normalizeCard = (card, order) => {
     const taxonomy = card.taxonomy && typeof card.taxonomy === 'object' ? card.taxonomy : {};
-    const facets = {
-      domains: normalizeFacetArray(taxonomy.domains),
-      tool_types: normalizeFacetArray(taxonomy.tool_types),
-      stages: normalizeFacetArray(taxonomy.stages),
-      interaction: normalizeFacetArray(taxonomy.interaction),
-      content_type: normalizeFacetArray(taxonomy.content_type),
-      source: normalizeFacetArray(taxonomy.source),
-      style: normalizeFacetArray(taxonomy.style && taxonomy.style.length ? taxonomy.style : (card.style ? [card.style] : [])),
-      risk: normalizeFacetArray(taxonomy.risk)
-    };
     return {
       ...card,
       __order: order,
@@ -182,7 +172,16 @@
       __tags: Array.isArray(card.tags) ? card.tags : [],
       __kind: buildKindLabel(card),
       __glyph: buildLeadGlyph(card),
-      __facets: facets
+      __facets: {
+        domains: normalizeFacetArray(taxonomy.domains),
+        tool_types: normalizeFacetArray(taxonomy.tool_types),
+        stages: normalizeFacetArray(taxonomy.stages),
+        interaction: normalizeFacetArray(taxonomy.interaction),
+        content_type: normalizeFacetArray(taxonomy.content_type),
+        source: normalizeFacetArray(taxonomy.source),
+        style: normalizeFacetArray(taxonomy.style && taxonomy.style.length ? taxonomy.style : (card.style ? [card.style] : [])),
+        risk: normalizeFacetArray(taxonomy.risk)
+      }
     };
   };
 
@@ -196,17 +195,12 @@
       const loadError = ref('');
       const allCards = ref([]);
       const searchQuery = ref('');
+      const selectedTags = ref([]);
       const selectedFacets = ref({
-        domains: [],
-        tool_types: [],
-        stages: [],
-        interaction: [],
-        content_type: [],
-        source: [],
-        style: [],
-        risk: []
+        domains: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: []
       });
-      const facetsExpanded = ref(false);
+      const expandedFacetKey = ref('');
+      const tagsExpanded = ref(false);
       const visibleCount = ref(BATCH_SIZE);
       const scrollTop = ref(0);
       const isAutoLoading = ref(false);
@@ -237,6 +231,20 @@
 
       const latestTimeLabel = computed(() => normalizedCards.value[0]?.__time?.full || '—');
 
+      const tagCounter = computed(() => {
+        const map = new Map();
+        normalizedCards.value.forEach((card) => {
+          card.__tags.forEach((tag) => map.set(tag, (map.get(tag) || 0) + 1));
+        });
+        return map;
+      });
+
+      const sortedTags = computed(() => [...tagCounter.value.entries()]
+        .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0]), 'zh-Hans-CN'))
+        .map(([tag, count]) => ({ tag, count })));
+
+      const hotTags = computed(() => sortedTags.value.slice(0, 3));
+
       const facetCounters = computed(() => {
         const result = {};
         [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS].forEach((dim) => {
@@ -251,11 +259,10 @@
         return result;
       });
 
-      const selectedFacetCount = computed(() => Object.values(selectedFacets.value).reduce((sum, arr) => sum + arr.length, 0));
-
       const filteredCards = computed(() => {
         const q = searchQuery.value.trim().toLowerCase();
         return normalizedCards.value.filter((card) => {
+          const matchLegacyTag = !selectedTags.value.length || selectedTags.value.some((tag) => card.__tags.includes(tag));
           const matchFacets = [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS].every((dim) => {
             const selected = selectedFacets.value[dim.key] || [];
             if (!selected.length) return true;
@@ -268,7 +275,7 @@
             card.__tags.some((tag) => String(tag).toLowerCase().includes(q)) ||
             String(card.category || '').toLowerCase().includes(q) ||
             [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS].some((dim) => (card.__facets[dim.key] || []).some((item) => String(item).toLowerCase().includes(q)));
-          return matchFacets && matchSearch;
+          return matchLegacyTag && matchFacets && matchSearch;
         });
       });
 
@@ -276,7 +283,7 @@
       const shownCount = computed(() => filteredCards.value.length);
       const renderedCount = computed(() => visibleCards.value.length);
       const hasMore = computed(() => renderedCount.value < shownCount.value);
-      const countLineText = computed(() => `共 ${totalCount.value} 张信息卡 · 命中 ${shownCount.value} 张 · 已渲染 ${renderedCount.value} 张 · 多维 taxonomy 筛选`);
+      const countLineText = computed(() => `共 ${totalCount.value} 张信息卡 · 命中 ${shownCount.value} 张 · 已渲染 ${renderedCount.value} 张 · 严格时间降序`);
       const listProgressText = computed(() => hasMore.value ? `loaded ${renderedCount.value}/${shownCount.value}` : `loaded all ${renderedCount.value}`);
       const loadingNoteText = computed(() => {
         if (loadError.value) return '';
@@ -286,8 +293,20 @@
         return '已加载当前结果集全部条目';
       });
 
-      const posterSummary = computed(() => `LATEST FIRST · ${shownCount.value} ACTIVE RESULTS · ${selectedFacetCount.value} ACTIVE FACETS`);
+      const posterSummary = computed(() => `LATEST FIRST · ${shownCount.value} ACTIVE RESULTS · ${categoryCount.value} CATEGORIES`);
+      const activeTagClass = (tag) => selectedTags.value.includes(tag);
       const activeFacetClass = (dimension, value) => (selectedFacets.value[dimension] || []).includes(value);
+      const compactFacetRows = computed(() => PRIMARY_DIMENSIONS.map((dim) => {
+        const full = facetCounters.value[dim.key] || [];
+        const expanded = expandedFacetKey.value === dim.key;
+        return {
+          ...dim,
+          expanded,
+          full,
+          visible: expanded ? full : full.slice(0, dim.limit),
+          hiddenCount: Math.max(0, full.length - dim.limit)
+        };
+      }));
 
       const resetVisibleCount = () => {
         visibleCount.value = Math.min(BATCH_SIZE, Math.max(filteredCards.value.length, BATCH_SIZE));
@@ -307,27 +326,46 @@
         });
       };
 
-      const collapseFacetPanel = () => {
-        facetsExpanded.value = false;
+      const collapseTagPanel = () => {
+        tagsExpanded.value = false;
+      };
+
+      const toggleTag = (tag) => {
+        if (!tag) {
+          selectedTags.value = [];
+        } else if (selectedTags.value.includes(tag)) {
+          selectedTags.value = selectedTags.value.filter((item) => item !== tag);
+        } else {
+          selectedTags.value = [...selectedTags.value, tag];
+        }
+        resetVisibleCount();
+        nextTick(() => {
+          measureTagCollapse();
+          ensureAutoFill();
+        });
       };
 
       const toggleFacetValue = (dimension, value) => {
         const current = selectedFacets.value[dimension] || [];
-        const next = current.includes(value)
-          ? current.filter((item) => item !== value)
-          : [...current, value];
-        selectedFacets.value = { ...selectedFacets.value, [dimension]: next };
+        selectedFacets.value = {
+          ...selectedFacets.value,
+          [dimension]: current.includes(value)
+            ? current.filter((item) => item !== value)
+            : [...current, value]
+        };
         resetVisibleCount();
         nextTick(() => {
           ensureAutoFill();
         });
       };
 
+      const toggleFacetRow = (dimension) => {
+        expandedFacetKey.value = expandedFacetKey.value === dimension ? '' : dimension;
+      };
+
       const clearAllFacets = () => {
-        selectedFacets.value = {
-          domains: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: []
-        };
-        collapseFacetPanel();
+        selectedFacets.value = { domains: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: [] };
+        expandedFacetKey.value = '';
         resetVisibleCount();
         nextTick(() => {
           ensureAutoFill();
@@ -335,16 +373,37 @@
       };
 
       const removeFacetValue = (dimension, value) => {
-        const current = selectedFacets.value[dimension] || [];
-        selectedFacets.value = { ...selectedFacets.value, [dimension]: current.filter((item) => item !== value) };
+        selectedFacets.value = {
+          ...selectedFacets.value,
+          [dimension]: (selectedFacets.value[dimension] || []).filter((item) => item !== value)
+        };
         resetVisibleCount();
         nextTick(() => {
           ensureAutoFill();
         });
       };
 
-      const toggleAdvancedFacets = () => {
-        facetsExpanded.value = !facetsExpanded.value;
+      const clearSelectedTags = () => {
+        selectedTags.value = [];
+        resetVisibleCount();
+        nextTick(() => {
+          measureTagCollapse();
+          ensureAutoFill();
+        });
+      };
+
+      const removeTag = (tag) => {
+        selectedTags.value = selectedTags.value.filter((item) => item !== tag);
+        resetVisibleCount();
+        nextTick(() => {
+          measureTagCollapse();
+          ensureAutoFill();
+        });
+      };
+
+      const toggleTagsExpanded = () => {
+        tagsExpanded.value = !tagsExpanded.value;
+        nextTick(measureTagCollapse);
       };
 
       const measureTagCollapse = () => {
@@ -460,21 +519,26 @@
         if (Array.isArray(saved.cards)) allCards.value = saved.cards;
         if (typeof saved.version === 'string') version.value = saved.version;
         if (typeof saved.visibleCount === 'number') visibleCount.value = saved.visibleCount;
+        if (Array.isArray(saved.selectedTags)) selectedTags.value = saved.selectedTags;
         if (saved.selectedFacets && typeof saved.selectedFacets === 'object') selectedFacets.value = saved.selectedFacets;
-        if (saved.facetsExpanded === true) facetsExpanded.value = true;
+        if (typeof saved.expandedFacetKey === 'string') expandedFacetKey.value = saved.expandedFacetKey;
+        if (saved.tagsExpanded === true) tagsExpanded.value = true;
         if (typeof saved.searchQuery === 'string') searchQuery.value = saved.searchQuery;
         if (typeof saved.scrollTop === 'number') scrollTop.value = saved.scrollTop;
         return Array.isArray(saved.cards) && saved.cards.length > 0;
       };
 
+      // Persist state to sessionStorage on key interactions
       const saveSessionState = () => {
         persistState({
           cards: allCards.value,
           version: version.value,
           savedAt: Date.now(),
           visibleCount: visibleCount.value,
+          selectedTags: selectedTags.value.slice(),
           selectedFacets: JSON.parse(JSON.stringify(selectedFacets.value)),
-          facetsExpanded: facetsExpanded.value,
+          expandedFacetKey: expandedFacetKey.value,
+          tagsExpanded: tagsExpanded.value,
           searchQuery: searchQuery.value,
           scrollTop: scrollTop.value
         });
@@ -526,7 +590,7 @@
       });
 
       // Watch state changes and persist
-      Vue.watch([allCards, version, filteredCards, facetsExpanded, selectedFacets, searchQuery, visibleCount], async () => {
+      Vue.watch([allCards, version, filteredCards, tagsExpanded, selectedTags, selectedFacets, expandedFacetKey, searchQuery, visibleCount], async () => {
         await nextTick();
         measureTagCollapse();
         ensureAutoFill();
@@ -534,6 +598,7 @@
         saveSessionState();
       }, { deep: true });
 
+      const renderTagLabel = (tag) => `${tag.tag} (${tag.count})`;
       const renderFacetLabel = (item) => `${item.value} (${item.count})`;
       const serialOf = (card) => pad2(card.__order + 1);
 
@@ -546,13 +611,17 @@
         renderedCount,
         hasMore,
         searchQuery,
+        selectedTags,
         selectedFacets,
-        facetsExpanded,
+        expandedFacetKey,
+        tagsExpanded,
         visibleCards,
+        sortedTags,
+        hotTags,
         facetCounters,
+        compactFacetRows,
         PRIMARY_DIMENSIONS,
         ADVANCED_DIMENSIONS,
-        selectedFacetCount,
         totalCountLabel,
         latestTimeLabel,
         categoryCount,
@@ -566,13 +635,19 @@
         tagViewportRef,
         tagFilterRef,
         tagToggleRef,
+        activeTagClass,
         activeFacetClass,
         onSearchInput,
+        toggleTag,
         toggleFacetValue,
+        toggleFacetRow,
         clearAllFacets,
         removeFacetValue,
-        toggleAdvancedFacets,
+        clearSelectedTags,
+        removeTag,
+        toggleTagsExpanded,
         loadMore,
+        renderTagLabel,
         renderFacetLabel,
         serialOf
       };
@@ -594,7 +669,7 @@
                 <div class="poster-title-zone compact">
                   <div class="poster-index">01 / ARCHIVE POSTER</div>
                   <h1>INFOCARD<br>ARCHIVE</h1>
-                  <p class="poster-copy compact">公开信息卡索引，按最新时间优先排列，支持多维 taxonomy 筛选与增量浏览。</p>
+                  <p class="poster-copy compact">公开信息卡索引，按最新时间优先排列，支持标签并集筛选与增量浏览。</p>
                 </div>
 
                 <div class="poster-info-zone compact">
@@ -626,68 +701,96 @@
             </label>
           </section>
 
-          <section class="tag-stack facet-stack">
+          <section class="tag-stack compact-taxonomy-stack">
             <div class="tag-stack-top">
               <div class="tag-stack-title-wrap">
-                <div class="tag-stack-kicker">archive / taxonomy / faceted filter</div>
-                <div class="tag-stack-title">多维 taxonomy 筛选</div>
+                <div class="tag-stack-kicker">archive / taxonomy / compact rows</div>
+                <div class="tag-stack-title">标签 + taxonomy 紧凑筛选</div>
               </div>
-              <div class="tag-stack-note">主筛选显示 5 个维度；来源 / 风格 / 风险折叠在高级筛选里。普通 tags 退化为搜索关键词。</div>
+              <div class="tag-stack-note">保留原有紧凑档案馆节奏：taxonomy 每个维度仅占 1 行，默认只显示高频项，按行单独展开。</div>
             </div>
 
-            <div v-if="selectedFacetCount" class="current-filter banded">
+            <div v-if="selectedTags.length || Object.values(selectedFacets).some(v => v.length)" class="current-filter banded">
               <span class="stack-label">当前条件</span>
               <span class="selected-pills">
+                <span v-for="tag in selectedTags" :key="'legacy-' + tag" class="pill pill-stack">
+                  标签 · {{ tag }}
+                  <button type="button" aria-label="移除标签" @click="removeTag(tag)">×</button>
+                </span>
                 <template v-for="dim in [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS]" :key="dim.key">
-                  <span v-for="value in selectedFacets[dim.key]" :key="dim.key + value" class="pill pill-stack">
+                  <span v-for="value in selectedFacets[dim.key]" :key="dim.key + value" class="pill pill-stack taxonomy-pill">
                     {{ dim.label }} · {{ value }}
                     <button type="button" aria-label="移除筛选" @click="removeFacetValue(dim.key, value)">×</button>
                   </span>
                 </template>
               </span>
-              <button type="button" class="clear-all" @click="clearAllFacets">清空</button>
+              <button type="button" class="clear-all" @click="clearAllFacets">清空 taxonomy</button>
             </div>
 
-            <div class="facet-groups">
-              <section v-for="dim in PRIMARY_DIMENSIONS" :key="dim.key" class="facet-group">
-                <div class="facet-group-head">
-                  <span class="facet-group-title">{{ dim.label }}</span>
-                </div>
-                <div class="tag-filter facet-filter">
+            <div class="facet-compact-list">
+              <div v-for="row in compactFacetRows" :key="row.key" class="facet-compact-row">
+                <div class="facet-compact-label">{{ row.label }}</div>
+                <div class="facet-compact-items">
                   <button
-                    v-for="item in facetCounters[dim.key] || []"
-                    :key="dim.key + item.value"
-                    :class="{ active: activeFacetClass(dim.key, item.value) }"
+                    v-for="item in row.visible"
+                    :key="row.key + item.value"
+                    :class="{ active: activeFacetClass(row.key, item.value) }"
                     type="button"
-                    @click="toggleFacetValue(dim.key, item.value)"
+                    @click="toggleFacetValue(row.key, item.value)"
                   >
                     {{ renderFacetLabel(item) }}
                   </button>
                 </div>
-              </section>
+                <button
+                  v-if="row.hiddenCount > 0"
+                  class="facet-row-toggle"
+                  type="button"
+                  @click="toggleFacetRow(row.key)"
+                >
+                  {{ row.expanded ? '−' : '+' }}
+                </button>
+              </div>
             </div>
 
-            <div class="advanced-facet-wrap">
-              <button type="button" class="tag-toggle-mini advanced-toggle" :class="{ active: facetsExpanded }" @click="toggleAdvancedFacets">
-                {{ facetsExpanded ? '收起高级筛选' : '展开高级筛选 +' }}
-              </button>
-              <div v-if="facetsExpanded" class="facet-groups advanced">
-                <section v-for="dim in ADVANCED_DIMENSIONS" :key="dim.key" class="facet-group">
-                  <div class="facet-group-head">
-                    <span class="facet-group-title">{{ dim.label }}</span>
-                  </div>
-                  <div class="tag-filter facet-filter">
+            <div class="tag-row tag-row-layered" style="margin-top:12px">
+              <div class="tag-viewport-wrap" :class="{ expanded: tagsExpanded, collapsed: tagNeedsCollapse && !tagsExpanded }">
+                <div ref="tagViewportRef" class="tag-viewport layered" :style="{ maxHeight: collapsedMaxHeight }">
+                  <div ref="tagFilterRef" class="tag-filter">
                     <button
-                      v-for="item in facetCounters[dim.key] || []"
-                      :key="dim.key + item.value"
-                      :class="{ active: activeFacetClass(dim.key, item.value) }"
+                      :class="{ active: !selectedTags.length }"
                       type="button"
-                      @click="toggleFacetValue(dim.key, item.value)"
+                      @click="clearSelectedTags"
                     >
-                      {{ renderFacetLabel(item) }}
+                      全部关键词
+                    </button>
+                    <button
+                      v-for="tag in sortedTags"
+                      :key="tag.tag"
+                      :class="{ active: activeTagClass(tag.tag) }"
+                      type="button"
+                      @click="toggleTag(tag.tag)"
+                    >
+                      {{ renderTagLabel(tag) }}
                     </button>
                   </div>
-                </section>
+                </div>
+                <button
+                  v-if="tagNeedsCollapse"
+                  ref="tagToggleRef"
+                  class="tag-toggle-mini"
+                  :class="{ active: tagsExpanded }"
+                  type="button"
+                  @click.stop="toggleTagsExpanded"
+                  :aria-label="tagsExpanded ? '收起关键词标签' : '展开关键词标签'"
+                >
+                  {{ tagsExpanded ? '−' : '+' }}
+                </button>
+                <div
+                  v-if="tagNeedsCollapse && !tagsExpanded"
+                  class="tag-fade"
+                  aria-hidden="true"
+                  @click.stop.prevent
+                ></div>
               </div>
             </div>
           </section>
