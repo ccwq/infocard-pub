@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FreeLLMAPI：把 16 家免费模型入口收束到一个 OpenAI 接口，但边界比便利更重要</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:210px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:160px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1{margin:0;max-width:820px;font-size:clamp(28px,4.1vw,46px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:13px;line-height:1.58}
+    .badge-row,.quickline{display:flex;flex-wrap:wrap;gap:6px}
+    .badge,.quickline .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.4px;font-weight:850;line-height:1}
+    .badge.red,.quickline .badge.red{background:var(--red);color:#fff}
+    .badge.blue,.quickline .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark,.quickline .badge.dark{background:#111;color:#fff}
+    .quickline .badge.green{background:#eefbf1;color:#006b3c;border-color:#006b3c}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:14px;line-height:1.35}
+    .alert p{margin:0;font-size:12.8px;line-height:1.63;color:#f0ebe0!important}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.2px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin:16px 0 18px}
+    .overview-sentence{font-size:16px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:13px;line-height:1.68;color:#333}
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini,.risk,.figure-card,.wide{border:2px solid var(--line);background:#fff;min-width:0;box-shadow:var(--shadow)}
+    .card,.mini,.risk,.wide{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4,.risk h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p,.risk p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:18px}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.2px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)} .tag.blue{background:var(--soft-blue)} .tag.dark{background:#111;color:#fff}
+    .stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+    .stat{border:2px solid var(--line);background:#fff;padding:12px;display:grid;gap:6px;box-shadow:var(--shadow)}
+    .stat .k{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .stat .v{font-size:28px;line-height:1;font-weight:950;letter-spacing:-.05em}
+    .stat .d{font-size:12.5px;color:#333;line-height:1.5}
+    .wide{display:grid;gap:12px}
+    .wide h3{font-size:18px;line-height:1.18}
+    .table-wrap{overflow-x:auto;max-width:100%}
+    table{border-collapse:collapse;width:100%;min-width:760px;font-size:13px;background:#fff}
+    th,td{border:2px solid var(--line);padding:10px 10px;vertical-align:top;text-align:left;line-height:1.55}
+    th{background:#111;color:#fff;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .mini{display:grid;gap:8px}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)} .risk[data-accent="blue"]{--accent:var(--blue)} .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px;margin-top:6px}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72;box-shadow:var(--shadow)}
+    .gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    figure.shot{border:2px solid var(--line);background:#fff;box-shadow:var(--shadow)}
+    figure.shot img{width:100%;height:auto}
+    figure.shot figcaption{padding:10px 12px;border-top:2px solid var(--line);font-size:12.5px;line-height:1.6;color:#333}
+    .save{display:block;width:fit-content;position:static;margin:14px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,#0036a3,#002a7a);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(0,0,0,.35);cursor:pointer}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .stats,.grid-4,.matrix,.risk-grid,.gallery{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100%,calc(100% - 16px));padding:10px 0 80px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .stats,.grid-4,.grid-3,.grid-2,.matrix,.risk-grid,.gallery{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block,.wide{padding-left:12px;padding-right:12px}
+      table{min-width:640px}
+      .save{margin-top:12px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">Resource Share · OpenAI-Compatible Proxy</div>
+        <h1>把 16 家免费模型入口收束成一个 OpenAI 接口，但边界比便利更重要</h1>
+        <p class="subtitle">FreeLLMAPI 是一个 TypeScript 自托管代理：把 Google、Groq、Cerebras、Mistral、GitHub Models、Cloudflare、OpenRouter 等 16 家免费层聚到同一个 <code>/v1</code> 入口，并补了 Responses API、Anthropic Messages API、图片生成、TTS、embeddings、自动切换和密钥加密存储。</p>
+        <div class="quickline">
+          <span class="badge red">12.1k stars</span>
+          <span class="badge blue">TypeScript</span>
+          <span class="badge dark">MIT</span>
+          <span class="badge green">~1.7B tokens / month</span>
+          <span class="badge">16 providers</span>
+        </div>
+        <div class="alert">
+          <strong>一句话判断：这不是“白嫖捷径”工具，而是把多家免费额度编排成统一推理入口的本地实验网关。</strong>
+          <p>它最有价值的地方不是省下一两个 SDK，而是把路由、失败切换、密钥保护、统一认证和客户端兼容层一起打包；同时 README 也明确写了个人实验、非生产、不要公网暴露、并逐家标注 ToS 风险。</p>
+          <div class="mini-row">
+            <span class="mini-tag">/v1/chat/completions</span>
+            <span class="mini-tag">/v1/responses</span>
+            <span class="mini-tag">/v1/messages</span>
+            <span class="mini-tag">failover</span>
+            <span class="mini-tag">AES-256-GCM</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">Why It Matters</div>
+          <h3>统一协议层 + 多来源免费配额 + 风险边界显式化</h3>
+          <p>对于 OpenAI SDK、Claude Code、Codex CLI、LangChain、Continue 这类客户端，它把“切十几家接口”改写成“只换 base_url”。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>值得看的核心：</b>它把“免费模型聚合”从脚本拼凑升级成一个有兼容层、有管理台、有失败切换策略、有 ToS 说明的完整系统。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">统一 OpenAI / Anthropic 入口</div></div>
+            <div class="flow-item red"><div class="t">Step 2</div><div class="c">按优先级挑模型与密钥</div></div>
+            <div class="flow-item dark"><div class="t">Step 3</div><div class="c">429 / 5xx 自动降级切换</div></div>
+            <div class="flow-item blue"><div class="t">Step 4</div><div class="c">在本地仪表盘里观察配额与路由</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <div class="overview">
+      <div class="overview-sentence">真正值得收藏的不是“免费”两个字，而是它把多 provider、多协议、多失败路径统一成一个可替换的本地 AI 网关。</div>
+      <div class="overview-body">
+        <p>FreeLLMAPI 的传播点很强，但卡片更值得强调的是系统完整度：一端兼容 OpenAI SDK、Responses API、Anthropic Messages API、图片生成、TTS 和 embeddings，另一端连接 16 家免费模型入口与任意 OpenAI-compatible 自定义端点；中间再补上按 key 追踪 RPM/RPD/TPM/TPD、自动 failover、30 分钟 sticky session、AES-256-GCM 密钥加密、统一 bearer key、React 管理台与 live catalog。这使它更像一层“个人 AI 网关操作系统”，而不是简单代理脚本。与此同时，作者在 README 里反复画线：仅限个人实验、不要当生产后端、不要公开分享给别人、不同 provider 的 ToS 风险并不相同。</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">Snapshot</div>
+          <h2>先看 5 个硬事实</h2>
+          <p>来自 GitHub metadata 与 README。这里先回答“它是什么、规模多大、面向什么客户端”。</p>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Stars</div><div class="v">12.1k</div><div class="d">公开仓库，增长速度快，已经脱离“私人脚本”阶段。</div></div>
+        <div class="stat"><div class="k">Providers</div><div class="v">16</div><div class="d">Google、Groq、Cerebras、Mistral、OpenRouter、GitHub Models、Cloudflare 等。</div></div>
+        <div class="stat"><div class="k">Budget</div><div class="v">~1.7B</div><div class="d">README 给出的聚合免费层月度 token 量级。</div></div>
+        <div class="stat"><div class="k">Protocol</div><div class="v">/v1</div><div class="d">兼容 OpenAI、Anthropic 两套主流客户端形态。</div></div>
+        <div class="stat"><div class="k">Scope</div><div class="v">Personal</div><div class="d">README 明确定位个人实验，不建议生产，更不建议公网暴露。</div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">Capability Map</div>
+          <h2>它补的不是一个 API，而是一整层兼容与调度</h2>
+          <p>如果只说“聚合免费模型”，会低估这个项目。真正的价值在协议兼容、路由机制和本地运营面板一起出现。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <h3>客户端兼容层</h3>
+          <p>同一服务暴露 OpenAI Chat Completions、Responses API、Anthropic Messages API，还支持图像生成、TTS 与 embeddings。</p>
+          <div class="tagrow">
+            <span class="tag blue">OpenAI SDK</span>
+            <span class="tag blue">Claude Code</span>
+            <span class="tag blue">Codex CLI</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>模型与 key 调度层</h3>
+          <p>按 provider / model / key 追踪 RPM、RPD、TPM、TPD，遇到 429、5xx、timeout 会进入 cooldown 并跳下一个候选。</p>
+          <div class="tagrow">
+            <span class="tag red">fallback chain</span>
+            <span class="tag red">cooldown</span>
+            <span class="tag red">sticky session</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>本地运营层</h3>
+          <p>统一 bearer key、AES-256-GCM 加密存储、SQLite、健康检查、React + Vite 仪表盘与 live catalog，让“个人网关”可维护。</p>
+          <div class="tagrow">
+            <span class="tag dark">dashboard</span>
+            <span class="tag dark">encrypted keys</span>
+            <span class="tag dark">analytics</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">Architecture</div>
+          <h2>从客户端到 provider 的完整链路</h2>
+          <p>这张图比 star 数更重要，因为它直接说明了为什么项目不只是“转发请求”。</p>
+        </div>
+      </div>
+      <figure class="figure-card">
+        <img src="assets/images/20260625-freellmapi/fallback-chain.png" alt="FreeLLMAPI 的 fallback chain 与多 provider 路由示意图" />
+      </figure>
+      <p class="source-note">图中展示：统一 OpenAI-compatible 请求先进入 Express proxy，再交给 router 依次挑 model / key，若遇到 429、5xx 或超时就跳到下一 provider。</p>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">Risk Split</div>
+          <h2>它最容易被误解的 4 个点</h2>
+          <p>这张卡不把它写成“白嫖工具榜单”，因为 README 自己已经把边界说得很清楚。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <article class="mini">
+          <div class="lead">误解一</div>
+          <h4>不是 frontier model 替代品</h4>
+          <p>README 明写拿不到 GPT-5、Claude Opus 级别推理能力，日内还会随着高优模型额度耗尽而退化。</p>
+        </article>
+        <article class="mini">
+          <div class="lead">误解二</div>
+          <h4>不是生产 SLA</h4>
+          <p>作者明确写了 no SLA、free tiers can change、latency highly variable；这是一层实验网关，不是签约推理基础设施。</p>
+        </article>
+        <article class="mini">
+          <div class="lead">误解三</div>
+          <h4>不是多租户共享服务</h4>
+          <p>README 直接说 single-user、local-first、不要暴露到互联网；共享给别人会同时踩安全边界和条款边界。</p>
+        </article>
+        <article class="mini">
+          <div class="lead">误解四</div>
+          <h4>不是所有 provider 都“完全没风险”</h4>
+          <p>README 单列了 ToS review：有 likely OK，也有 caution、ambiguous、avoid。项目本身已经提示了合规差异。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">ToS Table</div>
+          <h2>条款判断不是附录，而是这个项目的主内容之一</h2>
+          <p>README 逐家给出 verdict，这意味着作者知道“免费聚合”天然会引发条款与使用边界问题。</p>
+        </div>
+      </div>
+      <article class="wide">
+        <h3>README 中已显式列出的 ToS 结论</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Provider</th><th>Verdict</th><th>README 摘要</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Groq / Cerebras / Mistral / OpenRouter / Zhipu / OVH</td><td>Likely OK</td><td>更偏个人/内部使用可辩护，但仍不允许 resale、共享 key、把免费层当公共后端出售。</td></tr>
+              <tr><td>Google Gemini / Cloudflare / NVIDIA NIM / GitHub Models / Z.ai</td><td>Caution / Ambiguous</td><td>有“professional use”“evaluation only”“experimentation only”或 anti-traffic-redirect 等条款，需要按各家政策自己判断。</td></tr>
+              <tr><td>Cohere</td><td>Avoid</td><td>README 直接写了不建议，原因是条款对 personal / household 用途限制更严格。</td></tr>
+              <tr><td>整体规则</td><td>Boundary First</td><td>README 给出的原则是：一 provider 一账户、不转售、不共享 endpoint 给其他人、不要把免费层当稳定生产后端。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+      <div class="quote-block"><b>值得注意：</b>作者没有回避这部分，反而把条款判断提前写进 README。对这种“聚合免费层”的项目来说，这种自带边界说明反而提升了它作为研究样本的价值。</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">06</div>
+        <div class="section-meta">
+          <div class="label k">Screens</div>
+          <h2>管理界面说明它已经进入“可操作系统”阶段</h2>
+          <p>不是只给一个 server.ts，而是已经把 key 管理、路由顺序、模型开关和 playground 做成了可视化入口。</p>
+        </div>
+      </div>
+      <div class="gallery">
+        <figure class="shot">
+          <img src="assets/images/20260625-freellmapi/keys.png" alt="FreeLLMAPI 的 key 管理界面截图" />
+          <figcaption>图中展示：各 provider key 的集中管理、统一 bearer key 以及 fallback chain 调度基础。</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/images/20260625-freellmapi/playground.png" alt="FreeLLMAPI 的 playground 界面截图" />
+          <figcaption>图中展示：本地 playground 与调试入口，说明它不仅是 API 代理，也带运营面板。</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/images/20260625-freellmapi/avatar.png" alt="FreeLLMAPI 仓库作者头像" />
+          <figcaption>图中展示：仓库 owner 头像本地化嵌入，用于来源标识；事实判断仍以 GitHub metadata 与 README 为准。</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">07</div>
+        <div class="section-meta">
+          <div class="label">Use Cases</div>
+          <h2>什么场景值得看，什么场景不要碰</h2>
+          <p>最稳的读法是把它当“个人 AI 网关样本库”，而不是“公开服务方案”。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="blue">
+          <div class="n">01</div>
+          <h4>适合</h4>
+          <p>个人实验、多客户端统一接入、想研究 OpenAI / Anthropic 兼容层、failover 策略、key 加密与本地 dashboard 的人。</p>
+        </article>
+        <article class="risk" data-accent="red">
+          <div class="n">02</div>
+          <h4>不适合</h4>
+          <p>对外共享、生产 SLA、商业转售、团队公用后端，或把它包装成“免费替代一切闭源 API”的叙事。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">03</div>
+          <h4>真正可复用的启发</h4>
+          <p>统一协议层、动态 provider 路由、per-key quota ledger、兼容多客户端 wire format，这些设计思路远比“免费额度”本身更值得学。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">08</div>
+        <div class="section-meta">
+          <div class="label b">Takeaway</div>
+          <h2>为什么这张资源分享值得发</h2>
+          <p>因为它把当下 AI 工程里最现实的一类需求浓缩出来了：多接口、多额度、多客户端、多失败路径，最后都要收束成一层你自己能控制的网关。</p>
+        </div>
+      </div>
+      <article class="wide">
+        <h3>一张卡带走的 3 个结论</h3>
+        <ul>
+          <li>它不是“又一个代理壳”，而是把 <b>协议兼容、密钥安全、路由策略、控制台</b> 串成一个完整个人 AI gateway。</li>
+          <li>它的亮点不该被“免费”覆盖，真正值得研究的是 <b>Responses API / Anthropic Messages API / failover / sticky session / quota ledger</b> 这一层系统设计。</li>
+          <li>它自己已经把风险写清楚了：<b>个人实验、非生产、不要公网暴露、不要共享、逐家读 ToS</b>。这也是分享时最应该一起带出去的边界。</li>
+        </ul>
+      </article>
+      <button class="save" onclick="window.print()">保存 / 导出</button>
+    </section>
+
+    <p class="source-note">Source: <a href="https://github.com/tashfeenahmed/freellmapi">tashfeenahmed/freellmapi</a> · Homepage: <a href="https://freellmapi.co">freellmapi.co</a> · Verified on 2026-06-25 · Theme: hardblue</p>
+  </main>
+</body>
+</html>
