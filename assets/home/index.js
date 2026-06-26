@@ -29,9 +29,6 @@
     history.scrollRestoration = 'manual';
   }
   const INTERSECTION_ROOT_MARGIN = '0px 0px 480px 0px';
-  const COLLAPSED_FULL_ROWS = 3;
-  const TAG_COLLAPSED_ROWS = 1;
-  const COLLAPSED_EXTRA_PX = 24;
   const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
   const DATETIME_MINUTE_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?:Z|[+-]\d{2}:?\d{2})?$/;
   const DATETIME_SECOND_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/;
@@ -170,7 +167,6 @@
       __title: card.title || card.slug || '未命名',
       __category: String(card.category || 'misc').toUpperCase(),
       __desc: card.desc || card.note || '',
-      __tags: Array.isArray(card.tags) ? card.tags : [],
       __kind: buildKindLabel(card),
       __glyph: buildLeadGlyph(card),
       __facets: {
@@ -196,22 +192,15 @@
       const loadError = ref('');
       const allCards = ref([]);
       const searchQuery = ref('');
-      const selectedTags = ref([]);
       const selectedFacets = ref({
         domains: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: []
       });
-      const expandedFacetKey = ref('');
-      const tagsExpanded = ref(false);
+      const filterDrawerOpen = ref(false);
+      const isMobileViewport = ref(false);
       const visibleCount = ref(BATCH_SIZE);
       const scrollTop = ref(0);
       const isAutoLoading = ref(false);
       const sentinelRef = ref(null);
-      const tagViewportRef = ref(null);
-      const tagFilterRef = ref(null);
-      const tagToggleRef = ref(null);
-      const tagNeedsCollapse = ref(false);
-      const tagHiddenCount = ref(0);
-      const collapsedMaxHeight = ref('none');
       const observerRef = ref(null);
 
       const totalCount = computed(() => allCards.value.length);
@@ -233,20 +222,6 @@
 
       const latestTimeLabel = computed(() => normalizedCards.value[0]?.__time?.full || '—');
 
-      const tagCounter = computed(() => {
-        const map = new Map();
-        normalizedCards.value.forEach((card) => {
-          card.__tags.forEach((tag) => map.set(tag, (map.get(tag) || 0) + 1));
-        });
-        return map;
-      });
-
-      const sortedTags = computed(() => [...tagCounter.value.entries()]
-        .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0]), 'zh-Hans-CN'))
-        .map(([tag, count]) => ({ tag, count })));
-
-      const hotTags = computed(() => sortedTags.value.slice(0, 3));
-
       const facetCounters = computed(() => {
         const result = {};
         [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS].forEach((dim) => {
@@ -264,7 +239,6 @@
       const filteredCards = computed(() => {
         const q = searchQuery.value.trim().toLowerCase();
         return normalizedCards.value.filter((card) => {
-          const matchLegacyTag = !selectedTags.value.length || selectedTags.value.some((tag) => card.__tags.includes(tag));
           const matchFacets = [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS].every((dim) => {
             const selected = selectedFacets.value[dim.key] || [];
             if (!selected.length) return true;
@@ -274,10 +248,9 @@
           const matchSearch = !q ||
             String(card.__title).toLowerCase().includes(q) ||
             String(card.slug || '').toLowerCase().includes(q) ||
-            card.__tags.some((tag) => String(tag).toLowerCase().includes(q)) ||
             String(card.category || '').toLowerCase().includes(q) ||
             [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS].some((dim) => (card.__facets[dim.key] || []).some((item) => String(item).toLowerCase().includes(q)));
-          return matchLegacyTag && matchFacets && matchSearch;
+          return matchFacets && matchSearch;
         });
       });
 
@@ -296,19 +269,33 @@
       });
 
       const posterSummary = computed(() => `LATEST FIRST · ${shownCount.value} ACTIVE RESULTS · ${categoryCount.value} CATEGORIES`);
-      const activeTagClass = (tag) => selectedTags.value.includes(tag);
       const activeFacetClass = (dimension, value) => (selectedFacets.value[dimension] || []).includes(value);
       const compactFacetRows = computed(() => PRIMARY_DIMENSIONS.map((dim) => {
         const full = facetCounters.value[dim.key] || [];
-        const expanded = expandedFacetKey.value === dim.key;
         return {
           ...dim,
-          expanded,
-          full,
-          visible: expanded ? full : full.slice(0, dim.limit),
-          hiddenCount: Math.max(0, full.length - dim.limit)
+          full
         };
       }));
+
+      const drawerFacetRows = computed(() => [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS].map((dim) => ({
+        ...dim,
+        full: facetCounters.value[dim.key] || []
+      })));
+
+      const activeFacetCount = computed(() => Object.values(selectedFacets.value)
+        .reduce((sum, values) => sum + (Array.isArray(values) ? values.length : 0), 0));
+
+      const activeFilterCount = computed(() => activeFacetCount.value);
+
+      const filterSummaryText = computed(() => {
+        if (!activeFilterCount.value) return '未设置筛选';
+        return `${activeFilterCount.value} 个条件`;
+      });
+
+      const updateViewportMode = () => {
+        isMobileViewport.value = window.innerWidth <= 720;
+      };
 
       const resetVisibleCount = () => {
         visibleCount.value = Math.min(BATCH_SIZE, Math.max(filteredCards.value.length, BATCH_SIZE));
@@ -323,26 +310,6 @@
         searchQuery.value = event.target.value;
         resetVisibleCount();
         nextTick(() => {
-          measureTagCollapse();
-          ensureAutoFill();
-        });
-      };
-
-      const collapseTagPanel = () => {
-        tagsExpanded.value = false;
-      };
-
-      const toggleTag = (tag) => {
-        if (!tag) {
-          selectedTags.value = [];
-        } else if (selectedTags.value.includes(tag)) {
-          selectedTags.value = selectedTags.value.filter((item) => item !== tag);
-        } else {
-          selectedTags.value = [...selectedTags.value, tag];
-        }
-        resetVisibleCount();
-        nextTick(() => {
-          measureTagCollapse();
           ensureAutoFill();
         });
       };
@@ -361,13 +328,16 @@
         });
       };
 
-      const toggleFacetRow = (dimension) => {
-        expandedFacetKey.value = expandedFacetKey.value === dimension ? '' : dimension;
+      const openFilterDrawer = () => {
+        filterDrawerOpen.value = true;
+      };
+
+      const closeFilterDrawer = () => {
+        filterDrawerOpen.value = false;
       };
 
       const clearAllFacets = () => {
         selectedFacets.value = { domains: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: [] };
-        expandedFacetKey.value = '';
         resetVisibleCount();
         nextTick(() => {
           ensureAutoFill();
@@ -383,76 +353,6 @@
         nextTick(() => {
           ensureAutoFill();
         });
-      };
-
-      const clearSelectedTags = () => {
-        selectedTags.value = [];
-        resetVisibleCount();
-        nextTick(() => {
-          measureTagCollapse();
-          ensureAutoFill();
-        });
-      };
-
-      const removeTag = (tag) => {
-        selectedTags.value = selectedTags.value.filter((item) => item !== tag);
-        resetVisibleCount();
-        nextTick(() => {
-          measureTagCollapse();
-          ensureAutoFill();
-        });
-      };
-
-      const toggleTagsExpanded = () => {
-        tagsExpanded.value = !tagsExpanded.value;
-        nextTick(measureTagCollapse);
-      };
-
-      const measureTagCollapse = () => {
-        const viewport = tagViewportRef.value;
-        const filterEl = tagFilterRef.value;
-        if (!viewport || !filterEl) return;
-
-        const buttons = Array.from(filterEl.querySelectorAll('button.tag-chip-mini, button.tag-label-mini'));
-        if (!buttons.length) {
-          collapsedMaxHeight.value = 'none';
-          tagNeedsCollapse.value = false;
-          tagHiddenCount.value = 0;
-          return;
-        }
-
-        const rows = [];
-        let currentTop = null;
-        buttons.forEach((button) => {
-          const top = button.offsetTop;
-          if (currentTop === null || top !== currentTop) {
-            rows.push(top);
-            currentTop = top;
-          }
-        });
-
-        const shouldExpand = tagsExpanded.value;
-        tagNeedsCollapse.value = rows.length > TAG_COLLAPSED_ROWS;
-
-        if (!tagNeedsCollapse.value || shouldExpand) {
-          collapsedMaxHeight.value = `${filterEl.scrollHeight}px`;
-          tagHiddenCount.value = 0;
-          return;
-        }
-
-        const baseTop = rows[0] || 0;
-        const visibleRows = rows.slice(0, TAG_COLLAPSED_ROWS);
-        let lastBottom = 0;
-        let hidden = 0;
-        buttons.forEach((button) => {
-          if (visibleRows.includes(button.offsetTop)) {
-            lastBottom = Math.max(lastBottom, button.offsetTop + button.offsetHeight);
-          } else {
-            hidden += 1;
-          }
-        });
-        tagHiddenCount.value = Math.max(0, hidden);
-        collapsedMaxHeight.value = `${Math.max(0, lastBottom - baseTop + 6)}px`;
       };
 
       const ensureAutoFill = () => {
@@ -513,7 +413,7 @@
 
       const onResize = () => {
         window.requestAnimationFrame(() => {
-          measureTagCollapse();
+          updateViewportMode();
           ensureAutoFill();
         });
       };
@@ -527,10 +427,7 @@
         if (Array.isArray(saved.cards)) allCards.value = saved.cards;
         if (typeof saved.version === 'string') version.value = saved.version;
         if (typeof saved.visibleCount === 'number') visibleCount.value = saved.visibleCount;
-        if (Array.isArray(saved.selectedTags)) selectedTags.value = saved.selectedTags;
         if (saved.selectedFacets && typeof saved.selectedFacets === 'object') selectedFacets.value = saved.selectedFacets;
-        if (typeof saved.expandedFacetKey === 'string') expandedFacetKey.value = saved.expandedFacetKey;
-        if (saved.tagsExpanded === true) tagsExpanded.value = true;
         if (typeof saved.searchQuery === 'string') searchQuery.value = saved.searchQuery;
         if (typeof saved.scrollTop === 'number') scrollTop.value = saved.scrollTop;
         return Array.isArray(saved.cards) && saved.cards.length > 0;
@@ -543,10 +440,7 @@
           version: version.value,
           savedAt: Date.now(),
           visibleCount: visibleCount.value,
-          selectedTags: selectedTags.value.slice(),
           selectedFacets: JSON.parse(JSON.stringify(selectedFacets.value)),
-          expandedFacetKey: expandedFacetKey.value,
-          tagsExpanded: tagsExpanded.value,
           searchQuery: searchQuery.value,
           scrollTop: scrollTop.value
         });
@@ -564,6 +458,7 @@
       onMounted(async () => {
         let restoredFromHistory = false;
         document.body.classList.add('is-loading-index');
+        updateViewportMode();
         window.addEventListener('resize', onResize);
         window.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('pagehide', persistLatestScrollState);
@@ -585,7 +480,6 @@
           document.body.classList.remove('is-loading-index');
         }
         await nextTick();
-        measureTagCollapse();
         // Restore scroll AFTER DOM + visibleCards are ready, only for browser Back/Forward.
         const savedScroll = restoredFromHistory ? scrollTop.value : 0;
         if (savedScroll > 0) {
@@ -598,15 +492,13 @@
       });
 
       // Watch state changes and persist
-      Vue.watch([allCards, version, filteredCards, tagsExpanded, selectedTags, selectedFacets, expandedFacetKey, searchQuery, visibleCount], async () => {
+      Vue.watch([allCards, version, filteredCards, selectedFacets, searchQuery, visibleCount], async () => {
         await nextTick();
-        measureTagCollapse();
         ensureAutoFill();
         setupObserver();
         saveSessionState();
       }, { deep: true });
 
-      const renderTagLabel = (tag) => tag.tag;
       const renderFacetLabel = (item) => `${item.value} (${item.count})`;
       const serialOf = (card) => pad2(card.__order + 1);
 
@@ -619,17 +511,17 @@
         renderedCount,
         hasMore,
         searchQuery,
-        selectedTags,
         selectedFacets,
-        expandedFacetKey,
-        tagsExpanded,
+        filterDrawerOpen,
+        isMobileViewport,
         visibleCards,
-        sortedTags,
-        hotTags,
         facetCounters,
         compactFacetRows,
+        drawerFacetRows,
         PRIMARY_DIMENSIONS,
         ADVANCED_DIMENSIONS,
+        activeFilterCount,
+        filterSummaryText,
         totalCountLabel,
         latestTimeLabel,
         categoryCount,
@@ -637,26 +529,15 @@
         countLineText,
         listProgressText,
         loadingNoteText,
-        tagNeedsCollapse,
-        tagHiddenCount,
-        collapsedMaxHeight,
         sentinelRef,
-        tagViewportRef,
-        tagFilterRef,
-        tagToggleRef,
-        activeTagClass,
         activeFacetClass,
         onSearchInput,
-        toggleTag,
         toggleFacetValue,
-        toggleFacetRow,
+        openFilterDrawer,
+        closeFilterDrawer,
         clearAllFacets,
         removeFacetValue,
-        clearSelectedTags,
-        removeTag,
-        toggleTagsExpanded,
         loadMore,
-        renderTagLabel,
         renderFacetLabel,
         serialOf
       };
@@ -678,7 +559,7 @@
                 <div class="poster-title-zone compact">
                   <div class="poster-index">01 / ARCHIVE POSTER</div>
                   <h1>INFOCARD<br>ARCHIVE</h1>
-                  <p class="poster-copy compact">公开信息卡索引，按最新时间优先排列，支持标签并集筛选与增量浏览。</p>
+                  <p class="poster-copy compact">公开信息卡索引，按最新时间优先排列，支持 taxonomy 筛选与增量浏览。</p>
                 </div>
 
                 <div class="poster-info-zone compact">
@@ -703,28 +584,49 @@
               <input
                 :value="searchQuery"
                 type="search"
-                placeholder="搜索标题 / slug / 标签 / 分类…"
+                placeholder="搜索标题 / slug / 分类 / taxonomy…"
                 autocomplete="off"
                 @input="onSearchInput"
               >
             </label>
           </section>
 
-          <section class="tag-stack compact-taxonomy-stack compact-filter-strip">
-            <div class="tag-stack-top compact-filter-top">
-              <div class="tag-stack-title-wrap compact-filter-head">
-                <div class="tag-stack-kicker compact-filter-kicker">taxonomy / keywords</div>
-                <div class="tag-stack-title compact-filter-title">紧凑筛选</div>
+          <section v-if="isMobileViewport" class="mobile-filter-summary">
+            <div class="mobile-filter-copy">
+              <span class="mobile-filter-label">FILTERS</span>
+              <strong>{{ filterSummaryText }}</strong>
+              <span>{{ shownCount }} / {{ totalCount }} 命中</span>
+            </div>
+            <div v-if="Object.values(selectedFacets).some(v => v.length)" class="mobile-selected-list" aria-label="已选择筛选条件">
+              <template v-for="dim in [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS]" :key="'mobile-selected-' + dim.key">
+                <button
+                  v-for="value in selectedFacets[dim.key]"
+                  :key="'mobile-summary-' + dim.key + value"
+                  type="button"
+                  class="mobile-selected-pill"
+                  @click="removeFacetValue(dim.key, value)"
+                >
+                  {{ dim.label }} · {{ value }}
+                </button>
+              </template>
+            </div>
+            <button type="button" class="mobile-filter-trigger" @click="openFilterDrawer">
+              筛选
+              <span v-if="activeFilterCount">{{ activeFilterCount }}</span>
+            </button>
+          </section>
+
+          <section v-if="!isMobileViewport" class="filter-stack compact-taxonomy-stack compact-filter-strip desktop-filter-panel">
+            <div class="filter-stack-top compact-filter-top">
+              <div class="filter-stack-title-wrap compact-filter-head">
+                <div class="filter-stack-kicker compact-filter-kicker">taxonomy</div>
+                <div class="filter-stack-title compact-filter-title">紧凑筛选</div>
               </div>
             </div>
 
-            <div v-if="selectedTags.length || Object.values(selectedFacets).some(v => v.length)" class="current-filter banded">
+            <div v-if="Object.values(selectedFacets).some(v => v.length)" class="current-filter banded">
               <span class="stack-label">当前条件</span>
               <span class="selected-pills">
-                <span v-for="tag in selectedTags" :key="'legacy-' + tag" class="pill pill-stack">
-                  标签 · {{ tag }}
-                  <button type="button" aria-label="移除标签" @click="removeTag(tag)">×</button>
-                </span>
                 <template v-for="dim in [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS]" :key="dim.key">
                   <span v-for="value in selectedFacets[dim.key]" :key="dim.key + value" class="pill pill-stack taxonomy-pill">
                     {{ dim.label }} · {{ value }}
@@ -740,7 +642,7 @@
                 <div class="facet-compact-label">{{ row.label }}</div>
                 <div class="facet-compact-items">
                   <button
-                    v-for="item in row.visible"
+                    v-for="item in row.full"
                     :key="row.key + item.value"
                     :class="{ active: activeFacetClass(row.key, item.value) }"
                     type="button"
@@ -749,48 +651,65 @@
                     {{ renderFacetLabel(item) }}
                   </button>
                 </div>
-                <button
-                  v-if="row.hiddenCount > 0"
-                  class="facet-row-toggle"
-                  type="button"
-                  @click="toggleFacetRow(row.key)"
-                >
-                  {{ row.expanded ? '−' : '+' }}
-                </button>
               </div>
             </div>
 
-            <div class="tag-row tag-row-layered tag-row-mini" style="margin-top:12px">
-              <div class="tag-viewport-wrap" :class="{ expanded: tagsExpanded, collapsed: tagNeedsCollapse && !tagsExpanded }">
-                <div ref="tagViewportRef" class="tag-viewport layered mini" :style="{ maxHeight: collapsedMaxHeight }">
-                  <div ref="tagFilterRef" class="tag-filter tag-filter-mini">
+          </section>
+
+          <div
+            v-if="isMobileViewport"
+            class="filter-drawer-shell"
+            :class="{ open: filterDrawerOpen }"
+            :aria-hidden="filterDrawerOpen ? 'false' : 'true'"
+          >
+            <button type="button" class="filter-drawer-backdrop" aria-label="关闭筛选" @click="closeFilterDrawer"></button>
+            <section class="filter-drawer" role="dialog" aria-modal="true" aria-label="筛选信息卡">
+              <div class="filter-drawer-handle" aria-hidden="true"></div>
+              <div class="filter-drawer-head">
+                <div>
+                  <div class="filter-drawer-kicker">taxonomy</div>
+                  <h2>筛选信息卡</h2>
+                  <p>{{ shownCount }} / {{ totalCount }} 命中</p>
+                </div>
+                <button type="button" class="filter-drawer-close" aria-label="关闭筛选" @click="closeFilterDrawer">×</button>
+              </div>
+
+              <div class="filter-drawer-body">
+                <div v-if="Object.values(selectedFacets).some(v => v.length)" class="current-filter banded drawer-current-filter">
+                  <span class="stack-label">当前条件</span>
+                  <span class="selected-pills">
+                    <template v-for="dim in [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS]" :key="'drawer-selected-' + dim.key">
+                      <span v-for="value in selectedFacets[dim.key]" :key="'drawer-' + dim.key + value" class="pill pill-stack taxonomy-pill">
+                        {{ dim.label }} · {{ value }}
+                        <button type="button" aria-label="移除筛选" @click="removeFacetValue(dim.key, value)">×</button>
+                      </span>
+                    </template>
+                  </span>
+                </div>
+
+                <div v-for="row in drawerFacetRows" :key="'drawer-row-' + row.key" class="drawer-facet-row">
+                  <div class="drawer-facet-label">{{ row.label }}</div>
+                  <div class="drawer-facet-items">
                     <button
-                      v-for="tag in sortedTags"
-                      :key="tag.tag"
-                      class="tag-chip-mini"
-                      :class="{ active: activeTagClass(tag.tag) }"
+                      v-for="item in row.full"
+                      :key="'drawer-' + row.key + item.value"
+                      :class="{ active: activeFacetClass(row.key, item.value) }"
                       type="button"
-                      @click="toggleTag(tag.tag)"
+                      @click="toggleFacetValue(row.key, item.value)"
                     >
-                      <span class="tag-chip-mini-text">{{ renderTagLabel(tag) }}</span>
-                      <span class="tag-chip-mini-count">{{ tag.count }}</span>
+                      {{ renderFacetLabel(item) }}
                     </button>
                   </div>
                 </div>
-                <button
-                  v-if="tagNeedsCollapse"
-                  ref="tagToggleRef"
-                  class="tag-toggle-mini tag-toggle-inline"
-                  :class="{ active: tagsExpanded }"
-                  type="button"
-                  @click.stop="toggleTagsExpanded"
-                  :aria-label="tagsExpanded ? '收起关键词标签' : '展开关键词标签'"
-                >
-                  {{ tagsExpanded ? '−' : '+' + tagHiddenCount }}
-                </button>
+
               </div>
-            </div>
-          </section>
+
+              <div class="filter-drawer-actions">
+                <button type="button" class="drawer-clear" @click="clearAllFacets">清空</button>
+                <button type="button" class="drawer-apply" @click="closeFilterDrawer">查看结果</button>
+              </div>
+            </section>
+          </div>
 
           <section class="list-header premium">
             <div class="count-line">{{ loadError || countLineText }}</div>
@@ -829,9 +748,6 @@
                 <div class="entry-copy">
                   <h2><a :href="card.__href">{{ card.__title }}</a></h2>
                   <div v-if="card.__desc" class="desc">{{ card.__desc }}</div>
-                  <div class="card-meta premium-meta">
-                    <span v-for="tag in card.__tags" :key="tag" class="tag-chip">{{ tag }}</span>
-                  </div>
                 </div>
               </div>
             </article>
