@@ -8,6 +8,9 @@
  * 如需同步 updated，显式增加 --sync-updated。
  * 如需强制覆盖已有 date / updated，增加 --force。
  *
+ * 新文件（无 git 历史）：当 git log 返回空时，自动回退到 HTML 文件 mtime，
+ * 保证从未提交过的新卡也能自动获得发布时时间，不再依赖 LLM 手动填写。
+ *
  * 用法：
  *   node scripts/fix-meta-date.js
  *   node scripts/fix-meta-date.js --write --date-source first
@@ -221,10 +224,39 @@ function main() {
       }
 
       const commitDate = getGitCommitDate(htmlRelative, dateSource);
+      const fileDate = () => {
+        const stat = fs.statSync(htmlAbsolute);
+        const ms = stat.mtimeMs;
+        // Use UTC+8 (Asia/Shanghai) for wall-clock local time, consistent with build log timestamps
+        const offset = 8 * 60;
+        const localMs = ms + offset * 60 * 1000;
+        const d = new Date(localMs);
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+      };
+
       if (!commitDate) {
+        // New file (never committed to git yet): fall back to file mtime
+        const fallbackDate = fileDate();
         summary.missingGitHistory += 1;
-        summary.skipped += 1;
-        console.log(`SKIP ${metaRelative} | HTML 无 git 历史 -> ${htmlRelative}`);
+        const nextDate = !currentDate || shouldForce ? fallbackDate : currentDate;
+        const nextUpdated = shouldSyncUpdated && (!currentUpdated || shouldForce) ? fallbackDate : currentUpdated;
+        if (nextDate === currentDate && nextUpdated === currentUpdated) {
+          summary.unchanged += 1;
+          summary.skipped += 1;
+          console.log(`SKIP ${metaRelative} | 无需变更`);
+        } else {
+          summary.changed += 1;
+          console.log(
+            `CHANGE ${metaRelative} (git历史空，使用mtime) | date: ${currentDate || '<missing>'} -> ${nextDate}${shouldSyncUpdated ? ` | updated: ${currentUpdated || '<missing>'} -> ${nextUpdated || '<missing>'}` : ''}`
+          );
+          if (shouldWrite) {
+            let nextText = raw;
+            if (nextDate !== currentDate) nextText = replaceOrInsertYamlLine(nextText, 'date', DATE_LINE_RE, nextDate);
+            if (nextUpdated !== currentUpdated) nextText = replaceOrInsertYamlLine(nextText, 'updated', UPDATED_LINE_RE, nextUpdated);
+            fs.writeFileSync(metaFile, nextText, 'utf8');
+          }
+        }
         continue;
       }
 

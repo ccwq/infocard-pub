@@ -207,21 +207,23 @@ taxonomy:
 ### 新增卡
 
 ```bash
-# 1. 写 HTML + meta.yaml（可先留空 taxonomy）
-# 2. 自动补 taxonomy
+# 1. 写 HTML + meta.yaml（注意：不写 date / updated，链路自动处理）
+# 2. 自动补 taxonomy（不碰 date）
 npm run fix-taxonomy
 
-# 3. 校验
-npm run verify-taxonomy
-
-# 4. 构建 + 验证
+# 3. 构建 + 验证（含 fix-meta-date：已提交文件用 git 时间，新文件用 mtime）
 npm run build && npm run verify
+
+# 4. 校验
+npm run verify-taxonomy
 
 # 5. 可选：filter 数据验收
 node scripts/verify-filter-index.js --slug <slug>
 
 # 6. commit + push + wiki 同步
 ```
+
+**⚠️ date 由脚本处理，不手动填写**：LLM 写 meta.yaml 时不写 `date` / `updated`。新文件（还未 commit）由 `fix-meta-date.js` 自动用文件 mtime 补时间；已提交文件用 git 提交时间。详见 `fix-meta-date.js --help`。
 
 ### 修改卡
 
