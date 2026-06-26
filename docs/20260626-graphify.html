@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Graphify：把代码、文档、PDF、图片和视频统一压进一个可查询知识图</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#f7f6f2;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#6c6a63;
+      --line:#ddd7cb;
+      --accent:#3f6cff;
+      --accent-soft:rgba(63,108,255,.10);
+      --accent-2:#0f172a;
+      --shadow:0 10px 28px rgba(17,17,17,.05);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+    a{color:inherit}
+    .frame{max-width:1440px;margin:0 auto;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0));}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:18px 30px;border-bottom:1px solid var(--line);background:rgba(255,253,248,.86);backdrop-filter:blur(6px)}
+    .wordmark{font-weight:800;font-size:1.25rem;letter-spacing:-.04em;text-decoration:none}
+    .nav-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-end}
+    .nav-links span,.nav-links a{color:var(--muted);font-size:.92rem;text-decoration:none}
+    .hero{display:grid;grid-template-columns:1.06fr .94fr;border-bottom:1px solid var(--line)}
+    .hero-left{padding:62px 48px 48px;min-width:0}
+    .eyebrow{display:inline-flex;align-items:center;gap:.55rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+    .eyebrow:before{content:"";width:42px;height:1px;background:var(--line)}
+    h1{font-size:clamp(2.5rem,6vw,4.9rem);line-height:.94;font-weight:800;letter-spacing:-.05em;margin:0 0 16px;max-width:12ch}
+    .lede{font-size:clamp(1rem,1.45vw,1.18rem);line-height:1.66;color:var(--muted);max-width:39ch;margin:0 0 24px}
+    .kicker-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+    .pill{border:1px solid var(--line);padding:7px 10px;font-size:.8rem;background:rgba(255,255,255,.48);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .install{display:inline-flex;align-items:center;gap:.5rem;border:1px solid var(--line);padding:10px 12px 10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:.93rem;background:rgba(255,255,255,.42);margin-bottom:18px}
+    .copy{border:none;background:transparent;cursor:pointer;color:var(--muted);padding:2px 4px}
+    .micro{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:.92rem}
+    .hero-right{border-inline-start:1px solid var(--line);padding:24px;display:flex;align-items:center;justify-content:center;min-width:0}
+    .graph-shell{width:100%;max-width:620px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.7));box-shadow:var(--shadow);padding:20px}
+    .graph-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;font-size:.82rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+    .graph-title strong{color:var(--ink)}
+    .logo-box{display:grid;place-items:center;border:1px dashed var(--line);background:rgba(255,255,255,.5);padding:12px;margin-bottom:16px;min-height:92px}
+    .logo-box img{max-width:260px;width:100%;height:auto;display:block}
+    svg{width:100%;height:auto;display:block}
+    .edges line{stroke:var(--line);stroke-width:1.2}
+    .node circle{fill:var(--paper);stroke:var(--ink);stroke-width:1.6}
+    .node text{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:13px;fill:var(--ink);dominant-baseline:middle}
+    .node.hot circle{fill:var(--accent-soft);stroke:var(--accent)}
+    .node.dim circle{fill:#faf8f3}
+    .section{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+    .card{padding:28px 28px 30px;border-inline-start:1px solid var(--line);min-width:0}
+    .card:first-child{border-inline-start:none}
+    .section-label{display:flex;align-items:center;gap:.55rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+    .section-label:before{content:"";width:18px;height:1px;background:var(--line)}
+    .card h2{font-size:1.42rem;line-height:1.1;letter-spacing:-.03em;margin:0 0 12px}
+    .card p{margin:0;color:var(--muted);line-height:1.68;font-size:.98rem}
+    .list{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px}
+    .list li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:10px;font-size:.95rem}
+    .list span{color:var(--muted)}
+    .notes{display:grid;grid-template-columns:1.08fr .92fr;border-bottom:1px solid var(--line)}
+    .notes-left,.notes-right{padding:28px 28px 32px;min-width:0}
+    .notes-right{border-inline-start:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.45))}
+    .callout{border:1px solid var(--line);background:var(--paper);padding:16px 18px;box-shadow:var(--shadow)}
+    .callout strong{display:block;margin-bottom:6px}
+    .timeline{display:grid;gap:10px;margin-top:16px}
+    .step{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:12px 0;border-top:1px dashed var(--line)}
+    .step:first-child{border-top:none;padding-top:0}
+    .step b{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;color:var(--accent-2)}
+    .step p{margin:0;color:var(--muted);line-height:1.55}
+    .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+    .metric{border:1px solid var(--line);background:rgba(255,255,255,.55);padding:14px 12px;display:grid;gap:6px}
+    .metric .k{font:800 10px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .metric .v{font-size:1.1rem;font-weight:800;letter-spacing:-.03em}
+    .footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 28px;color:var(--muted);font-size:.88rem}
+    .save{display:block;width:fit-content;position:static;margin:18px 0 0 auto;border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:12px 16px;font-weight:700;cursor:pointer}
+    .save:hover{background:transparent;color:var(--ink)}
+    @media (max-width: 980px){
+      .hero,.notes{grid-template-columns:1fr}
+      .hero-right,.notes-right{border-inline-start:none;border-top:1px solid var(--line)}
+      .section{grid-template-columns:1fr}
+      .card{border-inline-start:none;border-top:1px solid var(--line)}
+      .card:first-child{border-top:none}
+      .hero-left{padding:48px 24px 34px}
+      .hero-right{padding:22px 18px 24px}
+      .nav{padding:14px 18px}
+      .metric-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width: 480px){
+      h1{max-width:none}
+      .lede{font-size:1rem}
+      .graph-shell{padding:14px}
+      .metric-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="frame" id="card">
+    <header class="nav">
+      <a class="wordmark" href="#">GRAPHIFY / INFocard</a>
+      <nav class="nav-links">
+        <span>graph-paper-style</span>
+        <a href="https://github.com/safishamsi/graphify" target="_blank" rel="noreferrer">repo</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-left">
+        <div class="eyebrow">knowledge graph / codebase map / assistant skill</div>
+        <h1>Graphify：把代码、文档、PDF、图片和视频统一压进一个可查询知识图</h1>
+        <p class="lede">它不是普通 RAG 封装，而是把任意项目文件夹转成知识图：代码、SQL schema、R 脚本、shell、文档、论文、图片、视频都能进图，然后让 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等助手直接对这张图提问。</p>
+        <div class="kicker-row">
+          <span class="pill">71.9k★ / 7.2k fork</span>
+          <span class="pill">default branch: v8</span>
+          <span class="pill">PyPI: graphifyy</span>
+          <span class="pill">MIT</span>
+        </div>
+        <div class="install"><code>/graphify .</code><button class="copy" onclick="copyInstall()">⧉</button></div>
+        <div class="micro">
+          <span>code + docs + media in one graph</span>
+          <span>queryable knowledge layer</span>
+          <span>assistant-first</span>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="graph-shell">
+          <div class="graph-title"><span>knowledge graph overview</span><strong>v8</strong></div>
+          <div class="logo-box">
+            <img src="assets/images/20260626-graphify/logo-text.svg" alt="Graphify logo">
+          </div>
+          <svg viewBox="0 0 620 360" aria-label="Graphify knowledge graph model">
+            <g class="edges">
+              <line x1="88" y1="78" x2="204" y2="62" />
+              <line x1="88" y1="78" x2="202" y2="156" />
+              <line x1="204" y1="62" x2="332" y2="92" />
+              <line x1="202" y1="156" x2="332" y2="92" />
+              <line x1="332" y1="92" x2="474" y2="68" />
+              <line x1="332" y1="92" x2="468" y2="170" />
+              <line x1="202" y1="156" x2="336" y2="250" />
+              <line x1="336" y1="250" x2="472" y2="226" />
+              <line x1="336" y1="250" x2="200" y2="296" />
+              <line x1="200" y1="296" x2="92" y2="232" />
+            </g>
+            <g class="node hot"><circle cx="88" cy="78" r="24" /><text x="88" y="78" text-anchor="middle">Folder</text></g>
+            <g class="node"><circle cx="204" cy="62" r="22" /><text x="204" y="62" text-anchor="middle">Code</text></g>
+            <g class="node"><circle cx="202" cy="156" r="22" /><text x="202" y="156" text-anchor="middle">Docs</text></g>
+            <g class="node hot"><circle cx="332" cy="92" r="24" /><text x="332" y="92" text-anchor="middle">Graph</text></g>
+            <g class="node"><circle cx="474" cy="68" r="22" /><text x="474" y="68" text-anchor="middle">Query</text></g>
+            <g class="node"><circle cx="468" cy="170" r="22" /><text x="468" y="170" text-anchor="middle">Skill</text></g>
+            <g class="node hot"><circle cx="336" cy="250" r="24" /><text x="336" y="250" text-anchor="middle">Agent</text></g>
+            <g class="node dim"><circle cx="472" cy="226" r="20" /><text x="472" y="226" text-anchor="middle">Wiki</text></g>
+            <g class="node"><circle cx="200" cy="296" r="21" /><text x="200" y="296" text-anchor="middle">Media</text></g>
+            <g class="node dim"><circle cx="92" cy="232" r="21" /><text x="92" y="232" text-anchor="middle">PDF</text></g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <article class="card">
+        <div class="section-label">核心定位</div>
+        <h2>它做的不是“再搜一遍仓库”，而是先把仓库变成图，再让你问图</h2>
+        <p>README 的开头已经把定位说透了：只要在 AI coding assistant 里输入 `/graphify .`，Graphify 就会把当前项目映射成知识图，然后产出 `graph.html`、`GRAPH_REPORT.md` 和 `graph.json` 三个结果文件。重点不在报告本身，而在于它后续可查询、可继续复用，而不是一次性浏览。</p>
+        <ul class="list">
+          <li><strong>graph.html</strong><span>浏览器里点节点、筛选、搜索</span></li>
+          <li><strong>GRAPH_REPORT.md</strong><span>项目亮点、意外连接、建议问题</span></li>
+          <li><strong>graph.json</strong><span>真正的图数据底座，后续可以 query / path / explain</span></li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="section-label">最强卖点</div>
+        <h2>不是只看代码，连 SQL、文档、PDF、图片、视频都能落到同一张图里</h2>
+        <p>Graphify 最大的区分度在于输入域非常宽：代码、schema、shell、论文、文档、图片、音视频、Google Workspace、MCP config 都可以纳入同一个知识层。这让它不再只是代码库浏览器，而更像“项目的综合上下文层”。</p>
+        <div class="metric-grid">
+          <div class="metric"><span class="k">代码语法</span><span class="v">36+ tree-sitter</span></div>
+          <div class="metric"><span class="k">平台适配</span><span class="v">Claude / Codex / Cursor / Hermes / OpenClaw</span></div>
+          <div class="metric"><span class="k">安装入口</span><span class="v">graphify install</span></div>
+          <div class="metric"><span class="k">输出形式</span><span class="v">HTML / MD / JSON</span></div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="section-label">为什么值得看</div>
+        <h2>它把“项目知识层”从一堆 grep / report，推进成了一个可持续查询接口</h2>
+        <p>这类仓库真正有价值的地方，不是做一次图，而是让助手在之后持续优先查图而不是反复扫文件。README 明确提供了 `query`、`path`、`explain`、MCP server、hook install、auto rebuild 等路径，说明它是面向长期使用而不是一次性可视化演示。</p>
+      </article>
+    </section>
+
+    <section class="notes">
+      <div class="notes-left">
+        <div class="section-label">怎么工作</div>
+        <h2 style="margin:0 0 12px;font-size:1.8rem;letter-spacing:-.03em;">从文件夹 → 抽取 → 图谱 → 查询 → 助手工作流</h2>
+        <p style="margin:0;color:var(--muted);line-height:1.7;max-width:62ch;">Graphify 的真正主线不是“做 HTML 图”，而是“把所有输入压成一个可以复用的查询层，再让助手总是先查图而不是直接读全仓”。这一点让它更像 memory / graph context layer，而不是一次性知识整理器。</p>
+        <div class="timeline">
+          <div class="step"><b>01</b><p>你对当前项目运行 `/graphify .`，它开始抽取代码、文档、媒体和配置。</p></div>
+          <div class="step"><b>02</b><p>产出 `graph.html`、`GRAPH_REPORT.md`、`graph.json`，前者给人看，后者给助手继续查询。</p></div>
+          <div class="step"><b>03</b><p>再运行 `graphify install`，把“优先查图”这条规则写入 Claude Code / Codex / Cursor / Hermes / OpenClaw 等平台的工作流里。</p></div>
+          <div class="step"><b>04</b><p>之后助手就会用 `query` / `path` / `explain` 方式先向图提问，而不是从零扫文件。</p></div>
+        </div>
+      </div>
+      <div class="notes-right">
+        <div class="callout">
+          <strong>为什么这对 AI coding assistant 有用</strong>
+          <p style="margin:0;color:var(--muted);line-height:1.65;">当项目包含代码、数据库、基础设施、文档、图片和研究材料时，普通搜索只能一块块找；Graphify 试图先做实体、关系和路径层，把“局部问题”提升成“图上的连接问题”。</p>
+        </div>
+        <div class="timeline">
+          <div class="step"><b>Path</b><p>查两个节点之间怎么连起来：`graphify path "UserService" "DatabasePool"`</p></div>
+          <div class="step"><b>Query</b><p>直接问图：`graphify query "what connects auth to the database?"`</p></div>
+          <div class="step"><b>Serve</b><p>把 graph.json 暴露成 MCP / server，供一整个团队或多个 agent 消费。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <article class="card">
+        <div class="section-label">安装与接入</div>
+        <h2>真正上手门槛不高，但要注意它的包名和命令名不是同一个</h2>
+        <p>README 专门强调：PyPI 包是 <code>graphifyy</code>（双 y），但 CLI 命令仍然是 <code>graphify</code>。这类细节如果不写进卡里，读者很容易装错包或误以为命令不可用。</p>
+        <ul class="list">
+          <li><strong>推荐安装</strong><span><code>uv tool install graphifyy</code></span></li>
+          <li><strong>替代方案</strong><span><code>pipx install graphifyy</code></span></li>
+          <li><strong>接入助手</strong><span><code>graphify install</code></span></li>
+          <li><strong>项目内安装</strong><span><code>graphify install --project</code></span></li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="section-label">覆盖平台</div>
+        <h2>它已经把自己定位成一层“跨助手的项目知识图技能”</h2>
+        <p>README 列表覆盖范围极广：Claude Code、Codex、OpenCode、Cursor、Gemini CLI、GitHub Copilot CLI、VS Code Copilot Chat、Aider、OpenClaw、Factory Droid、Trae、Hermes、Kimi Code、Kiro、Pi、Devin CLI、Google Antigravity 等，都被当成接入对象。</p>
+      </article>
+      <article class="card">
+        <div class="section-label">边界与取舍</div>
+        <h2>它不是零成本黑箱：图谱质量仍取决于抽取范围、后端和依赖环境</h2>
+        <p>Graphify 很强，但不是魔法：要启用 PDF、Office、Google Workspace、video、neo4j、terraform、dm 等能力，还需要额外 extras。它的价值在于把这些能力整合进同一图，而不是承诺“默认全开、零配置”。</p>
+      </article>
+    </section>
+
+    <footer class="footer">
+      <span>内容来源：README + GitHub 元数据 · 风格自动选择：graph-paper</span>
+      <button class="save" onclick="saveCardAsPng()">保存 PNG</button>
+    </footer>
+  </div>
+
+  <script>
+    function copyInstall(){navigator.clipboard.writeText('/graphify .').catch(()=>{});}
+    async function saveCardAsPng(){
+      const target=document.getElementById('card');
+      const canvas=await html2canvas(target,{backgroundColor:'#f7f6f2',scale:2,useCORS:true,scrollY:-window.scrollY,windowWidth:document.documentElement.scrollWidth,windowHeight:document.documentElement.scrollHeight});
+      const link=document.createElement('a');
+      link.download='graphify-knowledge-graph-infocard.png';
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
