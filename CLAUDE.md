@@ -45,9 +45,26 @@ node scripts/fix-meta-date.js --write --date-source last --force
 python scripts/extract_infocard_styles.py
 ```
 
+### Taxonomy (数据维度)
+
+新增或修改信息卡时，必须运行 taxonomy 工具链：
+
+```bash
+# 自动补全 taxonomy 字段（从 source_url / title / tags / category 推断）
+npm run fix-taxonomy
+
+# 校验 taxonomy 完整性（发布门禁：必填维度非空 + 值在 _taxonomy.yaml 允许列表内）
+npm run verify-taxonomy
+
+# 验证卡片是否可被首页 filter 统计和筛选
+node scripts/verify-filter-index.js --slug <slug>
+```
+
+详细规范见 [TAXONOMY.md](./TAXONOMY.md)。
+
 ### Single check / targeted verification
 
-仓库没有独立测试框架；“测试”主要是生成产物一致性校验。
+仓库没有独立测试框架；"测试"主要是生成产物一致性校验。
 
 ```bash
 # 作为单次完整校验使用
