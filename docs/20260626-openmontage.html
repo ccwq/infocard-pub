@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenMontage：把 AI 编码助手变成完整视频工作室的开源生产系统</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --red:#ff5f6d;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 90px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:320px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,86px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .pill.red{border-color:rgba(255,95,109,.35);background:rgba(255,95,109,.12);color:#ffe1e4}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:24px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .logo-box{display:grid;gap:10px}
+    .logo-shell{display:grid;place-items:center;padding:12px;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1.5px solid rgba(255,255,255,.1);min-height:190px}
+    .logo-shell img{max-width:100%;max-height:150px;display:block}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+    .panel-head .meta{font:800 10px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#95a9dd}
+    .panel-body{padding:12px;display:grid;gap:12px}
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .stat{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.08);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .stat .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .stat .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .stat .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .alert{padding:12px 14px;border-left:4px solid var(--yellow);background:linear-gradient(90deg,rgba(244,200,76,.16),rgba(255,255,255,.03));border-radius:14px;border:1px solid rgba(244,200,76,.22)}
+    .alert strong{display:block;font-size:13px;margin-bottom:6px;color:#fff}
+    .alert p{margin:0;font-size:12.8px;line-height:1.68;color:#eef4ff}
+    .feature-list,.route-list,.risk-list{display:grid;gap:10px}
+    .feature{padding:10px 10px 9px;border:1.5px solid rgba(255,255,255,.08);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .feature h4,.route h4,.risk h4{margin:0 0 6px;font-size:13px;line-height:1.3;color:#fff}
+    .feature p,.route p,.risk p,.foot p{margin:0;font-size:12.6px;line-height:1.68;color:#d6e0ff}
+    .route,.risk{padding:10px 10px 9px;border:1.5px solid rgba(255,255,255,.08);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.018))}
+    .matrix{display:grid;gap:10px}
+    .matrix-row{display:grid;grid-template-columns:100px 1fr;gap:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.14)}
+    .matrix-row:first-child{padding-top:0;border-top:0}
+    .matrix-row .k{font:800 10px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:#93a4d5}
+    .flowbox{display:grid;gap:8px;padding:10px;border:1.5px solid rgba(255,255,255,.08);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.016))}
+    .flowline{font:800 11px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dfe8ff}
+    .flowline span{color:#92a6da}
+    .foot{margin-top:14px;padding:14px 16px;border:1.5px solid rgba(255,255,255,.1);border-radius:18px;background:rgba(9,12,22,.42);box-shadow:var(--shadow);display:grid;gap:8px}
+    .save{display:block;width:fit-content;position:static;margin:14px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,#0036a3,#002a7a);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(0,0,0,.35);cursor:pointer}
+    .save:hover{filter:brightness(1.06)}
+    @media(max-width:720px){
+      .page{width:min(100%,calc(100% - 12px));padding:12px 0 108px}
+      .hero{grid-template-columns:1fr;gap:12px}
+      .title{font-size:clamp(34px,12vw,54px)}
+      .shell{grid-template-columns:1fr;gap:12px;padding:10px}
+      .stats{grid-template-columns:1fr 1fr}
+      .matrix-row{grid-template-columns:1fr;gap:4px}
+      .save{margin-top:12px}
+      .panel-body{padding:10px}
+      .feature p,.route p,.risk p,.alert p,.foot p{font-size:12.6px}
+    }
+  </style>
+</head>
+<body>
+  <main id="card" class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">agentic video production / open-source system</span>
+          <span class="source">SOURCE · github.com/calesthio/OpenMontage · AGPL-3.0 · Python</span>
+        </div>
+        <h1 class="title">OpenMontage：把 AI 编码助手<br>变成完整视频工作室的开源生产系统</h1>
+        <p class="subtitle">它不是单点“文生视频”工具，而是一套把研究、脚本、素材、剪辑、配音、字幕、合成和质量门控串成端到端流水线的 agentic video production system。</p>
+        <p class="subcn">一句自然语言需求，Claude Code / Cursor / Copilot / Codex 就能按 pipeline 执行视频生产；既支持云端模型，也保留免费/本地路径与真实素材剪辑路径。</p>
+        <div class="pill-row">
+          <span class="pill cyan">12 条 Pipeline</span>
+          <span class="pill green">52 个工具</span>
+          <span class="pill purple">400+ Agent Skills</span>
+          <span class="pill yellow">支持真实素材剪辑</span>
+          <span class="pill red">22.3k★ / 2.5k Fork</span>
+        </div>
+        <div class="hero-note">
+          <strong>一句话结论</strong>
+          <p>OpenMontage 最值得看的，不是“又一个 AI 视频项目”，而是它把“视频生产团队”的分工逻辑显式写成了 pipeline、skill、tool registry、quality gate 和 budget governance，让 AI coding assistant 真正像一个可控的视频工作室在跑。</p>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">OM</div>
+          <div class="visual-meta">
+            <div class="big">Production Studio</div>
+            <div class="small">Agent · Pipeline · Runtime</div>
+          </div>
+        </div>
+        <div class="logo-box">
+          <div class="logo-shell">
+            <img src="assets/images/20260626-openmontage/logo.png" alt="OpenMontage logo">
+          </div>
+          <div class="visual-strip"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell">
+      <article class="panel">
+        <div class="panel-head"><h3>成本与成片路径</h3><span class="meta">sample economics</span></div>
+        <div class="panel-body">
+          <div class="stats">
+            <div class="stat"><span class="label">Ghibli 糖果冒险</span><span class="value">$0.15</span><span class="desc">12 张 FLUX 图 + 转场、粒子与环境音，不依赖视频生成 API。</span></div>
+            <div class="stat"><span class="label">Pixar 香蕉短片</span><span class="value">$1.33</span><span class="desc">6 段 Kling v3 动态片段 + Chirp3-HD 旁白 + TikTok 风逐词字幕。</span></div>
+            <div class="stat"><span class="label">产品广告</span><span class="value">$0.69</span><span class="desc">单 OpenAI key 路径：图像、配音、字幕、数据可视化都走统一栈。</span></div>
+            <div class="stat"><span class="label">零 key 路径</span><span class="value">可运行</span><span class="desc">Piper TTS + Remotion / HyperFrames + Archive.org / NASA / Wikimedia 真实素材。</span></div>
+          </div>
+          <div class="alert">
+            <strong>为什么这些成本数字有意义</strong>
+            <p>它们不是单一模型 API 的报价截图，而是把脚本、生成、字幕、配音、音乐和合成放在同一条 production pipeline 后给出的总花费样本，能直接帮助判断“这是不是一套可跑到交付的系统”。</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h3>它真正比普通 AI 视频工具多了什么</h3><span class="meta">why it matters</span></div>
+        <div class="panel-body feature-list">
+          <div class="feature"><h4>不是单 clip，而是完整 production pipeline</h4><p>大多数 AI 视频产品只生成一个片段；OpenMontage 把 research → proposal → script → scene_plan → assets → edit → compose 串成完整生产链。</p></div>
+          <div class="feature"><h4>不是只会“动几张图”，还能走真实素材路径</h4><p>它支持 documentary montage：从 Archive.org、NASA、Wikimedia、Pexels、Unsplash 等公开素材库建 corpus，再按 CLIP 语义检索和剪成真实 motion video。</p></div>
+          <div class="feature"><h4>不是黑盒 orchestration，而是 agent-first 架构</h4><p>真正的 orchestrator 不是隐藏在后端的 workflow engine，而是你的 AI coding assistant 本身：它读 pipeline manifest、读 stage skill、调用 tool registry、自审并 checkpoint。</p></div>
+          <div class="feature"><h4>不是“能生成就算完成”，而是带质量门控</h4><p>README 明确写了 pre-compose validation、delivery promise enforcement、ffprobe / frame extraction / audio analysis 这类自审链路，避免把 slideshow 或坏 render 当成成片交付。</p></div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h3>最小上手路径</h3><span class="meta">install path</span></div>
+        <div class="panel-body route-list">
+          <div class="route"><h4>1. 装基础依赖</h4><p>Python 3.10+、FFmpeg、Node.js 18+，再选一个 AI coding assistant（Claude Code / Cursor / Copilot / Windsurf / Codex）。</p></div>
+          <div class="route"><h4>2. clone + setup</h4><p>`git clone` → `cd OpenMontage` → `make setup`。没有 `make` 也可手动装 requirements、remotion-composer 依赖、Piper TTS 并复制 `.env.example`。</p></div>
+          <div class="route"><h4>3. 直接用自然语言下视频需求</h4><p>例如做 60 秒 explainers、documentary montage、product teaser，或先给一个 YouTube / TikTok 参考视频，让系统反推 pacing、hook 和风格。</p></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="shell">
+      <article class="panel">
+        <div class="panel-head"><h3>Pipeline 覆盖面</h3><span class="meta">11 visible in README</span></div>
+        <div class="panel-body">
+          <div class="matrix">
+            <div class="matrix-row"><div class="k">Explainers</div><div class="v">Animated Explainer / Screen Demo / Talking Head：适合教程、产品演示、讲解视频。</div></div>
+            <div class="matrix-row"><div class="k">Brand / Promo</div><div class="v">Animation / Cinematic / Hybrid：适合 trailer、广告、品牌 teaser、抽象动效片。</div></div>
+            <div class="matrix-row"><div class="k">Repurpose</div><div class="v">Clip Factory / Podcast Repurpose / Localization & Dub：适合一条长内容切多平台版本，或把现有视频做翻译与二次分发。</div></div>
+            <div class="matrix-row"><div class="k">Real Footage</div><div class="v">Documentary Montage：是这套系统最有区分度的路径，用真实公开素材而不是只做 Ken Burns 式图片动画。</div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h3>架构总览</h3><span class="meta">3-layer knowledge stack</span></div>
+        <div class="panel-body">
+          <div class="flowbox">
+            <div class="flowline"><span>you</span> → 写一句需求 / 给参考视频</div>
+            <div class="flowline"><span>pipeline_defs</span> → 定 stages、success gates、tool routing</div>
+            <div class="flowline"><span>skills/pipelines</span> → 决定每个阶段怎么执行、怎么自审</div>
+            <div class="flowline"><span>tools/</span> → 视频、图像、TTS、音乐、字幕、增强、分析等 48+ Python 工具</div>
+            <div class="flowline"><span>checkpoints + schemas</span> → 记录决策、验证合同、保证 resumable</div>
+            <div class="flowline"><span>Remotion / HyperFrames / FFmpeg</span> → 完成合成与交付</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h3>边界与取舍</h3><span class="meta">what to watch</span></div>
+        <div class="panel-body risk-list">
+          <div class="risk"><h4>AGPL-3.0 不是宽松许可</h4><p>这类许可证适合开源协作和二次研究，但如果你要把它深度嵌入闭源商业工作流，需要先看清 license 影响。</p></div>
+          <div class="risk"><h4>README 的“500+ skills”与可见目录规模要区分</h4><p>宣传口径讲的是全系统 capability；真正落地时仍需按你配置的 provider、GPU、本地工具链和 pipeline 选择去看哪些能力现在能跑。</p></div>
+          <div class="risk"><h4>“一句话拍大片”并不等于完全免审</h4><p>OpenMontage 的设计本身也假设你要做人类审批：proposal、cost estimates、quality gates 都在提醒你，这仍是一套需要控制的 production system。</p></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="foot">
+      <p><strong>为什么值得发这张卡：</strong>OpenMontage 把“AI 视频生成”从一个 prompt 工具，往前推进成了带 pipeline、tooling、skills、quality gate、budget governance 的生产系统。对于已经在用 Claude Code / Cursor / Copilot 的人，它提供的不是另一个模型入口，而是一套更完整的视频生产工作台。</p>
+      <p><strong>最适合谁：</strong>想把 Agent 扩展到视频工作流的人；想要真实素材 documentary path、而不是只做图片转场视频的人；想比较本地/免费路径和云端 provider 混合生产的人。</p>
+      <p><strong>来源：</strong><a href="https://github.com/calesthio/OpenMontage">calesthio/OpenMontage</a> · README、GitHub 元数据、仓库内可见目录结构。</p>
+      <button class="save" onclick="saveCardAsPng()">保存 PNG</button>
+    </section>
+  </main>
+
+  <script>
+    async function saveCardAsPng(){
+      const target=document.getElementById('card');
+      const canvas=await html2canvas(target,{backgroundColor:'#0c1020',scale:2,useCORS:true,scrollY:-window.scrollY,windowWidth:document.documentElement.scrollWidth,windowHeight:document.documentElement.scrollHeight});
+      const link=document.createElement('a');
+      link.download='openmontage-agentic-video-production-system.png';
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
