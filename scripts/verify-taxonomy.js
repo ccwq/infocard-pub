@@ -34,9 +34,10 @@ function getTargets() {
     return files.map(f => path.isAbsolute(f) ? f : path.join(ROOT, f));
   }
   if (ALL_MODE) return walkMetaFiles(DOCS);
-  const changed = getChangedMetaFiles();
-  if (changed.length > 0) return changed;
-  return walkMetaFiles(DOCS);
+  // --changed-only: only check files that differ from the base branch.
+  // In CI (shallow clone) origin/main may not exist, so this returns [].
+  // Return [] to signal "nothing to check" rather than falling back to all files.
+  return getChangedMetaFiles();
 }
 
 function verifyMeta(file) {
@@ -120,6 +121,14 @@ function main() {
   let pass = 0;
   let fail = 0;
   let warn = 0;
+
+  // --changed-only with no base ref / no changed files: skip gracefully
+  if (targets.length === 0 && !ALL_MODE) {
+    console.log('[SKIP] no changed meta files detected (--changed-only, no base ref available in CI shallow clone)');
+    console.log('      Use --all to audit the full repository, or ensure origin/main exists locally.');
+    process.exit(0);
+    return;
+  }
 
   for (const file of targets) {
     const res = verifyMeta(file);
