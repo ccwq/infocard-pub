@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LikeC4：从代码生成软件架构图</title>
+  <style>
+    :root{
+      --bg:#f7f6f2;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#6c6a63;
+      --line:#ddd7cb;
+      --accent:#3f6cff;
+      --accent-soft:rgba(63,108,255,.10);
+      --accent-2:#0f172a;
+      --green:#15803d;
+      --green-soft:#dcfce7;
+      --red:#d80018;
+      --red-soft:#fde9eb;
+      --shadow:0 10px 28px rgba(17,17,17,.05);
+      --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+    body{min-height:100vh}
+    a{color:inherit;text-decoration:none}
+    .page{max-width:780px;margin:0 auto;padding:0 0 88px;background:var(--paper);border-left:1px solid var(--line);border-right:1px solid var(--line);min-height:100vh;box-shadow:var(--shadow)}
+
+    /* ─── HEADER ─── */
+    header{background:var(--accent-2);color:#fff;padding:18px 20px 16px;border-bottom:3px solid var(--accent)}
+    .tag{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid rgba(255,255,255,.3);font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:10px}
+    h1{font-size:clamp(1.45rem,4.5vw,2rem);font-weight:900;letter-spacing:-.035em;margin:0 0 9px;line-height:1.08}
+    .sub{font-size:12.5px;line-height:1.7;color:rgba(255,255,255,.65);max-width:55ch}
+    .top-links{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+    .top-links a{padding:5px 10px;border:1px solid rgba(255,255,255,.22);font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px}
+    .top-links a:hover{border-color:#fff}
+
+    /* ─── STATS ROW ─── */
+    .stats{display:flex;border-bottom:1px solid var(--line);background:rgba(247,246,242,.4)}
+    .stat{flex:1;padding:14px 12px;border-right:1px solid var(--line);text-align:center;min-width:0}
+    .stat:last-child{border-right:none}
+    .stat .num{font-size:clamp(1.1rem,2.5vw,1.4rem);font-weight:900;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1}
+    .stat .label{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+
+    /* ─── SECTIONS ─── */
+    .section{padding:18px 20px 0;border-bottom:1px solid var(--line)}
+    .sec-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:12px}
+    .sec-no{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--accent-2);color:#fff;font-size:12.5px;font-weight:900;border:1.5px solid var(--accent-2)}
+    .sec-title{flex:1;min-width:0}
+    .sec-title h2{font-size:16px;font-weight:900;letter-spacing:-.025em;margin:0 0 4px;line-height:1.2}
+    .sec-title p{font-size:12px;line-height:1.65;color:var(--muted);margin:0}
+
+    /* ─── DIAGRAM GRID (like architecture nodes) ─── */
+    .node-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:4px}
+    .node-row{display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--paper);border:1.5px solid var(--line);font-size:12.5px;line-height:1.4}
+    .node-row .icon{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;font-weight:900;color:var(--accent);background:var(--accent-soft)}
+    .node-row .label{flex:1;font-weight:700;min-width:0}
+    .node-row .desc{color:var(--muted);font-size:12px}
+    .node-row .connector{margin:0 4px;color:var(--muted);font-size:11px;flex-shrink:0}
+
+    /* ─── CODE BLOCK ─── */
+    .code-block{background:#0f172a;color:#e2e8f0;border:1.5px solid var(--line);padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.75;overflow-x:auto;margin-bottom:12px;tab-size:2}
+    .code-block .kw{color:#93c5fd}
+    .code-block .str{color:#86efac}
+    .code-block .cm{color:#64748b;font-style:italic}
+    .code-block .fn{color:#fcd34d}
+
+    /* ─── TABLE ─── */
+    .tbl-wrap{overflow-x:auto;border:1.5px solid var(--line);margin-bottom:12px}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}
+    th{background:var(--accent-2);color:#fff;font-size:11px;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
+    tr:nth-child(even) td{background:rgba(247,246,242,.35)}
+
+    /* ─── CALLOUT ─── */
+    .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:10px 12px;font-size:12.5px;line-height:1.75;margin-bottom:12px}
+    .callout strong{color:var(--accent)}
+
+    /* ─── LAYER DIAGRAM ─── */
+    .layer-stack{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+    .layer{border:1.5px solid var(--line);padding:9px 12px;display:flex;align-items:center;gap:10px;background:var(--paper)}
+    .layer .lvl{width:70px;flex-shrink:0;font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);text-align:center}
+    .layer .content{flex:1;font-size:12.5px}
+    .layer .content strong{display:block;font-weight:800;margin-bottom:2px}
+    .layer .content span{font-size:11.5px;color:var(--muted);line-height:1.5}
+    .layer .badge{padding:2px 8px;border:1.5px solid var(--accent);color:var(--accent);font-size:10.5px;font-weight:700;white-space:nowrap;background:var(--accent-soft)}
+
+    /* ─── PILL ROW ─── */
+    .pill-row{display:flex;flex-wrap:wrap;gap:7px}
+    .pill{padding:3px 9px;border:1.5px solid var(--ink);font-size:11px;font-weight:700}
+    .pill.blue{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+    .pill.green{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+    .pill.red{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+
+    /* ─── TWO COLUMN ─── */
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+    .col-box{border:1.5px solid var(--line);background:var(--paper);padding:12px 12px 11px}
+    .col-box h3{font-size:13.5px;font-weight:900;margin:0 0 7px}
+    .col-box ul,.col-box ol{margin:5px 0 0 18px;padding:0}
+    .col-box li{font-size:12.5px;line-height:1.7;margin:0 0 4px;color:#2a2a2a}
+
+    /* ─── WORKFLOW STRIP ─── */
+    .wstrip{display:flex;gap:0;margin-bottom:12px}
+    .wstep{flex:1;border:1.5px solid var(--line);background:var(--paper);padding:9px 10px 8px;margin-right:-1.5px;position:relative;min-width:0}
+    .wstep:last-child{margin-right:0}
+    .wstep .n{font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+    .wstep .t{font-size:12.5px;font-weight:800;line-height:1.3;margin-bottom:3px}
+    .wstep .d{font-size:11px;color:var(--muted);line-height:1.5}
+    .wstep::after{content:"→";position:absolute;right:-8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:11px;z-index:1}
+    .wstep:last-child::after{display:none}
+
+    /* ─── GRAPH PREVIEW ─── */
+    .graph-shell{border:1.5px solid var(--line);background:linear-gradient(180deg,#fff 0%,rgba(247,246,242,.8) 100%);padding:16px 16px 14px;margin-bottom:12px;position:relative}
+    .graph-shell .g-label{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .graph-shell .g-label strong{color:var(--ink)}
+    .graph-inner{border:1px dashed var(--line);background:repeating-linear-gradient(0deg,transparent,transparent 19px,var(--line) 19px,var(--line) 20px),repeating-linear-gradient(90deg,transparent,transparent 19px,var(--line) 19px,var(--line) 20px);min-height:120px;padding:10px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+    .g-node{border:1.5px solid var(--accent);background:var(--accent-soft);padding:6px 10px;font-size:11.5px;font-weight:700;min-width:60px;text-align:center}
+    .g-arrow{color:var(--muted);font-size:12px}
+
+    /* ─── FOOTER ─── */
+    .footer{padding:14px 20px 0;border-top:1px solid var(--line);font-size:11.5px;line-height:1.8;color:var(--muted)}
+    .footer-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+    .footer-links a{padding:3px 8px;border:1px solid var(--line);background:var(--paper);font-size:11px;font-weight:700}
+
+    /* ─── RESPONSIVE ─── */
+    @media(max-width:720px){
+      .page{padding-bottom:100px}
+      header,.section,.footer{padding-left:14px;padding-right:14px}
+      .stats{flex-wrap:wrap}
+      .stat{width:50%}
+      .stat:nth-child(2n){border-right:none}
+      .two-col{grid-template-columns:1fr}
+      .wstrip{flex-wrap:wrap}
+      .wstep{width:calc(50% - 3px)}
+      .wstep:nth-child(2n){margin-right:0}
+      .wstep::after{display:none}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="tag">📐 架构即代码 · 架构图谱</div>
+    <h1>LikeC4：从代码生成软件架构图</h1>
+    <div class="sub">把代码结构翻译成架构图，代码改了图也跟着变。LikeC4 基于 C4 Model 和 Structurizr DSL，支持多语言解析、多格式导出和 VSCode 实时预览，终结手动维护架构图的历史。</div>
+    <div class="top-links">
+      <a href="https://github.com/likec4/likec4" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="https://likec4.dev" target="_blank" rel="noreferrer">文档</a>
+      <a href="https://playground.likec4.dev" target="_blank" rel="noreferrer">Playground</a>
+      <a href="https://marketplace.visualstudio.com/items?itemName=likec4.likec4-vscode" target="_blank" rel="noreferrer">VSCode 插件</a>
+      <a href="https://github.com/likec4/likec4/releases" target="_blank" rel="noreferrer">Releases</a>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="num">3.7k</div><div class="label">Stars</div></div>
+    <div class="stat"><div class="num">v1.52</div><div class="label">版本</div></div>
+    <div class="stat"><div class="num">TypeScript</div><div class="label">主语言</div></div>
+    <div class="stat"><div class="num">6+</div><div class="label">语言解析</div></div>
+    <div class="stat"><div class="num">4.2k+</div><div class="label">Commits</div></div>
+  </div>
+
+  <section class="section">
+    <div class="sec-head">
+      <div class="sec-no">01</div>
+      <div class="sec-title">
+        <h2>它解决的不是"画图"，而是"让架构图永远和代码同步"</h2>
+        <p>LikeC4 是一种架构描述语言，也是配套的工具链。代码改了，架构图自动更新，不需要再在 Figma 里手动拖框。</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>核心定位：</strong>Architecture as Code — 把架构设计当成代码来维护，版本化管理、自动生成、CI/CD 集成全部打通。
+    </div>
+
+    <div class="graph-shell">
+      <div class="g-label"><strong>代码</strong> → <strong>LikeC4</strong> → <strong>架构图</strong></div>
+      <div class="graph-inner">
+        <div class="g-node">User.ts</div>
+        <div class="g-arrow">→</div>
+        <div class="g-node">API Gateway</div>
+        <div class="g-arrow">→</div>
+        <div class="g-node">Auth Service</div>
+        <div class="g-arrow">→</div>
+        <div class="g-node">DB</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="col-box">
+        <h3>输入</h3>
+        <ul>
+          <li>Go 代码（官方解析器）</li>
+          <li>Python 代码</li>
+          <li>TypeScript / JavaScript</li>
+          <li>C#</li>
+          <li>Java</li>
+          <li>PlantUML（参考模型）</li>
+        </ul>
+      </div>
+      <div class="col-box">
+        <h3>导出格式</h3>
+        <ul>
+          <li>SVG（矢量，可直接嵌入文档）</li>
+          <li>PNG / JPG</li>
+          <li>Mermaid 语法</li>
+          <li>PlantUML 语法</li>
+          <li>JSON（模型数据）</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head">
+      <div class="sec-no">02</div>
+      <div class="sec-title">
+        <h2>C4 Model 是什么：把架构分层说清楚</h2>
+        <p>LikeC4 从 C4 Model 借鉴了分层抽象的思想，同时比 C4 更灵活。</p>
+      </div>
+    </div>
+
+    <div class="layer-stack">
+      <div class="layer">
+        <div class="lvl">L1 · Context</div>
+        <div class="content">
+          <strong>系统边界</strong>
+          <span>整个系统与外部参与者的关系，一句话交代系统做什么</span>
+        </div>
+        <div class="badge">用户视角</div>
+      </div>
+      <div class="layer">
+        <div class="lvl">L2 · Container</div>
+        <div class="content">
+          <strong>容器 / 应用</strong>
+          <span>核心应用和技术选择，数据库、微服务、前端 SPA 都在这层</span>
+        </div>
+        <div class="badge">开发者视角</div>
+      </div>
+      <div class="layer">
+        <div class="lvl">L3 · Component</div>
+        <div class="content">
+          <strong>组件</strong>
+          <span>每个容器内部的关键组件和它们之间的交互</span>
+        </div>
+        <div class="badge">架构师视角</div>
+      </div>
+      <div class="layer">
+        <div class="lvl">L4 · Code</div>
+        <div class="content">
+          <strong>代码</strong>
+          <span>具体类、接口的实际实现（可选，仅关键部分）</span>
+        </div>
+        <div class="badge">工程师视角</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>比 PlantUML / Mermaid 更好：</strong>LikeC4 支持实时预览、热更新和 VSCode 插件，不需要等渲染引擎出图；比手动画图更好：代码变了图自动变，不存在版本落后的问题。
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head">
+      <div class="sec-no">03</div>
+      <div class="sec-title">
+        <h2>快速上手：三步看到第一张图</h2>
+        <p>npm 全局安装后，两个命令出图。</p>
+      </div>
+    </div>
+
+    <div class="code-block"><span class="cm"># 1. 安装 CLI</span>
+<span class="kw">npm</span> i -g likec4
+
+<span class="cm"># 2. 在项目目录初始化</span>
+<span class="kw">likec4</span> init
+
+<span class="cm"># 3. 启动实时预览</span>
+<span class="kw">likec4</span> dev
+
+<span class="cm"># 导出静态文件</span>
+<span class="kw">likec4</span> <span class="fn">export</span> <span class="str">--format</span> svg
+<span class="kw">likec4</span> <span class="fn">export</span> <span class="str">--format</span> png</div>
+
+    <div class="pill-row">
+      <span class="pill blue">likec4 dev</span>
+      <span class="pill blue">likec4 export</span>
+      <span class="pill blue">likec4 format</span>
+      <span class="pill green">VSCode 插件</span>
+      <span class="pill green">Playground</span>
+      <span class="pill red">MCP Server</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head">
+      <div class="sec-no">04</div>
+      <div class="sec-title">
+        <h2>VSCode 插件：在编辑器里直接看架构图</h2>
+        <p>不需要切换工具，代码写到哪里，架构视图就跟到哪里。</p>
+      </div>
+    </div>
+
+    <div class="node-grid">
+      <div class="node-row">
+        <div class="icon">1</div>
+        <div class="label">安装插件</div>
+        <div class="connector">→</div>
+        <div class="desc">VSCode 插件市场搜索 <code>likec4</code>，或 Open VSX</div>
+      </div>
+      <div class="node-row">
+        <div class="icon">2</div>
+        <div class="label">打开 .c4 文件</div>
+        <div class="connector">→</div>
+        <div class="desc">插件自动渲染 C4 架构图，支持多视图</div>
+      </div>
+      <div class="node-row">
+        <div class="icon">3</div>
+        <div class="label">热更新</div>
+        <div class="connector">→</div>
+        <div class="desc">保存代码，视图自动刷新，不需要重新构建</div>
+      </div>
+      <div class="node-row">
+        <div class="icon">4</div>
+        <div class="label">导出分享</div>
+        <div class="connector">→</div>
+        <div class="desc">SVG / PNG / Mermaid 一键导出，嵌文档、做 PPT 都可以</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="col-box">
+        <h3>MCP Server 支持</h3>
+        <ul>
+          <li>v1.52+ 内置 MCP Server</li>
+          <li>支持 AI Agent 直接调用 LikeC4 生成图</li>
+          <li>Claude / Cursor 等 Agent 均可接入</li>
+        </ul>
+      </div>
+      <div class="col-box">
+        <h3>Playground 在线体验</h3>
+        <ul>
+          <li>无需本地安装，浏览器直接试</li>
+          <li>含多个真实示例模型</li>
+          <li>可导出结果文件</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head">
+      <div class="sec-no">05</div>
+      <div class="sec-title">
+        <h2>与同类工具的对比</h2>
+        <p>PlantUML / Mermaid / draw.io 适合手动画图，LikeC4 适合架构即代码。</p>
+      </div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>LikeC4</th>
+            <th>PlantUML</th>
+            <th>Mermaid</th>
+            <th>Figma / draw.io</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>代码驱动</td>
+            <td>✅ 直接从代码生成</td>
+            <td>❌ 纯 DSL</td>
+            <td>❌ 纯 DSL</td>
+            <td>❌ 纯手动</td>
+          </tr>
+          <tr>
+            <td>实时预览</td>
+            <td>✅ CLI + VSCode</td>
+            <td>需服务器</td>
+            <td>部分支持</td>
+            <td>❌ 手动操作</td>
+          </tr>
+          <tr>
+            <td>VSCode 插件</td>
+            <td>✅ 官方插件</td>
+            <td>社区插件</td>
+            <td>部分支持</td>
+            <td>扩展支持</td>
+          </tr>
+          <tr>
+            <td>多语言解析</td>
+            <td>✅ 6+ 语言</td>
+            <td>❌ 无</td>
+            <td>❌ 无</td>
+            <td>❌ 无</td>
+          </tr>
+          <tr>
+            <td>MCP / AI Agent</td>
+            <td>✅ v1.52+</td>
+            <td>❌ 无</td>
+            <td>❌ 无</td>
+            <td>❌ 无</td>
+          </tr>
+          <tr>
+            <td>多格式导出</td>
+            <td>✅ SVG PNG Mermaid PlantUML</td>
+            <td>PNG / SVG</td>
+            <td>PNG / SVG</td>
+            <td>多格式</td>
+          </tr>
+          <tr>
+            <td>自定义符号</td>
+            <td>✅ 完全自定义</td>
+            <td>有限</td>
+            <td>非常有限</td>
+            <td>✅ 完全自由</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-head">
+      <div class="sec-no">06</div>
+      <div class="sec-title">
+        <h2>适用场景：谁应该用 LikeC4</h2>
+        <p>不是所有项目都需要架构图，但需要的地方用 LikeC4 能省大量维护成本。</p>
+      </div>
+    </div>
+
+    <div class="wstrip">
+      <div class="wstep">
+        <div class="n">场景 1</div>
+        <div class="t">微服务 / 多模块项目</div>
+        <div class="d">几十个服务之间的调用关系，手动画根本跟不上代码变化。</div>
+      </div>
+      <div class="wstep">
+        <div class="n">场景 2</div>
+        <div class="t">新人 onboarding</div>
+        <div class="d">一张图胜过千言万语，LikeC4 让图始终是最新的。</div>
+      </div>
+      <div class="wstep">
+        <div class="n">场景 3</div>
+        <div class="t">架构文档自动化</div>
+        <div class="d">CI/CD 里跑 likec4 export，文档永远是最新状态。</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="col-box">
+        <h3>值得用的信号</h3>
+        <ul>
+          <li>代码结构经常变</li>
+          <li>团队 5 人以上</li>
+          <li>有新人需要快速了解系统</li>
+          <li>架构文档是评审材料</li>
+          <li>AI Agent 需要读懂代码结构</li>
+        </ul>
+      </div>
+      <div class="col-box">
+        <h3>可能用不上的情况</h3>
+        <ul>
+          <li>单体项目，结构一目了然</li>
+          <li>短期一次性脚本</li>
+          <li>已经有成熟的可视化工具链</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <div>来源：</div>
+    <div class="footer-links">
+      <a href="https://github.com/likec4/likec4" target="_blank" rel="noreferrer">GitHub 仓库</a>
+      <a href="https://likec4.dev" target="_blank" rel="noreferrer">官方文档</a>
+      <a href="https://playground.likec4.dev" target="_blank" rel="noreferrer">Playground</a>
+      <a href="https://marketplace.visualstudio.com/items?itemName=likec4.likec4-vscode" target="_blank" rel="noreferrer">VSCode 插件</a>
+      <a href="https://github.com/likec4/likec4/releases" target="_blank" rel="noreferrer">Releases</a>
+    </div>
+    <div style="margin-top:7px">LikeC4 把架构图维护变成代码管理的一部分，代码改图自动更新，比手动画图更可持续。适合微服务、多模块项目和 AI Agent 读代码场景。</div>
+  </div>
+
+</div>
+</body>
+</html>
