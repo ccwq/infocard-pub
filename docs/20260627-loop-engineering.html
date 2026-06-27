@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Loop Engineering：把 AI 智能体编成自动循环</title>
+  <style>
+    :root{
+      --bg:#0a0e1a;
+      --panel:#111827;
+      --panel-2:#1a2438;
+      --border:#1e2d45;
+      --ink:#e8edf5;
+      --muted:#7a8ba8;
+      --accent:#22d3ee;
+      --accent-2:#38bdf8;
+      --accent-3:#34d399;
+      --green:#4ade80;
+      --red:#f87171;
+      --line:#1e2d45;
+      --shadow:0 8px 32px rgba(0,0,0,.4);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+    .page{max-width:780px;margin:0 auto;background:var(--bg);min-height:100vh}
+
+    /* HEADER */
+    .header{padding:40px 40px 32px;border-bottom:1.5px solid var(--border)}
+    .header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+    .header-left{flex:1;min-width:0}
+    .eyebrow{font-size:.8rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;display:flex;align-items:center;gap:.6rem;font-weight:600}
+    .eyebrow::before{content:"⚙";font-size:1rem}
+    h1{font-size:clamp(1.55rem,4vw,2.15rem);line-height:1.08;font-weight:800;letter-spacing:-.04em;margin:0 0 14px}
+    .subtitle{font-size:.98rem;color:var(--muted);line-height:1.65;max-width:52ch;margin:0}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .stat{display:inline-flex;align-items:center;gap:.4rem;font-size:.88rem;font-variant-numeric:tabular-nums;border:1px solid var(--border);padding:5px 12px;background:var(--panel)}
+    .stat strong{font-weight:700;color:var(--accent)}
+    .stat.muted{color:var(--muted)}
+    .meta-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .badge{border:1px solid var(--border);padding:4px 10px;font-size:.78rem;background:var(--panel);color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas}
+    .badge.green{border-color:var(--accent);color:var(--accent);background:rgba(34,211,238,.08)}
+
+    /* HERO CALLOUT */
+    .hero-callout{background:linear-gradient(135deg,rgba(34,211,238,.06),rgba(56,189,248,.04));border-bottom:1px solid var(--border);padding:28px 40px}
+    .callout-label{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:10px;font-weight:600}
+    .callout-text{font-size:clamp(1rem,2.4vw,1.28rem);font-weight:700;line-height:1.45;letter-spacing:-.02em;margin:0 0 16px}
+    .callout-sub{font-size:.92rem;color:var(--muted);line-height:1.6;margin:0 0 18px;max-width:56ch}
+    .cta-row{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;gap:.4rem;padding:9px 18px;font-size:.88rem;font-weight:600;text-decoration:none;border:1px solid;border-radius:3px;transition:background .14s,color .14s}
+    .btn-primary{background:var(--accent);color:#0a0e1a;border-color:var(--accent)}
+    .btn-primary:hover{background:#5eead4;color:#0a0e1a}
+    .btn-ghost{border-color:var(--border);color:var(--muted)}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+    /* STATS ROW */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)}
+    .stat-cell{padding:24px 20px;border-inline-start:1px solid var(--border);text-align:center}
+    .stat-cell:first-child{border-inline-start:none}
+    .stat-num{font-size:clamp(1.5rem,3vw,2rem);font-weight:800;letter-spacing:-.04em;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1}
+    .stat-num.green{color:var(--green)}
+    .stat-num.cyan{color:var(--accent-2)}
+    .stat-num.white{color:#fff}
+    .stat-label{font-size:.82rem;color:var(--muted);margin-top:6px;text-transform:uppercase;letter-spacing:.08em}
+
+    /* ARCHITECTURE */
+    .section{padding:32px 40px;border-bottom:1px solid var(--border)}
+    .section-header{display:flex;align-items:center;gap:.6rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .section-header::before{content:"";width:24px;height:1.5px;background:var(--accent);flex-shrink:0}
+    .section-title{font-size:1.2rem;font-weight:800;letter-spacing:-.03em;margin:0 0 6px;color:var(--ink)}
+    .section-desc{font-size:.92rem;color:var(--muted);line-height:1.65;margin:0 0 22px;max-width:58ch}
+
+    /* 5 COMPONENTS */
+    .comp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+    .comp-card{border:1px solid var(--border);padding:16px 14px;background:var(--panel);text-align:center;transition:border-color .14s}
+    .comp-card:hover{border-color:var(--accent)}
+    .comp-num{width:28px;height:28px;border-radius:50%;background:rgba(34,211,238,.15);color:var(--accent);font-size:.78rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-family:ui-monospace,monospace}
+    .comp-title{font-size:.85rem;font-weight:700;margin-bottom:5px;color:var(--ink)}
+    .comp-desc{font-size:.75rem;color:var(--muted);line-height:1.5}
+
+    /* WORKFLOW */
+    .workflow{display:flex;flex-direction:column;gap:0}
+    .wf-step{display:flex;gap:16px;align-items:flex-start}
+    .wf-step:not(:last-child){padding-bottom:20px;position:relative}
+    .wf-step:not(:last-child)::after{content:"";position:absolute;left:15px;top:32px;bottom:0;width:1px;background:var(--border)}
+    .wf-num{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);font-size:.82rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas}
+    .wf-content{flex:1;min-width:0;padding-top:3px}
+    .wf-title{font-size:.95rem;font-weight:700;margin-bottom:4px}
+    .wf-desc{font-size:.85rem;color:var(--muted);line-height:1.55}
+
+    /* CLI TOOLS */
+    .cli-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .cli-card{border:1px solid var(--border);padding:18px 18px;background:var(--panel);transition:border-color .14s}
+    .cli-card:hover{border-color:var(--accent)}
+    .cli-name{font-family:ui-monospace,monospace;font-size:.9rem;font-weight:700;color:var(--accent);margin-bottom:6px}
+    .cli-desc{font-size:.82rem;color:var(--muted);line-height:1.55}
+
+    /* LEVELS */
+    .level-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .level-card{border:1px solid var(--border);padding:18px 18px;background:var(--panel);position:relative}
+    .level-tag{display:inline-block;border:1px solid var(--accent);color:var(--accent);padding:2px 8px;font-size:.72rem;font-weight:700;font-family:ui-monospace,monospace;margin-bottom:10px;letter-spacing:.08em}
+    .level-card:nth-child(2) .level-tag{border-color:var(--accent-2);color:var(--accent-2)}
+    .level-card:nth-child(3) .level-tag{border-color:var(--green);color:var(--green)}
+    .level-title{font-size:.95rem;font-weight:700;margin-bottom:6px}
+    .level-desc{font-size:.82rem;color:var(--muted);line-height:1.55}
+
+    /* STACK */
+    .stack-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+    .stack-tag{border:1px solid var(--border);padding:5px 12px;font-size:.8rem;color:var(--muted);background:var(--panel);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas}
+
+    /* BOTTOM CTA */
+    .bottom-cta{padding:28px 40px 0;border-top:1.5px solid var(--border)}
+    .bottom-cta-inner{border:1px solid var(--border);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--panel)}
+    .bottom-cta-left strong{display:block;font-size:1.05rem;font-weight:700;margin-bottom:4px}
+    .bottom-cta-left span{font-size:.88rem;color:var(--muted)}
+    .bottom-cta-btn{display:inline-flex;align-items:center;gap:.4rem;padding:10px 20px;background:var(--accent);color:#0a0e1a;font-weight:700;font-size:.88rem;text-decoration:none;white-space:nowrap;border-radius:3px}
+    .bottom-cta-btn:hover{background:#5eead4}
+
+    /* FOOTER */
+    .footer{padding:20px 40px 0;color:var(--muted);font-size:.8rem;line-height:1.6}
+    .footer a{border-bottom:1px solid var(--border)}
+    .footer a:hover{border-bottom-color:var(--accent);color:var(--accent)}
+
+    @media(max-width:640px){
+      .header,.hero-callout,.stats-row,.section,.bottom-cta,.footer{padding-left:20px;padding-right:20px}
+      .comp-grid{grid-template-columns:repeat(2,1fr)}
+      .cli-grid,.level-grid{grid-template-columns:1fr}
+      .stats-row{grid-template-columns:repeat(2,1fr)}
+      .wf-step:not(:last-child)::after{display:none}
+      h1{font-size:1.45rem}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-top">
+      <div class="header-left">
+        <div class="eyebrow">Agent 系统编排 · CLI 工具集</div>
+        <h1>Loop Engineering：把 AI 智能体编成自动循环</h1>
+        <p class="subtitle">不用每次自己敲提示词，而是设计一套系统来调度智能体干活。5 个核心构件 + 记忆，7 个生产模式，L1 到 L3 渐进式落地。</p>
+      </div>
+    </div>
+    <div class="stats">
+      <span class="stat"><strong>2.8k</strong> Stars</span>
+      <span class="stat"><strong>386</strong> Forks</span>
+      <span class="stat muted">MIT</span>
+      <span class="stat muted">JavaScript</span>
+      <span class="stat muted">2026-06-09</span>
+    </div>
+    <div class="meta-row">
+      <span class="badge green">CLI 工具集</span>
+      <span class="badge">loop-engineering</span>
+      <span class="badge">MCP</span>
+      <span class="badge">Claude Code</span>
+      <span class="badge">agentic-ai</span>
+      <span class="badge">自动化</span>
+    </div>
+  </header>
+
+  <!-- HERO CALLOUT -->
+  <section class="hero-callout">
+    <div class="callout-label">核心理念</div>
+    <p class="callout-text">不是用提示词指挥智能体干活——是设计一套循环系统，让智能体自己调度自己。</p>
+    <p class="callout-sub">把每次临时性的"写 prompt → 看结果 → 再写 prompt"升级为可固化、可复用、可观测的自动化工作流。</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/cobusgreyling/loop-engineering" target="_blank" rel="noreferrer">github.com/cobusgreyling/loop-engineering</a>
+      <a class="btn btn-ghost" href="https://github.com/cobusgreyling/loop-engineering#readme" target="_blank" rel="noreferrer">快速开始</a>
+    </div>
+  </section>
+
+  <!-- STATS ROW -->
+  <div class="stats-row">
+    <div class="stat-cell">
+      <div class="stat-num">2.8k</div>
+      <div class="stat-label">GitHub Stars</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num green">386</div>
+      <div class="stat-label">Forks</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num white">MIT</div>
+      <div class="stat-label">许可证</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num cyan">2026-06</div>
+      <div class="stat-label">创建时间</div>
+    </div>
+  </div>
+
+  <!-- 5 CORE COMPONENTS -->
+  <section class="section">
+    <div class="section-header">01 · 核心架构</div>
+    <h2 class="section-title">5 个构件 + 记忆，构建循环系统</h2>
+    <p class="section-desc">每个构件解决一个问题，五者组合形成完整的智能体循环工作台。</p>
+    <div class="comp-grid">
+      <div class="comp-card">
+        <div class="comp-num">1</div>
+        <div class="comp-title">定时触发</div>
+        <div class="comp-desc">按计划自动触发任务，无需人工介入</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-num">2</div>
+        <div class="comp-title">工作树并行</div>
+        <div class="comp-desc">多任务分叉并行，结果汇总合并</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-num">3</div>
+        <div class="comp-title">技能固化</div>
+        <div class="comp-desc">提示词固化为可复用技能模块</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-num">4</div>
+        <div class="comp-title">MCP 接工具</div>
+        <div class="comp-desc">Model Context Protocol 连接真实系统</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-num">5</div>
+        <div class="comp-title">交叉验证</div>
+        <div class="comp-desc">子智能体分头干活，相互验证结果</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKFLOW -->
+  <section class="section" style="padding-top:28px">
+    <div class="section-header">02 · 设计理念</div>
+    <h2 class="section-title">从临时 prompt 到自动化循环</h2>
+    <div class="workflow" style="margin-top:4px">
+      <div class="wf-step">
+        <div class="wf-num">临</div>
+        <div class="wf-content">
+          <div class="wf-title">临时 prompt 模式</div>
+          <div class="wf-desc">每次手动写 prompt → 执行 → 看结果 → 再写。效率低，不可复用，结果不稳定。</div>
+        </div>
+      </div>
+      <div class="wf-step">
+        <div class="wf-num">→</div>
+        <div class="wf-content">
+          <div class="wf-title">Loop Engineering</div>
+          <div class="wf-desc">把任务封装为循环系统：触发 → 执行 → 验证 → 记忆 → 再触发。全程自动运行。</div>
+        </div>
+      </div>
+      <div class="wf-step">
+        <div class="wf-num">稳</div>
+        <div class="wf-content">
+          <div class="wf-title">渐进式落地</div>
+          <div class="wf-desc">L1 纯报告 → L2 半自动 → L3 全自动。从低风险场景起步，逐步提升自动化程度。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLI TOOLS -->
+  <section class="section" style="padding-top:28px">
+    <div class="section-header">03 · CLI 工具集</div>
+    <h2 class="section-title">三个实用 CLI，贯穿循环全周期</h2>
+    <p class="section-desc">每个工具对应循环工程的一个环节，开箱即用。</p>
+    <div class="cli-grid">
+      <div class="cli-card">
+        <div class="cli-name">loop-audit</div>
+        <div class="cli-desc">给项目打分，判断它是否适合上循环。分析代码结构、工具链、Agent 边界，输出可行性报告。</div>
+      </div>
+      <div class="cli-card">
+        <div class="cli-name">loop-init</div>
+        <div class="cli-desc">一键搭建 Loop Engineering 项目骨架。包含目录结构、技能配置、MCP 集成起点。</div>
+      </div>
+      <div class="cli-card">
+        <div class="cli-name">loop-cost</div>
+        <div class="cli-desc">计算 Token 花销。追踪每次循环调用的模型消耗，估算成本，优化循环效率。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 PRODUCTION PATTERNS -->
+  <section class="section" style="padding-top:28px">
+    <div class="section-header">04 · 生产模式</div>
+    <h2 class="section-title">7 个生产模式，L1 → L3 渐进升级</h2>
+    <p class="section-desc">每个模式带启动模板，建议从 L1 起步确认循环稳定，再升级到更高自动化级别。</p>
+    <div class="level-grid">
+      <div class="level-card">
+        <div class="level-tag">L1</div>
+        <div class="level-title">纯报告模式</div>
+        <div class="level-desc">Agent 生成分析报告，人工审核后决定下一步。最低风险，适合评估循环效果。</div>
+      </div>
+      <div class="level-card">
+        <div class="level-tag">L2</div>
+        <div class="level-title">半自动模式</div>
+        <div class="level-desc">Agent 执行 + 自动验证通过后自动推进；人工介入点保留，兼顾效率与安全。</div>
+      </div>
+      <div class="level-card">
+        <div class="level-tag">L3</div>
+        <div class="level-title">全自动模式</div>
+        <div class="level-desc">全流程无人值守。适合高置信场景，配合 Token 成本监控和熔断机制。</div>
+      </div>
+    </div>
+    <div class="stack-row" style="margin-top:18px">
+      <span class="stack-tag">7 种生产模式</span>
+      <span class="stack-tag">启动模板</span>
+      <span class="stack-tag">渐进式升级路径</span>
+    </div>
+  </section>
+
+  <!-- STACK -->
+  <section class="section" style="padding-top:28px">
+    <div class="section-header">05 · 技术栈</div>
+    <h2 class="section-title">JavaScript + MCP，支持主流 Agent</h2>
+    <div class="stack-row">
+      <span class="stack-tag">JavaScript</span>
+      <span class="stack-tag">MCP</span>
+      <span class="stack-tag">Claude Code</span>
+      <span class="stack-tag">Codex</span>
+      <span class="stack-tag">Claude API</span>
+      <span class="stack-tag">GitHub Actions</span>
+      <span class="stack-tag">Grok</span>
+      <span class="stack-tag">MIT</span>
+    </div>
+    <div style="margin-top:14px;padding:14px 16px;border:1px solid var(--border);background:var(--panel)">
+      <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:8px;font-weight:600">支持模型</div>
+      <div style="font-size:.85rem;color:var(--muted);line-height:1.6">Claude Code · Codex · Grok · 其他 OpenAI API 兼容模型</div>
+    </div>
+  </section>
+
+  <!-- BOTTOM CTA -->
+  <section class="bottom-cta">
+    <div class="bottom-cta-inner">
+      <div class="bottom-cta-left">
+        <strong>从 L1 开始，稳妥推进自动化</strong>
+        <span>loop-init 一键建架子，loop-audit 评估项目，loop-cost 追踪花销。</span>
+      </div>
+      <a class="bottom-cta-btn" href="https://github.com/cobusgreyling/loop-engineering" target="_blank" rel="noreferrer">github.com/cobusgreyling/loop-engineering</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    数据来源：<a href="https://github.com/cobusgreyling/loop-engineering" target="_blank" rel="noreferrer">github.com/cobusgreyling/loop-engineering</a>（Stars 2.8k · Forks 386 · MIT · JavaScript · 2026-06-09）
+  </footer>
+
+</div>
+</body>
+</html>
