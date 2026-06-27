@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CoreCoder：用 1400 行 Python 读懂 Claude Code 核心架构</title>
+  <style>
+    :root{
+      --bg:#f7f6f2;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#6c6a63;
+      --line:#ddd7cb;
+      --accent:#3f6cff;
+      --accent-soft:rgba(63,108,255,.10);
+      --accent-2:#0f172a;
+      --shadow:0 10px 28px rgba(17,17,17,.05);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+    body{min-height:100vh;padding:0 0 48px}
+    a{color:inherit;text-decoration:none}
+    .page{max-width:780px;margin:0 auto;background:var(--paper);min-height:100vh}
+
+    /* HEADER */
+    .header{padding:36px 40px 28px;border-bottom:1.5px solid var(--ink)}
+    .header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+    .header-left{flex:1;min-width:0}
+    .eyebrow{display:inline-flex;align-items:center;gap:.55rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+    .eyebrow::before{content:"";width:32px;height:1.5px;background:var(--accent)}
+    h1{font-size:clamp(1.6rem,4.2vw,2.2rem);line-height:1.05;font-weight:800;letter-spacing:-.04em;margin:0 0 12px}
+    .subtitle{font-size:1rem;color:var(--muted);line-height:1.6;max-width:52ch;margin:0}
+    .stats{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+    .stat{display:inline-flex;align-items:center;gap:.4rem;font-size:.88rem;font-variant-numeric:tabular-nums;border:1px solid var(--line);padding:5px 12px;background:var(--bg)}
+    .stat strong{font-weight:700}
+    .stat.muted{color:var(--muted)}
+    .meta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+    .badge{border:1px solid var(--line);padding:4px 10px;font-size:.8rem;background:var(--bg);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .badge.blue{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+    /* THESIS */
+    .thesis{background:var(--accent-2);padding:28px 40px 26px;color:#fff}
+    .thesis-label{font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px;display:flex;align-items:center;gap:.55rem}
+    .thesis-label::before{content:"";width:28px;height:1.5px;background:rgba(255,255,255,.35)}
+    .thesis-text{font-size:clamp(1.05rem,2.5vw,1.35rem);line-height:1.45;font-weight:700;margin:0 0 14px;letter-spacing:-.02em}
+    .thesis-sub{font-size:.95rem;color:rgba(255,255,255,.6);line-height:1.6;margin:0;max-width:58ch}
+    .thesis-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    .cta-btn{display:inline-flex;align-items:center;gap:.4rem;padding:9px 16px;font-size:.88rem;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,.3);transition:background .14s,color .14s}
+    .cta-btn.primary{background:#fff;color:var(--accent-2)}
+    .cta-btn.primary:hover{background:var(--accent-soft);color:#fff;border-color:var(--accent)}
+    .cta-btn.ghost{color:rgba(255,255,255,.8)}
+    .cta-btn.ghost:hover{background:rgba(255,255,255,.1)}
+
+    /* PATTERNS SECTION */
+    .section{padding:32px 40px}
+    .section-header{display:flex;align-items:center;gap:.55rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:20px}
+    .section-header::before{content:"";width:28px;height:1.5px;background:var(--line);flex-shrink:0}
+    .section-title{font-size:1.25rem;font-weight:800;letter-spacing:-.03em;margin:0 0 6px;color:var(--ink)}
+    .section-desc{font-size:.95rem;color:var(--muted);line-height:1.6;margin:0 0 20px;max-width:60ch}
+
+    /* Pattern Grid + Graph */
+    .graph-area{border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.95),rgba(255,255,255,.75));padding:20px;margin-bottom:24px;box-shadow:var(--shadow)}
+    .graph-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .graph-header strong{color:var(--ink)}
+    svg{width:100%;height:auto;display:block;overflow:visible}
+    .edges line{stroke:var(--line);stroke-width:1.4}
+    .node circle{fill:var(--paper);stroke:var(--ink);stroke-width:1.6;transition:fill .14s}
+    .node text{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px;fill:var(--ink);dominant-baseline:middle}
+    .node.hot circle{fill:var(--accent-soft);stroke:var(--accent)}
+    .node:hover circle{fill:var(--ink)}
+    .node:hover text{fill:var(--paper)}
+
+    /* Pattern Table */
+    .pattern-table{width:100%;border-collapse:collapse;font-size:.93rem}
+    .pattern-table th{text-align:left;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:8px 14px 8px 0;border-bottom:2px solid var(--ink);font-weight:600}
+    .pattern-table th:last-child,.pattern-table td:last-child{text-align:right;padding-right:0}
+    .pattern-table td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+    .pattern-table tr:last-child td{border-bottom:none}
+    .pattern-table tr:hover td{background:var(--bg)}
+    .pattern-num{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:.82rem;color:var(--accent);font-weight:700;width:2.5ch}
+    .pattern-name{font-weight:700;letter-spacing:-.01em;width:15ch}
+    .pattern-key{color:var(--muted);font-size:.88rem}
+
+    /* MODEL SUPPORT */
+    .model-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .model-card{border:1px solid var(--line);padding:16px 18px;background:var(--bg)}
+    .model-card-title{font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+    .model-card-value{font-size:1.1rem;font-weight:700;letter-spacing:-.02em}
+    .model-card-note{font-size:.82rem;color:var(--muted);margin-top:4px;line-height:1.45}
+
+    /* BOTTOM CTA */
+    .bottom-cta{padding:28px 40px 0;border-top:1.5px solid var(--ink)}
+    .bottom-cta-inner{border:1px solid var(--line);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--bg)}
+    .bottom-cta-left strong{display:block;font-size:1.05rem;font-weight:700;margin-bottom:4px}
+    .bottom-cta-left span{font-size:.9rem;color:var(--muted)}
+    .bottom-cta-btn{display:inline-flex;align-items:center;gap:.4rem;padding:10px 20px;background:var(--ink);color:var(--paper);font-weight:600;font-size:.9rem;text-decoration:none;white-space:nowrap}
+    .bottom-cta-btn:hover{background:var(--accent)}
+
+    /* FOOTER */
+    .footer{padding:20px 40px 0;color:var(--muted);font-size:.82rem;line-height:1.6}
+    .footer a{border-bottom:1px solid var(--line)}
+    .footer a:hover{border-bottom-color:var(--ink)}
+
+    @media(max-width:640px){
+      .header,.thesis,.section,.bottom-cta,.footer{padding-left:20px;padding-right:20px}
+      .model-cards{grid-template-columns:1fr}
+      .graph-area{padding:14px}
+      h1{font-size:1.5rem}
+      .bottom-cta-inner{flex-direction:column;align-items:flex-start}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-top">
+      <div class="header-left">
+        <div class="eyebrow">开源项目 · AI 编码智能体</div>
+        <h1>CoreCoder：用 1400 行 Python 读懂 Claude Code 核心架构</h1>
+        <p class="subtitle">把 50 多万行 Claude Code 泄露闭源代码压缩为可读的 Python 实现，7 个核心模式全部真实可运行，花一个下午就能通读一遍。</p>
+      </div>
+    </div>
+    <div class="stats">
+      <span class="stat"><strong>1.3k</strong> Stars</span>
+      <span class="stat"><strong>301</strong> Forks</span>
+      <span class="stat muted"><strong>MIT</strong> 协议</span>
+      <span class="stat muted">Python</span>
+    </div>
+    <div class="meta-row">
+      <span class="badge blue">coding-agent</span>
+      <span class="badge">claude-code</span>
+      <span class="badge">openai-compatible</span>
+      <span class="badge">llm</span>
+      <span class="badge">deepseek</span>
+    </div>
+  </header>
+
+  <!-- THESIS -->
+  <section class="thesis">
+    <div class="thesis-label">技术选型 · 学习路径</div>
+    <p class="thesis-text">Claude Code 的核心不是 50 万行代码，而是 7 个可复用的架构模式。</p>
+    <p class="thesis-sub">这 7 个模式全部是真实可运行的 Python 代码，没有图表，没有博客注释，每个模式都对应 Claude Code 的一个真实决策点。看完就理解 AI 编码智能体到底是怎么工作的。</p>
+    <div class="thesis-cta">
+      <a class="cta-btn primary" href="https://github.com/he-yufeng/CoreCoder" target="_blank" rel="noreferrer">github.com/he-yufeng/CoreCoder</a>
+      <a class="cta-btn ghost" href="https://pypi.org/project/corecoder/" target="_blank" rel="noreferrer">PyPI 安装</a>
+    </div>
+  </section>
+
+  <!-- PATTERNS -->
+  <section class="section">
+    <div class="section-header">01 · 核心模式</div>
+    <h2 class="section-title">7 个关键架构模式</h2>
+    <p class="section-desc">每个模式对应 Claude Code 的一个核心决策点。用节点图展示模式之间的调用关系，用表格说明每个模式的职责与关键实现。</p>
+
+    <!-- Pattern Graph -->
+    <div class="graph-area">
+      <div class="graph-header"><span>pattern call graph</span><strong>CoreCoder 架构</strong></div>
+      <svg viewBox="0 0 680 220" aria-label="CoreCoder 7 patterns call graph">
+        <g class="edges">
+          <!-- Root -> Agent Loop -->
+          <line x1="340" y1="28" x2="340" y2="62" />
+          <!-- Agent Loop -> Pattern 1, 2, 3, 4, 5, 6, 7 -->
+          <line x1="340" y1="80" x2="80" y2="108" />
+          <line x1="340" y1="80" x2="190" y2="108" />
+          <line x1="340" y1="80" x2="300" y2="108" />
+          <line x1="340" y1="80" x2="410" y2="108" />
+          <line x1="340" y1="80" x2="520" y2="108" />
+          <line x1="340" y1="80" x2="580" y2="108" />
+          <line x1="340" y1="80" x2="640" y2="108" />
+          <!-- Tool Exec -> Danger Interceptor -->
+          <line x1="80" y1="126" x2="190" y2="154" stroke-dasharray="4,3" />
+          <!-- Tool Exec -> Context Comp -->
+          <line x1="80" y1="126" x2="300" y2="154" stroke-dasharray="4,3" />
+          <!-- Context Comp -> Long-horizon -->
+          <line x1="300" y1="126" x2="410" y2="154" stroke-dasharray="4,3" />
+        </g>
+        <!-- Nodes -->
+        <g class="node hot">
+          <circle cx="340" cy="20" r="18" />
+          <text x="340" y="20" text-anchor="middle">Agent Loop</text>
+        </g>
+        <g class="node">
+          <circle cx="80" cy="108" r="18" />
+          <text x="80" y="108" text-anchor="middle">Tool Exec</text>
+        </g>
+        <g class="node">
+          <circle cx="190" cy="108" r="18" />
+          <text x="190" y="108" text-anchor="middle">Danger Interceptor</text>
+        </g>
+        <g class="node">
+          <circle cx="300" cy="108" r="18" />
+          <text x="300" y="108" text-anchor="middle">Context Comp</text>
+        </g>
+        <g class="node hot">
+          <circle cx="410" cy="108" r="18" />
+          <text x="410" y="108" text-anchor="middle">Long-horizon</text>
+        </g>
+        <g class="node">
+          <circle cx="520" cy="108" r="18" />
+          <text x="520" y="108" text-anchor="middle">Skill Router</text>
+        </g>
+        <g class="node">
+          <circle cx="580" cy="108" r="18" />
+          <text x="580" y="108" text-anchor="middle">Session Memory</text>
+        </g>
+        <g class="node">
+          <circle cx="640" cy="108" r="18" />
+          <text x="640" y="108" text-anchor="middle">Model Adapter</text>
+        </g>
+        <!-- Bottom row labels -->
+        <g class="node">
+          <circle cx="80" cy="190" r="15" />
+          <text x="80" y="190" text-anchor="middle">1</text>
+        </g>
+        <g class="node">
+          <circle cx="190" cy="190" r="15" />
+          <text x="190" y="190" text-anchor="middle">2</text>
+        </g>
+        <g class="node">
+          <circle cx="300" cy="190" r="15" />
+          <text x="300" y="190" text-anchor="middle">3</text>
+        </g>
+        <g class="node">
+          <circle cx="410" cy="190" r="15" />
+          <text x="410" y="190" text-anchor="middle">4</text>
+        </g>
+        <g class="node">
+          <circle cx="520" cy="190" r="15" />
+          <text x="520" y="190" text-anchor="middle">5</text>
+        </g>
+        <g class="node">
+          <circle cx="580" cy="190" r="15" />
+          <text x="580" y="190" text-anchor="middle">6</text>
+        </g>
+        <g class="node">
+          <circle cx="640" cy="190" r="15" />
+          <text x="640" y="190" text-anchor="middle">7</text>
+        </g>
+        <!-- Dashed connections to bottom numbers -->
+        <line x1="80" y1="126" x2="80" y2="175" stroke-dasharray="2,3" stroke="#ccc" />
+        <line x1="190" y1="126" x2="190" y2="175" stroke-dasharray="2,3" stroke="#ccc" />
+        <line x1="300" y1="126" x2="300" y2="175" stroke-dasharray="2,3" stroke="#ccc" />
+        <line x1="410" y1="126" x2="410" y2="175" stroke-dasharray="2,3" stroke="#ccc" />
+        <line x1="520" y1="126" x2="520" y2="175" stroke-dasharray="2,3" stroke="#ccc" />
+        <line x1="580" y1="126" x2="580" y2="175" stroke-dasharray="2,3" stroke="#ccc" />
+        <line x1="640" y1="126" x2="640" y2="175" stroke-dasharray="2,3" stroke="#ccc" />
+      </svg>
+    </div>
+
+    <!-- Pattern Table -->
+    <table class="pattern-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>模式</th>
+          <th>关键实现</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="pattern-num">1</td>
+          <td class="pattern-name">并行工具执行</td>
+          <td class="pattern-key">工具调用的并发控制，结果合并后再决定下一步。支持 Bash / Web search / File read 等多种工具并行。</td>
+        </tr>
+        <tr>
+          <td class="pattern-num">2</td>
+          <td class="pattern-name">危险命令拦截</td>
+          <td class="pattern-key">在执行 Bash 命令前扫描高危操作（rm -rf、git push --force 等），拦截或要求确认，防止破坏性操作。</td>
+        </tr>
+        <tr>
+          <td class="pattern-num">3</td>
+          <td class="pattern-name">三层上下文压缩</td>
+          <td class="pattern-key">Token 接近上限时自动压缩：①消息摘要 ②历史摘要 ③关键信息保留。在长任务中保持上下文相关性。</td>
+        </tr>
+        <tr>
+          <td class="pattern-num">4</td>
+          <td class="pattern-name">长期记忆与规划</td>
+          <td class="pattern-key">维护任务目标状态，跨多轮对话保持一致性。不只是记住说了什么，而是记住要做什么和做到了哪一步。</td>
+        </tr>
+        <tr>
+          <td class="pattern-num">5</td>
+          <td class="pattern-name">Skill 路由与执行</td>
+          <td class="pattern-key">根据用户意图动态选择合适的 Skill（任务模板），支持自定义扩展，无需修改核心代码即可添加新能力。</td>
+        </tr>
+        <tr>
+          <td class="pattern-num">6</td>
+          <td class="pattern-name">会话状态管理</td>
+          <td class="pattern-key">记录会话上下文、工具执行历史、决策理由，支持会话恢复和审计追踪。</td>
+        </tr>
+        <tr>
+          <td class="pattern-num">7</td>
+          <td class="pattern-name">模型适配层</td>
+          <td class="pattern-key">统一的模型接口抽象，屏蔽 API 差异，让同一套代码跑在 OpenAI / Anthropic / DeepSeek / Ollama 等任意模型上。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- MODEL SUPPORT -->
+  <section class="section" style="padding-top:0">
+    <div class="section-header">02 · 模型支持</div>
+    <h2 class="section-title">任意模型，灵活接入</h2>
+    <p class="section-desc">通过统一适配层，CoreCoder 不绑定任何模型商。本地跑 Ollama 或接入 100+ 服务商，随你选。</p>
+    <div class="model-cards">
+      <div class="model-card">
+        <div class="model-card-title">OpenAI 兼容</div>
+        <div class="model-card-value">GPT-4o / o1 / o3</div>
+        <div class="model-card-note">标准 OpenAI API 格式，无需额外配置，直接填 key 即可。</div>
+      </div>
+      <div class="model-card">
+        <div class="model-card-title">LiteLLM 桥接</div>
+        <div class="model-card-value">100+ 提供商</div>
+        <div class="model-card-note">通过 LiteLLM 统一接口调用 Anthropic、DeepSeek、Azure 等 100 多家服务商。</div>
+      </div>
+      <div class="model-card">
+        <div class="model-card-title">本地 Ollama</div>
+        <div class="model-card-value">Llama / Qwen / Phi</div>
+        <div class="model-card-note">无需网络请求，数据不离开本地，适合隐私敏感场景和开发调试。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTTOM CTA -->
+  <section class="bottom-cta">
+    <div class="bottom-cta-inner">
+      <div class="bottom-cta-left">
+        <strong>想搞懂 AI 编码智能体是怎么工作的？</strong>
+        <span>花一个下午通读 1400 行 Python，比看 50 万行泄露源码更有效。</span>
+      </div>
+      <a class="bottom-cta-btn" href="https://github.com/he-yufeng/CoreCoder" target="_blank" rel="noreferrer">github.com/he-yufeng/CoreCoder</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    数据来源：<a href="https://github.com/he-yufeng/CoreCoder" target="_blank" rel="noreferrer">github.com/he-yufeng/CoreCoder</a>（Stars 1.3k · Forks 301 · MIT 协议 · 2026-04-01 创建）<br/>
+    注：7 个模式名称基于用户提供内容整理，具体实现以项目源码为准。
+  </footer>
+
+</div>
+</body>
+</html>
