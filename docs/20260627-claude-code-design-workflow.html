@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UI 设计到代码开发的 AI 自动化闭环：Claude Code /design 工作流</title>
+  <style>
+    :root{--bg:#070b18;--bg2:#0c1430;--panel:#111a33;--panel2:#0b1124;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.13);--cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--red:#ff5b6e}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 15% 5%,rgba(88,195,255,.28),transparent 34%),radial-gradient(circle at 88% 4%,rgba(132,89,255,.24),transparent 34%),linear-gradient(180deg,var(--bg),#040713);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}body{padding:26px 14px}.wrap{width:min(1120px,100%);margin:0 auto;display:grid;gap:18px}
+    /* HERO */
+    .hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:28px;background:linear-gradient(135deg,rgba(17,26,51,.94),rgba(11,17,36,.86));box-shadow:0 30px 90px rgba(0,0,0,.45);padding:28px}
+    .hero:before{content:"";position:absolute;inset:-40%;background:conic-gradient(from 210deg,transparent,rgba(88,195,255,.18),transparent,rgba(132,89,255,.18),transparent);animation:spin 18s linear infinite}
+    .hero>*{position:relative}@keyframes spin{to{transform:rotate(360deg)}}
+    .top{display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:stretch}
+    .kicker{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:rgba(255,255,255,.06);color:var(--cyan);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    .title{margin:18px 0 12px;font-size:clamp(36px,6.5vw,72px);line-height:.92;font-weight:950;letter-spacing:-.07em}.title span{display:block;background:linear-gradient(90deg,#fff,var(--cyan),var(--purple));-webkit-background-clip:text;color:transparent}
+    .lead{max-width:660px;color:var(--muted);font-size:16px;line-height:1.72}
+    .pills{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}
+    .pill{border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:rgba(255,255,255,.06);font-size:12px;color:#dbe7ff}
+    .pill.hot{background:linear-gradient(90deg,var(--blue),var(--purple));color:#fff;border:0}
+    .pill.green{background:rgba(45,179,106,.18);color:#90f0a2;border-color:rgba(45,179,106,.3)}
+    /* HERO RIGHT */
+    .orb-card{display:grid;grid-template-rows:auto 1fr;gap:14px;border:1px solid var(--line);border-radius:24px;padding:20px;background:rgba(0,0,0,.22)}
+    .orb-row{display:flex;align-items:center;gap:12px}
+    .orb{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--cyan),var(--blue),var(--purple));display:grid;place-items:center;font-size:22px;font-weight:950;color:#fff;letter-spacing:-.05em;box-shadow:0 8px 22px rgba(88,195,255,.3)}
+    .metric{font-size:13px;font-weight:800;color:#fff;line-height:1.2}
+    .metric small{display:block;font-size:11px;color:var(--muted);font-weight:400;margin-top:2px}
+    .terminal{background:#060b15;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+    .termbar{display:flex;gap:6px;padding:9px 12px;background:#0d1422;border-bottom:1px solid rgba(255,255,255,.08)}
+    .dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.15)}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#9fcf9f;line-height:1.7}
+    .hl{color:var(--cyan)}
+    .cmds{display:grid;gap:6px;margin-top:8px}
+    .cmd{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 11px;font-family:ui-monospace,monospace;font-size:11.5px;color:#c8d8ff}
+    /* SECTION */
+    .section{border:1px solid var(--line);border-radius:20px;background:rgba(13,19,38,.7);padding:22px 24px;backdrop-filter:blur(8px)}
+    .section-title{margin:0 0 14px;font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:10px}
+    .section-title::before{content:"";width:22px;height:1.5px;background:var(--cyan);flex-shrink:0}
+    .section-title.red{color:var(--red)}.section-title.red::before{background:var(--red)}
+    .section-title.green{color:#90f0a2}.section-title.green::before{background:#90f0a2}
+    .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .card{border:1px solid var(--line);border-radius:16px;padding:16px;background:rgba(17,26,51,.6);display:grid;gap:8px}
+    .card.red{border-color:rgba(255,91,110,.28);background:rgba(255,91,110,.06)}
+    .card.green{border-color:rgba(45,179,106,.28);background:rgba(45,179,106,.06)}
+    .card-num{font-size:11px;font-weight:900;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+    .card h3{margin:0;font-size:15px;font-weight:800;color:#fff;line-height:1.3}
+    .card p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.6}
+    .card code{display:inline-block;background:rgba(88,195,255,.12);border:1px solid rgba(88,195,255,.22);color:var(--cyan);padding:1px 6px;border-radius:5px;font-size:11.5px;font-family:ui-monospace,monospace}
+    /* WORKFLOW */
+    .wf{display:grid;gap:14px}
+    .wf-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .step{border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px;background:rgba(255,255,255,.03);display:grid;gap:10px}
+    .step-head{display:flex;align-items:center;gap:8px}
+    .step-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:grid;place-items:center;font-size:12px;font-weight:950;color:#fff;flex-shrink:0}
+    .step h4{margin:0;font-size:13.5px;font-weight:800;color:#fff}
+    .step p{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
+    .step pre{background:#060b15;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;font-family:ui-monospace,monospace;font-size:11.5px;color:#9fcf9f;line-height:1.7;margin:0;white-space:pre-wrap}
+    .step pre .c{color:var(--cyan)}
+    .step pre .m{color:#ffb3c0}
+    .tag{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:3px 8px;font-size:11px;color:#b6c5f2;background:rgba(255,255,255,.04)}
+    .tag.blue{border-color:rgba(88,195,255,.3);color:var(--cyan);background:rgba(88,195,255,.08)}
+    .tag.green{border-color:rgba(45,179,106,.3);color:#90f0a2;background:rgba(45,179,106,.08)}
+    .tag.yellow{border-color:rgba(244,200,76,.3);color:var(--yellow);background:rgba(244,200,76,.08)}
+    .tag.red{border-color:rgba(255,91,110,.3);color:var(--red);background:rgba(255,91,110,.08)}
+    /* MATRIX TABLE */
+    .matrix{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+    .mx{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--line)}
+    .mx > div{padding:10px 12px;background:rgba(11,15,28,.8);font-size:12.5px}
+    .mx .hd{background:rgba(17,26,51,.9);font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+    .mx .ok{color:#90f0a2;font-weight:900}.mx .no{color:#ff7a8a}
+    /* BANNER */
+    .banner{border:1px solid rgba(255,91,110,.25);border-radius:14px;padding:14px 16px;background:rgba(255,91,110,.06);display:grid;gap:6px}
+    .banner h4{margin:0;font-size:13px;font-weight:800;color:var(--red)}
+    .banner p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.6}
+    .banner-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+    .banner-item{border:1px solid rgba(255,91,110,.18);border-radius:10px;padding:10px 12px;background:rgba(255,91,110,.04)}
+    .banner-item h5{margin:0 0 4px;font-size:12px;font-weight:800;color:#ffb3c0}
+    .banner-item p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5}
+    /* FOOTER */
+    .footer{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:rgba(0,0,0,.22);display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:12px}
+    .footer strong{color:#fff}
+    .footer a{color:var(--cyan)}
+    /* RESPONSIVE */
+    @media(max-width:900px){.top{grid-template-columns:1fr}.grid4{grid-template-columns:repeat(2,1fr)}.wf-row{grid-template-columns:1fr}.banner-grid{grid-template-columns:1fr}}
+    @media(max-width:640px){.grid4{grid-template-columns:1fr}.wrap{padding:14px 10px}.hero{padding:20px 16px}.section{padding:16px}.term-body{font-size:11px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="top">
+        <div>
+          <div class="kicker">CLAUDE CODE · DESIGN SYSTEM · MCP PROTOCOL</div>
+          <h1 class="title">UI ↔ Code<span>AI 全链路闭环</span></h1>
+          <p class="lead">Claude Code 内置 <code>/design</code> 与 <code>/design-sync</code> 命令，打通设计可视化与代码开发双向同步，实现从 UI 设计到源码交付的端到端自动化工作流。</p>
+          <div class="pills">
+            <span class="pill hot">MCP 协议驱动</span>
+            <span class="pill">双向状态同步</span>
+            <span class="pill green">Design System 复用</span>
+            <span class="pill">Claude Design Beta</span>
+            <span class="pill">Claude Code 最新版</span>
+          </div>
+        </div>
+        <div class="orb-card">
+          <div class="orb-row">
+            <div class="orb">⚡</div>
+            <div class="metric"><b>双向</b><small>Design ↔ Code</small></div>
+          </div>
+          <div class="terminal">
+            <div class="termbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+            <div class="term-body">
+<span class="hl">$ claude</span>
+<span class="hl">→ /design login</span>          浏览器弹窗完成认证
+<span class="hl">→ /design sync</span>          拉取 Design System
+<span class="hl">→ 描述 UI 需求</span>        Claude Design 生成预览
+<span class="hl">→ /design pull</span>          同步代码到本地
+<span class="hl">→ /design push</span>          代码反哺设计规范
+<span class="hl">→ /design stats</span>          验证连接状态</div>
+          </div>
+          <div class="cmds">
+            <div class="cmd">npm install -g @anthropic-ai/claude-code</div>
+            <div class="cmd">claude  # → /design login</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 模块一：初始化连接 -->
+    <section class="section">
+      <h2 class="section-title">模块一 · 初始化连接与授权</h2>
+      <div class="wf">
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">1</div>
+            <h4>触发登录认证</h4>
+          </div>
+          <p>在 Claude Code 终端输入 <code>/design login</code>，浏览器自动弹窗完成云端授权连接。整个认证流程无需复制 Token。</p>
+          <pre><span class="c">$ claude</span>
+<span class="c">→ /design login</span>   <span class="m"># 触发浏览器授权弹窗</span></pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag blue">浏览器弹窗认证</span>
+            <span class="tag">无需手动配置 Token</span>
+            <span class="tag green">首次配置一次</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">2</div>
+            <h4>验证连接状态</h4>
+          </div>
+          <p>登录完成后，通过 <code>/design stats</code> 确认三项状态：云端 Design System 列表加载、GitHub 仓库关联、当前设计上下文。</p>
+          <pre><span class="c">$ /design stats</span>
+Design System: 已连接 ✓
+GitHub 仓库: 已关联 ✓
+云端同步: 正常 ✓</pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag blue">/design stats</span>
+            <span class="tag green">验证门禁</span>
+            <span class="tag">确保云端可访问</span>
+          </div>
+        </div>
+      </div>
+      <div style="border:1px solid rgba(244,200,76,.25);border-radius:12px;padding:12px 14px;background:rgba(244,200,76,.06);margin-top:12px;font-size:12.5px;color:var(--muted);line-height:1.6">
+        <b style="color:var(--yellow)">⚠ 前置要求：</b>首次配置前确保网络可访问 <code>claude.ai</code> 云端服务，且 Claude Code 已升级至最新版本（含 2026-06 Beta 功能更新）。
+      </div>
+    </section>
+
+    <!-- 模块二：快速创建UI -->
+    <section class="section">
+      <h2 class="section-title green">模块二 · 快速创建 UI 与双向状态同步</h2>
+      <div class="wf">
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">1</div>
+            <h4>自然语言描述 UI 需求</h4>
+          </div>
+          <p>在 Claude Code 中附加具体需求描述（如"创建一个手机端设置页面，包含账号、安全、通知三个 Tab"），Claude Design 自动生成对应的 UI 结构与布局代码。</p>
+          <pre><span class="c">$ /design</span>
+<span class="m"># 自然语言输入需求</span>
+"创建一个手机端设置页面，
+  包含账号、安全、通知三个 Tab，
+  使用深色主题"</span></pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag blue">自然语言驱动</span>
+            <span class="tag green">实时生成预览</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">2</div>
+            <h4>浏览器内实时预览与深度微调</h4>
+          </div>
+          <p>Claude Design 自动在浏览器中打开 UI 调试页面。两种微调方式：自然语言对话修改，或进入 edit 模式直接在属性面板调整颜色、字体、布局模式、元素间距。</p>
+          <pre><span class="m"># edit 模式中直接操作</span>
+字体: PingFang SC 14px
+背景: #0c1430
+间距: 16px 12px
+圆角: 12px</pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag blue">像素级调整</span>
+            <span class="tag yellow">edit 模式</span>
+            <span class="tag green">所见即所得</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">3</div>
+            <h4>代码同步到本地（Pull）</h4>
+          </div>
+          <p>设计完成后，在 Claude Code 终端输入拉取指令，将设计端最新 UI 状态同步覆盖到本地代码文件（React / Tailwind / HTML 等）。</p>
+          <pre><span class="c">$ /design pull</span>   <span class="m"># 拉取设计端最新代码</span>
+已同步:
+  src/components/SettingsPage.tsx ✓
+  src/styles/settings.module.css ✓</pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag blue">/design pull</span>
+            <span class="tag green">Design → Code</span>
+            <span class="tag">自动生成源文件</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">4</div>
+            <h4>代码反哺设计规范（Push）</h4>
+          </div>
+          <p>在 Claude Code 侧完成代码修改后，<code>/design push</code> 将变更回写至云端 Design System，使设计器中的组件规范与源码保持同步。</p>
+          <pre><span class="c">$ /design push</span>   <span class="m"># 代码反哺设计系统</span>
+已更新云端组件:
+  Button.tsx v2 ✓
+  InputField.tsx v1 ✓</pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag blue">/design push</span>
+            <span class="tag green">Code → Design</span>
+            <span class="tag">Design System 同步</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 模块三：存量项目接入 -->
+    <section class="section">
+      <h2 class="section-title green">模块三 · 存量项目接入与设计规范重构</h2>
+      <div class="wf">
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">1</div>
+            <h4>提取现有项目为 Design System</h4>
+          </div>
+          <p>在现有项目目录下执行 <code>/design sync</code>，Claude Code 自动扫描项目 UI 代码，提取样式规范、色板、组件接口，上传至云端 Design System 库。</p>
+          <pre><span class="c">$ cd ~/my-project</span>
+<span class="c">$ /design sync</span>   <span class="m"># 提取为 Design System</span>
+扫描中... 提取样式规范
+上传到云端 Design System ✓</pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag blue">/design sync</span>
+            <span class="tag green">Design System 提取</span>
+            <span class="tag">自动扫描 UI 代码</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">2</div>
+            <h4>跨项目复用设计规范</h4>
+          </div>
+          <p>在后续新项目中，直接指定复用已上传的 Design System，确保全局 UI 风格一致（颜色、圆角、间距、字体统一），无需重复定义基础组件。</p>
+          <pre><span class="c">$ /design load my-design-system</span>
+已加载:
+  主色板 / 字体规范 / 圆角系统
+  Button / Input / Card 组件库</pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag green">跨项目复用</span>
+            <span class="tag">Design System 加载</span>
+            <span class="tag yellow">一致性保障</span>
+          </div>
+        </div>
+        <div class="step" style="grid-column:1/-1">
+          <div class="step-head">
+            <div class="step-num">3</div>
+            <h4>深度逆向重构：GitHub 仓库 → 可视化 UI → 重构 → 导回代码</h4>
+          </div>
+          <p>Claude Design 支持关联 GitHub 仓库（React / Swift / Vue 等），将已有项目代码逆向解析为可视化组件。在设计器中重构 UI 后，直接导回代码仓库，形成完整的逆向-正向闭环。</p>
+          <pre><span class="c">$ /design link github:owner/repo --branch main</span>
+<span class="m"># 关联 GitHub 仓库，自动逆向解析 UI 组件</span>
+✓ 识别 React 组件 12 个
+✓ 解析样式规范 8 项
+✓ 生成可视化组件图谱</pre>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <span class="tag blue">/design link</span>
+            <span class="tag green">GitHub 逆向解析</span>
+            <span class="tag yellow">可视化重构</span>
+            <span class="tag">React · Swift · Vue</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 系统约束 -->
+    <section class="section">
+      <h2 class="section-title red">系统约束与风险提示</h2>
+      <div class="banner-grid">
+        <div class="banner-item">
+          <h5>🔒 MCP 协议依赖</h5>
+          <p>双向打通依赖 MCP（Model Context Protocol）协议实现。需确保 Claude Code MCP 服务保持可用状态；MCP 连接异常会导致设计与代码同步中断。</p>
+        </div>
+        <div class="banner-item">
+          <h5>🎨 复杂结构调整优先在 Design 界面</h5>
+          <p>涉及布局模式、组件层级、响应式断点等结构性调整，优先在 Claude Design 可视化界面完成后再执行代码同步，以确保同步准确性。</p>
+        </div>
+        <div class="banner-item">
+          <h5>🌐 网络环境要求</h5>
+          <p>Design System 存储在云端，设计同步、GitHub 关联、Design System 拉取均需要稳定访问 <code>claude.ai</code> 云端服务。</p>
+        </div>
+        <div class="banner-item">
+          <h5>📦 版本兼容性</h5>
+          <p>2026-06 起 Claude Code 新增 <code>/design</code> 命令。旧版本仅支持基础功能，请升级至最新版以获取完整双向同步能力。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 适用场景矩阵 -->
+    <section class="section">
+      <h2 class="section-title">适用场景与核心价值</h2>
+      <div class="grid4">
+        <div class="card green">
+          <div class="card-num">场景 01</div>
+          <h3>前端页面极速生成</h3>
+          <p>自然语言描述需求 → Claude Design 生成 UI → <code>/design pull</code> 导出完整源码，省去手写组件的时间。</p>
+          <span class="tag green">推荐</span>
+        </div>
+        <div class="card">
+          <div class="card-num">场景 02</div>
+          <h3>可视化 UI 样式微调</h3>
+          <p>无需修改代码，直接在设计器中调整颜色、字体、间距，通过双向同步保持设计与代码一致。</p>
+          <span class="tag blue">edit 模式</span>
+        </div>
+        <div class="card">
+          <div class="card-num">场景 03</div>
+          <h3>现有项目界面重构</h3>
+          <p>关联 GitHub 仓库，Claude Design 逆向解析现有代码为可视化组件，重构后再导回，提升重构效率。</p>
+          <span class="tag yellow">逆向重构</span>
+        </div>
+        <div class="card green">
+          <div class="card-num">场景 04</div>
+          <h3>Design System 沉淀</h3>
+          <p>用 <code>/design sync</code> 提取现有项目样式规范，跨项目复用，团队 UI 一致性从制度约束变为技术自动保障。</p>
+          <span class="tag green">推荐</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 来源说明 -->
+    <div class="footer">
+      <div>
+        <strong>来源：</strong>IT之家（2026-06-18）、腾讯新闻、Cloud.tencent（2026-06-27）· 交叉验证
+      </div>
+      <div>
+        <a href="https://code.claude.com/docs/en/cli-reference">Claude Code 官方文档 →</a>
+      </div>
+      <div>
+        <strong>版本：</strong>Claude Code 最新版（含 2026-06 Beta 功能）
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
