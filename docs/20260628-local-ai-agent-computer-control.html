@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本地AI代理接管电脑 · 零成本 · 35B GGUF + 视觉模型 · OpenClaw + llama.cpp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#070d1a;
+  --surface:#0b1425;
+  --surface2:#0f1c35;
+  --surface3:#152038;
+  --border:#1a2e50;
+  --border2:#1e3868;
+  --text:#d8e6f4;
+  --text2:#7a9cc0;
+  --text3:#3d5a80;
+  --accent:#5b9cf6;
+  --accent2:#4a8de8;
+  --accent3:#7bb5ff;
+  --green:#4ade80;
+  --yellow:#fbbf24;
+  --red:#f87171;
+  --purple:#c084fc;
+  --orange:#fb923c;
+  --teal:#2dd4bf;
+  --font:'Inter',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.7;
+  min-height:100vh;
+}
+.card-wrap{max-width:780px;margin:0 auto;padding:0 20px 52px}
+
+/* HEADER */
+.card-header{
+  padding:28px 0 20px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+}
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.badge{
+  font-family:var(--mono);
+  font-size:10.5px;font-weight:600;
+  padding:3px 10px;border-radius:20px;letter-spacing:.5px;
+}
+.badge-free{background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+.badge-ai{background:rgba(91,156,246,.12);color:var(--accent);border:1px solid rgba(91,156,246,.25)}
+.badge-arch{background:rgba(192,132,252,.12);color:var(--purple);border:1px solid rgba(192,132,252,.25)}
+.badge-local{background:rgba(251,146,60,.12);color:var(--orange);border:1px solid rgba(251,146,60,.25)}
+.badge-tech{background:rgba(45,212,191,.12);color:var(--teal);border:1px solid rgba(45,212,191,.25)}
+.card-title{font-size:22.5px;font-weight:800;letter-spacing:-.4px;line-height:1.2}
+.card-subtitle{font-size:13.5px;color:var(--text2);margin-top:6px;font-weight:400;line-height:1.6}
+.card-meta{
+  display:flex;gap:14px;font-size:11.5px;color:var(--text3);
+  margin-top:10px;font-family:var(--mono);flex-wrap:wrap;
+}
+.card-meta span{display:flex;align-items:center;gap:4px}
+.hero-icon{
+  width:52px;height:52px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:14px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.hero-icon svg{width:30px;height:30px}
+
+/* STATS */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:13px;text-align:center;
+}
+.stat-val{font-size:19px;font-weight:800;font-family:var(--mono)}
+.stat-lbl{font-size:10.5px;color:var(--text3);margin-top:3px}
+
+/* SECTIONS */
+.section{margin:22px 0}
+.section-title{
+  font-size:11.5px;font-weight:700;color:var(--text2);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* INTRO BOX */
+.intro-box{
+  background:linear-gradient(135deg,rgba(91,156,246,.07),rgba(74,222,128,.05));
+  border:1px solid rgba(91,156,246,.2);border-radius:12px;
+  padding:16px 20px;font-size:13.5px;color:var(--text2);line-height:1.7;
+}
+.intro-box strong{color:var(--accent)}
+
+/* ARCH FLOW */
+.arch-flow{display:flex;align-items:center;gap:0;margin:16px 0}
+.arch-node{
+  flex:1;background:var(--surface);
+  border:1px solid var(--border);border-radius:12px;
+  padding:13px 10px;text-align:center;position:relative;
+}
+.arch-node::after{
+  content:'→';position:absolute;right:-16px;top:50%;
+  transform:translateY(-50%);color:var(--text3);font-size:15px;z-index:2;
+}
+.arch-node:last-child::after{display:none}
+.arch-icon{font-size:20px;margin-bottom:4px}
+.arch-name{font-weight:700;font-size:12px;margin-bottom:2px}
+.arch-desc{font-size:10.5px;color:var(--text3)}
+
+/* TOOL CARDS */
+.tool-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:16px;margin-bottom:10px;
+  transition:border-color .2s;
+}
+.tool-card:hover{border-color:var(--accent2)}
+.tool-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;flex-wrap:wrap;gap:8px;
+}
+.tool-name{font-weight:800;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.tool-tag{
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  padding:2px 8px;border-radius:20px;
+  background:rgba(91,156,246,.12);color:var(--accent);
+  border:1px solid rgba(91,156,246,.25);
+}
+.tool-desc{font-size:12.5px;color:var(--text2);line-height:1.6;margin-bottom:10px}
+.func-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.func-chip{
+  font-family:var(--mono);font-size:11px;padding:3px 10px;
+  border-radius:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+}
+.func-chip.active{
+  background:rgba(74,222,128,.12);color:var(--green);border-color:rgba(74,222,128,.25);
+}
+
+/* TABLES */
+.info-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.info-table th{
+  background:var(--surface);color:var(--text2);
+  font-weight:600;font-size:11px;text-transform:uppercase;
+  letter-spacing:.5px;padding:9px 12px;
+  border:1px solid var(--border);text-align:left;
+}
+.info-table td{
+  padding:8px 12px;border:1px solid var(--border);
+  vertical-align:top;line-height:1.5;
+}
+.info-table tr:nth-child(even) td{background:rgba(11,20,37,.4)}
+.td-green{color:var(--green);font-weight:600}
+.td-yellow{color:var(--yellow)}
+.td-red{color:var(--red)}
+.td-purple{color:var(--purple)}
+
+/* STEP BLOCKS */
+.step-block{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:16px;margin-bottom:10px;
+}
+.step-block-title{font-weight:700;font-size:13.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.step-block-title .num{
+  width:22px;height:22px;border-radius:50%;
+  background:var(--accent2);color:#fff;font-weight:800;font-size:11px;
+  display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.step-block-body{font-size:12.5px;color:var(--text2);line-height:1.6}
+.code-block{
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;padding:12px 14px;font-family:var(--mono);
+  font-size:12px;color:#79c0ff;overflow-x:auto;white-space:pre;
+  margin-top:8px;
+}
+
+/* WARN/TIP/INFO BOXES */
+.warn-box{
+  background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.2);
+  border-radius:10px;padding:12px 16px;font-size:12.5px;
+  color:var(--orange);line-height:1.6;margin:10px 0;
+}
+.tip-box{
+  background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.18);
+  border-radius:10px;padding:12px 16px;font-size:12.5px;
+  color:var(--green);line-height:1.6;margin:10px 0;
+}
+.info-box{
+  background:rgba(91,156,246,.07);border:1px solid rgba(91,156,246,.18);
+  border-radius:10px;padding:12px 16px;font-size:12.5px;
+  color:var(--accent);line-height:1.6;margin:10px 0;
+}
+.purple-box{
+  background:rgba(192,132,252,.07);border:1px solid rgba(192,132,252,.18);
+  border-radius:10px;padding:12px 16px;font-size:12.5px;
+  color:var(--purple);line-height:1.6;margin:10px 0;
+}
+
+/* CAPABILITY ROW */
+.cap-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px 0}
+.cap-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:13px;
+}
+.cap-icon{font-size:18px;margin-bottom:6px}
+.cap-title{font-weight:700;font-size:12.5px;margin-bottom:4px}
+.cap-desc{font-size:11.5px;color:var(--text2);line-height:1.5}
+
+/* FOOTER */
+.card-footer{
+  margin-top:24px;padding-top:16px;border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:10px;
+}
+.footer-links{display:flex;gap:14px;flex-wrap:wrap}
+.footer-links a{font-size:12px;color:var(--text2);text-decoration:none;display:flex;align-items:center;gap:5px;transition:color .2s}
+.footer-links a:hover{color:var(--accent)}
+.source-btn{
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;
+  cursor:pointer;font-family:var(--font);text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;
+  transition:background .2s,border-color .2s;
+}
+.source-btn:hover{background:var(--surface);border-color:var(--accent2)}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+  .arch-flow{flex-direction:column}
+  .arch-node::after{content:'↓';right:auto;left:50%;top:auto;bottom:-14px;transform:translateX(-50%)}
+  .cap-grid{grid-template-columns:1fr}
+  .card-title{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="card-wrap">
+
+  <!-- HEADER -->
+  <div class="card-header">
+    <div style="flex:1;min-width:0">
+      <div class="badge-row">
+        <span class="badge badge-free">💰 零成本</span>
+        <span class="badge badge-ai">🤖 AI代理</span>
+        <span class="badge badge-arch">⚛️ 35B GGUF</span>
+        <span class="badge badge-local">👁️ 视觉模型</span>
+        <span class="badge badge-tech">🛠️ OpenClaw</span>
+      </div>
+      <div class="card-title">本地AI代理接管电脑 · 零成本自动化 · 35B GGUF + 视觉模型</div>
+      <div class="card-subtitle">OpenClaw + llama.cpp + Qwen3.5 35B量化模型 + ~800MB视觉模型，消费级显卡（4G~24G显存）直接跑，无需云端API计费，全程本地计算，数据完全自主可控。</div>
+      <div class="card-meta">
+        <span>🔗 开源免费 · MIT/Apache 2.0</span>
+        <span>📦 llama.cpp 推理引擎</span>
+        <span>🖥️ NVIDIA CUDA / AMD HIP</span>
+        <span>⚡ 消费级显卡直跑</span>
+      </div>
+    </div>
+    <div class="hero-icon">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="8" width="40" height="28" rx="4" stroke="#5b9cf6" stroke-width="2.5"/>
+        <path d="M16 22l5 5-5 5" stroke="#5b9cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M22 27h8" stroke="#5b9cf6" stroke-width="2" stroke-linecap="round"/>
+        <path d="M28 18l4 4-4 4" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="10" cy="10" r="3" fill="#4ade80"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--green)">$0</div>
+      <div class="stat-lbl">API费用</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--accent)">35B</div>
+      <div class="stat-lbl">量化主脑</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--teal)">~800MB</div>
+      <div class="stat-lbl">视觉模型</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--purple)">4~24GB</div>
+      <div class="stat-lbl">显存适配</div>
+    </div>
+  </div>
+
+  <!-- INTRO -->
+  <div class="section">
+    <div class="section-title">产品定位</div>
+    <div class="intro-box">
+      一套<strong>完全本地化的 AI 代理</strong>，让 AI 真正接管你的电脑。不同于云端 API 的按量计费，这套方案基于开源大模型（35B GGUF）+ 轻量视觉模型，通过 OpenClaw 框架与 llama.cpp 推理引擎，在<strong>消费级显卡</strong>上实现零成本、高隐私的电脑自动化操作。
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <div class="section">
+    <div class="section-title">系统架构</div>
+    <div class="arch-flow">
+      <div class="arch-node">
+        <div class="arch-icon">🧠</div>
+        <div class="arch-name">35B GGUF 主脑</div>
+        <div class="arch-desc">Qwen3.5-35B-A3B MoE 量化版</div>
+      </div>
+      <div class="arch-node">
+        <div class="arch-icon">👁️</div>
+        <div class="arch-name">~800MB 视觉核</div>
+        <div class="arch-desc">轻量多模态视觉模型</div>
+      </div>
+      <div class="arch-node">
+        <div class="arch-icon">⚙️</div>
+        <div class="arch-name">llama.cpp 引擎</div>
+        <div class="arch-desc">本地 GGUF 推理（CUDA/HIP）</div>
+      </div>
+      <div class="arch-node">
+        <div class="arch-icon">🦞</div>
+        <div class="arch-name">OpenClaw 框架</div>
+        <div class="arch-desc">交互层 + Skills 插件系统</div>
+      </div>
+      <div class="arch-node">
+        <div class="arch-icon">💻</div>
+        <div class="arch-name">操作系统</div>
+        <div class="arch-desc">Windows / macOS / Linux</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORE MODULES -->
+  <div class="section">
+    <div class="section-title">核心模块详解</div>
+
+    <div class="tool-card">
+      <div class="tool-header">
+        <div class="tool-name">🧠 主脑模型 · 35B GGUF 量化版</div>
+        <span class="tool-tag">Qwen3.5-35B-A3B MoE</span>
+      </div>
+      <div class="tool-desc">选用 Qwen3.5-35B-A3B MoE 架构（总参数 397B，激活仅 17B，稀疏激活率 &lt;4.3%），配合 Q4/Q5_K_M GGUF 量化，推理成本媲美 20B 级模型，同时保持强力指令跟随与工具调用能力。适合 Agent 任务编排、长上下文和复杂推理。</div>
+      <div class="func-list">
+        <span class="func-chip active">MoE 稀疏激活</span>
+        <span class="func-chip active">Q4/Q5 量化</span>
+        <span class="func-chip active">GGUF 格式</span>
+        <span class="func-chip active">工具调用</span>
+        <span class="func-chip active">1M Token 上下文</span>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-header">
+        <div class="tool-name">👁️ 视觉核心 · ~800MB 轻量模型</div>
+        <span class="tool-tag">多模态感知</span>
+      </div>
+      <div class="tool-desc">为 OpenClaw 提供屏幕理解能力的轻量视觉模型，负责解析 UI 界面、识别按钮和输入框、定位验证码、理解图像内容。全程本地运行，无网络传输，响应速度快。</div>
+      <div class="func-list">
+        <span class="func-chip active">屏幕截图解析</span>
+        <span class="func-chip active">UI 元素识别</span>
+        <span class="func-chip active">图像内容理解</span>
+        <span class="func-chip active">验证码检测</span>
+        <span class="func-chip active">全网反向图片搜索</span>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-header">
+        <div class="tool-name">⚙️ 推理引擎 · llama.cpp</div>
+        <span class="tool-tag">GGUF 本地推理</span>
+      </div>
+      <div class="tool-desc">llama.cpp 是本地推理 GGUF 模型的标准引擎，支持 NVIDIA CUDA 和 AMD HIP 两种后端，适配从 4GB 到 24GB 显存的各种消费级显卡。通过 <code>./server</code> 启动 HTTP API 服务，OpenClaw 通过标准 OpenAI 兼容接口接入。</div>
+      <div class="func-list">
+        <span class="func-chip active">GGUF 模型加载</span>
+        <span class="func-chip active">NVIDIA CUDA</span>
+        <span class="func-chip active">AMD HIP</span>
+        <span class="func-chip active">OpenAI 兼容 API</span>
+        <span class="func-chip active">上下文长度可配</span>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-header">
+        <div class="tool-name">🦞 交互框架 · OpenClaw</div>
+        <span class="tool-tag">AI Agent 框架 · 300K Stars</span>
+      </div>
+      <div class="tool-desc">OpenClaw（昵称"小龙虾"，前身为 Clawdbot / Moltbot，因 Anthropic 商标投诉改名）是开源 AI Agent 框架，支持本地 GGUF 模型接入、系统命令执行、浏览器自动化、文件管理和 Skills 插件扩展。跨平台（Windows / macOS / Linux），可通过飞书/Telegram/微信等 IM 接入。</div>
+      <div class="func-list">
+        <span class="func-chip active">本地 GGUF 模型接入</span>
+        <span class="func-chip active">浏览器自动化</span>
+        <span class="func-chip active">系统命令执行</span>
+        <span class="func-chip active">文件读写管理</span>
+        <span class="func-chip active">多 IM 平台接入</span>
+        <span class="func-chip active">Skills 插件生态</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HARDWARE COMPATIBILITY -->
+  <div class="section">
+    <div class="section-title">硬件兼容参考</div>
+    <table class="info-table">
+      <thead>
+        <tr>
+          <th>显卡型号</th>
+          <th>显存</th>
+          <th>推荐模型规格</th>
+          <th>实测效果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>RTX 3060</td>
+          <td>12GB</td>
+          <td>Qwen3.5-9B Q5_K_M</td>
+          <td class="td-green">流畅运行，适合日常任务</td>
+        </tr>
+        <tr>
+          <td>RTX 3080Ti / 3090</td>
+          <td>12~24GB</td>
+          <td>Qwen3.5-14B Q4_K_M</td>
+          <td class="td-green">稳定运行，复杂推理可用</td>
+        </tr>
+        <tr>
+          <td>RTX 4090 / A5000</td>
+          <td>24GB</td>
+          <td>Qwen3.5-35B-A3B Q4</td>
+          <td class="td-green">全量级推理，工具调用强</td>
+        </tr>
+        <tr>
+          <td>AMD RX 7900 XTX</td>
+          <td>24GB</td>
+          <td>Qwen3.5-35B-A3B Q4 (HIP)</td>
+          <td class="td-yellow">需配置 HIP 版 llama.cpp</td>
+        </tr>
+        <tr>
+          <td>AMD 锐龙 AI Max+ 395</td>
+          <td>128GB 统一</td>
+          <td>Qwen3-Next 80B 裸模型</td>
+          <td class="td-green">极致性能，单机超算体验</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CAPABILITIES -->
+  <div class="section">
+    <div class="section-title">核心自动化能力</div>
+    <div class="cap-grid">
+      <div class="cap-card">
+        <div class="cap-icon">🌐</div>
+        <div class="cap-title">网页深度交互</div>
+        <div class="cap-desc">自主定位输入框并填写账号密码；自动构思并发布博客内容；识别并绕过人机安全验证码（CAPTCHA）。</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">🛒</div>
+        <div class="cap-title">复杂任务推理</div>
+        <div class="cap-desc">在电商平台执行带多条件搜索与过滤；自主归纳排名前三商品并生成汇总报告。</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">📂</div>
+        <div class="cap-title">跨系统协同</div>
+        <div class="cap-desc">读取网页资讯后，在 Windows 桌面自主新建文本文档并安全保存整理好的资料，全程无需人工干预。</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">🖼️</div>
+        <div class="cap-title">高级视觉处理</div>
+        <div class="cap-desc">精准提取网页高清大图保存至本地；仅凭像素内容在全网反向搜索图片原始出处（以图搜图）。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEPLOYMENT -->
+  <div class="section">
+    <div class="section-title">部署最佳实践</div>
+
+    <div class="step-block">
+      <div class="step-block-title"><span class="num">①</span> 底层环境配置</div>
+      <div class="step-block-body">根据显卡类型选择对应版本 llama.cpp，然后依次下载主模型和视觉模型文件，放入指定目录。</div>
+      <div class="code-block"># NVIDIA 显卡 → 下载 CUDA 版 llama.cpp
+# AMD 显卡 → 下载 HIP 版 llama.cpp
+# 地址: https://github.com/ggerganov/llama.cpp/releases
+
+# 下载 Qwen3.5-35B-A3B GGUF 量化模型（Q4_K_M，约 20GB）
+# 推荐从 hf-mirror.com 国内镜像下载（速度更快）
+wget https://hf-mirror.com/Qwen/Qwen3.5-35B-A3B-GGUF/resolve/main/qwen3.5-35b-a3b-q4_k_m.gguf
+
+# 下载 ~800MB 轻量视觉模型
+wget https://huggingface.co/***/vision-model.gguf</div>
+      <div class="tip-box">
+        <strong>💡 国内加速：</strong>用 <code>hf-mirror.com</code> 或 <code>modelscope.cn</code> 替代 HuggingFace 下载，速度可达 MB/s 级。用 <code>aria2c -x 16 -s 16</code> 多线程下载大文件更稳定。
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-block-title"><span class="num">②</span> llama.cpp 推理服务启动</div>
+      <div class="step-block-body">将 GGUF 模型文件放入 llama.cpp 模型目录，启动本地 HTTP API 服务（OpenAI 兼容接口），供 OpenClaw 调用。</div>
+      <div class="code-block"># 启动 llama.cpp HTTP 服务（NVIDIA CUDA 示例）
+./server \
+  -m qwen3.5-35b-a3b-q4_k_m.gguf \
+  -c 8192 \           # context 长度
+  --port 8080 \
+  --host 0.0.0.0 \
+  -ngl 99             # GPU 加载层数（99=全加载）
+
+# 验证服务正常
+curl http://localhost:8080/v1/models</div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-block-title"><span class="num">③</span> 安装 OpenClaw 并接入本地模型</div>
+      <div class="step-block-body">安装 OpenClaw，通过 onboard 向导配置 API 指向本地 llama.cpp 地址，并<strong>显式开启视觉模块</strong>。</div>
+      <div class="code-block"># 安装 OpenClaw（Node.js 22+ 环境）
+npm install -g openclaw@latest
+
+# 运行初始化向导（选择 Advanced 模式自定义模型）
+openclaw onboard --flow advanced
+
+# 关键配置步骤：
+# 1. Provider → 选择 "Custom"
+# 2. Default Model → 填入本地模型 ID（如 qwen-35b）
+# 3. API 地址 → 填入 llama.cpp 服务地址
+#    http://localhost:8080/v1/chat/completions
+# 4. ⚠️ 显式开启视觉模块：
+#    在配置文件中添加：
+#    vision.enabled = true
+#    vision.model = "本地视觉模型路径"</div>
+      <div class="warn-box">
+        <strong>⚠️ 关键约束：</strong>必须<strong>显式开启视觉模块</strong>（<code>vision.enabled = true</code>），否则 AI 无法解析屏幕截图，无法实现 UI 定位、验证码识别、以图搜图等核心能力。
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-block-title"><span class="num">④</span> 启动并使用</div>
+      <div class="step-block-body">启动 OpenClaw，通过 Web 界面、飞书、Telegram 或微信发送自然语言指令，AI 代理开始接管电脑。</div>
+      <div class="code-block"># 启动 OpenClaw
+openclaw start
+
+# 打开 Web 界面
+# 访问 http://localhost:3000
+
+# 或接入飞书（需配置飞书机器人）
+# 修改 ~/.openclaw/config.yaml:
+# channels:
+#   feishu:
+#     enabled: true
+#     app_id: "your-app-id"
+#     app_secret: "your-secret"</div>
+    </div>
+  </div>
+
+  <!-- MODEL SYSTEM -->
+  <div class="section">
+    <div class="section-title">Qwen3.5 系列模型规格参考</div>
+    <table class="info-table">
+      <thead>
+        <tr>
+          <th>模型</th>
+          <th>参数量</th>
+          <th>量化后大小</th>
+          <th>显存需求</th>
+          <th>适合场景</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Qwen3.5-9B Q4_K_M</td>
+          <td>9B</td>
+          <td>~6.5GB</td>
+          <td class="td-green">6GB 即可</td>
+          <td>Agent 基础任务、JSON 输出、流程编排</td>
+        </tr>
+        <tr>
+          <td>Qwen3.5-14B Q4_K_M</td>
+          <td>14B</td>
+          <td>~9GB</td>
+          <td class="td-yellow">12GB 推荐</td>
+          <td>复杂推理、中等代码生成</td>
+        </tr>
+        <tr>
+          <td>Qwen3.5-27B Q4_K_M</td>
+          <td>27B</td>
+          <td>~16GB</td>
+          <td class="td-yellow">16GB+</td>
+          <td>高精度代码、高质量输出</td>
+        </tr>
+        <tr>
+          <td><strong>Qwen3.5-35B-A3B</strong></td>
+          <td>397B 总 / 17B 激活</td>
+          <td>~20GB（Q4）</td>
+          <td class="td-purple">20~24GB</td>
+          <td>全量级 Agent 任务、长上下文、多步推理</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="purple-box" style="margin-top:10px">
+      <strong>💡 分层模型策略：</strong>常驻任务用 <strong>9B</strong>（低显存占用）+ 复杂推理时按需调用 <strong>35B MoE</strong>（按需激活），兼顾速度与质量，总成本更低。
+    </div>
+  </div>
+
+  <!-- COMPARISON -->
+  <div class="section">
+    <div class="section-title">本地方案 vs 云端 API</div>
+    <table class="info-table">
+      <thead>
+        <tr>
+          <th>维度</th>
+          <th>本地 GGUF + OpenClaw</th>
+          <th>云端 API（Claude/GPT-4）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>API 费用</td>
+          <td class="td-green">💰 完全免费</td>
+          <td>按 Token 计费，月均 $50~500+</td>
+        </tr>
+        <tr>
+          <td>数据隐私</td>
+          <td class="td-green">✅ 全程本地，无网络传输</td>
+          <td class="td-red">⚠️ 数据上传第三方服务器</td>
+        </tr>
+        <tr>
+          <td>网络延迟</td>
+          <td class="td-green">✅ 无延迟，本地推理</td>
+          <td class="td-yellow">依赖网络质量</td>
+        </tr>
+        <tr>
+          <td>视觉能力</td>
+          <td class="td-yellow">需额外配置视觉模型</td>
+          <td class="td-green">内置多模态（Claude/GPT-4V）</td>
+        </tr>
+        <tr>
+          <td>电脑控制能力</td>
+          <td class="td-green">✅ OpenClaw 原生支持</td>
+          <td class="td-yellow">Anthropic Computer Use（云端）</td>
+        </tr>
+        <tr>
+          <td>启动成本</td>
+          <td class="td-yellow">需准备显存≥6GB 显卡</td>
+          <td class="td-green">直接注册 API 即可</td>
+        </tr>
+        <tr>
+          <td>额度限制</td>
+          <td class="td-green">✅ 无限使用，无 Rate Limit</td>
+          <td class="td-red">⚠️ 有并发/用量限制</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SKILLS -->
+  <div class="section">
+    <div class="section-title">Skills 插件生态</div>
+    <div class="info-box">
+      OpenClaw 支持 Skills 插件扩展，通过 <code>npx skills add &lt;skill-name&gt;</code> 安装。常用 Skills：
+    </div>
+    <table class="info-table" style="margin-top:10px">
+      <thead>
+        <tr>
+          <th>Skill</th>
+          <th>功能</th>
+          <th>适用场景</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>file-manager</td>
+          <td>文件读写、新建、重命名、移动</td>
+          <td>自动整理下载资料、生成报告</td>
+        </tr>
+        <tr>
+          <td>report-generator</td>
+          <td>结构化报告生成</td>
+          <td>竞品分析、数据汇总</td>
+        </tr>
+        <tr>
+          <td>browser-use</td>
+          <td>浏览器自动化（搜索/填表/抓取）</td>
+          <td>网页数据采集、批量操作</td>
+        </tr>
+        <tr>
+          <td>code-runner</td>
+          <td>Shell 命令执行</td>
+          <td>系统自动化、脚本批处理</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- LIMITATIONS -->
+  <div class="section">
+    <div class="section-title">局限与风险</div>
+    <table class="info-table">
+      <thead>
+        <tr>
+          <th>限制项</th>
+          <th>说明</th>
+          <th>规避建议</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>硬件门槛</td>
+          <td>至少需要 6GB 显存才能跑 9B 模型，35B 需 20GB+</td>
+          <td>先用 9B 模型验证思路，再按需升级显卡</td>
+        </tr>
+        <tr>
+          <td>模型质量差距</td>
+          <td>量化 GGUF 在指令跟随、JSON 稳定性上弱于 GPT-4o / Claude</td>
+          <td>用官方 GGUF（非社区魔改），避免 distilled/uncensored 后缀</td>
+        </tr>
+        <tr>
+          <td>视觉模型配置复杂</td>
+          <td>需手动下载、放置、显式开启视觉模块</td>
+          <td>参考部署步骤第③步，确认 vision.enabled=true</td>
+        </tr>
+        <tr>
+          <td>首次部署耗时</td>
+          <td>模型下载 + 环境配置可能需要数小时</td>
+          <td>用国内镜像（hf-mirror / modelscope）加速下载</td>
+        </tr>
+        <tr>
+          <td>权限风险</td>
+          <td>OpenClaw 拥有系统命令执行权限，需注意配置文件 <code>tool.profile</code></td>
+          <td>设置为 <code>full</code> 仅在受控环境开启；生产环境建议限制</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="card-footer">
+    <div class="footer-links">
+      <a href="https://github.com/openclaw/openclaw" target="_blank">🦞 OpenClaw GitHub</a>
+      <a href="https://github.com/ggerganov/llama.cpp" target="_blank">⚙️ llama.cpp</a>
+      <a href="https://hf-mirror.com" target="_blank">📦 hf-mirror 模型下载</a>
+      <a href="https://docs.openclaw.ai" target="_blank">📖 OpenClaw 文档</a>
+    </div>
+    <a href="https://github.com/openclaw/openclaw" target="_blank" class="source-btn">⭐ 300K+ Stars → GitHub</a>
+  </div>
+
+</div>
+</body>
+</html>
