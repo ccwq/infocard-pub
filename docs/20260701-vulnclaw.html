@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0b">
+  <title>VulnClaw：把授权渗透测试压成自然语言驱动的工作流</title>
+  <style>
+    :root{
+      --bg:#0b0b0b; --paper:#f7f4ee; --paper2:#fbf8f2; --ink:#141414; --muted:#4b5563; --line:#202020;
+      --red:#c8102e; --red2:#8f1021; --blue:#1246a6; --blue2:#1e66d1; --green:#0d7a47; --yellow:#d2a60d;
+      --shadow:0 18px 42px rgba(0,0,0,.16);
+      --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    }
+    *{box-sizing:border-box} html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:linear-gradient(180deg,#f5f1ea 0%, #f7f4ee 24%, #f7f4ee 100%);color:var(--ink);font-family:var(--sans);line-height:1.72;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+    a{color:inherit}
+    img,svg{max-width:100%;display:block}
+    .page{width:min(780px,calc(100% - 18px));margin:0 auto;padding:14px 0 96px}
+    .shell{background:linear-gradient(180deg,var(--paper) 0%, #f8f6f0 100%);border:2px solid #171717;box-shadow:var(--shadow);border-radius:18px;overflow:hidden}
+    .hero{display:grid;grid-template-columns:1.16fr .84fr;gap:0;border-bottom:2px solid #171717}
+    .hero-copy{padding:20px 18px 18px;background:linear-gradient(180deg,#fff8ec 0%, #f1ece2 100%);border-right:2px solid #171717}
+    .kicker{display:inline-flex;align-items:center;gap:8px;padding:4px 10px;border-radius:999px;border:1.5px solid rgba(200,16,46,.3);background:rgba(200,16,46,.08);color:var(--red);font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+    .kicker:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 3px rgba(200,16,46,.12)}
+    h1{margin:12px 0 10px;font-size:clamp(26px,4.8vw,33px);line-height:1.08;letter-spacing:-.04em;font-weight:900}
+    .lead{margin:0;max-width:64ch;font-size:13.8px;line-height:1.82;color:#232323}
+    .hero-side{padding:16px;background:linear-gradient(180deg,#f7f3e9 0%, #efe8db 100%);display:grid;align-content:start;gap:10px}
+    .meta-card{border:1.5px solid #1b1b1b;border-radius:14px;background:#fffdf8;padding:11px 12px}
+    .meta-card b{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);margin-bottom:3px}
+    .meta-card span{display:block;font-size:11.5px;line-height:1.52;color:#1c2430;font-weight:700}
+    .meta-card em{font-style:normal;color:var(--red)}
+    .hero-visual{grid-column:1/-1;border-top:2px solid #171717;background:#f5f1e9;padding:12px}
+    .hero-visual figure{margin:0}
+    .hero-visual .panel{border:1.5px solid rgba(17,17,17,.16);border-radius:15px;overflow:hidden;background:linear-gradient(180deg,#0f1724 0%,#111827 100%);color:#e7edf7;box-shadow:0 14px 28px rgba(0,0,0,.16)}
+    .panel-top{padding:14px 14px 12px;border-bottom:1px solid rgba(255,255,255,.08);background:linear-gradient(90deg,rgba(200,16,46,.14),rgba(18,70,166,.10))}
+    .panel-top h3{margin:0 0 4px;font-size:14px;line-height:1.25;font-weight:900}
+    .panel-top p{margin:0;font-size:11.5px;line-height:1.55;color:#e9eef7}
+    .flow{display:grid;grid-template-columns:1fr 42px 1fr 42px 1fr 42px 1fr;gap:8px;padding:12px 14px 14px;align-items:center}
+    .node{border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.04);padding:10px 8px;text-align:center;min-width:0}
+    .node b{display:block;font-size:14px;line-height:1;color:#ffd8dc;margin-bottom:3px;font-family:var(--mono)}
+    .node span{display:block;font-size:10.5px;line-height:1.35;color:#c9d6ea}
+    .arrow{font-size:18px;color:#7ea9ff;text-align:center;line-height:1}
+    .hero-caption{margin-top:8px;font-size:11px;line-height:1.56;color:var(--muted)}
+    .hero-caption strong{color:var(--red)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 14px 0}
+    .stat{background:#fffdf8;border:1.5px solid #1b1b1b;border-radius:14px;padding:13px 10px;text-align:center}
+    .stat strong{display:block;font-family:var(--mono);font-size:20px;line-height:1;font-weight:900}
+    .stat span{display:block;margin-top:5px;color:var(--muted);font-size:10.5px;line-height:1.35}
+    .chips{display:flex;flex-wrap:wrap;gap:6px;padding:12px 14px 0}
+    .chip{padding:4px 9px;border-radius:999px;border:1.5px solid #1b1b1b;background:#fffdf8;font-size:10.5px;font-weight:800;letter-spacing:.01em;white-space:nowrap}
+    .chip.red{border-color:rgba(200,16,46,.35);color:var(--red);background:rgba(200,16,46,.06)}
+    .chip.blue{border-color:rgba(18,70,166,.32);color:var(--blue);background:rgba(18,70,166,.06)}
+    .chip.green{border-color:rgba(13,122,71,.32);color:var(--green);background:rgba(13,122,71,.06)}
+    .chip.yellow{border-color:rgba(210,166,13,.32);color:#8a6a00;background:rgba(210,166,13,.08)}
+    .section{margin:14px 14px 0;border:1.5px solid #1b1b1b;border-radius:16px;background:linear-gradient(180deg,#fffdf8 0%, #f7f2e8 100%);overflow:hidden}
+    .sec-head{display:flex;align-items:center;gap:10px;padding:11px 12px;background:linear-gradient(90deg,rgba(200,16,46,.12),rgba(18,70,166,.04));border-bottom:1.5px solid #1b1b1b}
+    .sec-no{width:28px;height:28px;border-radius:9px;background:linear-gradient(180deg,var(--bg),#202020);border:1px solid rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;color:#ffd9d9;font-size:11px;font-weight:900;font-family:var(--mono)}
+    .sec-title h2{margin:0;font-size:15px;line-height:1.25;font-weight:900;letter-spacing:-.02em}
+    .sec-title p{margin:2px 0 0;font-size:10.5px;line-height:1.45;color:var(--muted)}
+    .sec-body{padding:13px}
+    .intro{padding:13px 14px;border:1.5px solid rgba(18,70,166,.18);border-left:5px solid var(--blue);background:linear-gradient(135deg,rgba(18,70,166,.08),rgba(255,255,255,.7));border-radius:14px;margin-bottom:12px}
+    .intro .t{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);font-weight:900;margin-bottom:4px}
+    .intro p{margin:0;color:#161a22;font-size:13.2px;line-height:1.8}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .box{min-width:0;border:1.5px solid #1b1b1b;border-radius:14px;background:#fffdf8;padding:12px;overflow:hidden}
+    .box h3{margin:0 0 7px;font-size:14px;line-height:1.25;font-weight:900;letter-spacing:-.02em}
+    .box p{margin:0;color:#222;font-size:12px;line-height:1.72}
+    .box.blue{border-left:5px solid var(--blue)}
+    .box.red{border-left:5px solid var(--red)}
+    .box.green{border-left:5px solid var(--green)}
+    .box.yellow{border-left:5px solid var(--yellow)}
+    .list{display:grid;gap:7px}
+    .item{display:grid;grid-template-columns:24px 1fr;gap:8px;align-items:start}
+    .n{width:24px;height:24px;border-radius:7px;background:var(--bg);border:1px solid rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;color:#ffd9d9;font-size:10px;font-weight:900;font-family:var(--mono)}
+    .item .title{display:block;font-size:12.4px;line-height:1.35;font-weight:900;margin-bottom:1px}
+    .item .desc{display:block;font-size:11px;line-height:1.56;color:var(--muted)}
+    .table-wrap{overflow-x:auto;border:1.5px solid #1b1b1b;border-radius:14px;background:#fffdf8}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{border-bottom:1px solid rgba(0,0,0,.1);padding:8px 9px;vertical-align:top;text-align:left}
+    th{background:rgba(18,70,166,.06);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+    td:first-child{font-family:var(--mono);font-weight:900;color:var(--red);white-space:nowrap}
+    .note{padding:11px 12px;border-radius:14px;border-left:5px solid var(--yellow);background:rgba(210,166,13,.09);color:#573f00;font-size:11.6px;line-height:1.65}
+    .note strong{color:#8b6500}
+    .footer{display:grid;grid-template-columns:1.05fr .95fr .9fr;gap:10px;padding:14px;border-top:1.5px solid #1b1b1b;background:linear-gradient(180deg,#f7f0e4,#efe8db)}
+    .foot{font-size:10.5px;line-height:1.56;color:var(--muted)}
+    .foot b{display:block;color:var(--blue);font-size:9px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px}
+    .center{text-align:center}.right{text-align:right}
+    .save-btn{display:block;width:calc(100% - 28px);margin:14px auto 0;border:1.5px solid rgba(18,70,166,.36);border-radius:13px;padding:11px 14px;background:linear-gradient(135deg,#0b3d88,#1e66d1);color:#fff;font-size:11px;font-weight:900;letter-spacing:.06em;cursor:pointer;box-shadow:0 10px 24px rgba(18,70,166,.18)}
+    .save-btn:active{transform:translateY(1px)}
+    .save-btn[disabled]{opacity:.72;cursor:progress}
+    @media (max-width:760px){
+      .page{width:calc(100% - 10px);padding:10px 0 96px}
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:none;border-bottom:2px solid #171717}
+      .stats,.grid2,.grid3,.footer{grid-template-columns:1fr}
+      .flow{grid-template-columns:1fr 24px 1fr 24px 1fr 24px 1fr;gap:6px;padding:10px 10px 12px}
+      .center,.right{text-align:left}
+      .save-btn{width:calc(100% - 24px);padding:10px 12px;font-size:10px;line-height:1.1}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="shell" id="card-root">
+      <header class="hero">
+        <div class="hero-copy">
+          <div class="kicker">AI 驱动的授权渗透测试 CLI</div>
+          <h1>VulnClaw：把“信息收集 → 漏洞验证 → 报告生成”压成自然语言驱动的工作流</h1>
+          <p class="lead">它不是让你更快做攻击，而是把已授权渗透测试里最费时的流程串成一条自动化链路：先收集证据，再做漏洞发现与验证，最后输出结构化报告与可复核脚本。重点在于节省重复劳动，而不是扩大攻击边界。</p>
+        </div>
+        <aside class="hero-side">
+          <div class="meta-card"><b>repo</b><span>Unclecheng-li/VulnClaw · <em>MIT</em></span></div>
+          <div class="meta-card"><b>stack</b><span>Python · AI Agent · MCP · 渗透 Skill 编排</span></div>
+          <div class="meta-card"><b>定位</b><span>授权渗透 / CTF / 红队演练的自动化助手</span></div>
+          <div class="meta-card"><b>风险边界</b><span>仅用于已授权目标；不应被当作未授权攻击工具</span></div>
+        </aside>
+        <div class="hero-visual">
+          <figure>
+            <div class="panel" role="img" aria-label="VulnClaw 安全工作流示意图">
+              <div class="panel-top">
+                <h3>VulnClaw 安全工作流：授权前提下的自动化测试闭环</h3>
+                <p>自然语言描述目标后，系统把任务拆成四段：收集证据、发现问题、验证风险、整理报告；所有输出都应该回到可审计的报告链路。</p>
+              </div>
+              <div class="flow">
+                <div class="node"><b>01</b><span>授权与范围确认</span></div><div class="arrow">→</div>
+                <div class="node"><b>02</b><span>信息收集与指纹</span></div><div class="arrow">→</div>
+                <div class="node"><b>03</b><span>漏洞发现与验证</span></div><div class="arrow">→</div>
+                <div class="node"><b>04</b><span>结构化报告输出</span></div>
+              </div>
+            </div>
+            <figcaption class="hero-caption"><strong>图中展示：</strong>这是一个面向授权安全测试的闭环示意，不是实战攻击教程；它强调的是任务编排、证据留存与报告输出三件事。</figcaption>
+          </figure>
+        </div>
+      </header>
+
+      <section class="stats" aria-label="关键统计">
+        <div class="stat"><strong>1446</strong><span>GitHub Stars</span></div>
+        <div class="stat"><strong>Python</strong><span>主语言</span></div>
+        <div class="stat"><strong>21</strong><span>个渗透 Skill</span></div>
+        <div class="stat"><strong>4</strong><span>MCP 服务</span></div>
+      </section>
+
+      <div class="chips">
+        <span class="chip red">授权渗透</span>
+        <span class="chip blue">AI Agent</span>
+        <span class="chip blue">MCP</span>
+        <span class="chip green">报告生成</span>
+        <span class="chip yellow">证据留存</span>
+        <span class="chip">CTF / 红队演练</span>
+      </div>
+
+      <section class="section">
+        <div class="sec-head"><div class="sec-no">01</div><div class="sec-title"><h2>先给结论：这是一款“把重复劳动自动化”的安全工具，不是替你越界的按钮</h2><p>VulnClaw 的价值在于减少授权测试中的机械重复，而不是降低安全边界。</p></div></div>
+        <div class="sec-body">
+          <div class="intro">
+            <div class="t">一句话判断</div>
+            <p><strong>VulnClaw</strong> 把授权渗透测试常见的四段工作——信息收集、漏洞发现、漏洞验证、报告生成——串成自然语言驱动的闭环，适合安全从业者、CTF 选手和红队演练场景，但前提始终是“已授权、可审计、可复核”。</p>
+          </div>
+          <div class="grid2">
+            <div class="box blue">
+              <h3>它解决的痛点</h3>
+              <p>把本来很散的收集、验证、记录和输出流程收束成一条线，减少人工在工具之间来回切换。</p>
+            </div>
+            <div class="box red">
+              <h3>它的边界</h3>
+              <p>只应面对明确授权的目标；如果没有边界，它就不该被当成“自动打洞器”。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="sec-head"><div class="sec-no">02</div><div class="sec-title"><h2>README 里最显眼的能力信号</h2><p>从公开资料看，它把安全测试重构成“自然语言 + Agent + 工具链 + 报告”的组合。</p></div></div>
+        <div class="sec-body grid3">
+          <div class="box blue"><h3>自然语言驱动</h3><p>输入目标和意图，系统自动识别阶段并组织工具执行。</p></div>
+          <div class="box green"><h3>证据级闸门</h3><p>主张必须能在真实工具输出里被核实，避免空口结论。</p></div>
+          <div class="box yellow"><h3>报告与脚本</h3><p>输出结构化测试报告，并可附带可复核的验证脚本。</p></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="sec-head"><div class="sec-no">03</div><div class="sec-title"><h2>它的“系统感”来自哪里</h2><p>公开 README 重点强调了几项工程化信号，而不是单点漏洞玩法。</p></div></div>
+        <div class="sec-body">
+          <div class="table-wrap">
+            <table>
+              <tr><th>模块</th><th>公开信息中的作用</th></tr>
+              <tr><td>AI Agent</td><td>把目标描述拆成可执行的测试任务</td></tr>
+              <tr><td>MCP 工具链</td><td>接入本地与外部工具服务，形成统一编排</td></tr>
+              <tr><td>渗透 Skill</td><td>把不同测试阶段封装成可复用能力</td></tr>
+              <tr><td>黑板图 / 状态搜索</td><td>用事实和意图管理测试进度，避免原地打转</td></tr>
+              <tr><td>报告链路</td><td>把结果沉淀为可审计文档，而不是只停留在终端输出</td></tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="sec-head"><div class="sec-no">04</div><div class="sec-title"><h2>它适合谁，不适合谁</h2><p>如果你站在授权测试、竞赛或演练的一侧，它的效率价值才成立。</p></div></div>
+        <div class="sec-body grid2">
+          <div class="box green">
+            <h3>适合</h3>
+            <div class="list">
+              <div class="item"><span class="n">1</span><div><span class="title">安全从业者</span><span class="desc">需要整理证据、验证风险、输出报告的人。</span></div></div>
+              <div class="item"><span class="n">2</span><div><span class="title">CTF 选手</span><span class="desc">希望把重复性检查流程自动化的人。</span></div></div>
+              <div class="item"><span class="n">3</span><div><span class="title">红队演练</span><span class="desc">在严格授权与范围控制下做批量测试的人。</span></div></div>
+            </div>
+          </div>
+          <div class="box red">
+            <h3>不适合</h3>
+            <div class="list">
+              <div class="item"><span class="n">1</span><div><span class="title">没有授权的目标</span><span class="desc">这不是用来突破边界的工具。</span></div></div>
+              <div class="item"><span class="n">2</span><div><span class="title">只想要“黑盒一键利用”</span><span class="desc">它强调的是流程编排和证据链，不是跳过判断。</span></div></div>
+              <div class="item"><span class="n">3</span><div><span class="title">不愿复核报告的人</span><span class="desc">自动化只能加速，不能替代人工审查。</span></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="sec-head"><div class="sec-no">05</div><div class="sec-title"><h2>安全视角下，真正该看的是哪些信号</h2><p>如果你想评估类似工具是否靠谱，先看边界和证据，再看功能数量。</p></div></div>
+        <div class="sec-body grid2">
+          <div class="box blue">
+            <h3>正向信号</h3>
+            <div class="list">
+              <div class="item"><span class="n">1</span><div><span class="title">有授权声明</span><span class="desc">公开强调 scope、authorized only、可审计。</span></div></div>
+              <div class="item"><span class="n">2</span><div><span class="title">有证据闸门</span><span class="desc">结论必须能在真实输出中复核。</span></div></div>
+              <div class="item"><span class="n">3</span><div><span class="title">有报告链路</span><span class="desc">结果回到文档，而不是只停在一条命令输出。</span></div></div>
+            </div>
+          </div>
+          <div class="box yellow">
+            <h3>需要留意</h3>
+            <div class="list">
+              <div class="item"><span class="n">1</span><div><span class="title">高风险能力</span><span class="desc">只读、验证、报告可以辅助；真正的利用能力必须严格受控。</span></div></div>
+              <div class="item"><span class="n">2</span><div><span class="title">模型输出偏差</span><span class="desc">越自动化，越要检查是否把推测当事实。</span></div></div>
+              <div class="item"><span class="n">3</span><div><span class="title">范围漂移</span><span class="desc">目标边界不清时，工具容易把测试意图扩得过大。</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="sec-body" style="padding-top:0">
+          <div class="note"><strong>一句建议：</strong>把 VulnClaw 当作“授权安全测试的自动化助理”理解最准确；把它当成“漏洞利用捷径”理解则会误判它的边界和风险。</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="sec-head"><div class="sec-no">06</div><div class="sec-title"><h2>这张卡的结论</h2><p>它的亮点是流程编排、证据链和报告化，而不是单点炫技。</p></div></div>
+        <div class="sec-body grid2">
+          <div class="box red">
+            <h3>一句话总结</h3>
+            <p>VulnClaw 适合授权场景下的安全测试提效：把重复劳动交给 Agent，把判断与复核留给人。</p>
+          </div>
+          <div class="box blue">
+            <h3>实用提醒</h3>
+            <p>如果你要评估它，先看授权边界、证据闸门和报告质量，再看工具数量和自动化程度。</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div class="foot"><b>source</b><a href="https://github.com/Unclecheng-li/VulnClaw" target="_blank" rel="noreferrer">Unclecheng-li/VulnClaw</a></div>
+        <div class="foot center"><b>style</b>black-head · 安全工作流 / 风险边界卡</div>
+        <div class="foot right"><b>date</b>2026-07-01 10:37:08</div>
+      </footer>
+    </div>
+  </main>
+
+  <button class="save-btn" id="save-btn" type="button">保存 PNG</button>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+    function saveCard(){
+      const btn=document.getElementById('save-btn');
+      const card=document.getElementById('card-root');
+      const old=btn.textContent;
+      btn.disabled=true;
+      btn.textContent='导出中…';
+      html2canvas(card,{backgroundColor:'#f7f4ee',scale:2,useCORS:true,scrollX:0,scrollY:-window.scrollY}).then(canvas=>{
+        const a=document.createElement('a');
+        a.download='20260701-vulnclaw.png';
+        a.href=canvas.toDataURL('image/png');
+        a.click();
+      }).catch(err=>{console.error(err);alert('PNG 导出失败，请重试');}).finally(()=>{btn.disabled=false;btn.textContent=old;});
+    }
+    document.getElementById('save-btn').addEventListener('click', saveCard);
+  </script>
+</body>
+</html>
