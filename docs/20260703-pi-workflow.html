@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pi-workflow：用自然语言触发多步工作流，单轮对话升级为可复用流程</title>
+  <meta name="description" content="pi-workflow 让 Pi agent 支持命名、可复用、定义成 JSON 阶段图的多步工作流：deep-research / deep-review / spec-review / impact-review 四种内置工作流，支持 single/foreach/reduce/loop/dag/dynamic 六种阶段模式。"/>
+  <style>
+    :root{
+      --bg:#f7f8fa;--paper:#fff;--ink:#0b0d12;--muted:#66717f;--faint:#9aa5b2;
+      --line:#e2e7ee;--line2:#cdd5df;--blue:#001a72;--blue2:#4b73bd;--blue3:#9db3dd;
+      --soft:#f6f8fb;--soft-blue:#eef4ff;--black:#05070a;
+      --green:#0d5c3a;--green-bg:#edf7f3;--amber:#8a4f00;--amber-bg:#fff8ec;
+      --red:#9b1c1c;--red-bg:#fff5f5;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+    body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:13px;line-height:1.64}
+    img{max-width:100%;display:block}
+    a{color:inherit;text-decoration:none}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82em;background:rgba(0,26,114,.06);padding:.05em .4em;border-radius:3px;word-break:break-word}
+    pre{background:var(--black);color:#e2e8f0;border-radius:8px;padding:14px 18px;font-size:12px;overflow-x:auto;white-space:pre;line-height:1.65;margin:8px 0}
+    pre code{background:none;padding:0;font-size:inherit}
+    .page{width:min(1180px,100%);margin:0 auto;padding:16px 12px 88px}
+    .sheet{background:var(--paper);border:1px solid var(--line);box-shadow:0 18px 54px rgba(20,35,60,.08);padding:18px}
+
+    /* TOPLINE */
+    .topline{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:800}
+    .brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+    .brand:before{content:"";display:inline-block;width:22px;height:6px;background:var(--blue)}
+
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:18px;align-items:stretch;margin-bottom:18px}
+    .hero-copy{display:grid;align-content:space-between;gap:20px;min-height:320px}
+    .kicker{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+    h1{font-size:clamp(34px,6vw,78px);line-height:.92;letter-spacing:-.07em;margin:0;color:var(--ink);font-weight:900}
+    .lead{max-width:66ch;color:var(--muted);font-size:15px;line-height:1.72;margin:12px 0 0}
+    .hero-pills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .hero-pill{padding:11px 12px;border-right:1px solid var(--line)}
+    .hero-pill:last-child{border-right:0}
+    .hero-pill b{display:block;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:3px;font-weight:800}
+    .hero-pill span{font-size:12px;color:var(--muted);line-height:1.45}
+    .mini-bar{width:28px;height:4px;background:var(--blue);margin-bottom:10px}
+
+    /* BLUE BLOCK */
+    .blue-block{background:var(--blue);color:#fff;min-height:320px;padding:22px;display:grid;align-content:space-between;position:relative;overflow:hidden}
+    .blue-block:after{content:"";position:absolute;inset:auto -16px -16px auto;width:100px;height:100px;border:1px solid rgba(255,255,255,.18);transform:rotate(15deg)}
+    .blue-block .label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:rgba(255,255,255,.72);position:relative;z-index:1}
+    .blue-block .big{font-size:clamp(64px,10vw,130px);line-height:.84;letter-spacing:-.08em;font-weight:900;position:relative;z-index:1}
+    .blue-block .caption{max-width:34ch;font-size:14px;color:rgba(255,255,255,.8);line-height:1.6;position:relative;z-index:1}
+    .blue-block .logo-img{width:80px;height:80px;position:relative;z-index:1}
+
+    /* GRID LAYOUTS */
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .panel{background:var(--paper);border:1px solid var(--line);padding:16px 18px;display:grid;gap:10px;min-width:0}
+    .panel.gray{background:var(--soft)}
+    .panel.blue-bg{background:var(--soft-blue)}
+    .panel.black{background:var(--black);color:#fff;border-color:var(--black)}
+    .panel.green-bg{background:var(--green-bg)}
+    .panel.amber-bg{background:var(--amber-bg)}
+    .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px}
+    .panel.black .head{border-color:rgba(255,255,255,.18)}
+    .label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);font-weight:800;line-height:1.25}
+    .page-no{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:800;white-space:nowrap}
+    .panel h2{font-size:clamp(18px,2vw,26px);line-height:1.05;letter-spacing:-.05em;margin:0;font-weight:900}
+    .panel p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.65}
+    .panel.black p{color:rgba(255,255,255,.72)}
+    .panel h3{font-size:14px;font-weight:800;color:var(--ink);margin:0;line-height:1.3}
+    .panel.black h3{color:#fff}
+
+    /* WORKFLOW CARDS */
+    .wf-card{background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:8px}
+    .wf-name{font-size:13px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:7px}
+    .wf-name code{font-size:11.5px;background:rgba(0,26,114,.08);padding:2px 7px;border-radius:4px;color:var(--blue)}
+    .wf-tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px}
+    .tag-green{background:#dcfce7;color:#15803d}
+    .tag-blue{background:#dbeafe;color:#1d4ed8}
+    .tag-amber{background:#fef3c7;color:#b45309}
+    .tag-purple{background:#ede9fe;color:#6d28d9}
+    .wf-desc{font-size:12px;color:var(--muted);line-height:1.6;margin:0}
+
+    /* STAGE TYPES */
+    .stage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .stage-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--paper)}
+    .stage-name{font-size:12.5px;font-weight:800;color:var(--blue);margin-bottom:3px}
+    .stage-use{font-size:11.5px;color:var(--muted);line-height:1.5;margin:0}
+
+    /* SOP TABLE */
+    .sop-table{width:100%;border-collapse:collapse;font-size:12.5px}
+    .sop-table th{background:var(--blue);color:#fff;padding:9px 12px;text-align:left;font-weight:800;font-size:11px;letter-spacing:.05em}
+    .sop-table td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+    .sop-table tr:nth-child(even) td{background:var(--soft)}
+    .sop-table tr:last-child td:first-child{border-radius:0 0 0 6px}
+    .sop-table tr:last-child td:last-child{border-radius:0 0 6px 0}
+
+    /* USAGE EXAMPLE */
+    .usage-box{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--soft);font-size:12px;line-height:1.65;color:var(--muted)}
+    .usage-box code{font-size:11.5px;background:rgba(0,26,114,.08);color:var(--blue)}
+
+    /* CTA */
+    .cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
+    .cta-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;border:none}
+    .cta-btn.primary{background:var(--blue);color:#fff}
+    .cta-btn.secondary{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+
+    /* FOOTER */
+    .footer{border-top:1px solid var(--line);padding-top:12px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--faint);gap:12px;flex-wrap:wrap}
+    .footer a{color:var(--blue2)}
+    .save-btn{
+      background:var(--blue);color:#fff;border:none;border-radius:7px;
+      padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer;
+      transition:background .15s;flex-shrink:0;
+    }
+    .save-btn:hover{background:var(--blue2)}
+  </style>
+</head>
+<body>
+<div class="page">
+<div class="sheet">
+
+<!-- TOPLINE -->
+<div class="topline">
+  <div class="brand">pi-workflow · AgwaB</div>
+  <div>工作流编排 · TypeScript · MIT</div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-copy">
+    <div>
+      <div class="kicker">Workflow Orchestration for Pi</div>
+      <h1>pi-workflow</h1>
+      <p class="lead">把 Pi agent 的单轮对话升级为<strong>可命名、可复用</strong>的多步工作流。用自然语言触发，不用每次手写提示词。</p>
+    </div>
+    <div>
+      <div class="hero-pills">
+        <div class="hero-pill">
+          <div class="mini-bar"></div>
+          <b>4 种内置工作流</b>
+          <span>deep-research / deep-review / spec-review / impact-review</span>
+        </div>
+        <div class="hero-pill">
+          <div class="mini-bar"></div>
+          <b>6 种阶段模式</b>
+          <span>single · foreach · reduce · loop · dag · dynamic</span>
+        </div>
+        <div class="hero-pill">
+          <div class="mini-bar"></div>
+          <b>JSON 阶段图</b>
+          <span>定义流程结构，Pi subagent 执行任务</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="blue-block">
+    <div>
+      <div class="label">Deep Research 工作流</div>
+      <img src="assets/images/20260703-pi-workflow/deep-research-flow.png" alt="deep-research flow" style="width:100%;margin-top:10px;border-radius:4px;opacity:.9">
+    </div>
+    <div class="caption">计划问题 → 广度调研 → 归一化排序 → 证据核实 → 生成审计报告</div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="grid4" style="margin-bottom:18px">
+  <div class="panel" style="padding:14px 16px;text-align:center">
+    <div style="font-size:36px;font-weight:900;letter-spacing:-.06em;color:var(--ink)">75</div>
+    <div style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.1em;text-transform:uppercase">GitHub Stars</div>
+  </div>
+  <div class="panel" style="padding:14px 16px;text-align:center">
+    <div style="font-size:36px;font-weight:900;letter-spacing:-.06em;color:var(--ink)">TypeScript</div>
+    <div style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.1em;text-transform:uppercase">实现语言</div>
+  </div>
+  <div class="panel" style="padding:14px 16px;text-align:center">
+    <div style="font-size:36px;font-weight:900;letter-spacing:-.06em;color:var(--ink)">4</div>
+    <div style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.1em;text-transform:uppercase">内置工作流</div>
+  </div>
+  <div class="panel" style="padding:14px 16px;text-align:center">
+    <div style="font-size:36px;font-weight:900;letter-spacing:-.06em;color:var(--ink)">6</div>
+    <div style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.1em;text-transform:uppercase">阶段模式</div>
+  </div>
+</div>
+
+<!-- ONE SENTENCE -->
+<div class="panel blue-bg" style="margin-bottom:18px;padding:16px 18px">
+  <div style="font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);margin-bottom:6px">一句话判断</div>
+  <p style="font-size:14px;color:var(--ink);line-height:1.7;margin:0">如果你想<strong>让 AI 做多步骤、有依赖、能复用</strong>的任务，而不是每次都手写提示词，pi-workflow 是目前最干净的方案：JSON 定义阶段图，Pi subagent 执行业务逻辑，结果自动流转，run 可查可恢复。</p>
+</div>
+
+<!-- BUNDLED WORKFLOWS -->
+<div class="panel" style="margin-bottom:14px">
+  <div class="head">
+    <div>
+      <div class="label">内置工作流 · 4 种</div>
+      <h2 style="font-size:clamp(18px,2vw,26px);letter-spacing:-.05em;margin-top:6px">直接用，说句话就行</h2>
+    </div>
+    <div class="page-no">WORKFLOWS</div>
+  </div>
+  <div class="grid2">
+    <div class="wf-card">
+      <div class="wf-name">
+        <span class="wf-tag tag-green">深度研究</span>
+        <code>deep-research</code>
+      </div>
+      <p class="wf-desc">需要广度、验证、有引用推荐的研究任务。计划问题 → 按深度展开调研 → 归一化排名 → 核实关键论断 → 生成有审计痕迹的报告。</p>
+    </div>
+    <div class="wf-card">
+      <div class="wf-name">
+        <span class="wf-tag tag-blue">代码审查</span>
+        <code>deep-review</code>
+      </div>
+      <p class="wf-desc">一次 review 不够的多视角代码审查。分镜选取 → 多审查者产生结论 → 确定性去重 → 对幸存结论挑战测试 → 最终报告只保留有证据的问题。</p>
+    </div>
+    <div class="wf-card">
+      <div class="wf-name">
+        <span class="wf-tag tag-amber">规格审查</span>
+        <code>spec-review</code>
+      </div>
+      <p class="wf-desc">需求与实现的一致性检查。提取可测试需求 → 映射到实现和测试 → 验证候选缺口 → 报告哪些需求已覆盖、缺失、模糊或需要人工判断。</p>
+    </div>
+    <div class="wf-card">
+      <div class="wf-name">
+        <span class="wf-tag tag-purple">影响评估</span>
+        <code>impact-review</code>
+      </div>
+      <p class="wf-desc">变更的副作用和风险评估。映射影响范围 → 分析合同/状态/验证/文档/安全/性能 → 合并为可能回归项、缺失检查和后续行动。</p>
+    </div>
+  </div>
+</div>
+
+<!-- STAGE TYPES -->
+<div class="panel gray" style="margin-bottom:14px">
+  <div class="head">
+    <div>
+      <div class="label">阶段图架构 · 6 种模式</div>
+      <h2 style="font-size:clamp(18px,2vw,26px);letter-spacing:-.05em;margin-top:6px">工作流 = JSON 阶段图</h2>
+    </div>
+    <div class="page-no">STAGE TYPES</div>
+  </div>
+  <div class="stage-grid">
+    <div class="stage-card">
+      <div class="stage-name">single</div>
+      <p class="stage-use">单步执行，一个 prompt → 一个 subagent，适合聚焦操作。</p>
+    </div>
+    <div class="stage-card">
+      <div class="stage-name">foreach</div>
+      <p class="stage-use">动态发散，上游 JSON 数组 → 每个元素一个 subagent，适合批量处理。</p>
+    </div>
+    <div class="stage-card">
+      <div class="stage-name">reduce</div>
+      <p class="stage-use">聚合收敛，多个上游 artifact → 一个综合 subagent，生成最终输出。</p>
+    </div>
+    <div class="stage-card">
+      <div class="stage-name">loop</div>
+      <p class="stage-use">有界循环，重复子阶段直到满足确定性停止条件，适合迭代优化。</p>
+    </div>
+    <div class="stage-card">
+      <div class="stage-name">dag</div>
+      <p class="stage-use">嵌套图容器，子阶段降级为命名空间任务，暴露选定输出到下游。</p>
+    </div>
+    <div class="stage-card">
+      <div class="stage-name">dynamic</div>
+      <p class="stage-use">自适应编排，信任的 bundle 内置控制器可通过 ctx.agent() 创建工作流任务。</p>
+    </div>
+  </div>
+  <div class="usage-box">
+    <strong>工作流定义示例（JSON 阶段图）：</strong>
+    <pre><code>{
+  "defaults": { "agent": "researcher", "tools": ["read","grep","find"] },
+  "artifactGraph": {
+    "stages": [
+      { "id": "plan",  "type": "single",  "prompt": "..." },
+      { "id": "inspect","type": "foreach","from": {"source":"plan","path":"$.items"}},
+      { "id": "report","type": "reduce", "from": ["plan","inspect"],"prompt":"..."}
+    ]
+  }
+}</code></pre>
+  </div>
+</div>
+
+<!-- USAGE SOP -->
+<div class="panel" style="margin-bottom:14px">
+  <div class="head">
+    <div>
+      <div class="label">上手 SOP · 自然语言触发</div>
+      <h2 style="font-size:clamp(18px,2vw,26px);letter-spacing:-.05em;margin-top:6px">装完就能用</h2>
+    </div>
+    <div class="page-no">USAGE</div>
+  </div>
+  <table class="sop-table">
+    <thead>
+      <tr>
+        <th>步骤</th>
+        <th>操作</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>① 安装</strong></td>
+        <td><code>pi install npm:@agwab/pi-workflow</code></td>
+        <td>同时装入 /workflow 扩展、workflow-guide skill 和 execution-router skill。</td>
+      </tr>
+      <tr>
+        <td><strong>② 重载 Pi</strong></td>
+        <td>重启 Pi 应用</td>
+        <td>扩展加载生效。</td>
+      </tr>
+      <tr>
+        <td><strong>③ 自然语言触发</strong></td>
+        <td><code>Use the deep-research workflow to research this repository.</code></td>
+        <td>Pi 自动解析工作流名称，执行对应阶段图。</td>
+      </tr>
+      <tr>
+        <td><strong>④ 查看运行状态</strong></td>
+        <td><code>/workflow</code></td>
+        <td>打开只读 TUI，检查阶段进度、任务输出、fan-out 情况。</td>
+      </tr>
+      <tr>
+        <td><strong>⑤ 自定义工作流</strong></td>
+        <td><code>/skill:workflow-guide create a workflow for weekly release readiness.</code></td>
+        <td>用 workflow-guide skill 创建项目专用工作流，保存为可复用 JSON 阶段图。</td>
+      </tr>
+      <tr>
+        <td><strong>⑥ 动态编排（可选）</strong></td>
+        <td><code>/workflow dynamic "Research and summarize architecture tradeoffs."</code></td>
+        <td>不使用预设工作流，让内置动态控制器规划并执行，run 记录在 <code>.pi/workflows/</code>。</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- EXECUTION ROUTER -->
+<div class="panel blue-bg" style="margin-bottom:14px;padding:14px 16px">
+  <div class="label" style="margin-bottom:6px">execution-router skill · 智能路由</div>
+  <p style="font-size:13px;color:var(--ink);margin:0 0 8px;line-height:1.65">不确定任务该用什么方式处理？让 execution-router 帮你判断：直接单步 / targeted verifier / 已有工作流 / 新建工作流。</p>
+  <div class="usage-box">
+    <code>/skill:execution-router decide whether this repository review should use a single-agent pass, deep-review, or a targeted verifier.</code>
+  </div>
+</div>
+
+<!-- WORKFLOW BOARD -->
+<div class="panel gray" style="margin-bottom:14px">
+  <div class="head">
+    <div>
+      <div class="label">运行记录 · TUI 工作台</div>
+      <h2 style="font-size:clamp(18px,2vw,26px);letter-spacing:-.05em;margin-top:6px">/workflow 实时检查</h2>
+    </div>
+    <div class="page-no">TUI BOARD</div>
+  </div>
+  <p style="font-size:13px;color:var(--muted);margin:0 0 10px">运行中打开 /workflow 可实时查看：run 列表 → 阶段进度 → 任务 fan-out 详情 → 单个任务 artifact 输出。完全只读，不干扰执行。</p>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+    <div style="border:1px solid var(--line);border-radius:7px;padding:10px 12px;background:var(--paper)">
+      <div style="font-size:11px;font-weight:800;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Runs List</div>
+      <p style="font-size:11.5px;color:var(--muted);margin:0">查看所有历史运行记录和状态</p>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:7px;padding:10px 12px;background:var(--paper)">
+      <div style="font-size:11px;font-weight:800;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Stages View</div>
+      <p style="font-size:11.5px;color:var(--muted);margin:0">深入每个阶段的执行进度</p>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:7px;padding:10px 12px;background:var(--paper)">
+      <div style="font-size:11px;font-weight:800;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Task Detail</div>
+      <p style="font-size:11.5px;color:var(--muted);margin:0">查看任务级 fan-out 和 artifact 输出</p>
+    </div>
+  </div>
+</div>
+
+<!-- ARCHITECTURE -->
+<div class="panel black" style="margin-bottom:14px">
+  <div class="head">
+    <div>
+      <div class="label" style="color:var(--blue3)">三层架构</div>
+      <h2 style="font-size:clamp(18px,2vw,26px);letter-spacing:-.05em;margin-top:6px;color:#fff">Workflow / Task / Support</h2>
+    </div>
+    <div class="page-no" style="color:rgba(255,255,255,.4)">ARCHITECTURE</div>
+  </div>
+  <div class="grid3">
+    <div>
+      <h3>① Workflow</h3>
+      <p>阶段图和运行生命周期：存在哪些阶段、何时运行、输出如何流转。</p>
+    </div>
+    <div>
+      <h3>② Task</h3>
+      <p>agent 支持的工作：聚焦 prompt、动态发散、收敛综合、有界循环。</p>
+    </div>
+    <div>
+      <h3>③ Support</h3>
+      <p>确定性本地轨道：辅助代码、验证、归一化、artifact、run state 可恢复。</p>
+    </div>
+  </div>
+</div>
+
+<!-- DEPENDENCIES -->
+<div class="panel" style="margin-bottom:14px;padding:14px 16px">
+  <div class="label" style="margin-bottom:8px">运行时依赖</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div style="border:1px solid var(--line);border-radius:8px;padding:12px">
+      <div style="font-size:12.5px;font-weight:800;color:var(--ink);margin-bottom:4px">@agwab/pi-subagent</div>
+      <p style="font-size:11.5px;color:var(--muted);margin:0;line-height:1.55">启动和管理 Pi subagent workers，追踪其生命周期，供 workflow task 调用。</p>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:8px;padding:12px">
+      <div style="font-size:12.5px;font-weight:800;color:var(--ink);margin-bottom:4px">pi-web-access</div>
+      <p style="font-size:11.5px;color:var(--muted);margin:0;line-height:1.55">提供 web_search、fetch_content、get_search_content、code_search 等工具，可替换为其他兼容 provider。</p>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div>
+    <a href="https://github.com/AgwaB/pi-workflow" target="_blank">GitHub</a> ·
+    <a href="https://www.npmjs.com/package/@agwab/pi-workflow" target="_blank">npm</a> ·
+    <a href="https://github.com/AgwaB/pi-workflow/blob/main/docs/usage.md" target="_blank">usage.md</a>
+  </div>
+  <button class="save-btn" onclick="window._saveCard&&window._saveCard()">保存 PNG</button>
+</div>
+
+</div>
+</div>
+<script>window._saveCard=function(){const e=document.querySelector('.sheet');html2canvas&&html2canvas(e,{scale:2,useCORS:true,logging:false,backgroundColor:'#fff'}).then(t=>{const n=document.createElement('a');n.download='pi-workflow-infocard.png',n.href=t.toDataURL('image/png'),n.click()}).catch(()=>{alert('截图失败，请尝试右键保存页面')})};</script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+</body>
+</html>
