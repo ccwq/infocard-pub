@@ -2,212 +2,242 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#8A5CF5"/>
 <title>Dagu：本地优先 DAG 工作流引擎，单 binary 跑 DAG、带 Web UI 和 MCP</title>
-<meta name="description" content="Dagu 是本地优先的 DAG 工作流引擎，单个 binary 无需 DB 或 broker，YAML 定义流程，内置 shell/Docker/K8s/SSH/harness.run 等动作，支持 MCP 协议让 AI Agent 直接管理 DAG。适合小团队、私有环境和 Agent Workflow。"/>
+<meta name="description" content="Dagu 是本地优先的 DAG 工作流引擎，单个 binary 无需 DB 或 broker，YAML 定义流程，内置 shell/Docker/K8s/SSH/harness.run，支持 MCP 协议让 AI Agent 直接管理 DAG。适合小团队、私有环境和 Agent Workflow。"/>
 <style>
 :root{
-  --bg:#e8ecf0;--shell-bg:#f8fafc;--ink:#0a1628;--ink2:#1e2d45;--muted:#5a6a7e;
-  --border:#1a2f5a;--accent:#3b82f6;--accent2:#60a5fa;--green:#059669;
-  --green-bg:#ecfdf5;
+  --bg:#f7f7fb;--paper:#ffffff;--paper-soft:#fbfbfe;--ink:#111111;--muted:#68687b;--faint:#9c9cb0;
+  --line:rgba(138,92,245,.16);--line-strong:rgba(138,92,245,.28);
+  --accent:#8a5cf5;--accent-deep:#5b49ff;--accent-soft:rgba(138,92,245,.10);--accent-soft-2:rgba(138,92,245,.06);
+  --glass:rgba(255,255,255,.72);--shadow:0 8px 28px rgba(35,24,82,.08);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{margin:0;overflow-x:hidden}
-body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px;line-height:1.65}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em;background:rgba(10,22,40,.07);padding:.06em .3em;border-radius:3px;word-break:break-all}
-pre{background:#0a1628;color:#e2e8f0;border-radius:8px;padding:10px 12px;font-size:10.5px;overflow-x:auto;-webkit-overflow-scrolling:touch;line-height:1.6;margin:6px 0;white-space:pre}
-pre code{background:none;padding:0;font-size:inherit}
-.page{width:min(780px,100%);margin:0 auto;padding:14px 10px 80px;min-width:0}
+html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px;line-height:1.62}
+a{color:inherit;text-decoration:none}
+.page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:16px 0 64px;position:relative}
+.shell{
+  background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.80));
+  border:1px solid var(--line);box-shadow:var(--shadow);
+  backdrop-filter:blur(10px);padding:18px;position:relative;overflow:hidden;
+}
+.shell::before{
+  content:"";position:absolute;inset:0;
+  background:
+    linear-gradient(90deg,rgba(138,92,245,.04) 0 1px,transparent 1px 100%),
+    linear-gradient(180deg,rgba(138,92,245,.04) 0 1px,transparent 1px 100%);
+  background-size:52px 52px;pointer-events:none;
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.18),transparent 68%);
+}
+.shell>*{position:relative;z-index:1}
 
-/* shell */
-.shell{border:1.5px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(10,22,40,.12);background:var(--shell-bg)}
+/* topbar */
+.topline{display:flex;justify-content:space-between;gap:14px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:750}
+.brand::before{content:"";width:22px;height:6px;background:var(--accent);display:inline-block;box-shadow:10px 0 0 rgba(138,92,245,.28)}
+.meta-tag{padding:4px 8px;border:1px solid var(--line-strong);background:rgba(255,255,255,.8);color:var(--accent-deep);font-weight:800;font-size:10.5px;letter-spacing:.06em}
 
 /* hero */
-.hero{background:var(--ink);color:#fff;padding:16px 16px 14px}
-.hero-inner{display:flex;gap:14px;align-items:flex-start;margin-bottom:10px}
-.hero-orb{width:52px;height:52px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:#fff;border:2px solid rgba(255,255,255,.2);flex-shrink:0}
-.hero-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(59,130,246,.25);border:1px solid rgba(59,130,246,.5);color:#93c5fd;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-bottom:6px}
-.hero-title{font-size:17px;font-weight:800;line-height:1.2;margin-bottom:6px;color:#fff}
-.hero-title span{color:var(--accent2)}
-.hero-desc{font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:9px}
-.hero-meta{display:flex;flex-wrap:wrap;gap:5px}
-.meta-chip{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#cbd5e1;font-size:10px;padding:2px 7px;border-radius:20px}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.8fr);gap:16px;align-items:stretch;margin-bottom:16px}
+.kicker{font-size:11px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:8px}
+h1{font-size:clamp(28px,4vw,52px);line-height:1;letter-spacing:-.04em;margin:0 0 10px;color:var(--ink);font-weight:900}
+.lead{max-width:66ch;color:var(--muted);font-size:13.5px;line-height:1.72;margin:0 0 12px}
+.hero-pills{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.hero-pill{padding:10px 12px;border-right:1px solid var(--line)}
+.hero-pill:last-child{border-right:0}
+.mini-bar{width:28px;height:4px;background:var(--accent);margin-bottom:8px;box-shadow:0 0 0 3px var(--accent-soft)}
+.hero-pill b{display:block;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:2px;font-weight:800}
+.hero-pill span{font-size:11.5px;color:var(--muted);line-height:1.45}
 
-/* takeaway */
-.takeaway{background:linear-gradient(135deg,#0a1628 0%,#1e3a5f 100%);color:#fff;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
-.takeaway-label{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#60a5fa;margin-bottom:4px}
-.takeaway-text{font-size:12.5px;line-height:1.7;color:#e2e8f0}
+/* glass stat card */
+.glass-card{
+  background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,.66));
+  border:1px solid var(--line);box-shadow:0 8px 22px rgba(49,29,106,.06);
+  backdrop-filter:blur(8px);padding:18px;display:grid;gap:12px;align-content:space-between;
+}
+.stat-big{font-size:clamp(52px,8vw,80px);line-height:.85;letter-spacing:-.06em;font-weight:900;color:var(--ink)}
+.stat-label{font-size:10.5px;color:var(--muted);font-weight:850;letter-spacing:.1em;text-transform:uppercase}
 
-/* stats */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e2e8f0}
-.stat-cell{background:#fff;padding:9px 8px;text-align:center}
-.stat-n{font-size:18px;font-weight:800;color:var(--ink2)}
-.stat-l{font-size:9.5px;color:var(--muted);margin-top:1px}
+/* section */
+.section{margin-bottom:14px}
+.section-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px}
+.label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-deep);font-weight:900}
+.page-no{font-size:10px;letter-spacing:.1em;color:var(--faint);font-weight:800;margin-left:auto}
 
-/* sections */
-.section{padding:12px 14px;border-bottom:1px solid #e2e8f0}
-.section:last-child{border-bottom:none}
-.section-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:9px;display:flex;align-items:center;gap:5px}
-.section-title::before{content:"";display:block;width:3px;height:11px;background:var(--accent);border-radius:2px}
-
-/* sop */
-.sop-steps{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.sop-step{background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 11px}
-.sop-step-n{font-size:9px;font-weight:800;color:#fff;background:var(--accent);border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;margin-right:5px;vertical-align:middle;flex-shrink:0}
-.sop-step-title{font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:4px}
-.sop-step code{font-size:10px}
-.sop-note{font-size:10px;color:var(--muted);margin-top:3px}
+/* sop steps */
+.sop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sop-card{background:var(--paper);border:1px solid var(--line);padding:12px 14px;box-shadow:0 4px 12px rgba(49,29,106,.03)}
+.sop-n{font-size:9px;font-weight:900;color:#fff;background:var(--accent-deep);border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;vertical-align:middle;flex-shrink:0;line-height:1}
+.sop-title{font-size:12.5px;font-weight:800;color:var(--ink);margin-bottom:5px}
+.sop-card pre{background:#161324;color:#e2e8f0;border-radius:6px;padding:8px 10px;font-size:10.5px;line-height:1.55;margin:4px 0;overflow-x:auto;white-space:pre;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.sop-card code{font-size:10.5px;background:rgba(138,92,245,.08);padding:.06em .3em;border-radius:3px}
+.sop-note{font-size:10.5px;color:var(--muted);margin-top:4px}
+code.inline{font-family:ui-monospace,monospace;font-size:.85em;background:rgba(138,92,245,.08);padding:.06em .3em;border-radius:3px}
 
 /* action grid */
-.action-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-.action-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:7px;padding:9px 11px}
-.action-name{font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:2px}
+.action-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.action-card{background:var(--paper);border:1px solid var(--line);padding:10px 12px;box-shadow:0 3px 8px rgba(49,29,106,.03)}
+.action-name{font-size:12px;font-weight:800;color:var(--ink);margin-bottom:3px}
 .action-desc{font-size:10.5px;color:var(--muted);line-height:1.5}
-.action-tag{display:inline-block;font-size:9px;font-weight:600;padding:1px 6px;border-radius:20px;margin-top:3px}
-.tag-green{background:#dcfce7;color:#15803d}
-.tag-blue{background:#dbeafe;color:#1d4ed8}
-.tag-purple{background:#ede9fe;color:#6d28d9}
+.action-tag{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;margin-top:4px}
+.tag-green{background:rgba(5,150,105,.1);color:#059669}
+.tag-blue{background:rgba(29,78,216,.1);color:#1d4ed8}
+.tag-purple{background:var(--accent-soft);color:var(--accent-deep)}
 
 /* alert */
-.alert-item{display:flex;align-items:flex-start;gap:7px;margin-bottom:6px;font-size:11.5px;line-height:1.6}
-.alert-item:last-child{margin-bottom:0}
-.alert-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:6px}
+.alert-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.alert-card{background:linear-gradient(180deg,rgba(138,92,245,.10),rgba(138,92,245,.05));border:1px solid rgba(138,92,245,.22);padding:12px 14px}
+.alert-num{font-size:20px;font-weight:900;color:var(--accent-deep);letter-spacing:-.04em;margin-bottom:4px}
+.alert-text{font-size:11px;color:var(--muted);line-height:1.5}
+.alert-dot{width:5px;height:5px;border-radius:50%;background:var(--accent-deep);display:inline-block;margin-right:4px;vertical-align:middle}
 
-/* deploy */
-.deploy-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
-.deploy-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:7px;padding:9px 11px}
-.deploy-name{font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:2px}
+/* deploy cards */
+.deploy-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.deploy-card{background:var(--paper);border:1px solid var(--line);padding:10px 12px;box-shadow:0 3px 8px rgba(49,29,106,.03)}
+.deploy-name{font-size:12px;font-weight:800;color:var(--ink);margin-bottom:3px}
 .deploy-desc{font-size:10.5px;color:var(--muted)}
 
-/* compare: card-based, no table on mobile */
-.compare-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.compare-card{border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:#fff}
-.compare-card-head{background:var(--ink);color:#fff;padding:6px 10px;font-size:11px;font-weight:700;text-align:center}
-.compare-card-head.best{background:#059669}
-.compare-row{display:flex;gap:0;border-bottom:1px solid #f1f5f9;padding:5px 8px}
-.compare-row:last-child{border-bottom:none}
-.compare-row dt{font-size:9.5px;font-weight:700;color:var(--muted);width:60px;flex-shrink:0;padding-top:1px}
-.compare-row dd{font-size:10.5px;color:var(--ink2);flex:1;min-width:0;line-height:1.5}
-.tag-yes{color:#059669;font-weight:700}
-.tag-no{color:#dc2626}
-.tag-mid{color:#d97706}
+/* compare */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.compare-box{border:1px solid var(--line-strong);background:rgba(255,255,255,.84);padding:14px}
+.compare-box.purple{background:linear-gradient(180deg,rgba(138,92,245,.12),rgba(138,92,245,.06));border-color:rgba(138,92,245,.28)}
+.compare-head{font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.compare-row{display:flex;gap:8px;margin-bottom:6px;font-size:11px}
+.compare-row:last-child{margin-bottom:0}
+.compare-k{width:52px;flex-shrink:0;color:var(--muted);font-weight:700;padding-top:1px}
+.compare-v{color:var(--ink);flex:1;min-width:0;line-height:1.5}
+.tag-yes{color:#059669;font-weight:800}
+.tag-no{color:#dc2626;font-weight:800}
+.tag-mid{color:#d97706;font-weight:800}
 
-/* usage */
-.usage-list{display:flex;flex-direction:column;gap:5px}
-.usage-row{display:grid;grid-template-columns:80px 1fr;gap:8px;background:#fff;border:1.5px solid #e2e8f0;border-radius:7px;padding:7px 10px}
-.usage-s{font-size:10px;font-weight:700;color:var(--ink2)}
-.usage-d{font-size:10.5px;color:var(--muted);line-height:1.5}
+/* usage table */
+.usage-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.usage-card{background:var(--paper);border:1px solid var(--line);padding:10px 12px;box-shadow:0 3px 8px rgba(49,29,106,.03)}
+.usage-s{font-size:11px;font-weight:800;color:var(--accent-deep);margin-bottom:3px}
+.usage-d{font-size:11px;color:var(--muted);line-height:1.5}
 
 /* pricing */
-.price-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
-.price-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:7px;padding:9px 11px}
-.price-name{font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:2px}
-.price-desc{font-size:10px;color:var(--muted);line-height:1.5}
-.price-tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;margin-top:3px}
-.tag-free{background:#dcfce7;color:#166534}
-.tag-paid{background:#fff3e0;color:#92400e}
+.price-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.price-card{background:var(--paper);border:1px solid var(--line);padding:10px 12px;box-shadow:0 3px 8px rgba(49,29,106,.03)}
+.price-name{font-size:12px;font-weight:800;color:var(--ink);margin-bottom:3px}
+.price-desc{font-size:10.5px;color:var(--muted);line-height:1.5}
+.price-tag{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;margin-top:4px}
+.tag-free{background:rgba(5,150,105,.1);color:#059669}
+.tag-paid{background:rgba(217,119,6,.1);color:#92400e}
 
 /* footer */
-.footer{padding:10px 14px;display:flex;flex-wrap:wrap;gap:7px;justify-content:center}
-.footer a{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1.5px solid var(--border);border-radius:7px;background:#fff;font-size:11px;font-weight:600;color:var(--ink);text-decoration:none}
-.footer a:hover{text-decoration:none;background:#f1f5f9}
-
-/* save btn */
-.save-btn{display:block;width:calc(100% - 28px);margin:0 14px 12px;text-align:center;padding:7px 0;border:2px solid var(--accent);border-radius:7px;background:var(--accent);color:#fff;font-size:11.5px;font-weight:700;cursor:pointer}
+.footer{display:flex;justify-content:space-between;gap:12px;margin-top:14px;padding-top:10px;border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:800}
+.footer a{color:var(--accent-deep);font-weight:700}
+.save-btn{display:block;width:100%;margin-top:10px;text-align:center;padding:8px 0;border:2px solid var(--accent-deep);border-radius:8px;background:var(--accent-deep);color:#fff;font-size:12px;font-weight:800;cursor:pointer}
 
 /* mobile */
-@media(max-width:400px){
-  .hero-inner{flex-direction:column;gap:10px}
-  .hero-orb{width:44px;height:44px}
-  .hero-title{font-size:16px}
-  .stats-grid{grid-template-columns:repeat(4,1fr)}
-  .sop-steps{grid-template-columns:1fr}
-  .action-grid{grid-template-columns:1fr}
-  .deploy-grid{grid-template-columns:1fr}
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr}
+  .sop-grid{grid-template-columns:repeat(2,1fr)}
+  .action-grid{grid-template-columns:repeat(2,1fr)}
+  .deploy-grid{grid-template-columns:repeat(2,1fr)}
+  .price-grid{grid-template-columns:repeat(2,1fr)}
+  .usage-grid{grid-template-columns:1fr}
+}
+@media(max-width:580px){
+  .page{width:min(100%,calc(100% - 12px));padding:10px 0 50px}
+  .shell{padding:12px}
+  .topline,.footer{flex-direction:column;align-items:flex-start}
+  h1{font-size:26px}
+  .sop-grid{grid-template-columns:1fr}
+  .action-grid{grid-template-columns:1fr 1fr}
+  .deploy-grid{grid-template-columns:1fr 1fr}
   .price-grid{grid-template-columns:1fr 1fr}
-  .compare-cards{grid-template-columns:1fr}
-  .usage-row{grid-template-columns:70px 1fr}
+  .compare-grid{grid-template-columns:1fr}
+  .usage-grid{grid-template-columns:1fr}
+  .hero-pills{grid-template-columns:1fr}
+  .hero-pill{border-right:0;border-bottom:1px solid var(--line)}
+  .hero-pill:last-child{border-bottom:0}
+  .alert-grid{grid-template-columns:1fr}
   pre{font-size:10px}
 }
 </style>
 </head>
 <body>
-<div class="page">
+<main class="page">
 <div class="shell">
 
-<!-- HERO -->
-<div class="hero">
-  <div class="hero-inner">
-    <div class="hero-orb">DAGU</div>
-    <div class="hero-content">
-      <div class="hero-badge">⚡ 本地优先 · 单 Binary</div>
-      <h1 class="hero-title">Dagu：轻量 <span>DAG 工作流引擎</span></h1>
-      <p class="hero-desc">单 binary 跑 DAG、YAML 定义流程、无需 DB 或 broker。内置 shell / Docker / K8s / SSH / harness.run，AI Agent 可通过 MCP 直接管理 DAG。</p>
-      <div class="hero-meta">
-        <span class="meta-chip">⭐ 3,589</span>
-        <span class="meta-chip">Go</span>
-        <span class="meta-chip">Linux / Mac / Win</span>
-        <span class="meta-chip">MCP 内置</span>
-        <span class="meta-chip">MIT</span>
-      </div>
-    </div>
+<!-- TOPBAR -->
+<div class="topline">
+  <div class="brand">Dagu · 本地优先工作流引擎</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <span class="meta-tag">Go</span>
+    <span class="meta-tag">MCP 内置</span>
+    <span class="meta-tag">MIT</span>
   </div>
 </div>
 
-<!-- TAKEAWAY -->
-<div class="takeaway">
-  <div class="takeaway-label">▎一句话判断</div>
-  <p class="takeaway-text">如果只是想把 agent、脚本、数据处理、运维任务动态串起来，而不想搭 Temporal 级别的系统，Dagu 这种本地优先路线反而很舒服。单个 binary、YAML 写流程、带 Web UI，Claude Code / Codex 可通过 MCP 直接操作 DAG。</p>
-</div>
-
-<!-- STATS -->
-<div class="stats-grid">
-  <div class="stat-cell"><div class="stat-n">3,589</div><div class="stat-l">Stars</div></div>
-  <div class="stat-cell"><div class="stat-n">1</div><div class="stat-l">Binary</div></div>
-  <div class="stat-cell"><div class="stat-n">0</div><div class="stat-l">DB/Broker</div></div>
-  <div class="stat-cell"><div class="stat-n">18</div><div class="stat-l">动作类型</div></div>
-</div>
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-copy">
+    <div>
+      <div class="kicker">DAG 编排 · 单 Binary · 无 DB</div>
+      <h1>Dagu</h1>
+      <p class="lead">单 binary 跑 DAG、YAML 定义流程、无需 DB 或 broker。内置 shell / Docker / K8s / SSH / harness.run，AI Agent 可通过 MCP 直接管理 DAG 生命周期。</p>
+    </div>
+    <div class="hero-pills">
+      <div class="hero-pill"><div class="mini-bar"></div><b>无依赖</b><span>单 binary，无需 PostgreSQL 或 Redis</span></div>
+      <div class="hero-pill"><div class="mini-bar"></div><b>YAML 驱动</b><span>声明式 DAG，状态 / 日志 / 重试全包</span></div>
+      <div class="hero-pill"><div class="mini-bar"></div><b>MCP 直连</b><span>Claude Code / Codex 等 AI Agent 直连</span></div>
+    </div>
+  </div>
+  <aside class="glass-card">
+    <div class="stat-big">18+</div>
+    <div class="stat-label">内置动作类型</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;border-top:1px solid var(--line);padding-top:10px">
+      <div style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--accent-deep)">3.5k</div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase">Stars</div></div>
+      <div style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--accent-deep)">0</div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase">DB/Broker</div></div>
+      <div style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--accent-deep)">1</div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase">Binary</div></div>
+    </div>
+  </aside>
+</section>
 
 <!-- SOP -->
 <div class="section">
-  <div class="section-title">快速上手 SOP</div>
-  <div class="sop-steps">
-    <div class="sop-step">
-      <div class="sop-step-title"><span class="sop-step-n">1</span>安装 Dagu</div>
-      <p style="font-size:10px;color:var(--muted);margin-bottom:4px">macOS / Linux：</p>
+  <div class="section-head">
+    <span class="label">快速上手 SOP</span>
+    <span class="page-no">STEP 1–6</span>
+  </div>
+  <div class="sop-grid">
+    <div class="sop-card">
+      <div class="sop-title"><span class="sop-n">1</span>安装</div>
       <pre><code>curl -fsSL dagu.sh/in.sh | bash</code></pre>
-      <p style="font-size:10px;margin-top:3px"><code>brew install dagu</code> · Win <code>irm dagu.sh/in.ps1|iex</code></p>
+      <p class="sop-note"><code>brew install dagu</code> 或 Win <code>irm dagu.sh/in.ps1|iex</code></p>
     </div>
-    <div class="sop-step">
-      <div class="sop-step-title"><span class="sop-step-n">2</span>写第一个 DAG</div>
+    <div class="sop-card">
+      <div class="sop-title"><span class="sop-n">2</span>写 DAG</div>
       <pre><code>steps:
   - id: fetch
-    run: curl -s api.github.com
+    run: curl api.github.com
   - id: parse
     run: python3 parse.py
     depends: [fetch]</code></pre>
       <p class="sop-note"><code>depends</code> 声明即成 DAG</p>
     </div>
-    <div class="sop-step">
-      <div class="sop-step-title"><span class="sop-step-n">3</span>启动 Web UI</div>
+    <div class="sop-card">
+      <div class="sop-title"><span class="sop-n">3</span>启动 UI</div>
       <pre><code>dagu start --ui</code></pre>
       <p class="sop-note">浏览器打开 <code>localhost:8080</code></p>
     </div>
-    <div class="sop-step">
-      <div class="sop-step-title"><span class="sop-step-n">4</span>CLI 启动</div>
+    <div class="sop-card">
+      <div class="sop-title"><span class="sop-n">4</span>CLI 启动</div>
       <pre><code>dagu start --param name=world</code></pre>
-      <p class="sop-note">支持重试 / 条件分支</p>
+      <p class="sop-note">支持重试 / 条件分支 / 参数注入</p>
     </div>
-    <div class="sop-step">
-      <div class="sop-step-title"><span class="sop-step-n">5</span>AI Agent (MCP)</div>
-      <p style="font-size:10.5px;margin-bottom:4px">MCP 端点：</p>
+    <div class="sop-card">
+      <div class="sop-title"><span class="sop-n">5</span>MCP 连接</div>
       <pre><code>http://localhost:8080/mcp</code></pre>
-      <p class="sop-note">Claude Code / Codex 等直连</p>
+      <p class="sop-note">Claude Code / Codex / Gemini CLI 直连</p>
     </div>
-    <div class="sop-step">
-      <div class="sop-step-title"><span class="sop-step-n">6</span>外部 Agent</div>
+    <div class="sop-card">
+      <div class="sop-title"><span class="sop-n">6</span>外部 Agent</div>
       <pre><code>- id: claude-task
   run: harness.run "claude --print plan.md"
   depends: [fetch]</code></pre>
@@ -218,14 +248,17 @@ pre code{background:none;padding:0;font-size:inherit}
 
 <!-- ACTIONS -->
 <div class="section">
-  <div class="section-title">内置动作类型</div>
+  <div class="section-head">
+    <span class="label">内置动作类型</span>
+    <span class="page-no">18 TYPES</span>
+  </div>
   <div class="action-grid">
     <div class="action-card"><div class="action-name">shell</div><div class="action-desc">本地命令，含参数注入和环境变量</div><span class="action-tag tag-green">常用</span></div>
     <div class="action-card"><div class="action-name">docker</div><div class="action-desc">容器执行，镜像 + 卷挂载 + 网络隔离</div><span class="action-tag tag-blue">常用</span></div>
     <div class="action-card"><div class="action-name">k8s</div><div class="action-desc">K8s Job，自动管理 namespace 和配额</div><span class="action-tag tag-blue">扩展</span></div>
     <div class="action-card"><div class="action-name">ssh</div><div class="action-desc">远程服务器，跳板机 + 密钥认证</div><span class="action-tag tag-green">常用</span></div>
-    <div class="action-card"><div class="action-name">http</div><div class="action-desc">HTTP 请求，支持 Webhook 回调</div><span class="action-tag tag-blue">常用</span></div>
-    <div class="action-card"><div class="action-name">harness.run</div><div class="action-desc">接入外部 coding agent，全程记录</div><span class="action-tag tag-purple">AI 专用</span></div>
+    <div class="action-card"><div class="action-name">http</div><div class="action-desc">HTTP 请求，支持 Webhook 回调</div><span class="action-tag tag-green">常用</span></div>
+    <div class="action-card"><div class="action-name">harness.run</div><div class="action-desc">接入外部 coding agent，全程记录输出</div><span class="action-tag tag-purple">AI 专用</span></div>
     <div class="action-card"><div class="action-name">subdag</div><div class="action-desc">嵌套 DAG，复杂任务分而治之</div></div>
     <div class="action-card"><div class="action-name">重试 / 告警</div><div class="action-desc">自动重试 + 邮件 / Webhook 通知</div></div>
   </div>
@@ -233,92 +266,122 @@ pre code{background:none;padding:0;font-size:inherit}
 
 <!-- MCP -->
 <div class="section">
-  <div class="section-title">MCP 集成（AI Agent 直连）</div>
-  <div class="alert-item"><span class="alert-dot"></span>MCP 端点 <code>http://localhost:8080/mcp</code>：Claude Code / Codex / Gemini CLI 等客户端直连</div>
-  <div class="alert-item" style="margin-top:6px"><span class="alert-dot"></span>Agent 可 <strong>读状态</strong>、<strong>改 YAML</strong>、<strong>执行 / 暂停 / 恢复</strong>，无需额外插件</div>
-  <div class="alert-item" style="margin-top:6px"><span class="alert-dot"></span>Agent → MCP → Dagu → 执行 → Agent 反馈，形成完整闭环</div>
+  <div class="section-head">
+    <span class="label">MCP 集成（AI Agent 直连）</span>
+    <span class="page-no">AGENT INTEGRATION</span>
+  </div>
+  <div class="alert-grid">
+    <div class="alert-card">
+      <div class="alert-num">01</div>
+      <p class="alert-text"><span class="alert-dot"></span><strong>MCP 端点</strong> <code>http://localhost:8080/mcp</code></p>
+      <p class="alert-text" style="margin-top:6px">Claude Code / Codex / Gemini CLI 等 MCP 客户端直连</p>
+    </div>
+    <div class="alert-card">
+      <div class="alert-num">02</div>
+      <p class="alert-text"><span class="alert-dot"></span>Agent 可 <strong>读取 DAG 状态</strong>、<strong>修改 YAML 文件</strong>、<strong>执行 / 暂停 / 恢复</strong></p>
+      <p class="alert-text" style="margin-top:6px">无需额外插件，闭环即连</p>
+    </div>
+    <div class="alert-card">
+      <div class="alert-num">03</div>
+      <p class="alert-text"><span class="alert-dot"></span>Agent → MCP → Dagu → 执行 → Agent 反馈</p>
+      <p class="alert-text" style="margin-top:6px">形成完整 Agent 驱动工作流闭环</p>
+    </div>
+  </div>
 </div>
 
 <!-- DEPLOY -->
 <div class="section">
-  <div class="section-title">部署模式</div>
+  <div class="section-head">
+    <span class="label">部署模式</span>
+    <span class="page-no">DEPLOY</span>
+  </div>
   <div class="deploy-grid">
-    <div class="deploy-card"><div class="deploy-name">本地单节点</div><div class="deploy-desc">文件存储，适合个人 / 小团队</div></div>
-    <div class="deploy-card"><div class="deploy-name">自管理多节点</div><div class="deploy-desc">PostgreSQL / Redis 共享状态</div></div>
-    <div class="deploy-card"><div class="deploy-name">Docker</div><div class="deploy-desc"><code>docker run</code> 一行，数据卷保留配置</div></div>
+    <div class="deploy-card"><div class="deploy-name">本地单节点</div><div class="deploy-desc">文件存储 DAG，适合个人和小团队</div></div>
+    <div class="deploy-card"><div class="deploy-name">自管理多节点</div><div class="deploy-desc">PostgreSQL + Redis 共享状态，支持水平扩展</div></div>
+    <div class="deploy-card"><div class="deploy-name">Docker</div><div class="deploy-desc"><code>docker run</code> 一行，数据卷挂载保留配置</div></div>
     <div class="deploy-card"><div class="deploy-name">Kubernetes</div><div class="deploy-desc">Helm Chart 一键部署，K8s 原生调度</div></div>
   </div>
 </div>
 
-<!-- COMPARE: card-based, no horizontal scroll -->
+<!-- COMPARE -->
 <div class="section">
-  <div class="section-title">选型对比：Dagu vs 主流方案</div>
-  <div class="compare-cards">
-    <div class="compare-card">
-      <div class="compare-card-head best">✓ Dagu（推荐）</div>
-      <dl>
-        <div class="compare-row"><dt>依赖</dt><dd><span class="tag-yes">无</span></dd></div>
-        <div class="compare-row"><dt>安装</dt><dd>单 binary，curl 一行</dd></div>
-        <div class="compare-row"><dt>Web UI</dt><dd><span class="tag-yes">内置</span></dd></div>
-        <div class="compare-row"><dt>MCP</dt><dd><span class="tag-yes">内置</span></dd></div>
-        <div class="compare-row"><dt>harness</dt><dd><span class="tag-yes">支持</span></dd></div>
-        <div class="compare-row"><dt>规模</dt><dd>个人 / 小团队</dd></div>
-        <div class="compare-row"><dt>门槛</dt><dd><span class="tag-yes">极低</span></dd></div>
-        <div class="compare-row"><dt>定义</dt><dd><span class="tag-yes">YAML 原生</span></dd></div>
-      </dl>
+  <div class="section-head">
+    <span class="label">选型对比</span>
+    <span class="page-no">VS MAINSTREAM</span>
+  </div>
+  <div class="compare-grid">
+    <div class="compare-box purple">
+      <div class="compare-head">✓ Dagu（推荐）</div>
+      <div class="compare-row"><div class="compare-k">依赖</div><div class="compare-v"><span class="tag-yes">无</span></div></div>
+      <div class="compare-row"><div class="compare-k">安装</div><div class="compare-v">单 binary，curl 一行</div></div>
+      <div class="compare-row"><div class="compare-k">UI</div><div class="compare-v"><span class="tag-yes">内置 Web UI</span></div></div>
+      <div class="compare-row"><div class="compare-k">MCP</div><div class="compare-v"><span class="tag-yes">内置</span></div></div>
+      <div class="compare-row"><div class="compare-k">harness</div><div class="compare-v"><span class="tag-yes">支持</span></div></div>
+      <div class="compare-row"><div class="compare-k">规模</div><div class="compare-v">个人 / 小团队</div></div>
+      <div class="compare-row"><div class="compare-k">门槛</div><div class="compare-v"><span class="tag-yes">极低</span></div></div>
+      <div class="compare-row"><div class="compare-k">定义</div><div class="compare-v"><span class="tag-yes">YAML 原生</span></div></div>
     </div>
-    <div class="compare-card">
-      <div class="compare-card-head">Airflow / Temporal</div>
-      <dl>
-        <div class="compare-row"><dt>依赖</dt><dd><span class="tag-no">PostgreSQL + Redis</span></dd></div>
-        <div class="compare-row"><dt>安装</dt><dd>Python / Docker Compose</dd></div>
-        <div class="compare-row"><dt>Web UI</dt><dd>需另装或配套服务</dd></div>
-        <div class="compare-row"><dt>MCP</dt><dd><span class="tag-no">无</span></dd></div>
-        <div class="compare-row"><dt>harness</dt><dd><span class="tag-no">无</span></dd></div>
-        <div class="compare-row"><dt>规模</dt><dd>中大型 / 企业级</dd></div>
-        <div class="compare-row"><dt>门槛</dt><dd><span class="tag-mid">中等 ~ 较高</span></dd></div>
-        <div class="compare-row"><dt>定义</dt><dd>Python DSL / SDK</dd></div>
-      </dl>
+    <div class="compare-box">
+      <div class="compare-head">Airflow / Temporal</div>
+      <div class="compare-row"><div class="compare-k">依赖</div><div class="compare-v"><span class="tag-no">PostgreSQL + Redis</span></div></div>
+      <div class="compare-row"><div class="compare-k">安装</div><div class="compare-v">Python / Docker Compose</div></div>
+      <div class="compare-row"><div class="compare-k">UI</div><div class="compare-v">需另装或配套服务</div></div>
+      <div class="compare-row"><div class="compare-k">MCP</div><div class="compare-v"><span class="tag-no">无</span></div></div>
+      <div class="compare-row"><div class="compare-k">harness</div><div class="compare-v"><span class="tag-no">无</span></div></div>
+      <div class="compare-row"><div class="compare-k">规模</div><div class="compare-v">中大型 / 企业级</div></div>
+      <div class="compare-row"><div class="compare-k">门槛</div><div class="compare-v"><span class="tag-mid">中等 ~ 较高</span></div></div>
+      <div class="compare-row"><div class="compare-k">定义</div><div class="compare-v">Python DSL / SDK</div></div>
     </div>
   </div>
 </div>
 
 <!-- USAGE -->
 <div class="section">
-  <div class="section-title">典型使用场景</div>
-  <div class="usage-list">
-    <div class="usage-row"><div class="usage-s">ETL 数据</div><div class="usage-d">Python/Shell 脚本串成 DAG，cron 触发，历史可查</div></div>
-    <div class="usage-row"><div class="usage-s">定时任务</div><div class="usage-d">替代 Cron + 脚本，可视化状态 + 告警</div></div>
-    <div class="usage-row"><div class="usage-s">FFmpeg</div><div class="usage-d">shell 动作 + 参数注入，支持复杂处理链</div></div>
-    <div class="usage-row"><div class="usage-s">运维编排</div><div class="usage-d">SSH 跨服务器，错误自动重试</div></div>
-    <div class="usage-row"><div class="usage-s">CI/CD 替代</div><div class="usage-d">私有化 GitHub Actions，Docker/K8s 完全可控</div></div>
-    <div class="usage-row"><div class="usage-s">AI Agent</div><div class="usage-d">MCP 直连 + harness.run，Agent 驱动执行链</div></div>
-    <div class="usage-row"><div class="usage-s">个人自动化</div><div class="usage-d">单 binary，随时启停，无基础设施负担</div></div>
+  <div class="section-head">
+    <span class="label">典型使用场景</span>
+    <span class="page-no">USE CASES</span>
+  </div>
+  <div class="usage-grid">
+    <div class="usage-card"><div class="usage-s">ETL 数据处理</div><div class="usage-d">Python/Shell 脚本串成 DAG，cron 触发，历史可查</div></div>
+    <div class="usage-card"><div class="usage-s">定时任务</div><div class="usage-d">替代 Cron + 脚本，可视化状态 + 告警</div></div>
+    <div class="usage-card"><div class="usage-s">FFmpeg 转码</div><div class="usage-d">shell 动作 + 参数注入，支持复杂处理链</div></div>
+    <div class="usage-card"><div class="usage-s">运维编排</div><div class="usage-d">SSH 跨服务器，错误自动重试</div></div>
+    <div class="usage-card"><div class="usage-s">CI/CD 替代</div><div class="usage-d">私有化 GitHub Actions，Docker/K8s 完全可控</div></div>
+    <div class="usage-card"><div class="usage-s">AI Agent 工作流</div><div class="usage-d">MCP 直连 + harness.run，Agent 驱动执行链</div></div>
+    <div class="usage-card"><div class="usage-s">IoT 数据采集</div><div class="usage-d">HTTP 轮询 + 定时触发 + 数据落库</div></div>
+    <div class="usage-card"><div class="usage-s">个人自动化</div><div class="usage-d">单 binary，随时启停，无基础设施负担</div></div>
   </div>
 </div>
 
 <!-- PRICING -->
 <div class="section">
-  <div class="section-title">许可与定价</div>
+  <div class="section-head">
+    <span class="label">许可与定价</span>
+    <span class="page-no">PRICING</span>
+  </div>
   <div class="price-grid">
-    <div class="price-card"><div class="price-name">Community</div><div class="price-desc">开源免费，GitHub 下载</div><span class="price-tag tag-free">免费</span></div>
-    <div class="price-card"><div class="price-name">Self-managed</div><div class="price-desc">企业自管，商业 SLA</div><span class="price-tag tag-paid">付费</span></div>
-    <div class="price-card"><div class="price-name">Managed</div><div class="price-desc">官方托管，按用量计费</div><span class="price-tag tag-paid">付费</span></div>
-    <div class="price-card"><div class="price-name">在线试用</div><div class="price-desc">浏览器体验完整功能</div><span class="price-tag tag-free">免费</span></div>
+    <div class="price-card"><div class="price-name">Community</div><div class="price-desc">开源免费，GitHub 下载，社区 Slack 支持</div><span class="price-tag tag-free">免费</span></div>
+    <div class="price-card"><div class="price-name">Self-managed</div><div class="price-desc">企业自管部署，商业 SLA 支持</div><span class="price-tag tag-paid">付费</span></div>
+    <div class="price-card"><div class="price-name">Managed</div><div class="price-desc">官方托管，免运维，按用量计费</div><span class="price-tag tag-paid">付费</span></div>
+    <div class="price-card"><div class="price-name">在线试用</div><div class="price-desc">无需安装，浏览器体验完整功能</div><span class="price-tag tag-free">免费</span></div>
   </div>
 </div>
 
 <!-- FOOTER -->
 <div class="footer">
-  <a href="https://github.com/dagucloud/dagu" target="_blank">⭐ GitHub</a>
-  <a href="https://dagu.readthedocs.io" target="_blank">📖 文档</a>
-  <a href="https://dagu.sh" target="_blank">🌐 官网</a>
-  <a href="https://discord.gg/dagu" target="_blank">💬 Discord</a>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <a href="https://github.com/dagucloud/dagu" target="_blank">⭐ GitHub</a>
+    <a href="https://dagu.readthedocs.io" target="_blank">📖 文档</a>
+    <a href="https://dagu.sh" target="_blank">🌐 官网</a>
+    <a href="https://discord.gg/dagu" target="_blank">💬 Discord</a>
+  </div>
+  <span>Dagu · infocard-white-purple-style · 2026-07-03</span>
 </div>
 
 <button class="save-btn" onclick="window._saveCard()">保存 PNG</button>
+
 </div><!-- /shell -->
-</div><!-- /page -->
+</main><!-- /page -->
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
