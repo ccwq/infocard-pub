@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>Maka-Agent — 本地优先桌面 AI 工作台，Terminal-Bench 0.8 评分实践</title>
+<style>
+:root{
+  --bg:#f5f2ec;
+  --paper:#fffdf9;
+  --ink:#0a0a0a;
+  --red:#c8102e;
+  --soft-red:#fff5f6;
+  --line:#0a0a0a;
+  --shadow:6px 6px 0 rgba(10,10,10,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+.topbar{
+  display:flex;justify-content:space-between;align-items:flex-end;
+  border-bottom:3px solid var(--line);padding-bottom:8px;margin-bottom:14px;
+}
+.topbar-left{display:grid;gap:6px}
+.badge{
+  display:inline-block;padding:2px 8px;
+  border:1.5px solid var(--line);background:var(--ink);color:#fff;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+}
+h1.demo-title{font-size:clamp(22px,3.8vw,42px);font-weight:800;margin:4px 0 0;letter-spacing:-.04em;line-height:.96}
+.meta{font-size:11px;color:#666;margin-top:4px}
+.tagline{
+  display:inline-block;padding:3px 8px;
+  border:2px solid var(--red);background:var(--soft-red);color:var(--red);
+  font-size:10.8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px;
+}
+
+.stats{
+  display:flex;flex-wrap:wrap;
+  border:2px solid var(--line);margin-bottom:14px;
+  overflow:hidden;box-shadow:var(--shadow);
+}
+.stat{
+  flex:1;min-width:60px;padding:10px 12px 8px;
+  border-right:2px solid var(--line);text-align:center;background:#fff;
+}
+.stat:last-child{border-right:none}
+.stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+.stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+.pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+.pill.dark{background:var(--ink);color:#fff}
+.pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+.section{
+  border:2px solid var(--line);margin-bottom:10px;
+  overflow:hidden;background:var(--paper);box-shadow:var(--shadow);
+}
+.sec-head{
+  background:var(--ink);color:#fff;padding:7px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+.sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.sec-body{padding:10px 12px}
+
+h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.tag{
+  padding:2px 8px;border:1.5px solid var(--line);
+  font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:#fff;
+}
+.tag.red{background:var(--red);color:#fff;border-color:var(--red)}
+
+blockquote{
+  border-left:3px solid var(--red);padding:6px 10px;margin:6px 0;
+  background:var(--soft-red);font-size:12px;line-height:1.65;
+}
+blockquote p{margin:0}
+
+table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:12px}
+th,td{padding:6px 10px;border:1px solid #ddd;text-align:left}
+th{background:var(--ink);color:#fff;font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.06em}
+tr:nth-child(even){background:#fafaf8}
+
+.kv{display:grid;grid-template-columns:130px 1fr;gap:0;margin-bottom:6px}
+.kv-row{display:contents}
+.kv-key{padding:5px 10px 5px 0;font-weight:700;font-size:11px;color:#555;border-bottom:1px solid #eee;align-self:start}
+.kv-val{padding:5px 0 5px 10px;border-bottom:1px solid #eee;font-size:12.5px}
+
+.hl-row{display:flex;gap:8px;margin-bottom:6px;align-items:stretch}
+.hl-box{
+  flex:1;border:2px solid var(--line);padding:8px 10px;background:#fff;
+  box-shadow:4px 4px 0 rgba(10,10,10,.08);
+}
+.hl-box .val{font-size:22px;font-weight:900;color:var(--red);line-height:1;display:block}
+.hl-box .lbl{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:2px;display:block}
+
+.flow{
+  display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin:6px 0;
+}
+.flow-node{
+  padding:4px 10px;border:2px solid var(--line);background:#fff;
+  font-size:11px;font-weight:800;white-space:nowrap;
+}
+.flow-node.active{background:var(--red);color:#fff;border-color:var(--red)}
+.flow-node.dim{background:#eee;color:#888;border-color:#ddd}
+.flow-arrow{color:var(--red);font-size:14px;font-weight:900}
+
+.cmds{display:flex;flex-direction:column;gap:5px}
+.cmd{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:7px 10px;background:#f8f7f3;border:1px solid #ddd;
+  font-size:11.5px;line-height:1.6;
+}
+.cmd .kbd{
+  background:var(--ink);color:#fff;padding:1px 6px;
+  font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;margin-top:1px;
+}
+.cmd code{flex:1}
+
+.foot{
+  border-top:3px solid var(--line);padding-top:10px;margin-top:4px;
+  font-size:10.5px;color:#888;text-align:right;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div>
+      <span class="badge">Open Source · TypeScript</span>
+      <span class="badge" style="background:var(--red);border-color:var(--red)">Harness Engineering</span>
+    </div>
+    <h1 class="demo-title">Maka-Agent</h1>
+    <div class="meta">
+      <a href="https://github.com/maka-agent/maka-agent" target="_blank">github.com/maka-agent/maka-agent</a>
+      &nbsp;·&nbsp; 560 ★ &nbsp;·&nbsp; 48 forks &nbsp;·&nbsp; Created 2026-05-27
+    </div>
+    <div class="tagline">本地优先桌面 AI 工作台 · Agent + Harness + Terminal-Bench</div>
+  </div>
+</div>
+
+<!-- KEY METRICS -->
+<div class="stats">
+  <div class="stat">
+    <strong>0.8</strong>
+    <span>Terminal-Bench 样本评分</span>
+  </div>
+  <div class="stat">
+    <strong>10/84</strong>
+    <span>通过任务数</span>
+  </div>
+  <div class="stat">
+    <strong>4 RMB</strong>
+    <span>评测总成本</span>
+  </div>
+  <div class="stat">
+    <strong>97.5%</strong>
+    <span>Cache 命中率</span>
+  </div>
+  <div class="stat">
+    <strong>2 轮</strong>
+    <span>Self-Check 迭代</span>
+  </div>
+</div>
+
+<!-- PILLS -->
+<div class="pills">
+  <span class="pill red">Terminal-Bench</span>
+  <span class="pill dark">DeepSeek Flash V4</span>
+  <span class="pill">Harbor Harness</span>
+  <span class="pill">Self-Check Gate</span>
+  <span class="pill">两轮迭代</span>
+  <span class="pill">Electron 桌面端</span>
+  <span class="pill">npm workspaces</span>
+  <span class="pill soft">Claude Code 启发</span>
+  <span class="pill">Cost-Aware Runtime</span>
+  <span class="pill">Artifact Evidence</span>
+</div>
+
+<!-- WHAT IS MAKA -->
+<div class="section">
+  <div class="sec-head">
+    <div><span class="num">01</span> <span class="label">项目定位</span></div>
+  </div>
+  <div class="sec-body">
+    <p>Maka 是一个<strong>本地优先（local-first）</strong>的桌面 AI 工作台，目标是在用户自己的电脑上运行一个<strong>可观察、可控、可持续恢复的 Agent</strong>。它把模型连接、会话管理、工具权限、文件读写、终端执行、联网搜索、Bot 入口和运行恢复全部集成在一个 Electron 应用里。</p>
+    <p>当前核心能力包括：桌面会话管理（创建、切换、归档、搜索、重命名、停止、重试、分支）、基于 Vercel AI SDK 的模型运行时、本地工具集（Read/Write/Edit/Bash/Glob/Grep）、权限策略引擎、Settings 中心（模型/账号/统计/记忆/搜索/Bot 网关）、本地记忆管理（<code>MEMORY.md</code>）、Tavily 联网搜索、多平台 Bot 入口（TG/飞书/企微/Discord/钉钉/QQ）、本地 HTTP/SSE 网关、Office 文档工作流（<code>officecli</code>）等。</p>
+    <blockquote><p>核心设计判断：DeepSeek 成本运行线不应新建一条 agent flow，而应沿用已有的 <code>SessionManager → RuntimeKernel → AgentRun → RuntimeRunner → AiSdkFlow → ModelAdapter/ToolRuntime</code> 主线，把 provider-visible request 的成本纪律安装到现有边界上。</p></blockquote>
+  </div>
+</div>
+
+<!-- ARCHITECTURE -->
+<div class="section">
+  <div class="sec-head">
+    <div><span class="num">02</span> <span class="label">仓库结构 · npm Workspaces</span></div>
+  </div>
+  <div class="sec-body">
+    <table>
+      <tr><th>路径</th><th>职责</th></tr>
+      <tr><td><code>apps/desktop/</code></td><td>Electron 主进程 / IPC / 设置 / OAuth / Bot / 网关入口；React 桌面 UI</td></tr>
+      <tr><td><code>packages/core/</code></td><td>纯合约：sessions、events、settings、permissions、model connections、AgentRun 类型</td></tr>
+      <tr><td><code>packages/storage/</code></td><td>文件后端存储：session JSONL、settings、连接配置、run-ledger</td></tr>
+      <tr><td><code>packages/runtime/</code></td><td>SessionManager、AgentFlow、AgentRun、AgentCatalog、PiAgentBackend、工具、Bot、遥测</td></tr>
+      <tr><td><code>packages/ui/</code></td><td>共享渲染组件、Markdown 工件、脱敏工具</td></tr>
+      <tr><td><code>packages/headless/</code></td><td>无头评测内核：Terminal-Bench 适配器、Self-Check 机制、Harbor Python 桥接</td></tr>
+      <tr><td><code>docs/</code></td><td>产品设计系统、Runtime Kernel 文档、隐私合约、测试计划</td></tr>
+    </table>
+    <p style="margin-top:8px">Runtime 内核核心边界：</p>
+    <div class="flow">
+      <span class="flow-node">SessionManager</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node active">AgentRun</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">AiSdkBackend</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">ModelAdapter</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">ToolRuntime</span>
+      <span class="flow-arrow">+</span>
+      <span class="flow-node dim">RunTrace</span>
+      <span class="flow-arrow">+</span>
+      <span class="flow-node dim">AgentRunStore</span>
+    </div>
+  </div>
+</div>
+
+<!-- SELF-CHECK MECHANISM -->
+<div class="section">
+  <div class="sec-head">
+    <div><span class="num">03</span> <span class="label">Self-Check 机制 · 两轮迭代</span></div>
+  </div>
+  <div class="sec-body">
+    <p>Maka Agent 的 Self-Check 机制受 <strong>Claude Code</strong> 启发，是其 Terminal-Bench 高分（0.8）的关键所在。整体设计分为两个阶段：</p>
+
+    <h3>阶段一：Plan（计划提交）</h3>
+    <p>Agent 在任务执行前通过 <code>self_check_plan_submit</code> 工具提交公开计划：</p>
+    <div class="kv">
+      <div class="kv-row"><div class="kv-key">finalArtifacts</div><div class="kv-val">声明最终产物路径及用途，证明对任务的完整理解</div></div>
+      <div class="kv-row"><div class="kv-key">selfCheckScratch</div><div class="kv-val">自检用的临时目录（默认 <code>/tmp/maka-self-check/</code>）及预期生成路径，防止污染工作区</div></div>
+      <div class="kv-row"><div class="kv-key">workspaceGuardPlan</div><div class="kv-val">声明哪些路径会被检查/修改，防止意外副作用扩散</div></div>
+    </div>
+
+    <h3>阶段二：Submit（证据提交）</h3>
+    <p>Agent 在任务执行后通过 <code>self_check_submit</code> 提交语义自检证据：</p>
+    <div class="kv">
+      <div class="kv-row"><div class="kv-key">status</div><div class="kv-val"><code>pass | fail | inconclusive</code></div></div>
+      <div class="kv-row"><div class="kv-key">commandEvidence</div><div class="kv-val">执行命令、退出码、超时标记、输出片段、产物路径引用（最多 25 条）</div></div>
+      <div class="kv-row"><div class="kv-key">artifactEvidence</div><div class="kv-val">产物文件存在性、大小、哈希、元数据（最多 25 条）</div></div>
+      <div class="kv-row"><div class="kv-key">executionHygiene</div><div class="kv-val">sandbox 执行记录、scratch 使用情况、清理状态、工作区副作用（added/modified/removed paths）</div></div>
+    </div>
+
+    <h3>Gate 机制（两轮迭代关键）</h3>
+    <p><code>heavy-task-self-check-gate.ts</code> 评估每轮提交，决定三个动作之一：</p>
+    <div class="flow">
+      <span class="flow-node active">allow_finalize</span>
+      <span class="flow-arrow">/</span>
+      <span class="flow-node active">repair_prompt</span>
+      <span class="flow-arrow">/</span>
+      <span class="flow-node active">allow_official_verifier</span>
+    </div>
+    <p><code>repair_prompt</code> 返回带有 acceptance checklist 的修复提示，触发第二轮迭代。第一轮提交缺失证据 → Gate 拒绝 → Agent 收到修复提示 → 第二轮补全证据 → Gate 通过 → 提交官方验证器。</p>
+
+    <h3>Source Guard（防作弊）</h3>
+    <p>所有证据字符串经过 source guard 检查，拒绝引用以下内容：<code>hidden_tests</code>、<code>hidden_thresholds</code>、<code>private_scoring_criteria</code>、<code>pytest_assertions</code>、<code>official_verifier_artifacts</code>、<code>non_public_evaluator_files</code> 等。这确保 Agent 自检依赖的是公开任务指令，而非评测集内部信息。</p>
+  </div>
+</div>
+
+<!-- TERMINAL-BENCH -->
+<div class="section">
+  <div class="sec-head">
+    <div><span class="num">04</span> <span class="label">Terminal-Bench 评测细节</span></div>
+  </div>
+  <div class="sec-body">
+    <p><strong>Terminal-Bench</strong> 是由斯坦福等机构主导的权威 Agent 评测基准，给 AI Agent 提供一个具备执行权限的 Linux 终端环境（隔离 Docker 容器），模型不仅要写代码，还要精通系统运维、网络配置和 Shell 脚本。验证机制极为严格：无论推理过程多精彩，只要最终服务没跑起来/端口没通，直接记 0 分（Pass@1 Sandbox Execution）。</p>
+
+    <div class="hl-row">
+      <div class="hl-box">
+        <span class="val">0.8</span>
+        <span class="lbl">样本评分 (sample)</span>
+      </div>
+      <div class="hl-box">
+        <span class="val">10/84</span>
+        <span class="lbl">通过任务数 / 总任务</span>
+      </div>
+      <div class="hl-box">
+        <span class="val">4 RMB</span>
+        <span class="lbl">评测总成本</span>
+      </div>
+      <div class="hl-box">
+        <span class="val">97.5%</span>
+        <span class="lbl">DeepSeek Cache 命中率</span>
+      </div>
+    </div>
+
+    <h3>Terminal-Bench 适配器</h3>
+    <p><code>terminal-bench-adapter.ts</code> 实现：</p>
+    <div class="cmds">
+      <div class="cmd"><span class="kbd">Adapter</span><code>接收 <code>TerminalBenchVerifierSpec</code>（含 testCommand / instanceId / dataset / taskDir / maxAgentTimeoutSec / maxTestTimeoutSec 等字段）</code></div>
+      <div class="cmd"><span class="kbd">Verify</span><code>在 workspaceDir 内执行 <code>testCommand</code>，捕获 stdout/stderr/exitCode，超时标记</code></div>
+      <div class="cmd"><span class="kbd">Score</span><code>passed ? score=1 : score=0；errorClass 分为 <code>verification_error | verification_failed</code></code></div>
+      <div class="cmd"><span class="kbd">Output</span><code>返回 <code>BenchmarkVerifierOutput</code>：passed / exitCode / durationMs / stdout / stderr / authority.source='self_check'</code></div>
+    </div>
+
+    <h3>Benchmark Adapter 抽象</h3>
+    <p><code>benchmark-adapters.ts</code> 定义通用 <code>BenchmarkAdapter</code> 接口，任何 benchmark 只需实现：</p>
+    <div class="cmds">
+      <div class="cmd"><span class="kbd">taskFromInstance</span><code>将 benchmark instance 转换为 Task 对象</code></div>
+      <div class="cmd"><span class="kbd">runVerifier</span><code>运行 verifier 并返回 <code>BenchmarkVerifierOutput</code></code></div>
+    </div>
+  </div>
+</div>
+
+<!-- HARNESS ENGINEERING -->
+<div class="section">
+  <div class="sec-head">
+    <div><span class="num">05</span> <span class="label">Harness Engineering · 工程化方法论</span></div>
+  </div>
+  <div class="sec-body">
+    <p><strong>Harness Engineering</strong> 是 2026 年 AI Agent 领域的关键工程范式——Agent = Model + Harness。模型负责推理，剩下的全部是工程：工具系统、上下文管理、权限控制、反馈回路。实验证明：<strong>同一模型换 Harness，性能可差 10 倍</strong>（Trivedy 2026: 固定 GPT-5.2-Codex，仅靠 harness 改进，Terminal-Bench 2.0 从 52.8% 拉到 66.5%，+13.7 个百分点）。</p>
+
+    <h3>Maka Headless Harness 架构</h3>
+    <table>
+      <tr><th>组件</th><th>文件</th><th>职责</th></tr>
+      <tr><td>AutonomousAgentLoop</td><td><code>autonomous-agent-loop.ts</code></td><td>自主循环：budget（maxAttempts/runtimeSteps/wallTime）/ selfCheck / decision policy / retry/repair 路由</td></tr>
+      <tr><td>TaskAgentController</td><td><code>task-agent-controller.ts</code></td><td>单次任务执行：task setup / runtime invocation / verifier dispatch</td></tr>
+      <tr><td>HeavyTaskSelfCheckGate</td><td><code>heavy-task-self-check-gate.ts</code></td><td>语义完成度门禁：deriveHeavyTaskAcceptanceChecks / gateBlockerReason / repair_prompt 生成</td></tr>
+      <tr><td>HeavyTaskSelfCheckRecorder</td><td><code>heavy-task-self-check.ts</code></td><td>Plan/Submit 事件记录，source guard 检查，scratch escape 检测</td></tr>
+      <tr><td>TerminalBenchAdapter</td><td><code>terminal-bench-adapter.ts</code></td><td>Terminal-Bench testCommand 执行 + 评分</td></tr>
+      <tr><td>Harbor Python 桥接</td><td><code>harbor/maka_agent.py</code></td><td>在 Harbor task container 内运行Maka RuntimeRunner，暴露 cell output</td></tr>
+      <tr><td>Cost Runtime</td><td><code>deepseek-reasonix-cost-runtime-design.md</code></td><td>Cost-aware runtime discipline：稳定回答 provider request、cache 分类、成本回归问题</td></tr>
+    </table>
+
+    <h3>决策策略（Decision Policy）</h3>
+    <p><code>AutonomousDecisionPolicy</code> 接口根据 config / task / attempt / budget / selfCheck 输出决策：</p>
+    <div class="flow">
+      <span class="flow-node">defaultDecision</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node active">authoritative verification passed → stop</span>
+      <span class="flow-arrow">/</span>
+      <span class="flow-node active">nonRetryable taxonomy → stop/abort</span>
+      <span class="flow-arrow">/</span>
+      <span class="flow-node active">budget exhausted → stop</span>
+      <span class="flow-arrow">/</span>
+      <span class="flow-node active">retryable → continue/retry</span>
+    </div>
+
+    <h3>关键工程洞察</h3>
+    <blockquote><p>"Context 利用率保持在 40% 以下。更多 token 不等于更好结果。" —Maka 设计原则。DeepSeek 成本纪律第一目标不是压缩 prompt，而是让系统能稳定回答：Provider 看到了什么 request？哪些 token 是 cache hit/miss？成本变化的原因是什么？</p></blockquote>
+  </div>
+</div>
+
+<!-- TWO-ROUND ITERATION PRACTICE -->
+<div class="section">
+  <div class="sec-head">
+    <div><span class="num">06</span> <span class="label">两轮迭代实践 · 复盘</span></div>
+  </div>
+  <div class="sec-body">
+    <p>两轮 Self-Check 迭代是将"做完了"变成"验证通过了"的关键机制。第一轮 Agent 执行任务 → 提交自检证据 → Gate 评估 → 如果证据不足或不符合 acceptance checklist，触发 <code>repair_prompt</code>，附带详细修复指令；第二轮 Agent 根据修复提示重新执行 → 补充证据 → Gate 通过 → 提交官方 Terminal-Bench 验证。</p>
+    <table>
+      <tr><th>维度</th><th>第一轮</th><th>第二轮</th></tr>
+      <tr><td>目标</td><td>完成任务执行，提交初步自检证据</td><td>补充缺失证据，完成 acceptance checklist</td></tr>
+      <tr><td>Gate 决策</td><td>可能返回 <code>repair_prompt</code></td><td>返回 <code>allow_finalize</code> 或 <code>allow_official_verifier</code></td></tr>
+      <tr><td>Evidence 质量</td><td>可能缺少 sandbox 执行证据 / workspace hygiene</td><td>补全 commandEvidence + executionHygiene.sandbox + workspaceGuard</td></tr>
+      <tr><td>Source Guard</td><td>必须通过，拒绝引用 hidden/private/evaluator 材料</td><td>同上，所有新增证据仍需通过 guard 检查</td></tr>
+    </table>
+    <p>这一设计的核心价值在于：<strong>把模型能力的上限从"执行"提升到"验证"</strong>。在没有 Self-Check 机制的情况下，Agent 可能在错误的路径上走得很远，最终被验证器一票否决。两轮迭代确保 Agent 在提交正式评测前，先完成自我审视。</p>
+  </div>
+</div>
+
+<!-- KEY FILES -->
+<div class="section">
+  <div class="sec-head">
+    <div><span class="num">07</span> <span class="label">关键源文件速查</span></div>
+  </div>
+  <div class="sec-body">
+    <table>
+      <tr><th>文件</th><th>行数≈</th><th>核心内容</th></tr>
+      <tr><td><code>packages/headless/src/autonomous-agent-loop.ts</code></td><td>~550</td><td>AutonomousAgentLoop 完整实现，budget/decision/selfCheck 主循环</td></tr>
+      <tr><td><code>packages/headless/src/heavy-task-self-check.ts</code></td><td>~420</td><td>SelfCheckRecorder、Plan/Submit schema、source guard、scratch escape 检测</td></tr>
+      <tr><td><code>packages/headless/src/heavy-task-self-check-gate.ts</code></td><td>~260</td><td>Gate 决策逻辑、acceptance checklist 生成、repair_prompt 渲染</td></tr>
+      <tr><td><code>packages/headless/src/terminal-bench-adapter.ts</code></td><td>~60</td><td>Terminal-Bench verifier 适配器，轻量实现</td></tr>
+      <tr><td><code>packages/headless/src/benchmark-adapters.ts</code></td><td>~40</td><td>BenchmarkAdapter 接口抽象</td></tr>
+      <tr><td><code>packages/headless/harbor/maka_agent.py</code></td><td>~300+</td><td>Harbor Python 桥接，cell output 暴露，trial_pricing 成本估算</td></tr>
+      <tr><td><code>docs/deepseek-reasonix-cost-runtime-design.md</code></td><td>~200+</td><td>Cost-aware runtime system design v2</td></tr>
+      <tr><td><code>docs/runtime-kernel.md</code></td><td>~200+</td><td>Runtime Kernel 边界文档：ToolRuntime/ModelAdapter/RunTrace</td></tr>
+      <tr><td><code>docs/maka-capability-audit-v1.md</code></td><td>~200+</td><td>能力成熟度审计 v1：ArtifactRecord / right pane / data model</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- QUICK START -->
+<div class="section">
+  <div class="sec-head">
+    <div><span class="num">08</span> <span class="label">快速开始</span></div>
+  </div>
+  <div class="sec-body">
+    <div class="cmds">
+      <div class="cmd"><span class="kbd">Clone</span><code>git clone https://github.com/maka-agent/maka-agent.git && cd maka-agent</code></div>
+      <div class="cmd"><span class="kbd">Install</span><code>npm install</code></div>
+      <div class="cmd"><span class="kbd">Dev</span><code>npm run dev   # build all workspaces + start Electron app</code></div>
+      <div class="cmd"><span class="kbd">Build</span><code>npm run build</code></div>
+      <div class="cmd"><span class="kbd">Test</span><code>npm --workspace @maka/runtime run test</code></div>
+      <div class="cmd"><span class="kbd">Release</span><code>npm run check:release   # pre-release checks</code></div>
+    </div>
+    <p>如设置了 <code>ELECTRON_SKIP_BINARY_DOWNLOAD=1</code>，启动前需补二进制：<code>node node_modules/electron/install.js</code></p>
+  </div>
+</div>
+
+<div class="foot">
+  生成：2026-07-04 &nbsp;·&nbsp; Style: redswiss &nbsp;·&nbsp; Source: github.com/maka-agent/maka-agent + web research
+</div>
+
+</div>
+</body>
+</html>
