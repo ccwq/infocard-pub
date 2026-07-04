@@ -251,10 +251,12 @@
   <!-- 3-COL: CORE -->
   <section class="content">
     <div class="col">
-      <div class="col-head"><div class="col-kicker">TRAINING METHODS</div><div class="col-title">两种训练方法</div></div>
+      <div class="col-title">GRPO 算法详解与奖励函数</div></div>
       <div class="col-body">
-        <div class="principle"><div class="num">SFT</div><h4>监督微调（Supervised Fine-Tuning）</h4><p>用 R1 蒸馏的高质量思维链数据（CoT）对齐 GPT-4o/Claude 级别的推理质量。基于 Qwen2.5-Math-7B-RoPE-300k，5 epoch，lr=4e-5，max_seq=32768。</p></div>
-        <div class="principle"><div class="num">GRPO</div><h4>组相对策略优化（Group Relative Policy Optimization）</h4><p>DeepSeek 原创的 GRPO 是 PPO 的简化变体：对同一问题采样多组 response，按 group 相对 reward 排序更新策略，无需单独的价值网络，大幅降低训练成本。</p></div>
+        <div class="principle"><div class="num">A_i</div><h4>组内相对优势函数</h4><p>GRPO 对每个问题采样 G 个 response，按组内 reward 均值/标准差归一化优势值：<code>A_i = (r_i - mean(r)) / std(r)</code>。无需单独 Value/Critic 网络，比 PPO 降低约 50% 计算量。</p></div>
+        <div class="principle"><div class="num">R</div><h4>三类奖励函数</h4><p><code>AccuracyReward</code>（答案正确性）、<code>FormatReward</code>（检查 boxed{} 标签）、<code>PassRateReward</code>（代码通过率）。规则驱动，无需 reward model。</p></div>
+        <div class="principle"><div class="num">KL</div><h4>KL 正则化约束</h4><p>通过 KL 散度约束策略更新幅度，确保训练稳定性。PPO 风格裁剪损失 + 组内相对优势替代 Value 网络。</p></div>
+        <div class="principle"><div class="num">∞</div><h4>OlympicCoder-32B 超越 Claude 3.7 Sonnet</h4><p>CodeForces-CoTs 数据集训练的 OlympicCoder-32B，在 IOI 挑战上超越 Claude 3.7 Sonnet，7B 模型同样表现优异。</p></div>
       </div>
     </div>
     <div class="col">
@@ -385,6 +387,26 @@
 <span class="comment"># 4. 不需要单独的价值网络（Critic），比 PPO 轻量得多</span></pre>
   </section>
 
+  <!-- VLLM API SERVER -->
+  <section class="code-block" style="margin-bottom:12px">
+    <div class="tag">VLLM API SERVER · 用 vLLM 部署推理 API</div>
+    <pre><span class="comment"># 启动 vLLM OpenAI 兼容 API 服务</span>
+<span class="prompt">$</span> <span class="cmd">python -m vllm.entrypoints.openai.api_server \</span>
+<span class="prompt">$</span> <span class="cmd">  --model deepseek-ai/DeepSeek-R1-Distill-Qwen-7B \</span>
+<span class="prompt">$</span> <span class="cmd">  --port 8801 \</span>
+<span class="prompt">$</span> <span class="cmd">  --tensor-parallel-size 1</span>
+
+<span class="comment"># Python 调用 API</span>
+<span class="key">import</span> <span class="func">openai</span>
+client = openai.OpenAI(base_url=<span class="val">"http://localhost:8801/v1"</span>,
+                       api_key=<span class="val">"none"</span>)
+response = client.chat.completions.create(
+    model=<span class="val">"DeepSeek-R1-Distill-Qwen-7B"</span>,
+    messages=[{<span class="val">"role"</span>: <span class="val">"user"</span>, <span class="val">"content"</span>: <span class="val">"求 $\\frac{1}{2}+\\frac{1}{3}$ 的值"</span>}]
+)
+<span class="key">print</span>(response.choices[0].message.content)</pre>
+  </section>
+
   <!-- EVALUATION CODE -->
   <section class="code-block" style="margin-bottom:12px">
     <div class="tag">EVALUATION · 评测命令（LightEval + vLLM）</div>
@@ -507,6 +529,21 @@ model_id = <span class="val">"deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"</span>
       <div class="ds-label">代码数据</div>
       <a href="https://huggingface.co/datasets/open-r1/verifiable-coding-problems-python">open-r1/verifiable-coding-problems</a>
       <p>可验证 Python 编程题，已做 8-gram 数据去污染</p>
+    </div>
+    <div class="dataset-card">
+      <div class="ds-label">衍生复现</div>
+      <a href="https://github.com/OpenThoughts-AI/OpenReasonerZero">Open-Reasoner-Zero</a>
+      <p>阶跃+清华，仅需 1/30 训练步骤达 R1-Zero 水平，680 步出现"aha moment"</p>
+    </div>
+    <div class="dataset-card">
+      <div class="ds-label">轻量复现</div>
+      <a href="https://github.com/collected-ai/simpleRL-reason">simpleRL-reason</a>
+      <p>港科大，号称 30 美元复现"aha moment"，极低成本验证 R1-Zero 路线</p>
+    </div>
+    <div class="dataset-card">
+      <div class="ds-label">Agent 扩展</div>
+      <a href="https://github.com/rAGEN-Lab/RAGEN">RAGEN</a>
+      <p>首个用于训练 Agent 的 R1 复现框架，把推理能力扩展到 Agent 场景</p>
     </div>
   </section>
 
