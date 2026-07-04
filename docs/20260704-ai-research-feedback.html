@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-research-feedback · Claude Code 全自动同行评审与数据审查 Skill</title>
+  <meta name="description" content="开源 AI 同行评审 Skill（~400★），基于 Claude Code 多 Agent 并行，自动审查论文逻辑/代码 bug/数据样本量。完全本地运行，跨格式支持 Markdown/LaTeX/PDF/Word。适合 Web3 白皮书评审、数据审计、长文质量把控。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,48px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:60ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    /* Hero right: mission quote */
+    .mission{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .mission .big{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:16px;line-height:1.2;letter-spacing:-.02em;color:#fff}
+    .mission .en{font-size:10px;color:#8b9bbf;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+    .mission .tagline{font-size:11px;color:#d8e2ff;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--red) 0%, #991b1b 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12px;line-height:1.62;color:#fdd;margin-top:8px}
+    /* === CORE FEATURES === */
+    .features{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .features-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .features-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .features h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .features-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .feature-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .feature-icon{font-size:20px;line-height:1;margin-bottom:2px}
+    .feature-card h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .feature-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .feature-card .tag{display:inline-flex;padding:2px 7px;border:1.5px solid var(--line);background:#f4f0e8;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    /* === AGENT TABLE === */
+    .agent-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .agent-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .agent-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .agent-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .agent-table{width:100%;border-collapse:collapse;font-size:11.5px}
+    .agent-table th{background:var(--blue-soft);border:1.5px solid var(--line);padding:8px 10px;text-align:left;font-weight:800;color:var(--blue);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase}
+    .agent-table td{border:1.5px solid var(--line);padding:8px 10px;vertical-align:top}
+    .agent-table tr:nth-child(even) td{background:#faf7f0}
+    .agent-table .num{font:900 14px/1 Georgia,serif;color:var(--blue);text-align:center;display:block}
+    /* === SKILLS LIST === */
+    .skills-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .skills-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .skills-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .skills-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .skills-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .skill-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .skill-card .name{font:800 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);margin-bottom:6px}
+    .skill-card h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .skill-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .skill-card .agents{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--green);margin-top:6px}
+    /* === JOURNAL SUPPORT === */
+    .journals-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .journals-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .journals-badge{background:var(--yellow);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .journals-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .journals-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .journal-chip{display:inline-flex;padding:4px 10px;border:1.5px solid var(--line);background:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .journal-chip.top{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .journal-chip.fin{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .journal-chip.macro{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    /* === CODE / USAGE === */
+    .code-block{background:#111;border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px;overflow-x:auto}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#d8e2ff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:#d8e2ff;white-space:pre;word-break:normal;overflow-x:auto}
+    .code-block .prompt{color:#f4c84c}
+    .code-block .ai{color:#a8f59f}
+    .code-block .comment{color:#8b9bbf}
+    .code-block .cmd{color:#f4a8c8}
+    .code-block .key{color:#93c5fd}
+    .code-block .val{color:#fdba74}
+    /* === HOW TO USE === */
+    .howto{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .howto-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .howto-badge{background:var(--red-dark);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .howto h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .howto-body{padding:12px 16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+    .howto-step{padding:10px 12px;border-right:1.5px solid rgba(17,17,17,.15);min-width:0;display:grid;gap:6px}
+    .howto-step:last-child{border-right:none}
+    .howto-step .n{font:900 20px/1 Georgia,"Times New Roman",serif;color:var(--blue)}
+    .howto-step h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .howto-step p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === USE CASES === */
+    .usecases{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .usecases-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .usecases-badge{background:#111;color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .usecases h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .usecases-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .usecase-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .usecase-icon{font-size:20px;margin-bottom:6px}
+    .usecase-card h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3;color:var(--ink)}
+    .usecase-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === FAQ === */
+    .faq-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .faq-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .faq-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .faq-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .faq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .faq-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .faq-item .q{font-size:12.5px;font-weight:800;line-height:1.4;margin-bottom:5px}
+    .faq-item .a{font-size:11.5px;color:var(--muted);line-height:1.6;margin:0}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:12px 14px 10px;color:var(--muted);font-size:12px;line-height:1.6}
+    .footer .brand{font-weight:800;color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:14px}
+    .footer .small{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    .footer .small a{color:var(--blue)}
+    .save{display:block;width:fit-content;position:static;margin:12px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--red),#991b1b);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(153,27,27,.3);cursor:pointer}
+    /* === RESPONSIVE === */
+    @media(max-width:960px){
+      .hero,.features-grid,.faq-grid,.usecases-grid{grid-template-columns:1fr}
+      .howto-body{grid-template-columns:repeat(2,1fr)}
+      .skills-grid,.journals-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:10px 0 72px}
+      .hero,.banner,.footer{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(22px,8vw,32px)}
+      .banner .quote{font-size:18px}
+      .howto-body,.features-grid,.skills-grid,.journals-grid,.faq-grid,.usecases-grid{grid-template-columns:1fr}
+      .footer{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">AI RESEARCH FEEDBACK · CLAUDE CODE SKILL · MIT LICENSE</div>
+        <div class="source">github.com/claesbackman/AI-research-feedback</div>
+      </div>
+      <h1>AI-research-feedback</h1>
+      <p class="subtitle">基于 Claude Code 多 Agent 并行的<strong>全自动学术同行评审</strong>——论文、代码、数据、Grant 提案，审 Web3 白皮书也拿手。</p>
+      <div class="meta-row">
+        <span class="chip red">434 ★</span>
+        <span class="chip green">MIT License</span>
+        <span class="chip blue">5 个 Skill</span>
+        <span class="chip yellow">6 Agent 并行</span>
+        <span class="chip">本地运行</span>
+        <span class="chip">LaTeX/PDF/Word</span>
+      </div>
+    </div>
+    <div class="mission">
+      <div class="big">审稿如虎添翼，<br>漏洞无所遁形。</div>
+      <div class="en">Automated multi-agent peer review for research</div>
+      <div class="tagline">论文 · 代码 · 数据 · Pre-Analysis Plan<br>Paper · Code · Data · PAP · Grant</div>
+    </div>
+  </section>
+
+  <!-- BANNER -->
+  <section class="banner">
+    <div class="quote">"六位专业审稿 Agent 并行运作，覆盖拼写、逻辑、识别策略、数学符号、图表、贡献度——在提交前把论文扒一遍。"</div>
+    <div class="note">支持 Top-5 经济学期刊（AER、QJE、JPE、Econometrica、REStud）与金融顶刊（JF、JFE、RFS、JFQA）。</div>
+  </section>
+
+  <!-- CORE FEATURES -->
+  <section class="features">
+    <div class="features-head">
+      <div class="features-badge">CORE FEATURES</div>
+      <h2>四大核心卖点</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h4>全自动深度评审</h4>
+        <p>多 Agent 并行挑刺找漏洞，审 Web3 白皮书神器。6 个专业 Agent 覆盖论文各维度，模拟期刊审稿人视角。</p>
+        <span class="tag">多 Agent 并行</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💻</div>
+        <h4>代码与数据审计</h4>
+        <p>自动查复现代码、数据字典和样本量逻辑。paper-code 一致性审查，发现表格变量与代码不对应的问题。</p>
+        <span class="tag">Stata / R / Python</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h4>完全本地跑</h4>
+        <p>私密文档本地审查防泄密。所有评审在本地 Claude Code 环境运行，文档不离开你的机器。</p>
+        <span class="tag">本地优先</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📄</div>
+        <h4>跨格式批量操作</h4>
+        <p>Markdown、LaTeX、PDF、Word 多格式支持。自动检测主文件路径，批量扫描文件夹内的所有相关文件。</p>
+        <span class="tag">多格式支持</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENT TABLE -->
+  <section class="agent-section">
+    <div class="agent-head">
+      <div class="agent-badge">6 AGENTS</div>
+      <h2>review-paper 的六位审稿 Agent</h2>
+    </div>
+    <table class="agent-table">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>专注领域</th>
+          <th>检查内容</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="num">1</span></td>
+          <td>拼写、语法与学术风格</td>
+          <td>拼写错误、语法问题、学术表达规范性、引用格式一致性</td>
+        </tr>
+        <tr>
+          <td><span class="num">2</span></td>
+          <td>内部一致性与交叉引用</td>
+          <td>前后定义一致性、图表编号引用、变量命名统一、逻辑自洽</td>
+        </tr>
+        <tr>
+          <td><span class="num">3</span></td>
+          <td>未支撑声明与识别完整性</td>
+          <td>未经证实的结论、因果关系过度声称、识别策略漏洞</td>
+        </tr>
+        <tr>
+          <td><span class="num">4</span></td>
+          <td>数学、公式与符号</td>
+          <td>推导过程、符号一致性、单位使用、附录与正文公式对应</td>
+        </tr>
+        <tr>
+          <td><span class="num">5</span></td>
+          <td>表格与图表</td>
+          <td>表格可读性、图表标注完整性、数值精度、图例清晰度</td>
+        </tr>
+        <tr>
+          <td><span class="num">6</span></td>
+          <td>贡献度评估（对抗性）</td>
+          <td>创新点强度、与现有文献差异化、期刊适配度、贡献声明合理性</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SKILLS LIST -->
+  <section class="skills-section">
+    <div class="skills-head">
+      <div class="skills-badge">5 SKILLS</div>
+      <h2>套件包含的五个 Skill</h2>
+    </div>
+    <div class="skills-grid">
+      <div class="skill-card">
+        <div class="name">/review-paper</div>
+        <h4>预提交 referee 报告</h4>
+        <p>完整 6 Agent 并行审稿，生成结构化 referee 报告，输出到 <code>PRE_SUBMISSION_REVIEW_[日期].md</code></p>
+        <div class="agents">6 agents · 完整评审</div>
+      </div>
+      <div class="skill-card">
+        <div class="name">/review-paper-light</div>
+        <h4>快速论文检查</h4>
+        <p>2 Agent 快速迭代，聚焦贡献度、识别策略、因果声称和未支撑结论，适合提交前的快速自检</p>
+        <div class="agents">2 agents · 快速版</div>
+      </div>
+      <div class="skill-card">
+        <div class="name">/review-paper-code</div>
+        <h4>论文-代码可复现性审查</h4>
+        <p>检查实证研究代码可复现性、paper-code 一致性、样本限制和固定效应对应，输出 <code>code_review_report.md</code></p>
+        <div class="agents">代码 + 数据审计</div>
+      </div>
+      <div class="skill-card">
+        <div class="name">/review-pap</div>
+        <h4>Pre-Analysis Plan 评审</h4>
+        <p>6 Agent 评审 PAP 的写作质量、规范完整性、识别策略、统计分析、注册适配度</p>
+        <div class="agents">6 agents · PAP 专用</div>
+      </div>
+      <div class="skill-card">
+        <div class="name">/review-grant</div>
+        <h4>Grant 提案评审</h4>
+        <p>评审 Grant 提案的创新性、可行性、预算合理性、研究计划完整性</p>
+        <div class="agents">Grant 专用</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- JOURNAL SUPPORT -->
+  <section class="journals-section">
+    <div class="journals-head">
+      <div class="journals-badge">JOURNALS</div>
+      <h2>支持的期刊标准</h2>
+    </div>
+    <div style="margin-bottom:10px;font-size:12px;color:var(--muted)">review-paper 支持以下期刊的特定审稿人视角；不指定时应用通用高标准。</div>
+    <div style="display:grid;gap:8px">
+      <div>
+        <div style="font:700 10px/1 ui-monospace;color:var(--red);margin-bottom:6px;letter-spacing:.05em">TOP-5 ECONOMICS</div>
+        <div class="journals-grid">
+          <span class="journal-chip top">AER</span>
+          <span class="journal-chip top">QJE</span>
+          <span class="journal-chip top">JPE</span>
+          <span class="journal-chip top">Econometrica</span>
+          <span class="journal-chip top">REStud</span>
+        </div>
+      </div>
+      <div>
+        <div style="font:700 10px/1 ui-monospace;color:var(--blue);margin-bottom:6px;letter-spacing:.05em">FINANCE</div>
+        <div class="journals-grid">
+          <span class="journal-chip fin">JF</span>
+          <span class="journal-chip fin">JFE</span>
+          <span class="journal-chip fin">RFS</span>
+          <span class="journal-chip fin">JFQA</span>
+        </div>
+      </div>
+      <div>
+        <div style="font:700 10px/1 ui-monospace;color:#14532d;margin-bottom:6px;letter-spacing:.05em">MACRO</div>
+        <div class="journals-grid">
+          <span class="journal-chip macro">AEJMacro</span>
+          <span class="journal-chip macro">JME</span>
+          <span class="journal-chip macro">RED</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW TO USE -->
+  <section class="howto">
+    <div class="howto-head">
+      <div class="howto-badge">USAGE SOP</div>
+      <h2>本地部署四步走</h2>
+    </div>
+    <div class="howto-body">
+      <div class="howto-step">
+        <div class="n">①</div>
+        <h4>安装 Claude Code</h4>
+        <p>确保已安装 Claude Code 并配置好 <code>ANTHROPIC_API_KEY</code>，启用 <code>general-purpose</code> subagent。</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">②</div>
+        <h4>下载 Skill 文件</h4>
+        <p>创建命令目录并拉取 Skill 文件，或直接用 <code>curl</code> 一键安装到 <code>~/.claude/commands/</code>。</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">③</div>
+        <h4>进入论文目录</h4>
+        <p>切换到你的 LaTeX 论文目录，Claude Code 会自动检测主 <code>.tex</code> 文件和代码目录结构。</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">④</div>
+        <h4>激活 /review-paper</h4>
+        <p>输入 <code>/review-paper</code> 或指定期刊如 <code>/review-paper QJE</code>，等待报告生成。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTALLATION CODE -->
+  <section class="code-block">
+    <div class="tag">INSTALL · 一键安装 Skill</div>
+    <pre><span class="comment"># 全局安装（所有项目可用）</span>
+<span class="prompt">$</span> <span class="cmd">mkdir -p ~/.claude/commands && curl -o ~/.claude/commands/review-paper.md \</span>
+<span class="prompt">$</span> <span class="cmd">  https://raw.githubusercontent.com/claesbackman/AI-research-feedback/main/Skills/review-paper.md</span>
+
+<span class="comment"># 项目本地安装（仅当前项目可用）</span>
+<span class="prompt">$</span> <span class="cmd">mkdir -p .claude/commands && curl -o .claude/commands/review-paper.md \</span>
+<span class="prompt">$</span> <span class="cmd">  https://raw.githubusercontent.com/claesbackman/AI-research-feedback/main/Skills/review-paper.md</span>
+
+<span class="comment"># 安装全部 Skill</span>
+<span class="prompt">$</span> <span class="cmd">for f in review-paper review-paper-light review-paper-code review-pap review-grant; do</span>
+<span class="prompt">$</span> <span class="cmd">  curl -o ~/.claude/commands/$f.md \</span>
+<span class="prompt">$</span> <span class="cmd">  https://raw.githubusercontent.com/claesbackman/AI-research-feedback/main/Skills/$f.md</span>
+<span class="prompt">$</span> <span class="cmd">done</span></pre>
+  </section>
+
+  <!-- USAGE CODE -->
+  <section class="code-block">
+    <div class="tag">USAGE · Claude Code 中的使用方式</div>
+    <pre><span class="comment"># 基本使用：自动检测 .tex 文件</span>
+<span class="prompt">$</span> <span class="cmd">/review-paper</span>                    <span class="comment"># 通用高标准审稿</span>
+<span class="prompt">$</span> <span class="cmd">/review-paper QJE</span>               <span class="comment"># 指定 QJE 期刊视角</span>
+<span class="prompt">$</span> <span class="cmd">/review-paper JF path/to/main.tex</span>  <span class="comment"># 指定文件和期刊</span>
+
+<span class="comment"># 快速检查</span>
+<span class="prompt">$</span> <span class="cmd">/review-paper-light</span>              <span class="comment"># 2 Agent 快速版</span>
+<span class="prompt">$</span> <span class="cmd">/review-paper-light path/to/main.tex</span>
+
+<span class="comment"># 代码可复现性审查</span>
+<span class="prompt">$</span> <span class="cmd">/review-paper-code</span>               <span class="comment"># 默认：核心脚本</span>
+<span class="prompt">$</span> <span class="cmd">/review-paper-code path/main.tex path/code_dir full</span>  <span class="comment"># 全量审查</span>
+
+<span class="comment"># Pre-Analysis Plan 评审</span>
+<span class="prompt">$</span> <span class="cmd">/review-pap</span>                    <span class="comment"># 默认 top-journal 标准</span>
+<span class="prompt">$</span> <span class="cmd">/review-pap AEA</span>                <span class="comment"># AEA 注册标准</span>
+
+<span class="comment"># 输出文件</span>
+<span class="ai">→ PRE_SUBMISSION_REVIEW_2026-07-04.md</span>  <span class="comment"># review-paper</span>
+<span class="ai">→ QUICK_REVIEW_2026-07-04.md</span>           <span class="comment"># review-paper-light</span>
+<span class="ai">→ code_review_report.md</span>                <span class="comment"># review-paper-code</span>
+<span class="ai">→ PAP_REVIEW_2026-07-04.md</span>             <span class="comment"># review-pap</span></pre>
+  </section>
+
+  <!-- USE CASES -->
+  <section class="usecases">
+    <div class="usecases-head">
+      <div class="usecases-badge">USE CASES</div>
+      <h2>适用场景</h2>
+    </div>
+    <div class="usecases-grid">
+      <div class="usecase-card">
+        <div class="usecase-icon">📈</div>
+        <h4>Web3 白皮书评审</h4>
+        <p>多 Agent 并行深度挑刺，识别白皮书中的逻辑漏洞、数据声称夸大和 Token 经济模型缺陷。</p>
+      </div>
+      <div class="usecase-card">
+        <div class="usecase-icon">📊</div>
+        <h4>数据处理审计</h4>
+        <p>查数据字典、样本量逻辑、变量构建是否符合论文声明，检查代码与表格数字的一致性。</p>
+      </div>
+      <div class="usecase-card">
+        <div class="usecase-icon">📝</div>
+        <h4>长文质量把控</h4>
+        <p>对长篇学术论文、研究报告、Grant 提案进行系统性质量审查，发现人工审稿容易遗漏的细节问题。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <div class="faq-head">
+      <div class="faq-badge">FAQ</div>
+      <h2>常见问题</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <div class="q">Q: 这个 Skill 和通用 AI 润色工具的区别是什么？</div>
+        <div class="a">不只是润色，是系统性的学术评审——模拟期刊审稿人的视角，检查逻辑漏洞、识别策略、数据一致性，而非语言流畅度。6 个 Agent 各司其职，覆盖人工审稿的所有维度。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 支持中文论文吗？</div>
+        <div class="a">Skill 主要面向英文 LaTeX 论文设计，但语言检测和逻辑评审能力对中文论文也有参考价值。图表说明、公式规范等检查同样适用，中文项目可尝试使用。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 本地运行能保证文档安全吗？</div>
+        <div class="a">完全本地运行。Claude Code 在本地执行，文档不经过任何第三方服务器。所有审稿过程和输出文件都在你的本地机器上。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: review-paper-code 支持哪些编程语言？</div>
+        <div class="a">支持 Stata（.do）、R（.R）和 Python（.py）三种主流实证分析语言，自动检测代码目录结构，分析可复现性、路径、随机种子、依赖和运行顺序。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 快速版和完整版怎么选？</div>
+        <div class="a">提交前快速迭代用 <code>/review-paper-light</code>（2 Agent，约 5 分钟），正式提交前用 <code>/review-paper</code>（6 Agent，完整评审，约 15-30 分钟）。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 可以和其他 Skill 配合使用吗？</div>
+        <div class="a">可以。推荐工作流：论文写作 → AI-research-feedback 评审 → anti-vibe-writing 最终润色。先保证内容质量，再优化表达方式。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">AI-research-feedback</div>
+      <div class="small">
+        <a href="https://github.com/claesbackman/AI-research-feedback">github.com/claesbackman/AI-research-feedback</a> ·
+        434 ★ · 75 forks · MIT License · claesbackman
+      </div>
+    </div>
+    <div class="small">5 Skills · 6 Agents 并行 · 本地运行</div>
+  </footer>
+
+</main>
+<button id="save-btn" class="save" onclick="html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,logging:false,backgroundColor:null}).then(c=>{let a=document.createElement('a');a.download='ai-research-feedback-infocard.png';a.href=c.toDataURL('image/png');a.click()}).catch(e=>alert('Export: '+e))">⬇ 保存 PNG</button>
+</body>
+</html>
