@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tmux-workbench · Tmux 工作台管理工具</title>
+  <meta name="description" content="开源 Tmux 工作台管理工具，简化终端多路复用配置，支持快速搭建开发环境面板。适合需要在同一终端中管理多个会话/窗口的开发者。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,48px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:60ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    /* Hero right: mission quote */
+    .mission{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .mission .big{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:16px;line-height:1.2;letter-spacing:-.02em;color:#fff}
+    .mission .en{font-size:10px;color:#8b9bbf;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+    .mission .tagline{font-size:11px;color:#d8e2ff;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--red) 0%, #991b1b 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12px;line-height:1.62;color:#fdd;margin-top:8px}
+    /* === FEATURES GRID === */
+    .features{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .features-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .features-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .features h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .features-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .feat-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .feat-icon{font-size:18px;line-height:1}
+    .feat-card h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .feat-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === CODE / USAGE === */
+    .code-block{background:#111;border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px;overflow-x:auto}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#d8e2ff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:#d8e2ff;white-space:pre;word-break:normal;overflow-x:auto}
+    .code-block .prompt{color:#f4c84c}
+    .code-block .ai{color:#a8f59f}
+    .code-block .comment{color:#8b9bbf}
+    .code-block .cmd{color:#f4a8c8}
+    .code-block .key{color:#93c5fd}
+    .code-block .val{color:#fdba74}
+    /* === TUI SHORTCUTS === */
+    .shortcuts{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .shortcuts-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .shortcuts-badge{background:var(--red-dark);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .shortcuts h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .shortcuts-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .shortcut-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--line);background:#fff}
+    .shortcut-key{background:var(--red-soft);border:1px solid var(--red);color:var(--red-dark);padding:2px 6px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;border-radius:3px;flex-shrink:0}
+    .shortcut-desc{font-size:11.5px;color:var(--muted)}
+    /* === HOW TO USE === */
+    .howto{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .howto-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .howto-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .howto h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02epx}
+    .howto-body{padding:12px 16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+    .howto-step{padding:10px 12px;border-right:1.5px solid rgba(17,17,17,.15);min-width:0;display:grid;gap:6px}
+    .howto-step:last-child{border-right:none}
+    .howto-step .n{font:900 20px/1 Georgia,"Times New Roman",serif;color:var(--blue)}
+    .howto-step h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .howto-step p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === ARCHITECTURE === */
+    .arch{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .arch-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .arch-badge{background:var(--yellow);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .arch h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .arch-flow{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#fff;border:1.5px solid var(--line);flex-wrap:wrap}
+    .arch-node{background:var(--blue-soft);border:1.5px solid var(--blue);color:var(--blue);padding:6px 12px;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .arch-arrow{color:var(--muted);font-size:16px}
+    /* === FAQ === */
+    .faq-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .faq-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .faq-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .faq-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .faq-list{display:grid;gap:10px}
+    .faq-item{border:1.5px solid var(--line);background:#fff;padding:10px 12px}
+    .faq-q{font-weight:800;font-size:12.5px;margin:0 0 4px;color:var(--ink)}
+    .faq-a{font-size:11.5px;color:var(--muted);margin:0;line-height:1.55}
+    .faq-a code{background:var(--blue-soft);color:var(--blue);padding:1px 5px;font-size:10.5px}
+    /* === RESOURCES === */
+    .resources{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .resources-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .resources-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .resources h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .resources-list{display:grid;gap:8px}
+    .resource-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--line);background:#fff}
+    .resource-icon{font-size:20px;flex-shrink:0}
+    .resource-info{display:grid;gap:2px;min-width:0}
+    .resource-info h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .resource-info p{margin:0;font-size:11px;color:var(--muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .resource-link{margin-left:auto;flex-shrink:0;color:var(--blue);font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    /* === SCENARIOS === */
+    .scenarios{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .scenarios-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .scenarios-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .scenarios h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .scenarios-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .scenario-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .scenario-icon{font-size:18px;margin-bottom:6px}
+    .scenario-card h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .scenario-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === STATUS === */
+    .status-bar{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .status-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .status-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .status-bar h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .status-section{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .status-section h4{font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px;color:var(--blue)}
+    .status-section ul{margin:0;padding:0 0 0 16px;display:grid;gap:4px}
+    .status-section li{font-size:11.5px;color:var(--muted);line-height:1.5}
+    /* === RESPONSIVE === */
+    @media(max-width:900px){.hero{grid-template-columns:1fr}.mission{display:none}.features-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.shortcuts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.howto-body{grid-template-columns:repeat(2,minmax(0,1fr))}.howto-step:nth-child(2){border-right:none}.scenarios-grid{grid-template-columns:1fr}}
+    @media(max-width:600px){.features-grid{grid-template-columns:1fr}.shortcuts-grid{grid-template-columns:1fr}.howto-body{grid-template-columns:1fr}.howto-step{border-right:none;border-bottom:1.5px solid rgba(17,17,17,.15)}.howto-step:last-child{border-bottom:none}.arch-flow{flex-direction:column}.arch-arrow{transform:rotate(90deg)}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">Dev Tools · CLI / TUI</span>
+          <span class="source">Rust · MIT</span>
+        </div>
+        <h1>tmux-workbench</h1>
+        <p class="subtitle">终端工作台记忆管理器 — <strong>索引本地与远程 tmux 会话</strong>，记住项目上下文，一键恢复开发环境</p>
+        <div class="meta-row">
+          <span class="chip blue">★ 10 Stars</span>
+          <span class="chip green">MIT License</span>
+          <span class="chip">Rust</span>
+          <span class="chip">tmux</span>
+          <span class="chip">SSH</span>
+        </div>
+      </div>
+      <div class="mission">
+        <div class="big">记忆终端工作台</div>
+        <div class="en">Remember Your Terminal Workspaces</div>
+        <div class="tagline">不替换 tmux，而是让 tmux 工作区更易查找、检查和恢复</div>
+      </div>
+    </section>
+
+    <!-- BANNER -->
+    <section class="banner">
+      <div class="quote">「 SSH + tmux 很健壮，但当工作分散在多台机器和多个项目时，它记不住足够多。」</div>
+      <div class="note">tmux-workbench 在 tmux 之上添加本地记忆层：服务器连接信息、会话快照、项目路径、git 状态、笔记、标签、归档状态……</div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="features">
+      <div class="features-head">
+        <span class="features-badge">Features</span>
+        <h2>核心能力</h2>
+      </div>
+      <div class="features-grid">
+        <div class="feat-card">
+          <span class="feat-icon">🔍</span>
+          <h4>本地 + 远程索引</h4>
+          <p>索引本机和 SSH 服务器上的 tmux 会话，跨机器统一管理</p>
+        </div>
+        <div class="feat-card">
+          <span class="feat-icon">🔗</span>
+          <h4>稳定 ID 连接</h4>
+          <p>通过 <code>&lt;server&gt;/&lt;session&gt;</code> 稳定 ID 重新附加到工作区</p>
+        </div>
+        <div class="feat-card">
+          <span class="feat-icon">🖥️</span>
+          <h4>交互式 TUI</h4>
+          <p>支持搜索、服务器过滤、多种视图模式的终端界面</p>
+        </div>
+        <div class="feat-card">
+          <span class="feat-icon">📝</span>
+          <h4>元数据管理</h4>
+          <p>保留笔记、别名、标签、状态、附加历史</p>
+        </div>
+        <div class="feat-card">
+          <span class="feat-icon">🔀</span>
+          <h4>Git 快照</h4>
+          <p>捕获每个工作区的 git 仓库状态：分支、提交、脏状态</p>
+        </div>
+        <div class="feat-card">
+          <span class="feat-icon">⚡</span>
+          <h4>并发扫描</h4>
+          <p>后台扫描不阻塞 TUI，自动刷新可见扫描状态</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUICK START -->
+    <section class="howto">
+      <div class="howto-head">
+        <span class="howto-badge">Quick Start</span>
+        <h2>快速上手</h2>
+      </div>
+      <div class="howto-body">
+        <div class="howto-step">
+          <span class="n">1</span>
+          <h4>安装</h4>
+          <p>curl 脚本、Homebrew 或 cargo 安装 ws 二进制</p>
+        </div>
+        <div class="howto-step">
+          <span class="n">2</span>
+          <h4>初始化</h4>
+          <p><code>ws init</code> 初始化配置和数据库</p>
+        </div>
+        <div class="howto-step">
+          <span class="n">3</span>
+          <h4>扫描</h4>
+          <p><code>ws scan</code> 扫描本地和远程 tmux 会话</p>
+        </div>
+        <div class="howto-step">
+          <span class="n">4</span>
+          <h4>附加</h4>
+          <p><code>ws attach server/session</code> 一键返回工作区</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- INSTALLATION -->
+    <div class="code-block">
+      <span class="tag">Installation</span>
+      <pre><span class="prompt">#</span> <span class="comment">Install Script (推荐)</span>
+<span class="prompt">$</span> <span class="cmd">curl -fsSL https://raw.githubusercontent.com/LeON-Nie-code/tmux-workbench/master/install.sh | bash</span>
+
+<span class="prompt">#</span> <span class="comment">Homebrew</span>
+<span class="prompt">$</span> <span class="cmd">brew tap LeON-Nie-code/tmux-workbench https://github.com/LeON-Nie-code/tmux-workbench</span>
+<span class="prompt">$</span> <span class="cmd">brew install LeON-Nie-code/tmux-workbench/ws</span>
+
+<span class="prompt">#</span> <span class="comment">Cargo</span>
+<span class="prompt">$</span> <span class="cmd">cargo install --git https://github.com/LeON-Nie-code/tmux-workbench ws</span></pre>
+    </div>
+
+    <!-- CLI USAGE -->
+    <div class="code-block">
+      <span class="tag">CLI Usage</span>
+      <pre><span class="prompt">#</span> <span class="comment">服务器管理</span>
+<span class="prompt">$</span> <span class="cmd">ws servers</span>                    <span class="comment"># 列出服务器</span>
+<span class="prompt">$</span> <span class="cmd">ws add-server prod --ssh "ssh prod"</span>  <span class="comment"># 添加远程服务器</span>
+<span class="prompt">$</span> <span class="cmd">ws add-server local-dev --local</span>    <span class="comment"># 添加本地服务器</span>
+
+<span class="prompt">#</span> <span class="comment">扫描与列表</span>
+<span class="prompt">$</span> <span class="cmd">ws scan</span>                         <span class="comment"># 扫描所有服务器</span>
+<span class="prompt">$</span> <span class="cmd">ws list</span>                         <span class="comment"># 列出工作区</span>
+<span class="prompt">$</span> <span class="cmd">ws list --server prod</span>             <span class="comment"># 按服务器筛选</span>
+<span class="prompt">$</span> <span class="cmd">ws list --status active</span>           <span class="comment"># 按状态筛选</span>
+<span class="prompt">$</span> <span class="cmd">ws list --json</span>                    <span class="comment"># JSON 输出</span>
+
+<span class="prompt">#</span> <span class="comment">工作区操作</span>
+<span class="prompt">$</span> <span class="cmd">ws attach prod/api</span>               <span class="comment"># 附加到工作区</span>
+<span class="prompt">$</span> <span class="cmd">ws note prod/api "使用 uv"</span>       <span class="comment"># 添加笔记</span>
+<span class="prompt">$</span> <span class="cmd">ws tags prod/api work backend</span>     <span class="comment"># 设置标签</span>
+<span class="prompt">$</span> <span class="cmd">ws status prod/api archived</span>       <span class="comment"># 归档工作区</span></pre>
+    </div>
+
+    <!-- TUI SHORTCUTS -->
+    <section class="shortcuts">
+      <div class="shortcuts-head">
+        <span class="shortcuts-badge">TUI</span>
+        <h2>界面快捷键</h2>
+      </div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-item">
+          <span class="shortcut-key">Enter</span>
+          <span class="shortcut-desc">附加到工作区</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">/</span>
+          <span class="shortcut-desc">搜索</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">n</span>
+          <span class="shortcut-desc">编辑笔记</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">a</span>
+          <span class="shortcut-desc">归档/取消归档</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">v</span>
+          <span class="shortcut-desc">循环视图模式</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">s</span>
+          <span class="shortcut-desc">循环服务器过滤</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">r</span>
+          <span class="shortcut-desc">重新扫描</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">q</span>
+          <span class="shortcut-desc">退出</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENARIOS -->
+    <section class="scenarios">
+      <div class="scenarios-head">
+        <span class="scenarios-badge">Scenarios</span>
+        <h2>适用场景</h2>
+      </div>
+      <div class="scenarios-grid">
+        <div class="scenario-card">
+          <span class="scenario-icon">🖥️</span>
+          <h4>远程服务器开发</h4>
+          <p>通过 SSH 连接多台远程服务器，每个服务器上有多个 tmux 会话管理不同项目</p>
+        </div>
+        <div class="scenario-card">
+          <span class="scenario-icon">🔀</span>
+          <h4>多项目切换</h4>
+          <p>同时开发多个项目，需要在不同 tmux 会话间快速切换并记住上下文</p>
+        </div>
+        <div class="scenario-card">
+          <span class="scenario-icon">⏸️</span>
+          <h4>断点恢复</h4>
+          <p>下班后关闭终端，第二天通过稳定 ID 快速恢复到昨天的开发环境</p>
+        </div>
+        <div class="scenario-card">
+          <span class="scenario-icon">📊</span>
+          <h4>Git 状态追踪</h4>
+          <p>需要了解每个工作区的 git 分支、提交、脏状态，避免在错误的分支上工作</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE -->
+    <section class="arch">
+      <div class="arch-head">
+        <span class="arch-badge">Architecture</span>
+        <h2>技术架构</h2>
+      </div>
+      <div class="arch-flow">
+        <span class="arch-node">tmux list-panes</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-node">ws scan</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-node">SQLite Index</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-node">CLI / TUI</span>
+      </div>
+      <div class="arch-flow" style="margin-top:8px">
+        <span class="arch-node">git status</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-node">Git Snapshot</span>
+      </div>
+      <div style="margin-top:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div style="padding:8px 10px;border:1.5px solid var(--line);background:#fff;text-align:center">
+          <div style="font:800 10.5px/1 ui-monospace;color:var(--blue)">Language</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Rust</div>
+        </div>
+        <div style="padding:8px 10px;border:1.5px solid var(--line);background:#fff;text-align:center">
+          <div style="font:800 10.5px/1 ui-monospace;color:var(--blue)">CLI Parser</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:4px">clap</div>
+        </div>
+        <div style="padding:8px 10px;border:1.5px solid var(--line);background:#fff;text-align:center">
+          <div style="font:800 10.5px/1 ui-monospace;color:var(--blue)">TUI Framework</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:4px">ratatui + crossterm</div>
+        </div>
+        <div style="padding:8px 10px;border:1.5px solid var(--line);background:#fff;text-align:center">
+          <div style="font:800 10.5px/1 ui-monospace;color:var(--blue)">Database</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:4px">rusqlite (SQLite)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATUS -->
+    <section class="status-bar">
+      <div class="status-head">
+        <span class="status-badge">Status</span>
+        <h2>项目状态</h2>
+      </div>
+      <div class="status-grid">
+        <div class="status-section">
+          <h4>已实现</h4>
+          <ul>
+            <li>本地和远程 tmux 索引</li>
+            <li>并发扫描与命令超时</li>
+            <li>TUI 自动刷新</li>
+            <li>服务器管理 CLI</li>
+            <li>笔记、别名、标签、归档</li>
+            <li>附加历史记录</li>
+            <li>Git 快照</li>
+          </ul>
+        </div>
+        <div class="status-section">
+          <h4>计划中</h4>
+          <ul>
+            <li>窗格布局恢复</li>
+            <li>更多发布目标</li>
+            <li>专用 Homebrew tap</li>
+          </ul>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:10px 12px;border:1.5px solid var(--line);background:var(--yellow-soft)">
+        <span style="font:800 10.5px/1 ui-monospace;color:var(--yellow)">⚠ 注意</span>
+        <span style="font-size:11.5px;color:var(--muted);margin-left:8px">项目目前为 pre-1.0 版本，CLI 和数据库格式可能仍有变化</span>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq-section">
+      <div class="faq-head">
+        <span class="faq-badge">FAQ</span>
+        <h2>常见问题</h2>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item">
+          <p class="faq-q">Q: tmux-workbench 和 tmux 是什么关系？</p>
+          <p class="faq-a">tmux-workbench 不是 tmux 的替代品，而是 tmux 的上层工具。它索引 tmux 会话并添加元数据层，让工作区更易查找和恢复。</p>
+        </div>
+        <div class="faq-item">
+          <p class="faq-q">Q: 支持哪些平台？</p>
+          <p class="faq-a">支持 macOS、Linux 等 Unix-like 系统。需要 <code>tmux</code>、<code>git</code> 和 <code>ssh</code>（用于远程服务器）。</p>
+        </div>
+        <div class="faq-item">
+          <p class="faq-q">Q: 如何管理远程服务器？</p>
+          <p class="faq-a">使用系统 <code>ssh</code> 命令，因此现有的 <code>~/.ssh/config</code>、密钥、ProxyCommand 等配置可以直接使用。</p>
+        </div>
+        <div class="faq-item">
+          <p class="faq-q">Q: 数据存储在哪里？</p>
+          <p class="faq-a">配置文件在 <code>~/.config/ws/config.yaml</code>，数据库在 <code>~/.local/share/ws/workspaces.db</code>（SQLite）。</p>
+        </div>
+        <div class="faq-item">
+          <p class="faq-q">Q: TUI 搜索支持哪些过滤器？</p>
+          <p class="faq-a">支持 <code>server:prod</code>、<code>status:active</code>、<code>tag:backend</code>、<code>git:dirty</code>、<code>git:clean</code> 等过滤器。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESOURCES -->
+    <section class="resources">
+      <div class="resources-head">
+        <span class="resources-badge">Resources</span>
+        <h2>资源链接</h2>
+      </div>
+      <div class="resources-list">
+        <a class="resource-item" href="https://github.com/LeON-Nie-code/tmux-workbench" target="_blank">
+          <span class="resource-icon">🐙</span>
+          <div class="resource-info">
+            <h4>GitHub Repository</h4>
+            <p>https://github.com/LeON-Nie-code/tmux-workbench</p>
+          </div>
+          <span class="resource-link">Visit →</span>
+        </a>
+        <a class="resource-item" href="https://github.com/LeON-Nie-code/tmux-workbench/releases" target="_blank">
+          <span class="resource-icon">📦</span>
+          <div class="resource-info">
+            <h4>Releases</h4>
+            <p>下载预编译二进制文件</p>
+          </div>
+          <span class="resource-link">Visit →</span>
+        </a>
+        <a class="resource-item" href="https://github.com/LeON-Nie-code/tmux-workbench/blob/master/ROADMAP.md" target="_blank">
+          <span class="resource-icon">🗺️</span>
+          <div class="resource-info">
+            <h4>Roadmap</h4>
+            <p>项目路线图与规划</p>
+          </div>
+          <span class="resource-link">Visit →</span>
+        </a>
+      </div>
+    </section>
+
+  </div>
+</body>
+</html>
