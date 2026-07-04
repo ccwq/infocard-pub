@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>kcap-cli · Kurrent Capacitor CLI — AI 编程会话全息录制工具</title>
+  <meta name="description" content="Kurrent Capacitor（kcap-cli）开源 AI 编程代理录制工具，支持 Claude Code / Codex / Cursor / Copilot / Gemini / Kiro / Pi / OpenCode，实时流式录制会话、工具调用、Token 消耗，输出交互式回溯仪表盘与 PR 审查报告。无需云端处理，本地 CLI 即装即用。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,48px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:60ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    .mission{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .mission .big{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:16px;line-height:1.2;letter-spacing:-.02em;color:#fff}
+    .mission .en{font-size:10px;color:#8b9bbf;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+    .mission .tagline{font-size:11px;color:#d8e2ff;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--red) 0%, #991b1b 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12px;line-height:1.62;color:#fdd;margin-top:8px}
+    /* === FEATURES === */
+    .features{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .section-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px;border-bottom:1.5px solid var(--line);padding-bottom:10px}
+    .section-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .section-badge.blue{background:var(--blue)}
+    .section-badge.green{background:var(--green)}
+    .section-badge.yellow{background:var(--yellow)}
+    .section-head h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .features-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .feat-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .feat-num{display:flex;align-items:center;gap:6px}
+    .feat-num span{background:var(--red);color:#fff;font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:2px 6px;border-radius:3px;letter-spacing:.06em;flex-shrink:0}
+    .feat-card h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .feat-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5}
+    /* === AGENT GRID === */
+    .agents{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .agents-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .agent-card{border:1.5px solid var(--line);padding:8px 10px;background:#fff;display:grid;gap:4px}
+    .agent-card h5{margin:0;font-size:11.5px;font-weight:800;color:var(--ink);line-height:1.3}
+    .agent-card p{margin:0;font-size:10.5px;color:var(--muted);line-height:1.4}
+    .agent-tag{display:inline-flex;padding:1px 5px;background:var(--blue-soft);border:1px solid var(--blue);color:var(--blue);font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;border-radius:2px;letter-spacing:.04em}
+    /* === USE CASES === */
+    .usecases{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .usecase-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .usecase-card h4{margin:0;font-size:12px;font-weight:800;line-height:1.3;color:var(--blue)}
+    .usecase-card p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    /* === COMMANDS === */
+    .commands{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .cmd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .cmd-card{border:1.5px solid var(--line);background:#fff;overflow:hidden}
+    .cmd-label{background:var(--line);color:#fff;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:5px 10px;letter-spacing:.04em}
+    .cmd-label.red{background:var(--red)}
+    .cmd-label.blue{background:var(--blue)}
+    .cmd-label.green{background:var(--green)}
+    .cmd-body{padding:8px 10px;display:grid;gap:4px}
+    .cmd-body code{display:block;font:700 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);background:#f8f4ee;padding:4px 7px;border:1px solid #e8e3dc;white-space:pre-wrap;word-break:break-all}
+    .cmd-body p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    /* === FAQ === */
+    .faq{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .faq-grid{display:grid;gap:8px}
+    .faq-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:4px}
+    .faq-item h4{margin:0;font-size:12.5px;font-weight:800;color:var(--red-dark);line-height:1.3}
+    .faq-item p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5}
+    /* === LINKS === */
+    .links{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .link-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .link-card h4{margin:0;font-size:12px;font-weight:800;color:var(--ink);line-height:1.3}
+    .link-card p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    .link-url{display:block;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);word-break:break-all}
+    .link-card.blue{border-color:var(--blue);background:var(--blue-soft)}
+    .link-card.red{border-color:var(--red);background:var(--red-soft)}
+    .link-card.green{border-color:var(--green);background:var(--green-soft)}
+    /* === BOTTOM STAT BAR === */
+    .stat-bar{background:var(--line);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:10px 16px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between;align-items:center}
+    .stat-item{display:flex;flex-direction:column;gap:1px}
+    .stat-label{font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#8b8b8b;text-transform:uppercase;letter-spacing:.08em}
+    .stat-value{font:800 16px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#fff}
+    .stat-value.red{color:#ff6b6b}
+    .stat-value.green{color:#6bffb8}
+    .stat-value.blue{color:#93c5fd}
+    .stat-value.yellow{color:#fde68a}
+    /* === NOTE === */
+    .note{background:var(--yellow-soft);border:2px solid var(--yellow);box-shadow:var(--shadow);padding:10px 14px;margin-bottom:12px}
+    .note p{margin:0;font-size:11.5px;color:var(--yellow);line-height:1.6}
+    .note strong{font-weight:800}
+    @media(max-width:680px){.hero{grid-template-columns:1fr}.mission{display:none}.features-grid,.agents-grid,.usecases,.cmd-grid{grid-template-columns:1fr}.links{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker">Research Tools · CLI · Observability</span>
+        <span class="source">github.com/kurrent-io/kcap-cli</span>
+      </div>
+      <h1>kcap CLI</h1>
+      <p class="subtitle">AI 编程会话<strong>全息录制</strong>工具 — 完整记录每一次 Claude Code / Codex / Cursor 会话生命周期、工具调用、Token 消耗与子代理树，输出交互式回溯仪表盘与 PR 审查报告。</p>
+      <div class="meta-row">
+        <span class="chip blue">★ 11 Stars</span>
+        <span class="chip">🍴 4 Forks</span>
+        <span class="chip yellow">C# · NativeAOT</span>
+        <span class="chip green">Kurrent License v1</span>
+        <span class="chip red">8 种代理支持</span>
+      </div>
+    </div>
+    <div class="mission">
+      <div class="big">Record Every Session.<br>Surface Every Decision.</div>
+      <div class="en">Kurrent Capacitor</div>
+      <div class="tagline">让 AI 编程代理的工作可被完整回溯、审查与复用</div>
+    </div>
+  </div>
+
+  <!-- BANNER -->
+  <div class="banner">
+    <div class="quote">🎯 不是 Kaplan-Meier 估计器 — 而是 AI Coding 时代的会话录制与协作平台</div>
+    <div class="note">kcap 是 <strong>Kurrent Capacitor</strong> 的 CLI 工具，与统计学生存分析无关。记录 Claude Code、Codex CLI、Cursor、Copilot、 Gemini、Kiro、Pi、OpenCode 等 AI 编程代理的完整工作会话。</div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stat-bar">
+    <div class="stat-item">
+      <span class="stat-label">Stars</span>
+      <span class="stat-value red">11</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Forks</span>
+      <span class="stat-value">4</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Issues</span>
+      <span class="stat-value yellow">9</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Language</span>
+      <span class="stat-value blue">C#</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">License</span>
+      <span class="stat-value green">Kurrent v1</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Agents</span>
+      <span class="stat-value">8</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Since</span>
+      <span class="stat-value">2026-04</span>
+    </div>
+  </div>
+
+  <!-- WHAT IT RECORDS -->
+  <div class="features">
+    <div class="section-head">
+      <span class="section-badge">REC</span>
+      <h2>录制内容 — 完整会话全息图</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-num"><span>01</span></div>
+        <h4>会话生命周期</h4>
+        <p>Start / End / 中断 / 上下文压缩，完整记录会话起止与所有关键状态变迁。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num"><span>02</span></div>
+        <h4>实时流式转录</h4>
+        <p>通过 SignalR 后台进程实时流式传输对话内容，支持 SessionStart 时的持久化录制缓存（spool）。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num"><span>03</span></div>
+        <h4>子代理活动树</h4>
+        <p>完整捕获所有 spawn 子代理及其各自的转录，形成树状调用关系图。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num"><span>04</span></div>
+        <h4>工具调用详情</h4>
+        <p>每次工具调用含时间戳、参数与返回结果，支持错误提取（kcap errors）快速定位问题。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num"><span>05</span></div>
+        <h4>Token 消耗追踪</h4>
+        <p>Input / Output / Cache token 计数，精确到每轮交互，适合成本分析与性能优化。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num"><span>06</span></div>
+        <h4>Git 上下文关联</h4>
+        <p>自动关联仓库、分支、PR/MR，支持 PR 自动标签与 pull-request 审查报告。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUPPORTED AGENTS -->
+  <div class="agents">
+    <div class="section-head">
+      <span class="section-badge blue">Agnostic</span>
+      <h2>支持的 AI 编程代理（8 种）</h2>
+    </div>
+    <div class="agents-grid">
+      <div class="agent-card">
+        <h5>Claude Code</h5>
+        <p>Shell 钩子，PATH 检测，NativeAOT CLI，含 MCP 服务器（sessions / flows / memory）</p>
+        <span class="agent-tag">一级支持</span>
+      </div>
+      <div class="agent-card">
+        <h5>Codex CLI</h5>
+        <p>Shell 钩子，沙箱网络配置，Codex 桌面版共享进程，worktree 隔离执行</p>
+        <span class="agent-tag">一级支持</span>
+      </div>
+      <div class="agent-card">
+        <h5>Cursor IDE</h5>
+        <p>~/.cursor/hooks.json，user-scope，IDE 内部会话录制</p>
+        <span class="agent-tag">一级支持</span>
+      </div>
+      <div class="agent-card">
+        <h5>GitHub Copilot CLI</h5>
+        <p>~/.copilot/hooks/kcap.json，merge 方式，session-state 目录轮询</p>
+        <span class="agent-tag">Live + History</span>
+      </div>
+      <div class="agent-card">
+        <h5>Google Gemini CLI</h5>
+        <p>~/.gemini/settings.json merge，捕获子代理嵌套，--resume 复续</p>
+        <span class="agent-tag">Live + History</span>
+      </div>
+      <div class="agent-card">
+        <h5>AWS Kiro CLI</h5>
+        <p>默认代理克隆，agentSpawn 钩子，JSONL 会话日志，消费型 Token 统计</p>
+        <span class="agent-tag">No token data</span>
+      </div>
+      <div class="agent-card">
+        <h5>SST Pi</h5>
+        <p>Pi 扩展（~/.pi/agent/extensions/kcap.ts），无 Shell 钩子，live-ingest 插件</p>
+        <span class="agent-tag">Live only</span>
+      </div>
+      <div class="agent-card">
+        <h5>SST OpenCode</h5>
+        <p>OpenCode 插件（~/.config/opencode/plugins/kcap.ts），SQLite 历史回填，子代理嵌套捕获</p>
+        <span class="agent-tag">Live + History</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- USE CASES -->
+  <div class="usecases" style="margin-bottom:12px">
+    <div class="section-head" style="grid-column:1/-1">
+      <span class="section-badge green">USE</span>
+      <h2>适用场景</h2>
+    </div>
+    <div class="usecase-card">
+      <h4>🏢 团队协作与知识沉淀</h4>
+      <p>会话回溯让团队成员了解 AI 代理为何做出特定决策，减少重复提问，加速代码审查。</p>
+    </div>
+    <div class="usecase-card">
+      <h4>🐛 错误追踪与根因分析</h4>
+      <p>完整的工具调用链 + Token 时序数据帮助开发者精准定位 AI 代理出错的具体环节。</p>
+    </div>
+    <div class="usecase-card">
+      <h4>💰 Token 成本审计</h4>
+      <p>按会话、仓库、交互轮次统计 Token 消耗，支持成本控制和 API 使用合规审查。</p>
+    </div>
+    <div class="usecase-card">
+      <h4>📋 PR / MR 审查辅助</h4>
+      <p>AI 代理修改的代码关联 PR/MR 标签，审查者可在 Dashboard 查看代理工作上下文。</p>
+    </div>
+    <div class="usecase-card">
+      <h4>🔒 合规与审计</h4>
+      <p>本地录制，数据不上传第三方平台，适合有数据安全要求的金融、医疗、政务场景。</p>
+    </div>
+    <div class="usecase-card">
+      <h4>🔄 AI 代理评测</h4>
+      <p>录制不同 AI 代理在同一任务的表现差异（工具使用效率、Token 消耗、错误率）。</p>
+    </div>
+  </div>
+
+  <!-- COMMAND REFERENCE -->
+  <div class="commands">
+    <div class="section-head">
+      <span class="section-badge blue">CLI</span>
+      <h2>常用命令参考</h2>
+    </div>
+    <div class="cmd-grid">
+      <div class="cmd-card">
+        <div class="cmd-label red">安装与设置</div>
+        <div class="cmd-body">
+          <code>npm install -g @kurrent/kcap</code>
+          <p>自动下载 NativeAOT 二进制（macOS ARM64 / Linux x64+ARM64 / Windows x64）</p>
+        </div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-label">初始化</div>
+        <div class="cmd-body">
+          <code>kcap setup</code>
+          <p>交互式向导，发现租户、OAuth 登录、默认可见性配置、代理钩子安装</p>
+        </div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-label green">会话回溯</div>
+        <div class="cmd-body">
+          <code>kcap recap &lt;sessionId&gt;</code>
+          <p>AI 生成摘要 + 每轮交互大纲；加 --full 输出完整转录；--chain 跨会话链</p>
+        </div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-label">会话导入</div>
+        <div class="cmd-body">
+          <code>kcap import --org &lt;owner&gt;</code>
+          <p>导入历史会话；--all / --org / --repo 限定范围；--claude / --codex / --cursor 等限定代理</p>
+        </div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-label">本地代理</div>
+        <div class="cmd-body">
+          <code>kcap run-agent claude --detached</code>
+          <p>在后台运行 Claude Code（daemon 托管），Ctrl-Q d 可断开会话而不中断代理</p>
+        </div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-label blue">更新</div>
+        <div class="cmd-body">
+          <code>kcap update</code>
+          <p>升级 CLI + 刷新所有代理插件（绕过 npm 11+ allowScripts 限制）</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTE -->
+  <div class="note">
+    <p><strong>⚠ 关键区分：</strong>kcap-cli 与 Kaplan-Meier 估计器（生物统计/生存分析）完全无关。其全称为 <strong>Kurrent Capacitor</strong>，面向 AI 编程代理会话录制与协作场景。</p>
+  </div>
+
+  <!-- MCP SERVERS -->
+  <div class="features">
+    <div class="section-head">
+      <span class="section-badge yellow">MCP</span>
+      <h2>内置 MCP 服务器（面向 AI 代理自身）</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-num"><span>MCP-1</span></div>
+        <h4>kcap mcp sessions</h4>
+        <p>让 AI 代理在对话中搜索和调用历史 Capacitor 会话，无需离开当前工作流。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num"><span>MCP-2</span></div>
+        <h4>kcap mcp flows</h4>
+        <p>启动与交互 AI 驱动的代理流程（规范审查、代码评审等结构化迭代循环）。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num"><span>MCP-3</span></div>
+        <h4>kcap mcp memory</h4>
+        <p>团队级持久化记忆：搜索、保存、更新偏好、反馈、项目事实，可按 Org / Team / 个人范围。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="faq">
+    <div class="section-head">
+      <span class="section-badge">FAQ</span>
+      <h2>常见问题</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <h4>Q: 与 Kaplan-Meier 估计器有关吗？</h4>
+        <p>完全没有。kcap-cli 全称为 Kurrent Capacitor，是 AI 编程代理的会话录制工具，与生物统计/生存分析无关。</p>
+      </div>
+      <div class="faq-item">
+        <h4>Q: 数据存储在哪里？</h4>
+        <p>会话录制发送到配置的 Kurrent Capacitor 服务器（私有部署或 Kurrent 托管）。本地仅存储配置、钩子脚本和 spooled 事件。可通过排除配置（excluded_repos）精细控制不上传的仓库。</p>
+      </div>
+      <div class="faq-item">
+        <h4>Q: 支持哪些平台？</h4>
+        <p>macOS ARM64、Apple Silicon、Linux x64/ARM64（含 Alpine/musl）、Windows x64。CLI 使用 NativeAOT 编译，无需 .NET 运行时。</p>
+      </div>
+      <div class="faq-item">
+        <h4>Q: 如何实现断网容错？</h4>
+        <p>SessionStart/SessionEnd 事件在服务器不可达时自动写入 ~/.config/kcap/spool/，下次钩子触发时重新发送，最多保留 30 天。</p>
+      </div>
+      <div class="faq-item">
+        <h4>Q: 多租户/多服务器如何切换？</h4>
+        <p>使用 Profiles 功能（kcap profile add），支持 --remote 模式按 Git 远程地址自动切换；也可用 .kcap.json 文件团队共享配置。</p>
+      </div>
+      <div class="faq-item">
+        <h4>Q: 可否本地离线使用？</h4>
+        <p>CLI 工具本身可离线安装和运行，但录制数据需发送到配置好的服务器（支持自托管），离线状态下 spool 本地待发送。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LINKS -->
+  <div class="links">
+    <div class="link-card blue">
+      <h4>📦 NPM 包</h4>
+      <p>@kurrent/kcap，NativeAOT 编译，即装即用</p>
+      <a class="link-url" href="https://www.npmjs.com/package/@kurrent/kcap">npmjs.com/package/@kurrent/kcap</a>
+    </div>
+    <div class="link-card green">
+      <h4>🌐 官方文档</h4>
+      <p>完整 README，8 种代理接入指南，CLI 命令参考</p>
+      <a class="link-url" href="https://github.com/kurrent-io/kcap-cli">github.com/kurrent-io/kcap-cli</a>
+    </div>
+    <div class="link-card red">
+      <h4>🖥 官方仪表盘</h4>
+      <p>实时会话监控，PR 审查，回溯分析，团队协作</p>
+      <a class="link-url" href="https://capacitor.kurrent.io">capacitor.kurrent.io</a>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
