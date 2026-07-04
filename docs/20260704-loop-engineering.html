@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loop Engineering 入门 · 让 AI 自己找活干</title>
+  <meta name="description" content="JumpX AI 出品 Loop Engineering 入门课（120分钟）：从 prompt 到 loop，造一个自己会跑的编程 agent。基于 HuaShu Orange Book v260615，融合吴恩达三环嵌套模型、Addy Osmani/Peter Steinberger/Boris Cherny 三人一周内同时点火的 Loop Engineering 概念，五动作六部件完整 SOP，含 SKILL.md / worktree / evaluator / state file / cron 实战代码示例。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;
+      --line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;
+      --red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;
+      --shadow:7px 7px 0 rgba(17,17,17,.12);
+      --green:#15803d;--green-soft:#eefbf1;
+      --yellow:#b45309;--yellow-soft:#fef3c7;
+      --orange:#c2410c;--orange-soft:#fff7ed;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);
+      color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative;
+    }
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(240px,.5fr);gap:14px;background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 16px 14px;margin-bottom:12px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right;overflow-wrap:anywhere;max-width:220px}
+    h1{margin:0 0 10px;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(24px,4.8vw,50px);line-height:.98;letter-spacing:-.03em;color:var(--ink)}
+    .subtitle{margin:0;max-width:60ch;font-size:13px;line-height:1.72;color:#3f3932}
+    .subtitle strong{color:var(--blue)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.orange{background:var(--orange-soft);border-color:var(--orange);color:var(--orange)}
+    /* === COMPARE SIDEBAR === */
+    .compare{background:#111;color:#fff;display:flex;flex-direction:column;min-width:0;border:2px solid #111}
+    .compare-head{padding:10px 12px 8px;border-bottom:1.5px solid rgba(255,255,255,.18);font:800 11px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase}
+    .compare-body{padding:12px;display:grid;gap:8px;flex:1}
+    .compare-body .big{font-size:13.5px;font-weight:900;line-height:1.22;color:#fff}
+    .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .compare-card{background:#1e1e1e;border:1.5px solid rgba(255,255,255,.08);padding:8px 9px 7px;min-width:0}
+    .compare-card .tag{display:inline-block;margin-bottom:3px;padding:2px 5px;border:1.5px solid rgba(255,255,255,.18);font:800 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;color:#8b9bbf}
+    .compare-card h4{margin:0 0 2px;font-size:11px;line-height:1.3;color:#d8e2ff}
+    .compare-card p{margin:0;font-size:10px;color:#8b9bbf;line-height:1.4}
+    .compare-foot{padding:8px 12px;border-top:1.5px solid rgba(255,255,255,.12);font:700 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#8b9bbf;text-transform:uppercase;letter-spacing:.08em}
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--blue) 0%, #1a3a6b 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 16px 10px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:21px;line-height:1.2;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12.5px;line-height:1.62;color:#c8d8f0}
+    /* === THREE LOOPS === */
+    .three-loops{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .three-loops-head{padding:12px 14px 10px;border-bottom:1.5px solid var(--line);display:flex;align-items:center;gap:10px}
+    .three-loops .badge{background:var(--blue);color:#fff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:3px 9px;border-radius:3px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .three-loops h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:19px;line-height:1.1;letter-spacing:-.02em}
+    .loop-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+    .loop-col{border-right:1.5px solid var(--line);min-width:0;display:grid;gap:0}
+    .loop-col:last-child{border-right:none}
+    .loop-col-head{padding:9px 11px 8px;border-bottom:1.5px solid var(--line);background:#faf7f0}
+    .loop-col-head .tier{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+    .loop-col-head .name{font-size:14px;font-weight:800;line-height:1.2;color:var(--ink)}
+    .loop-col-head .who{font-size:11px;color:var(--muted);margin-top:3px}
+    .loop-col-body{padding:9px 11px 8px;display:grid;gap:6px}
+    .loop-stat{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(17,17,17,.08)}
+    .loop-stat:last-child{border-bottom:none}
+    .loop-stat .k{font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+    .loop-stat .v{font-size:12.5px;font-weight:800;color:var(--ink)}
+    .loop-focus{background:var(--blue-soft);border:1.5px solid var(--blue);padding:6px 9px 5px;margin:0 11px 9px;font-size:11.5px;line-height:1.5;color:var(--blue);font-weight:700;text-align:center}
+    /* === 3-COL CONTENT === */
+    .content{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+    .col{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);min-width:0;display:flex;flex-direction:column}
+    .col-head{padding:12px 12px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0}
+    .col-kicker{margin:0 0 5px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--blue);text-transform:uppercase}
+    .col-title{margin:0;font-size:19px;line-height:1.08;font-family:Georgia,"Times New Roman","Songti SC",serif;letter-spacing:-.03em}
+    .col-body{padding:12px 12px 10px;display:grid;gap:9px;flex:1}
+    .principle{padding:8px 9px 7px;border:1.5px solid var(--line);background:#fff}
+    .principle .num{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;background:var(--blue-soft);border:1.5px solid var(--blue);color:var(--blue);font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:6px}
+    .principle h4{margin:0 0 3px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .principle p{margin:0;color:#45413b;font-size:11.8px;line-height:1.58}
+    .principle code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;background:#f4f0e8;padding:1px 4px;border-radius:3px}
+    .mini{padding:8px 9px 7px;border:1.5px solid var(--line);background:#fff}
+    .mini h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .mini p{margin:0;font-size:11.5px;color:#47423c;line-height:1.58}
+    .mini .label{display:inline-block;margin-bottom:5px;padding:2px 6px;border:1.5px solid var(--red);background:var(--red-soft);color:var(--red-dark);font:700 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
+    .mini code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;background:#f4efe8;padding:1px 4px;border-radius:3px}
+    /* === CODE BLOCK === */
+    .code-block{background:#111;border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px;overflow-x:auto}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#d8e2ff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:#d8e2ff;white-space:pre;word-break:normal;overflow-x:auto}
+    .code-block .prompt{color:#f4c84c}
+    .code-block .ai{color:#a8f59f}
+    .code-block .comment{color:#8b9bbf}
+    .code-block .cmd{color:#f4a8c8}
+    .code-block .key{color:#93c5fd}
+    .code-block .val{color:#fdba74}
+    .code-block .var{color:#f9a8d4}
+    .code-block .section{color:#f0b4c8;font-weight:700}
+    /* === ANTI-PATTERNS === */
+    .anti-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}
+    .anti-card{border:1.5px solid var(--line);padding:9px 10px 8px;background:#fff;box-shadow:3px 3px 0 rgba(17,17,17,.1)}
+    .anti-card .anti-badge{display:inline-block;margin-bottom:6px;padding:2px 7px;background:var(--red-soft);border:1.5px solid var(--red);color:var(--red-dark);font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
+    .anti-card h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3;color:var(--red)}
+    .anti-card p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    .anti-card .fix{font-size:10.5px;color:var(--green);font-weight:700;margin-top:5px}
+    /* === LESSON GRID === */
+    .lesson-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .lesson-card{border:1.5px solid var(--line);padding:10px 11px;background:#fff;box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+    .lesson-card .lesson-num{font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+    .lesson-card h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .lesson-card p{margin:0 0 7px;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .lesson-card .cmd-row{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;background:#f4efe8;padding:2px 6px;border-radius:3px;word-break:break-all}
+    /* === SECTION LABEL === */
+    .section-label{font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding-left:2px}
+    /* === FOUR LAYER TABLE === */
+    .layer-table{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:12px 14px}
+    .layer-table table{width:100%;border-collapse:collapse;font-size:12.5px}
+    .layer-table th{background:var(--blue-soft);border:1.5px solid var(--line);padding:7px 10px;text-align:left;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);letter-spacing:.06em;text-transform:uppercase}
+    .layer-table td{border:1.5px solid var(--line);padding:7px 10px;vertical-align:top}
+    .layer-table td:first-child{font-weight:800;color:var(--blue)}
+    .layer-table .active-row{background:#fff7ed}
+    /* === QUOTE === */
+    .pullquote{border-left:4px solid var(--blue);background:#fff;padding:11px 14px;box-shadow:var(--shadow);border:2px solid var(--line);margin-bottom:12px;display:grid;gap:6px}
+    .pullquote p{margin:0;font-size:13px;line-height:1.62;color:#333;font-style:italic}
+    .pullquote cite{font-size:11px;color:var(--muted);font-style:normal;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    /* === RESOURCES === */
+    .res-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .res-card{border:1.5px solid var(--line);padding:9px 11px;background:#fff;box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+    .res-card .res-label{font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+    .res-card a{font-size:12px;color:var(--ink);font-weight:700}
+    .res-card p{font-size:11px;color:var(--muted);margin:3px 0 0;line-height:1.5}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:12px 14px 10px;color:var(--muted);font-size:12px;line-height:1.6}
+    .footer .brand{font-weight:800;color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:14px}
+    .footer .small{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    .footer .small a{color:var(--blue)}
+    .save{display:block;width:fit-content;position:static;margin:12px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--blue),#1a3a6b);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(36,74,156,.3);cursor:pointer}
+    /* === STACK DIAGRAM === */
+    .stack-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:#111;color:#fff;border:2px solid #111;box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .stack-layer{padding:9px 11px 8px;border-right:1.5px solid rgba(255,255,255,.18);min-width:0;display:grid;gap:3px}
+    .stack-layer:last-child{border-right:none}
+    .stack-layer .n{display:block;font:900 20px/1 Georgia,"Times New Roman",serif;color:#fff}
+    .stack-layer .t{display:block;font:800 9.5px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#ff9999}
+    .stack-layer .d{font-size:10.5px;line-height:1.45;color:#dfd7cd}
+    .stack-layer .extra{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;background:rgba(255,255,255,.06);padding:2px 5px;border-radius:3px;display:inline-block;margin-top:3px}
+    /* === RESPONSE === */
+    @media (max-width:960px){
+      .hero,.loop-body,.content,.stack-grid{grid-template-columns:1fr}
+      .lesson-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .compare-body{display:none}
+      .compare-head{border-bottom:none}
+      .anti-grid{grid-template-columns:repeat(2,1fr)}
+      .layer-table{overflow-x:auto}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:10px 0 72px}
+      .hero,.banner,.footer{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(22px,8vw,34px)}
+      .lesson-grid,.anti-grid,.res-grid{grid-template-columns:1fr}
+      .loop-body{grid-template-columns:1fr}
+      .loop-col{border-right:none;border-bottom:1.5px solid var(--line)}
+      .footer{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">LOOP ENGINEERING · AI AGENT WORKFLOW · JUMPX COURSE</div>
+        <div class="source">jumpxai.vercel.app · HuaShu Orange Book v260615</div>
+      </div>
+      <h1>Loop Engineering 入门</h1>
+      <p class="subtitle">让 AI 自己找活干：从 <strong>prompt</strong> 到 <strong>loop</strong>，造一个自己会跑的编程 agent。吴恩达三环嵌套模型 + Addy Osmani/Peter Steinberger/Boris Cherny 一周同时点火的 Loop Engineering 概念，120分钟五节课带你装好五动作六部件。</p>
+      <div class="meta-row">
+        <span class="chip blue">120 分钟</span>
+        <span class="chip red">Intermediate</span>
+        <span class="chip green">免费 · 全中文</span>
+        <span class="chip orange">Claude Code ≥ v2.1.139</span>
+        <span class="chip">五动作六部件</span>
+        <span class="chip">SKILL.md</span>
+        <span class="chip">worktree</span>
+        <span class="chip">evaluator</span>
+      </div>
+    </div>
+    <aside class="compare">
+      <div class="compare-head">HOOK · 三人一周内点燃同一件事</div>
+      <div class="compare-body">
+        <div class="big">2026年6月，几个互不通气的人，在同一周说出了同一件事。</div>
+        <div class="compare-grid">
+          <div class="compare-card"><div class="tag">OpenClaw</div><h4>Peter Steinberger</h4><p>800万浏览的帖子：不该再 prompt 编码 agent 了——该设计那些 prompt 它们的 loop。</p></div>
+          <div class="compare-card"><div class="tag">Claude Code</div><h4>Boris Cherny</h4><p>我现在已经不 prompt Claude 了，我有一堆 loop 在 prompt Claude，我的工作是写 loop。</p></div>
+          <div class="compare-card"><div class="tag">命名</div><h4>Addy Osmani</h4><p>6月7日博客写下"Loop Engineering"这个名字，把前两人的话拧到一起。</p></div>
+          <div class="compare-card"><div class="tag">地图</div><h4>Andrew Ng</h4><p>同一周在 The Batch 通讯里，给出了三环嵌套模型——你手里同时在跑 3 个 loop。</p></div>
+        </div>
+      </div>
+      <div class="compare-foot">人从循环里撤下来，建那个循环</div>
+    </aside>
+  </section>
+
+  <!-- BANNER -->
+  <section class="banner">
+    <div class="quote">"Loop engineering is replacing oneself as the person who prompts the agent, and designing the system that does it instead."</div>
+    <div class="note">— Addy Osmani, 2026年6月。核心命题：Loop engineering 跟前三层（prompt / context / harness）不一样——前三层都假设有人坐在键盘前，一行一行带着 agent 干。Loop 删掉这个假设。</div>
+  </section>
+
+  <!-- THREE LOOPS -->
+  <section class="three-loops">
+    <div class="three-loops-head">
+      <div class="badge">ANDREW NG · THE BATCH 2026-06</div>
+      <h2>吴恩达三环嵌套模型：做 0-to-1 产品时手里同时在跑 3 个 loop</h2>
+    </div>
+    <div class="loop-body">
+      <div class="loop-col">
+        <div class="loop-col-head"><div class="tier">L3 · SLOW</div><div class="name">External Feedback Loop</div><div class="who">用户 + 团队</div></div>
+        <div class="loop-col-body">
+          <div class="loop-stat"><span class="k">时间尺度</span><span class="v">几小时 ~ 几周</span></div>
+          <div class="loop-stat"><span class="k">谁在驱动</span><span class="v">外部反馈</span></div>
+          <div class="loop-stat"><span class="k">输出给</span><span class="v">中间层</span></div>
+          <div class="loop-stat"><span class="k">速度</span><span class="v">↓ 最慢</span></div>
+        </div>
+        <div class="loop-focus">让愿景再演化的真实数据</div>
+      </div>
+      <div class="loop-col">
+        <div class="loop-col-head"><div class="tier">L2 · HUMAN-IN-LOOP</div><div class="name">Developer Feedback Loop</div><div class="who">人 + agent</div></div>
+        <div class="loop-col-body">
+          <div class="loop-stat"><span class="k">时间尺度</span><span class="v">几十分钟 ~ 几小时</span></div>
+          <div class="loop-stat"><span class="k">谁在驱动</span><span class="v">人看产品改 spec</span></div>
+          <div class="loop-stat"><span class="k">输出给</span><span class="v">里层 + 外层</span></div>
+          <div class="loop-stat"><span class="k">速度</span><span class="v">中间</span></div>
+        </div>
+        <div class="loop-focus">更清楚的产品愿景和 spec</div>
+      </div>
+      <div class="loop-col">
+        <div class="loop-col-head" style="background:var(--blue-soft)"><div class="tier" style="color:var(--blue)">L1 · FAST · 本课聚焦</div><div class="name">Agentic Coding Loop</div><div class="who">agent 自己</div></div>
+        <div class="loop-col-body">
+          <div class="loop-stat"><span class="k">时间尺度</span><span class="v">几秒 ~ 几分钟</span></div>
+          <div class="loop-stat"><span class="k">谁在驱动</span><span class="v">loop 自己跑</span></div>
+          <div class="loop-stat"><span class="k">输出给</span><span class="v">一版能跑的软件</span></div>
+          <div class="loop-stat"><span class="k">速度</span><span class="v">↑ 最快</span></div>
+        </div>
+        <div class="loop-focus" style="background:#e9f0ff;border-color:var(--blue);color:var(--blue)">本课聚焦这一层：5节课装齐五动作六部件</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOUR LAYER STACK -->
+  <div class="section-label">FOUR-LAYER STACK · Addy Osmani 的抽象层次图</div>
+  <section class="stack-grid" style="margin-bottom:12px">
+    <div class="stack-layer">
+      <div class="n">L4</div><div class="t">LOOP ENG.</div>
+      <div class="d">让 loop 自己一遍一遍跑下去 · scheduling on the harness</div>
+      <span class="extra">runs on a timer · spawns helpers · feeds itself</span>
+    </div>
+    <div class="stack-layer">
+      <div class="n">L3</div><div class="t">HARNESS ENG.</div>
+      <div class="d">武装单次跑 · 哪些工具、哪些动作、什么算 done</div>
+      <span class="extra">MCP · skills · tools · done condition</span>
+    </div>
+    <div class="stack-layer">
+      <div class="n">L2</div><div class="t">CONTEXT ENG.</div>
+      <div class="d">这一轮窗口里塞什么 · 取什么、清什么</div>
+      <span class="extra">summarize · trim · prioritize</span>
+    </div>
+    <div class="stack-layer">
+      <div class="n">L1</div><div class="t">PROMPT ENG.</div>
+      <div class="d">写一条好 prompt · 给模型说什么</div>
+      <span class="extra">instruction · examples · format</span>
+    </div>
+  </section>
+
+  <!-- FIVE MOVES -->
+  <div class="section-label">FIVE MOVES · 一次 turn 长什么样</div>
+  <section class="anti-grid" style="margin-bottom:12px">
+    <div class="anti-card" style="border-color:var(--blue)">
+      <div class="anti-badge" style="background:var(--blue-soft);border-color:var(--blue);color:var(--blue)">① Discovery</div>
+      <h4>找活</h4>
+      <p>自己找出这一轮该做什么：读 CI / Issues / Commits</p>
+      <div class="fix">→ 写 SKILL.md 定输入源</div>
+    </div>
+    <div class="anti-card" style="border-color:var(--blue)">
+      <div class="anti-badge" style="background:var(--blue-soft);border-color:var(--blue);color:var(--blue)">② Handoff</div>
+      <h4>派活</h4>
+      <p>把任务派出去，并且物理隔开：每个 finding 独立 worktree</p>
+      <div class="fix">→ git worktree add</div>
+    </div>
+    <div class="anti-card" style="border-color:var(--orange);background:#fff7ed">
+      <div class="anti-badge" style="background:#fff7ed;border-color:var(--orange);color:var(--orange)">③ Verification</div>
+      <h4>Say "No"</h4>
+      <p>换一个 agent 来挑刺：generator ≠ evaluator，结构性分离</p>
+      <div class="fix">→ evaluator 默认 broken</div>
+    </div>
+    <div class="anti-card" style="border-color:var(--blue)">
+      <div class="anti-badge" style="background:var(--blue-soft);border-color:var(--blue);color:var(--blue)">④ Persistence</div>
+      <h4>记下</h4>
+      <p>把状态写到对话外：state file 落在磁盘，不在 context 里</p>
+      <div class="fix">→ ./state/triage.md</div>
+    </div>
+    <div class="anti-card" style="border-color:var(--green)">
+      <div class="anti-badge" style="background:var(--green-soft);border-color:var(--green);color:#14532d">⑤ Scheduling</div>
+      <h4>定时下一轮</h4>
+      <p>挂 trigger：cron / /loop / Cloud Routines，让它自己醒来</p>
+      <div class="fix">→ GitHub Actions cron</div>
+    </div>
+  </section>
+
+  <!-- CODE: SKILL.MD -->
+  <section class="code-block">
+    <div class="tag">SKILL.MD · Discovery 产物 · L1 核心产出</div>
+    <pre><span class="section">## SKILL.md (morning-triage) — 改三处就能用</span>
+<span class="comment">---</span>
+<span class="key">name</span>: <span class="val">morning-triage</span>
+<span class="key">trigger</span>: <span class="val">invoked by daily automation</span>
+
+<span class="section">## Read (DISCOVERY 的输入源)</span>
+<span class="comment"># 改:换成你项目真的能读到的源</span>
+- CI runs that failed since the last run          <span class="comment"># gh run list --status failure</span>
+- issues opened in the last 24h                   <span class="comment"># gh issue list --search "created:>=…"</span>
+- commits merged since yesterday                  <span class="comment"># git log --since=yesterday</span>
+- the previous ./state/triage.md                  <span class="comment"># 昨天 → 今天接力</span>
+
+<span class="section">## Judge (Discovery 设的天花板)</span>
+<span class="comment"># 改:这条是 loop 能否自己挑的核心</span>
+For each candidate, decide:
+  - is it actionable NOW, or noise?
+  - does it block a release? → priority = P0
+  - is it already being tracked? → skip
+Keep only what is worth a worktree TODAY.
+
+<span class="section">## Write (PERSISTENCE 的输出)</span>
+Append to ./state/triage.md:
+  | finding | source | priority | status |
+Commit the file so tomorrow can read it.
+
+<span class="section">## Handoff (准备 L2 worktree)</span>
+For each kept finding, emit a task line:
+  worktree=fix/&lt;slug&gt; goal=&lt;stop-condition&gt;
+
+<span class="section">## Stop (明文写 loop 不能做的事)</span>
+<span class="comment"># 改:这是你唯一需要自己想清楚的部分</span>
+Never merge. Never delete.
+Anything you are less than confident about → ./inbox/ for a human.
+
+<span class="comment"># 核心原则: automation 触发的是 skill，不是粘进 cron 的 prompt</span></pre>
+  </section>
+
+  <!-- CODE: WORKTREE + EVALUATOR -->
+  <section class="code-block" style="margin-bottom:12px">
+    <div class="tag">WORKTREE + EVALUATOR · L2/L3 核心代码</div>
+    <pre><span class="section">## L2: 每个 finding 独立 worktree (Handoff)</span>
+<span class="prompt">$</span> <span class="cmd">MAX_PARALLEL=3</span>
+<span class="prompt">$</span> <span class="cmd">findings=$(awk -F'|' 'NR>2 && $5 ~ /open/ {print $2}' state/triage.md | head -n $MAX_PARALLEL)</span>
+<span class="prompt">$</span> <span class="cmd">for finding in $findings; do</span>
+<span class="prompt">$</span> <span class="cmd">  slug=$(echo "$finding" | tr ' ' '-' | tr -cd '[:alnum:]-')</span>
+<span class="prompt">$</span> <span class="cmd">  git worktree add ../wt-$slug -b fix/$slug</span>
+<span class="prompt">$</span> <span class="cmd">  claude --worktree ../wt-$slug --goal "tests pass and lint clean" "draft fix: $finding" &</span>
+<span class="prompt">$</span> <span class="cmd">done && wait</span>
+<span class="comment"># 关键: worktree = 物理隔离。多个 agent 不碰同一文件。</span>
+
+<span class="section">## L3: Evaluator agent system prompt (Verification)</span>
+<span class="comment"># .claude/agents/reviewer.md</span>
+<span class="key">ROLE</span>: <span class="val">Adversarial code reviewer. ASSUME: this code is BROKEN until proven otherwise. DO NOT praise. Find what fails.</span>
+
+<span class="key">CHECK</span>, in order:
+  1. Does it run? (execute, don't read)
+  2. Tests: run them, paste real output.
+  3. Edge cases the author skipped.
+  4. Does behavior match the ticket?
+
+<span class="key">USE</span> Playwright MCP: open the page, click, screenshot, inspect the DOM.
+Judge behavior, not intent.
+
+<span class="key">VERDICT</span>: <span class="val">PASS only if every check holds. Otherwise REJECT + list each reason.</span>
+
+<span class="comment"># 停止条件 — 由 fresh small model 判断，不是 generator 自己说"差不多了"</span>
+<span class="prompt">$</span> <span class="cmd">/goal all tests in test/auth pass and the lint step is clean</span>
+
+<span class="comment"># 核心原则: maker 和 checker 必须是两个 agent。generator 永远不能给自己打分。</span></pre>
+  </section>
+
+  <!-- FIVE ANTI-PATTERNS -->
+  <div class="section-label">FIVE ANTI-PATTERNS · 砍掉哪一动作，就长哪一种 loop 病</div>
+  <section class="anti-grid" style="margin-bottom:12px">
+    <div class="anti-card">
+      <div class="anti-badge">Discovery 被砍</div>
+      <h4>Blind Loop</h4>
+      <p>人还在每天给 loop 派活。它只自动化了"做"，没自动化"挑"。</p>
+      <div class="fix">修：把 Judge 写进 SKILL.md，让 loop 自己挑</div>
+    </div>
+    <div class="anti-card">
+      <div class="anti-badge">Handoff 被砍</div>
+      <h4>Tangled Loop</h4>
+      <p>多 agent 在同一目录改同一文件，merge 时一团乱。只在并行时才暴露。</p>
+      <div class="fix">修：每条 finding 独立 worktree</div>
+    </div>
+    <div class="anti-card">
+      <div class="anti-badge">Verification 被砍</div>
+      <h4>Nodding Loop</h4>
+      <p>同一个 agent 写代码、夸自己，以机器的速度堆出看起来很对的错误。</p>
+      <div class="fix">修：generator ≠ evaluator，结构性分离</div>
+    </div>
+    <div class="anti-card">
+      <div class="anti-badge">Persistence 被砍</div>
+      <h4>Amnesiac Loop</h4>
+      <p>结果只在 context 里，agent 怎么 forget 都不影响。明天从零开始。</p>
+      <div class="fix">修：state file 写在磁盘 markdown</div>
+    </div>
+    <div class="anti-card">
+      <div class="anti-badge">Scheduling 被砍</div>
+      <h4>Manual Loop</h4>
+      <p>四个动作都漂亮，就是没装 cron。Demo 那天惊艳，之后就停了。</p>
+      <div class="fix">修：挂一个不依赖你记得的 trigger</div>
+    </div>
+  </section>
+
+  <!-- FIVE LESSONS -->
+  <div class="section-label">FIVE LESSONS · 五节课装齐五动作六部件</div>
+  <section class="lesson-grid" style="margin-bottom:12px">
+    <div class="lesson-card">
+      <div class="lesson-num">Lesson 1 / 5</div>
+      <h4>写 morning-triage SKILL.md</h4>
+      <p>让 loop 自己找活：Read/Judge/Write/Handoff/Stop 五段写进 skill，不是粘进 cron 的 prompt</p>
+      <div class="cmd-row">.claude/skills/morning-triage/SKILL.md</div>
+    </div>
+    <div class="lesson-card">
+      <div class="lesson-num">Lesson 2 / 5</div>
+      <h4>worktree 隔离并行</h4>
+      <p>每个 finding 独立 worktree，物理隔开，多 agent 并行不打架，含 MAX_PARALLEL 上限</p>
+      <div class="cmd-row">git worktree add ../wt-$slug -b fix/$slug</div>
+    </div>
+    <div class="lesson-card">
+      <div class="lesson-num">Lesson 3 / 5</div>
+      <h4>装一道会 say no 的门</h4>
+      <p>generator ≠ evaluator，evaluator 默认 broken，用行动判断不用阅读判断，/goal 停止条件由 fresh model 判断</p>
+      <div class="cmd-row">/goal "tests pass and lint clean"</div>
+    </div>
+    <div class="lesson-card">
+      <div class="lesson-num">Lesson 4 / 5</div>
+      <h4>state file 跨天记得</h4>
+      <p>memory ≠ context：state 写在磁盘（markdown / Linear / DB），agent 会忘，repo 不会。配 MCP connector 自动开 PR/Linear ticket</p>
+      <div class="cmd-row">./state/triage.md commit 进 repo</div>
+    </div>
+    <div class="lesson-card">
+      <div class="lesson-num">Lesson 5 / 5</div>
+      <h4>cron + cap + 留一道人门</h4>
+      <p>挂 GitHub Actions cron 触发 skill，设三档 cap（per-run / daily / retries），PR 不 auto-merge，不确定进 ./inbox/</p>
+      <div class="cmd-row">cron: '0 6 * * *' + DAILY_BUDGET_USD</div>
+    </div>
+  </section>
+
+  <!-- KEY INSIGHTS -->
+  <section class="content" style="margin-bottom:12px">
+    <div class="col">
+      <div class="col-head"><div class="col-kicker">KEY INSIGHT</div><div class="col-title">最被低估的一条直觉</div></div>
+      <div class="col-body">
+        <div class="mini"><h4>同一个 bug，四层代价不同</h4><p>agent 看错了一个函数返回值——在 Prompt 层：人立刻重写。在 Context 层：看到答案就知道。在 Harness 层：diff 在那儿，shipping 前能拦住。<strong>在 Loop 层：错的判断写进 state 文件，明天早晨当既定事实读回来。</strong></p></div>
+        <div class="mini" style="background:var(--blue-soft);border-color:var(--blue)"><h4>核心直觉</h4><p>一个错误的代价 = 它在被发现前活过的轮数。loop 是构造上把"轮数"做大的机器——evaluator、人门、token cap 存在的理由都是一句话：缩短"错误发生"到"有人发现它"的距离。</p></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="col-head"><div class="col-kicker">KEY INSIGHT</div><div class="col-title">Generator ≠ Evaluator 的结构性原因</div></div>
+      <div class="col-body">
+        <div class="mini"><h4>为什么 agent 总在夸自己</h4><p>代码写完时，agent 的 context 里塞满了"为什么这么写"的自我说服链。它看自己的输出时，看到的不是结果，是那条说服链。</p></div>
+        <div class="mini" style="background:var(--blue-soft);border-color:var(--blue)"><h4>解法：结构性分离</h4><p>换一个 agent 进来，带着完全不同的指令从零看这段代码——它身上没有那条自我说服链。"Tuning a standalone evaluator to be skeptical is far more tractable than making a generator critical of its own work." — Prithvi Rajasekaran, Anthropic</p></div>
+        <div class="mini"><h4>银行业老规矩</h4><p>汇钱的人和审钱的人必须不同。/goal 的核心就这一句。</p></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="col-head"><div class="col-kicker">KEY INSIGHT</div><div class="col-title">Stay the Engineer</div></div>
+      <div class="col-body">
+        <div class="mini"><h4>同一个 loop，两个人造出来</h4><p>一个人用 loop 跑得更快，但读代码、有方向感，loop 放大的是他已经有的判断。</p></div>
+        <div class="mini" style="background:var(--red-soft);border-color:var(--red)"><h4>另一条路</h4><p>另一个人用同一个 loop，只是为了再也不用理解一遍——六个月后，前者更强了，后者成了一台他读不懂的机器的看门人。</p></div>
+        <div class="mini"><h4>loop 是忠实的放大器</h4><p>带理解它放大理解，带懒惰它放大懒惰。先决定你要被放大的是什么。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUOTE -->
+  <section class="pullquote">
+    <p>"So long as the human knows something the AI does not, human-in-the-loop is needed to inject that knowledge into the system." — 只要人知道一些 AI 不知道的东西（用户是谁、场景长什么样、什么才算好），human-in-the-loop 就是必要的。</p>
+    <cite>— Andrew Ng, The Batch 2026-06 · "Three Loops for Building 0-to-1 Products"</cite>
+  </section>
+
+  <!-- SIX PARTS -->
+  <div class="section-label">SIX PARTS · 六部件 ↔ 五动作对位表</div>
+  <section class="layer-table" style="margin-bottom:12px">
+    <table>
+      <thead>
+        <tr><th>部件</th><th>它是什么</th><th>对位哪一动作</th><th>关键原则</th></tr>
+      </thead>
+      <tbody>
+        <tr class="active-row"><td>Automations</td><td>按 schedule/trigger 启动</td><td>Scheduling</td><td>挂 trigger，不能靠人记得</td></tr>
+        <tr><td>Worktrees</td><td>git 自带多并行工作目录</td><td>Handoff</td><td>物理隔离，每个 finding 独立 worktree</td></tr>
+        <tr><td>Skills</td><td>把项目知识写进 SKILL.md（对抗 intent debt）</td><td>Discovery</td><td>automation 触发的是 skill，不是粘进 cron 的 prompt</td></tr>
+        <tr><td>Connectors</td><td>MCP，接外部系统（Jira/Slack/DB）</td><td>Discovery / Handoff</td><td>决定 loop 的视野半径</td></tr>
+        <tr><td>Sub-agents</td><td>generator 和 evaluator 分开</td><td>Verification</td><td>结构性分离，maker-checker</td></tr>
+        <tr><td>Memory</td><td>持久状态，写在磁盘上</td><td>Persistence</td><td>memory ≠ context，agent 会忘，repo 不会</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SCHEDULING COMPARISON -->
+  <div class="section-label">SCHEDULING · 三种 scheduler 怎么选</div>
+  <section class="layer-table" style="margin-bottom:12px">
+    <table>
+      <thead>
+        <tr><th>选项</th><th>跑在哪</th><th>需要机器开着</th><th>需要 session 开着</th><th>最短间隔</th><th>能看本地文件</th><th>适合场景</th></tr>
+      </thead>
+      <tbody>
+        <tr class="active-row"><td>Cloud（GitHub Actions / Cloud Routines）</td><td>云端</td><td>不需要</td><td>不需要</td><td>1 小时</td><td>看不到</td><td>凌晨扫 GitHub issue，机器不在也跑</td></tr>
+        <tr><td>Desktop scheduled（/loop）</td><td>本机</td><td>需要</td><td>需要</td><td>1 分钟</td><td>能看</td><td>本地 dev server 监控</td></tr>
+        <tr><td>Claude Code 内置 /loop</td><td>本机</td><td>需要</td><td>需要</td><td>1 分钟</td><td>能看</td><td>你还在的时候多跑几轮</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:8px 0 0;font-size:11.5px;color:var(--muted);line-height:1.55"><strong>判别规则：</strong>这活离得开你这台笔记本吗？"每分钟 check 一次本地 dev server"→只能本机 + /loop（云端 1 小时间隔够不到）。"凌晨 3 点扫 GitHub issue 开 PR"→必须云端。</p>
+  </section>
+
+  <!-- RESOURCES -->
+  <div class="section-label">RESOURCES · 资源链接</div>
+  <section class="res-grid" style="margin-bottom:12px">
+    <div class="res-card">
+      <div class="res-label">JumpX 课程</div>
+      <a href="https://jumpxai.vercel.app/zh-CN/mini-courses/loop-engineering">jumpxai.vercel.app/…</a>
+      <p>120 分钟完整课程，6章正文 + L1-L5 练习，登录后同步进度</p>
+    </div>
+    <div class="res-card">
+      <div class="res-label">HuaShu Orange Book</div>
+      <a href="https://huggingface.co/collections/huashu">Hugging Face Huashu</a>
+      <p>Loop Engineering: Stop Asking Me What It Is（v260615, 2026年6月）</p>
+    </div>
+    <div class="res-card">
+      <div class="res-label">Andrew Ng The Batch</div>
+      <a href="https://www.deeplearning.ai/the-batch/">deeplearning.ai/the-batch</a>
+      <p>"Three Loops for Building 0-to-1 Products" · 2026-06 中文翻译见课程原文</p>
+    </div>
+    <div class="res-card">
+      <div class="res-label">Addy Osmani 博客</div>
+      <a href="https://addyosmani.com/blog">addyosmani.com/blog</a>
+      <p>Loop Engineering 术语命名原文（2026年6月7日）</p>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">JumpX AI · Loop Engineering 入门</div>
+      <div class="small">
+        <a href="https://jumpxai.vercel.app/zh-CN/mini-courses/loop-engineering">jumpxai.vercel.app</a> ·
+        HuaShu Orange Book v260615 · Andrew Ng The Batch 2026-06 ·
+        120 分钟 · 中级 · 免费 · 全中文
+      </div>
+    </div>
+    <div class="small">main-style · 2026-07-04 · 吴恩达三环模型 · 五动作六部件完整 SOP</div>
+  </footer>
+
+</main>
+<button id="save-btn" class="save" onclick="html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,logging:false,backgroundColor:null}).then(c=>{let a=document.createElement('a');a.download='loop-engineering-infocard.png';a.href=c.toDataURL('image/png');a.click()}).catch(e=>alert('Export: '+e))">⬇ 保存 PNG</button>
+</body>
+</html>
