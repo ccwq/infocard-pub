@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Open R1 · DeepSeek-R1 训练全流程开源复现指南</title>
+  <meta name="description" content="Hugging Face Open R1（26.4k Stars）把 DeepSeek-R1 的训练配方完整开源：从数据生成（Distilabel）、SFT 微调、GRPO 强化学习到四大评测基准（AIME 2024 / MATH-500 / GPQA / LiveCodeBench）。Step 1 已完成（Mixture-of-Thoughts 35万条数据蒸馏），Step 2/3 进行中。本卡含完整命令、硬件要求、评测结果对比与三步训练 SOP。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;
+      --line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;
+      --red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;
+      --shadow:7px 7px 0 rgba(17,17,17,.12);
+      --green:#15803d;--green-soft:#eefbf1;
+      --yellow:#b45309;--yellow-soft:#fef3c7;
+      --orange:#c2410c;--orange-soft:#fff7ed;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);
+      color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative;
+    }
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(260px,.6fr);gap:14px;background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 16px 14px;margin-bottom:12px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right;overflow-wrap:anywhere;max-width:240px}
+    h1{margin:0 0 10px;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(26px,4.8vw,54px);line-height:.98;letter-spacing:-.03em;color:var(--ink)}
+    .subtitle{margin:0;max-width:60ch;font-size:13.5px;line-height:1.72;color:#3f3932}
+    .subtitle strong{color:var(--blue)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    .chip.orange{background:var(--orange-soft);border-color:var(--orange);color:var(--orange)}
+    /* === STATS === */
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;background:#111;color:#fff;border:2px solid #111;box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px}
+    .stat{padding:8px 10px;border:1.5px solid rgba(255,255,255,.18);min-width:0}
+    .stat .n{display:block;font-size:20px;font-weight:900;line-height:1;color:#ff9999;font-family:Georgia,"Times New Roman",serif}
+    .stat .d{font-size:10.5px;line-height:1.4;color:#dfd7cd}
+    /* === PLAN STEPS === */
+    .plan-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .plan-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .plan-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .plan-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:22px;line-height:1.1;letter-spacing:-.02em}
+    .plan-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .plan-step{border:1.5px solid var(--line);padding:11px 12px;background:#fff}
+    .plan-step .plan-n{width:22px;height:22px;background:var(--blue);color:#fff;font:900 11px/1;display:grid;place-items:center;border-radius:50%;margin-bottom:8px}
+    .plan-step .status-badge{display:inline-flex;align-items:center;padding:2px 7px;border:1.5px solid var(--green);background:var(--green-soft);color:#14532d;font:700 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:6px}
+    .plan-step .status-badge.wip{display:inline-flex;padding:2px 7px;border:1.5px solid var(--yellow);background:var(--yellow-soft);color:var(--yellow);font:700 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:6px}
+    .plan-step h4{margin:0 0 5px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .plan-step p{margin:0;font-size:11px;color:var(--muted);line-height:1.55}
+    /* === 3-COL CONTENT === */
+    .content{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+    .col{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);min-width:0;display:flex;flex-direction:column}
+    .col-head{padding:12px 12px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0}
+    .col-kicker{margin:0 0 6px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--blue);text-transform:uppercase}
+    .col-title{margin:0;font-size:20px;line-height:1.08;font-family:Georgia,"Times New Roman","Songti SC",serif;letter-spacing:-.03em}
+    .col-body{padding:12px 12px 10px;display:grid;gap:10px;flex:1}
+    .principle{padding:9px 9px 8px;border:1.5px solid var(--line);background:#fff}
+    .principle .num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:var(--blue-soft);border:1.5px solid var(--blue);color:var(--blue);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:7px}
+    .principle h4{margin:0 0 4px;font-size:13px;line-height:1.3}
+    .principle p{margin:0;color:#45413b;font-size:12px;line-height:1.58}
+    .mini{padding:9px 9px 8px;border:1.5px solid var(--line);background:#fff}
+    .mini h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .mini p{margin:0;font-size:11.8px;line-height:1.58;color:#47423c}
+    .mini .label{display:inline-block;margin-bottom:5px;padding:2px 6px;border:1.5px solid var(--blue);background:var(--blue-soft);color:var(--blue);font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
+    .mini code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;background:#f4f0e8;padding:1px 4px;border-radius:3px}
+    /* === CODE BLOCK === */
+    .code-block{background:#111;border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px;overflow-x:auto}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#d8e2ff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:#d8e2ff;white-space:pre;word-break:normal;overflow-x:auto}
+    .code-block .prompt{color:#f4c84c}
+    .code-block .ai{color:#a8f59f}
+    .code-block .comment{color:#8b9bbf}
+    .code-block .cmd{color:#f4a8c8}
+    .code-block .key{color:#93c5fd}
+    .code-block .val{color:#fdba74}
+    .code-block .var{color:#f9a8d4}
+    .code-block .func{color:#f9a8d4}
+    /* === EVAL TABLE === */
+    .eval-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px;overflow-x:auto}
+    .eval-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .eval-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .eval-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .eval-table{width:100%;border-collapse:collapse;font-size:11.5px}
+    .eval-table th{background:#f4efe8;border:1.5px solid var(--line);padding:7px 10px;text-align:left;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+    .eval-table td{border:1.5px solid var(--line);padding:6px 10px;background:#fff}
+    .eval-table tr:hover td{background:#f9f7f2}
+    .eval-table .model{font-weight:700;font-size:11px}
+    .eval-table .hf{color:var(--blue);font-weight:700}
+    .eval-table .ds{color:var(--red);font-weight:700}
+    .eval-table .delta{font-size:10px;color:var(--muted)}
+    /* === HARDWARE GRID === */
+    .hw-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .hw-card{border:1.5px solid var(--line);padding:9px 11px;background:#fff;box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+    .hw-card .hw-icon{font-size:16px;margin-bottom:5px}
+    .hw-card h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .hw-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .hw-card code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;background:#f4efe8;padding:1px 5px;border-radius:3px}
+    /* === SOP SECTION === */
+    .sop-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .sop-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .sop-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .sop-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .sop-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .sop-step{border:1.5px solid var(--line);padding:10px 11px;background:#fff}
+    .sop-step .sop-n{width:22px;height:22px;background:var(--green);color:#fff;font:900 11px/1;display:grid;place-items:center;border-radius:50%;margin-bottom:7px}
+    .sop-step h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .sop-step p{margin:0;font-size:11px;color:var(--muted);line-height:1.55}
+    .sop-step .cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;background:#f4efe8;padding:2px 5px;border-radius:3px;display:block;margin-top:5px;word-break:break-all}
+    /* === DATA PIPELINE === */
+    .pipeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:#111;color:#fff;border:2px solid #111;box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .pipe-step{padding:9px 10px 8px;border-right:1.5px solid rgba(255,255,255,.18);min-width:0;display:grid;gap:4px}
+    .pipe-step:last-child{border-right:none}
+    .pipe-step .n{display:block;color:#fff;font:900 16px/1 Georgia,"Times New Roman",serif}
+    .pipe-step .t{display:block;font:800 9.5px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#ff9999}
+    .pipe-step .d{font-size:10.5px;line-height:1.45;color:#dfd7cd}
+    /* === DATASETS === */
+    .dataset-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .dataset-card{border:1.5px solid var(--line);padding:9px 11px;background:#fff;box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+    .dataset-card .ds-label{font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+    .dataset-card a{font-size:12px;color:var(--ink);font-weight:700}
+    .dataset-card p{font-size:11px;color:var(--muted);margin:3px 0 0;line-height:1.5}
+    /* === FAQ === */
+    .faq-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .faq-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .faq-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .faq-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .faq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .faq-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .faq-item .q{font-size:12.5px;font-weight:800;line-height:1.4;margin-bottom:5px;color:var(--ink)}
+    .faq-item .a{font-size:11.5px;color:var(--muted);line-height:1.6;margin:0}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:12px 14px 10px;color:var(--muted);font-size:12px;line-height:1.6}
+    .footer .brand{font-weight:800;color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:14px}
+    .footer .small{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    .footer .small a{color:var(--blue)}
+    .save{display:block;width:fit-content;position:static;margin:12px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--red),#991b1b);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(153,27,27,.3);cursor:pointer}
+    .section-label{font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding-left:2px}
+    @media (max-width:960px){
+      .hero,.content{grid-template-columns:1fr}
+      .plan-steps,.sop-steps{grid-template-columns:1fr 1fr}
+      .hw-grid,.dataset-grid,.pipeline{grid-template-columns:repeat(2,1fr)}
+      .stats{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:10px 0 72px}
+      .hero,.footer{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(24px,8vw,36px)}
+      .stats{grid-template-columns:repeat(2,1fr)}
+      .plan-steps,.sop-steps,.hw-grid,.dataset-grid,.pipeline,.faq-grid{grid-template-columns:1fr}
+      .footer{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">OPEN R1 · DEEPSEEK-R1 REPRODUCTION · REINFORCEMENT LEARNING</div>
+        <div class="source">github.com/huggingface/open-r1 · 26.4K Stars</div>
+      </div>
+      <h1>Open R1</h1>
+      <p class="subtitle">Hugging Face 完整开源 DeepSeek-R1 训练全流程：数据生成（Distilabel 合成）、SFT 微调、<strong>GRPO 强化学习</strong>到四大评测基准（AIME 2024 / MATH-500 / GPQA Diamond / LiveCodeBench）。Step 1（蒸馏）已完成，35万条思维链数据复现 R1-Distill 效果。把闭源黑箱拆开摊在桌上——这是大模型行业最权威的一份公开作业。</p>
+      <div class="meta-row">
+        <span class="chip blue">26.4K Stars</span>
+        <span class="chip red">GRPO 强化学习</span>
+        <span class="chip green">Step 1 完成</span>
+        <span class="chip yellow">Step 2/3 进行中</span>
+        <span class="chip orange">Hugging Face 官方</span>
+        <span class="chip">Python</span>
+      </div>
+    </div>
+    <aside style="display:grid;gap:10px;align-content:start">
+      <div style="background:#111;color:#fff;border:2px solid #111;padding:12px">
+        <div style="font:800 11px/1 ui-monospace,SFMono-Reg,monospace;color:#ff9999;text-transform:uppercase;margin-bottom:6px">KEY HIGHLIGHTS</div>
+        <div style="font-size:11.5px;line-height:1.55;color:#dfd7cd;display:grid;gap:6px">
+          <div>✅ Step 1 完成：<strong style="color:#fff">OpenR1-Distill-7B</strong> 复现 R1-Distill-Qwen-7B</div>
+          <div>✅ 35万条 <strong style="color:#fff">Mixture-of-Thoughts</strong> 思维链数据集</div>
+          <div>✅ 四大基准 <strong style="color:#fff">AIME/MATH/GPQA/LiveCodeBench</strong> 对齐 DeepSeek 报告</div>
+          <div>🔄 Step 2：复制 R1-Zero 纯 RL 路线</div>
+          <div>📋 Step 3：从 Base 到 RL 的多阶段训练</div>
+        </div>
+      </div>
+      <div style="background:var(--paper);border:2px solid var(--line);padding:12px">
+        <div style="font:800 10.5px/1 ui-monospace,SFMono-Reg,monospace;color:var(--blue);text-transform:uppercase;margin-bottom:6px">CORE STACK</div>
+        <div style="font-size:11px;line-height:1.65;color:var(--muted);display:grid;gap:5px">
+          <div><code>Python 3.11</code> · <code>CUDA 12.4</code></div>
+          <div><code>PyTorch 2.6</code> · <code>vLLM 0.8.5</code></div>
+          <div><code>FlashAttention</code> · <code>Liger Kernel</code></div>
+          <div><code>Distilabel</code> · <code>Transformers</code></div>
+          <div><code>Accelerate</code> · <code>DeepSpeed ZeRO-2/3</code></div>
+          <div><code>LightEval</code> · <code>wandb</code></div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- STATS -->
+  <section class="stats">
+    <div class="stat"><div class="n">350K</div><div class="d">Mixture-of-Thoughts 蒸馏数据量（数学/代码/科学）</div></div>
+    <div class="stat"><div class="n">94.5%</div><div class="d">MATH-500 上 OpenR1-Distill-7B vs DeepSeek 报告 92.8%</div></div>
+    <div class="stat"><div class="n">16</div><div class="d">DeepSeek 报告基准评测全部复现（~1-3σ 内）</div></div>
+    <div class="stat"><div class="n">8×H100</div><div class="d">推荐硬件配置（80GB）；7B 模型单卡可跑</div></div>
+  </section>
+
+  <!-- PLAN OF ATTACK -->
+  <section class="plan-section">
+    <div class="plan-head">
+      <div class="plan-badge">PLAN OF ATTACK</div>
+      <h2>三步复现路线图（基于 DeepSeek-R1 技术报告）</h2>
+    </div>
+    <div class="plan-steps">
+      <div class="plan-step">
+        <div class="plan-n">1</div>
+        <div class="status-badge">✅ STEP 1 完成</div>
+        <h4>R1-Distill 模型蒸馏</h4>
+        <p>用 DeepSeek-R1 生成高质量思维链数据（CoT），蒸馏到小模型（Qwen/Llama）。产出：OpenR1-Distill-7B，效果对齐 DeepSeek-R1-Distill-Qwen-7B。</p>
+        <p style="margin-top:6px;font-size:10.5px;color:var(--blue);font-weight:700">关键数据集：Mixture-of-Thoughts（350K）</p>
+      </div>
+      <div class="plan-step">
+        <div class="plan-n">2</div>
+        <div class="status-badge wip">🔄 STEP 2 进行中</div>
+        <h4>纯 RL 复制 R1-Zero</h4>
+        <p>不依赖 SFT 数据，通过大规模强化学习（GRPO）直接从 Base 模型训练出 R1-Zero 级别的推理能力。需要新建数学/推理/代码大规模数据集。</p>
+        <p style="margin-top:6px;font-size:10.5px;color:var(--yellow);font-weight:700">关键方法：GRPO（Group Relative Policy Optimization）</p>
+      </div>
+      <div class="plan-step">
+        <div class="plan-n">3</div>
+        <div class="status-badge wip">📋 STEP 3 规划中</div>
+        <h4>Base → RL 多阶段训练</h4>
+        <p>展示从原始 Base 模型到 RL 调优的完整路径：多阶段训练（预热→SFT→RL），验证无需蒸馏数据也能训练出强推理模型。</p>
+        <p style="margin-top:6px;font-size:10.5px;color:var(--muted);font-weight:700">依赖 Step 2 完成后推进</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3-COL: CORE -->
+  <section class="content">
+    <div class="col">
+      <div class="col-head"><div class="col-kicker">TRAINING METHODS</div><div class="col-title">两种训练方法</div></div>
+      <div class="col-body">
+        <div class="principle"><div class="num">SFT</div><h4>监督微调（Supervised Fine-Tuning）</h4><p>用 R1 蒸馏的高质量思维链数据（CoT）对齐 GPT-4o/Claude 级别的推理质量。基于 Qwen2.5-Math-7B-RoPE-300k，5 epoch，lr=4e-5，max_seq=32768。</p></div>
+        <div class="principle"><div class="num">GRPO</div><h4>组相对策略优化（Group Relative Policy Optimization）</h4><p>DeepSeek 原创的 GRPO 是 PPO 的简化变体：对同一问题采样多组 response，按 group 相对 reward 排序更新策略，无需单独的价值网络，大幅降低训练成本。</p></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="col-head"><div class="col-kicker">DATA PIPELINE</div><div class="col-title">数据生成流水线</div></div>
+      <div class="col-body">
+        <div class="mini"><div class="label">数据源</div><h4>NuminaMath-TIR / OpenR1-Math-220k</h4><p>从 NuminaMath-TIR（数学竞赛难题）提取题目，作为 prompt 输入给 R1 生成带思维链的解题过程。</p></div>
+        <div class="mini"><div class="label">合成工具</div><h4>Distilabel（Argilla）</h4><p>开源数据标注 + 合成流水线，支持 vLLM backend，每个 prompt 生成 4-64 个 response（温度 0.6，top_p 0.95，max_tokens 8192-32768）。</p></div>
+        <div class="mini"><div class="label">过滤</div><h4>Data Decontamination</h4><p>用 8-gram 哈希去重训练集中与评测基准重叠的题目，防止数据泄露导致虚高的基准分数。</p></div>
+        <div class="mini"><div class="label">输出</div><h4>思维链轨迹（Traces）</h4><p>每个样本 = prompt + reasoning（含反思/回溯）+ final answer + reward signal，保存为 HuggingFace Dataset 格式。</p></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="col-head"><div class="col-kicker">EVALUATION</div><div class="col-title">四大评测基准与结果对比</div></div>
+      <div class="col-body">
+        <div class="mini"><h4>AIME 2024（64 responses）</h4><p>美国数学邀请赛，30 题，难度极高。7B 模型 50.8%（HuggingFace）vs 55.5%（DeepSeek 报告），~1-3σ 内对齐。</p></div>
+        <div class="mini"><h4>MATH-500（4 responses）</h4><p>500 道不同难度数学题，7B 模型 94.5%（HF）vs 92.8%（DS），甚至略超 DeepSeek 报告。</p></div>
+        <div class="mini"><h4>GPQA Diamond（8 responses）</h4><p>研究生级别科学题，7B 模型 50.5%（HF）vs 49.1%（DS），~1-3σ 内。</p></div>
+        <div class="mini"><h4>LiveCodeBench（16 responses）</h4><p>代码生成，7B 模型 37.4%（HF）vs 37.6%（DS），~1-3σ 内。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATA PIPELINE FLOW -->
+  <div class="section-label">DATA PIPELINE · 数据生成四步流水线</div>
+  <section class="pipeline" style="margin-bottom:12px">
+    <div class="pipe-step">
+      <div class="n">1</div><div class="t">SOURCE</div>
+      <div class="d">NuminaMath-TIR / CodeForces-CoTs 等数据集作为 prompt 池</div>
+    </div>
+    <div class="pipe-step">
+      <div class="n">2</div><div class="t">DISTILL</div>
+      <div class="d">DeepSeek-R1 或小蒸馏模型通过 Distilabel 生成多 response 思维链轨迹</div>
+    </div>
+    <div class="pipe-step">
+      <div class="n">3</div><div class="t">FILTER</div>
+      <div class="d">8-gram 去重 + benchmark 数据泄露检查，清理污染样本</div>
+    </div>
+    <div class="pipe-step">
+      <div class="n">4</div><div class="t">TRAIN</div>
+      <div class="d">SFT 或 GRPO 训练，产出模型推送到 HuggingFace Hub</div>
+    </div>
+  </section>
+
+  <!-- INSTALLATION CODE -->
+  <section class="code-block">
+    <div class="tag">INSTALLATION · 环境安装</div>
+    <pre><span class="comment"># 1. 创建 Python 3.11 虚拟环境</span>
+<span class="prompt">$</span> <span class="cmd">uv venv openr1 --python 3.11 && source openr1/bin/activate && uv pip install --upgrade pip</span>
+
+<span class="comment"># 2. 安装 vLLM + FlashAttention（依赖 CUDA 12.4）</span>
+<span class="prompt">$</span> <span class="cmd">uv pip install vllm==0.8.5.post1</span>
+<span class="prompt">$</span> <span class="cmd">uv pip install setuptools && uv pip install flash-attn --no-build-isolation</span>
+
+<span class="comment"># 3. 安装 Open R1 开发依赖</span>
+<span class="prompt">$</span> <span class="cmd">GIT_LFS_SKIP_SMUDGE=1 uv pip install -e ".[dev]"</span>
+
+<span class="comment"># 4. 登录 HuggingFace + W&B</span>
+<span class="prompt">$</span> <span class="cmd">huggingface-cli login && wandb login</span>
+
+<span class="comment"># 5. 验证 Git LFS（加载/推送模型和数据集）</span>
+<span class="prompt">$</span> <span class="cmd">git-lfs --version</span>
+
+<span class="comment"># 一键安装（make install）</span>
+<span class="prompt">$</span> <span class="cmd">make install</span></pre>
+  </section>
+
+  <!-- SFT TRAINING CODE -->
+  <section class="code-block" style="margin-bottom:12px">
+    <div class="tag">SFT TRAINING · SFT 微调命令</div>
+    <pre><span class="comment"># SFT 训练（命令行参数方式）</span>
+<span class="prompt">$</span> <span class="cmd">accelerate launch --config_file=recipes/accelerate_configs/zero3.yaml \</span>
+<span class="prompt">$</span> <span class="cmd">  src/open_r1/sft.py \</span>
+<span class="prompt">$</span> <span class="cmd">  --model_name_or_path open-r1/Qwen2.5-Math-7B-RoPE-300k \</span>
+<span class="prompt">$</span> <span class="cmd">  --dataset_name open-r1/Mixture-of-Thoughts \</span>
+<span class="prompt">$</span> <span class="cmd">  --dataset_config all \</span>
+<span class="prompt">$</span> <span class="cmd">  --eos_token '&lt;|im_end|&gt;' \</span>
+<span class="prompt">$</span> <span class="cmd">  --learning_rate 4.0e-5 \</span>
+<span class="prompt">$</span> <span class="cmd">  --num_train_epochs 5 \</span>
+<span class="prompt">$</span> <span class="cmd">  --max_seq_length 32768 \</span>
+<span class="prompt">$</span> <span class="cmd">  --per_device_train_batch_size 2 \</span>
+<span class="prompt">$</span> <span class="cmd">  --gradient_checkpointing \</span>
+<span class="prompt">$</span> <span class="cmd">  --bf16 \</span>
+<span class="prompt">$</span> <span class="cmd">  --use_liger_kernel \</span>
+<span class="prompt">$</span> <span class="cmd">  --output_dir data/OpenR1-Distill-7B</span>
+
+<span class="comment"># SFT 训练（YAML 配置方式，推荐）</span>
+<span class="prompt">$</span> <span class="cmd">accelerate launch --config_file=recipes/accelerate_configs/zero3.yaml \</span>
+<span class="prompt">$</span> <span class="cmd">  src/open_r1/sft.py \</span>
+<span class="prompt">$</span> <span class="cmd">  --config recipes/OpenR1-Distill-7B/sft/config_distill.yaml</span>
+
+<span class="comment"># 更换底座模型（如换成 1.5B）</span>
+<span class="prompt">$</span> <span class="cmd">accelerate launch ... --model_name_or_path Qwen/Qwen3-0.6B-Base \</span>
+<span class="prompt">$</span> <span class="cmd">  --hub_model_id OpenR1-Distill-0.6B --output_dir data/OpenR1-Distill-0.6B</span>
+
+<span class="comment"># Qwen Base 模型必须对齐 EOS token</span>
+<span class="prompt">$</span> <span class="cmd">accelerate launch ... --eos_token '&lt;|im_end|&gt;'</span></pre>
+  </section>
+
+  <!-- GRPO TRAINING CODE -->
+  <section class="code-block" style="margin-bottom:12px">
+    <div class="tag">GRPO TRAINING · GRPO 强化学习训练</div>
+    <pre><span class="comment"># GRPO 训练（命令行）</span>
+<span class="prompt">$</span> <span class="cmd">accelerate launch --config_file=recipes/accelerate_configs/zero3.yaml \</span>
+<span class="prompt">$</span> <span class="cmd">  src/open_r1/grpo.py \</span>
+<span class="prompt">$</span> <span class="cmd">  --model_name_or_path open-r1/OpenR1-Distill-7B \</span>
+<span class="prompt">$</span> <span class="cmd">  --dataset_name open-r1/Mixture-of-Thoughts \</span>
+<span class="prompt">$</span> <span class="cmd">  --reward_funcs correctness \</span>
+<span class="prompt">$</span> <span class="cmd">  --max_seq_length 32768 \</span>
+<span class="prompt">$</span> <span class="cmd">  --per_device_train_batch_size 1 \</span>
+<span class="prompt">$</span> <span class="cmd">  --gradient_checkpointing \</span>
+<span class="prompt">$</span> <span class="cmd">  --bf16 \</span>
+<span class="prompt">$</span> <span class="cmd">  --output_dir data/OpenR1-Distill-7B-grpo</span>
+
+<span class="comment"># GRPO 训练（YAML 配置）</span>
+<span class="prompt">$</span> <span class="cmd">accelerate launch --config_file=recipes/accelerate_configs/zero3.yaml \</span>
+<span class="prompt">$</span> <span class="cmd">  src/open_r1/grpo.py \</span>
+<span class="prompt">$</span> <span class="cmd">  --config recipes/OpenR1-Distill-7B/grpo/config_distill.yaml</span>
+
+<span class="comment"># 自定义 W&B 项目和 run 名称</span>
+<span class="prompt">$</span> <span class="cmd">accelerate launch ... \</span>
+<span class="prompt">$</span> <span class="cmd">  --wandb_entity huggingface --wandb_project open-r1 \</span>
+<span class="prompt">$</span> <span class="cmd">  --run_name Qwen2.5-1.5B-GRPO</span>
+
+<span class="comment"># GRPO 核心原理（简述）</span>
+<span class="comment"># 1. 对同一 prompt 采样 G 个 response（如 G=16）</span>
+<span class="comment"># 2. 计算每个 response 的 reward（如答案正确性）</span>
+<span class="comment"># 3. 用 group 内相对排名更新策略：reward 高的 response 概率 ↑</span>
+<span class="comment"># 4. 不需要单独的价值网络（Critic），比 PPO 轻量得多</span></pre>
+  </section>
+
+  <!-- EVALUATION CODE -->
+  <section class="code-block" style="margin-bottom:12px">
+    <div class="tag">EVALUATION · 评测命令（LightEval + vLLM）</div>
+    <pre><span class="comment"># 评测前准备（安装 LightEval）</span>
+<span class="prompt">$</span> <span class="cmd">uv pip install lighteval</span>
+
+<span class="comment"># 评测 AIME 2024（单卡）</span>
+<span class="prompt">$</span> <span class="cmd">NUM_GPUS=1</span>
+<span class="prompt">$</span> <span class="cmd">MODEL=deepseek-ai/DeepSeek-R1-Distill-Qwen-7B</span>
+<span class="prompt">$</span> <span class="cmd">MODEL_ARGS="model_name=$MODEL,dtype=bfloat16,\</span>
+<span class="prompt">$</span> <span class="cmd">  max_model_length=32768,gpu_memory_utilization=0.8,\</span>
+<span class="prompt">$</span> <span class="cmd">  data_parallel_size=$NUM_GPUS,\</span>
+<span class="prompt">$</span> <span class="cmd">  generation_parameters={max_new_tokens:32768,temperature:0.6,top_p:0.95}"</span>
+<span class="prompt">$</span> <span class="cmd">OUTPUT_DIR=data/evals/$MODEL</span>
+<span class="prompt">$</span> <span class="cmd">lighteval vllm "$MODEL_ARGS" "lighteval|aime24|0|0" \</span>
+<span class="prompt">$</span> <span class="cmd">  --use-chat-template --output-dir $OUTPUT_DIR</span>
+
+<span class="comment"># 评测 MATH-500（4 responses）</span>
+<span class="prompt">$</span> <span class="cmd">lighteval vllm "$MODEL_ARGS" "lighteval|math_500|0|0" \</span>
+<span class="prompt">$</span> <span class="cmd">  --use-chat-template --output-dir $OUTPUT_DIR</span>
+
+<span class="comment"># 评测 GPQA Diamond（8 responses）</span>
+<span class="prompt">$</span> <span class="cmd">lighteval vllm "$MODEL_ARGS" "lighteval|gpqa:diamond|0|0" \</span>
+<span class="prompt">$</span> <span class="cmd">  --use-chat-template --output-dir $OUTPUT_DIR</span>
+
+<span class="comment"># 评测 LiveCodeBench（16 responses）</span>
+<span class="prompt">$</span> <span class="cmd">lighteval vllm "$MODEL_ARGS" "extended|lcb:codegeneration|0|0" \</span>
+<span class="prompt">$</span> <span class="cmd">  --use-chat-template --output-dir $OUTPUT_DIR</span>
+
+<span class="comment"># 使用 Slurm 批量跑基准（推荐 32B / 70B 模型用 8 卡）</span>
+<span class="prompt">$</span> <span class="cmd">python scripts/run_benchmarks.py --model-id deepseek-ai/DeepSeek-R1-Distill-Qwen-32B \</span>
+<span class="prompt">$</span> <span class="cmd">  --benchmarks aime24 math_500 gpqa lcb</span>
+
+<span class="comment"># make evaluate 快捷命令</span>
+<span class="prompt">$</span> <span class="cmd">make evaluate MODEL=deepseek-ai/DeepSeek-R1-Distill-Qwen-32B TASK=aime24 NUM_GPUS=8</span></pre>
+  </section>
+
+  <!-- DATA GENERATION CODE -->
+  <section class="code-block" style="margin-bottom:12px">
+    <div class="tag">DATA GENERATION · 用 Distilabel 生成合成数据（pipeline.py）</div>
+    <pre><span class="comment"># 安装依赖</span>
+<span class="prompt">$</span> <span class="cmd">uv pip install "distilabel[vllm]>=1.5.2"</span>
+
+<span class="comment"># pipeline.py（保存到项目根目录运行 python pipeline.py）</span>
+<span class="key">from</span> <span class="func">datasets</span> <span class="key">import</span> load_dataset
+<span class="key">from</span> <span class="func">distilabel.models</span> <span class="key">import</span> vLLM
+<span class="key">from</span> <span class="func">distilabel.pipeline</span> <span class="key">import</span> Pipeline
+<span class="key">from</span> <span class="func">distilabel.steps.tasks</span> <span class="key">import</span> TextGeneration
+
+prompt_template = <span class="val">"""\
+You will be given a problem. Please reason step by step, \
+and put your final answer within \\boxed{}:
+{{ instruction }}"""</span>
+
+dataset = load_dataset(<span class="val">"AI-MO/NuminaMath-TIR"</span>, split=<span class="val">"train"</span>).select(range(<span class="val">10</span>))
+model_id = <span class="val">"deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"</span>
+
+<span class="key">with</span> Pipeline(name=<span class="val">"distill-qwen-7b-r1"</span>, description=<span class="val">"..."</span>) <span class="key">as</span> pipeline:
+    llm = vLLM(model=model_id, tokenizer=model_id,
+        extra_kwargs={<span class="val">"tensor_parallel_size"</span>: <span class="val">1</span>, <span class="val">"max_model_len"</span>: <span class="val">8192</span>},
+        generation_kwargs={<span class="val">"temperature"</span>: <span class="val">0.6</span>, <span class="val">"max_new_tokens"</span>: <span class="val">8192</span>})
+    text_generation = TextGeneration(llm=llm, template=prompt_template,
+        num_generations=<span class="val">4</span>,
+        input_mappings={<span class="val">"instruction"</span>: <span class="val">"problem"</span>})
+    pipeline.run(dataset=dataset)
+
+<span class="comment"># 生成完成后推送到 HuggingFace Hub</span>
+<span class="prompt">$</span> <span class="cmd">distiset.push_to_hub(repo_id="username/numina-deepseek-r1-qwen-7b")</span>
+
+<span class="comment"># 大模型（DeepSeek-R1 671B）数据生成需要 2×8×H100</span>
+<span class="prompt">$</span> <span class="cmd">sbatch slurm/generate.slurm \</span>
+<span class="prompt">$</span> <span class="cmd">  --hf-dataset AI-MO/NuminaMath-TIR \</span>
+<span class="prompt">$</span> <span class="cmd">  --temperature 0.6 --prompt-column problem \</span>
+<span class="prompt">$</span> <span class="cmd">  --model deepseek-ai/DeepSeek-R1 \</span>
+<span class="prompt">$</span> <span class="cmd">  --hf-output-dataset username/r1-dataset</span></pre>
+  </section>
+
+  <!-- HARDWARE REQS -->
+  <div class="section-label">HARDWARE REQUIREMENTS · 硬件配置参考</div>
+  <section class="hw-grid" style="margin-bottom:12px">
+    <div class="hw-card">
+      <div class="hw-icon">🟢</div>
+      <h4>1×H100（80GB）</h4>
+      <p>蒸馏模型（SFT）训练：7B 模型 SFT 可单卡跑。数据生成：smol distilled R1 模型单卡推理。</p>
+      <code>--per_device_train_batch_size 2-16</code>
+    </div>
+    <div class="hw-card">
+      <div class="hw-icon">🟡</div>
+      <h4>8×H100（640GB）</h4>
+      <p>推荐训练配置：32B / 70B 模型 SFT/GRPO。多节点 DeepSeek-R1 蒸馏数据生成（Ray cluster）。</p>
+      <code>--num_gpus 8 --parallel tensor</code>
+    </div>
+    <div class="hw-card">
+      <div class="hw-icon">🔴</div>
+      <h4>2×8×H100（1280GB）</h4>
+      <p>DeepSeek-R1 671B 完整模型蒸馏数据生成（16×H100 via Slurm Ray cluster）。</p>
+      <code>sbatch slurm/generate.slurm</code>
+    </div>
+  </section>
+
+  <!-- DATASETS -->
+  <div class="section-label">KEY DATASETS · 关键数据集</div>
+  <section class="dataset-grid" style="margin-bottom:12px">
+    <div class="dataset-card">
+      <div class="ds-label">✅ STEP 1 主数据</div>
+      <a href="https://huggingface.co/datasets/open-r1/Mixture-of-Thoughts">open-r1/Mixture-of-Thoughts</a>
+      <p>35万条 R1 蒸馏思维链，数学+代码+科学，训练 OpenR1-Distill-7B</p>
+    </div>
+    <div class="dataset-card">
+      <div class="ds-label">数学推理</div>
+      <a href="https://huggingface.co/datasets/open-r1/OpenR1-Math-220k">open-r1/OpenR1-Math-220k</a>
+      <p>22万条 NuminaMath 蒸馏数据，匹配 DeepSeek 报告基准</p>
+    </div>
+    <div class="dataset-card">
+      <div class="ds-label">竞赛编程</div>
+      <a href="https://huggingface.co/datasets/open-r1/codeforces-cots">open-r1/CodeForces-CoTs</a>
+      <p>10k 道竞赛编程题+10万 R1 蒸馏解法，IOI24 基准专用</p>
+    </div>
+    <div class="dataset-card">
+      <div class="ds-label">代码数据</div>
+      <a href="https://huggingface.co/datasets/open-r1/verifiable-coding-problems-python">open-r1/verifiable-coding-problems</a>
+      <p>可验证 Python 编程题，已做 8-gram 数据去污染</p>
+    </div>
+  </section>
+
+  <!-- SOP: THREE STEPS -->
+  <section class="sop-section">
+    <div class="sop-head">
+      <div class="sop-badge">SOP</div>
+      <h2>完整复现三步 SOP（从零到评测）</h2>
+    </div>
+    <div class="sop-steps">
+      <div class="sop-step">
+        <div class="sop-n">①</div>
+        <h4>环境准备</h4>
+        <p>uv 虚拟环境 + vLLM + FlashAttention + HF 登录 + W&B 登录</p>
+        <span class="cmd">make install && huggingface-cli login && wandb login</span>
+      </div>
+      <div class="sop-step">
+        <div class="sop-n">②</div>
+        <h4>数据生成</h4>
+        <p>Distilabel pipeline 用 R1 蒸馏题目，生成 CoT 数据，去污染后上传 Hub</p>
+        <span class="cmd">python pipeline.py && distiset.push_to_hub()</span>
+      </div>
+      <div class="sop-step">
+        <div class="sop-n">③</div>
+        <h4>SFT + GRPO 训练</h4>
+        <p>Accelerate + DeepSpeed ZeRO-3 跑 SFT，再跑 GRPO，输出模型到 HF Hub</p>
+        <span class="cmd">make train-sft && make train-grpo</span>
+      </div>
+      <div class="sop-step">
+        <div class="sop-n">④</div>
+        <h4>评测验证</h4>
+        <p>LightEval + vLLM 跑四大基准，与 DeepSeek 报告数据对比（~1-3σ）</p>
+        <span class="cmd">make evaluate MODEL=... TASK=aime24</span>
+      </div>
+      <div class="sop-step">
+        <div class="sop-n">⑤</div>
+        <h4>模型推送</h4>
+        <p>训练完成后模型自动推送到 {username}/{model_name}-{task} 仓库</p>
+        <span class="cmd">--hub_model_id your-name/OpenR1-Distill-7B</span>
+      </div>
+      <div class="sop-step">
+        <div class="sop-n">⑥</div>
+        <h4>数据去污染</h4>
+        <p>训练完成后用 8-gram 去重脚本清理与评测重叠的数据</p>
+        <span class="cmd">python scripts/decontaminate.py --dataset ... --cleanup</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <div class="faq-head">
+      <div class="faq-badge">FAQ</div>
+      <h2>常见问题解答</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <div class="q">Q: GRPO 和 PPO 有什么区别？</div>
+        <div class="a">GRPO（Group Relative Policy Optimization）是 DeepSeek 提出的 PPO 简化版：对同一 prompt 采样一组 response（G 个），按组内相对 reward 排名更新策略，不需要单独的价值网络（Critic），训练成本大幅降低，稳定性更好。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: OpenR1-Distill-7B 和 DeepSeek-R1-Distill-Qwen-7B 哪个更强？</div>
+        <div class="a">在 MATH-500 上 OpenR1-Distill-7B（94.5%）略超 DeepSeek 报告（92.8%）。AIME2024 上略低（50.8% vs 55.5%），差距在 1-3σ 内，统计上可认为效果对齐。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 为什么评测结果和 DeepSeek 报告有差异？</div>
+        <div class="a">主要原因是每个 query 的采样 response 数量不同：DeepSeek 对 AIME 用 64 个，MATH-500 用 4 个。响应数量越多 pass@k 估计越稳定，方差越小。OpenR1 的选择与 DeepSeek 一致但随机性仍存在。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 没有 8×H100 还能跑吗？</div>
+        <div class="a">可以。7B 模型的 SFT 和 GRPO 单×H100 即可（调小 batch size）。32B 以上模型建议至少 8×H100 或用 DeepSpeed ZeRO-3 + gradient checkpointing 降低显存占用。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: Step 2（R1-Zero 纯 RL）的难点在哪？</div>
+        <div class="a">需要大规模高质量的数学/推理/代码数据（不是蒸馏数据），以及设计有效的 reward function。DeepSeek 用了 millions 级别的数据从头 RL 训练，这是最难复现的部分。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: DeepSeek-R1 训练配方中最关键的是什么？</div>
+        <div class="a">DeepSeek 技术报告指出三个核心：① 高质量可验证数据（带答案的数学/代码问题）；② GRPO 组内相对 reward 更新；③ 多阶段课程学习（先 SFT 激活，再 RL 强化）。Open R1 正在逐步复现这三者。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">Hugging Face · Open R1</div>
+      <div class="small">
+        <a href="https://github.com/huggingface/open-r1">github.com/huggingface/open-r1</a> ·
+        <a href="https://huggingface.co/datasets/open-r1/Mixture-of-Thoughts">Mixture-of-Thoughts</a> ·
+        <a href="https://huggingface.co/blog/open-r1">HF Blog</a> ·
+        26.4K Stars · Step 1 完成 · Step 2/3 进行中
+      </div>
+    </div>
+    <div class="small">github.com/huggingface/open-r1 · redswiss style · 2026-07-04 · DeepSeek-R1 训练全流程开源复现</div>
+  </footer>
+
+</main>
+<button id="save-btn" class="save" onclick="html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,logging:false,backgroundColor:null}).then(c=>{let a=document.createElement('a');a.download='open-r1-infocard.png';a.href=c.toDataURL('image/png');a.click()}).catch(e=>alert('Export: '+e))">⬇ 保存 PNG</button>
+</body>
+</html>
