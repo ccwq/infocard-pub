@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docus · 一条命令生成文档站，Nuxt 4 驱动的开源文档框架</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ MATRIX + RISK ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+
+    /* ============ CODE BLOCKS ============ */
+    .code-block{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto}
+    .code-block .code-label{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap}
+
+    /* ============ STAT ROW ============ */
+    .stat-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .stat{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:4px}
+    .stat .stat-k{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+    .stat .stat-v{font-size:17px;font-weight:900;line-height:1}
+    .stat .stat-v.red{color:var(--red)}
+    .stat .stat-v.blue{color:var(--blue)}
+    .stat .stat-s{font-size:11px;color:var(--muted)}
+
+    /* ============ FAQ ============ */
+    .faq-item{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px}
+    .faq-item h4{font-size:15px;line-height:1.25;margin:0;color:var(--ink)}
+    .faq-item p{margin:0;font-size:13.5px;color:#333;line-height:1.68}
+
+    /* ============ FOOTER ============ */
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+    .footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+    .footer-links{display:flex;gap:10px;flex-wrap:wrap}
+    .footer-links a{display:inline-flex;align-items:center;gap:8px;border:2px solid var(--line);padding:8px 14px;background:#fff;font-size:12.5px;font-weight:850;cursor:pointer}
+    .footer-links a.blue-link{border-color:var(--blue);background:var(--soft-blue);color:var(--blue)}
+    .footer-links a.red-link{border-color:var(--red);background:var(--soft-red);color:var(--red)}
+    .footer-links a.dark-link{background:#111;color:#fff}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- ============ HERO ============ -->
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">Dev Tools · Documentation Framework</div>
+        <h1 class="demo-title">Docus</h1>
+        <p class="subtitle">一条命令生成文档站 · Nuxt 4 驱动的开源文档框架</p>
+        <div class="badge-row">
+          <span class="badge red">MIT License</span>
+          <span class="badge blue">Nuxt 4</span>
+          <span class="badge">TypeScript</span>
+          <span class="badge dark">MDC</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge ink">★ 2.9k Stars</span>
+          <span class="badge ink">269 Forks</span>
+          <span class="badge ink">nuxt-content</span>
+        </div>
+        <div class="alert">
+          <strong>Write beautiful docs with Markdown &amp; Vue components</strong>
+          <p>Nuxt 官方出品 · 开箱即有响应式布局 / 深色模式 / 全文搜索 / 国际化 · Markdown 里直接嵌入 Vue 组件</p>
+          <div class="mini-row">
+            <span class="mini-tag">MDC</span>
+            <span class="mini-tag">AI Assistant</span>
+            <span class="mini-tag">MCP Server</span>
+            <span class="mini-tag">SEO</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">GET STARTED</div>
+          <h3>一条命令上线文档站</h3>
+          <p>npx create-docus my-docs · npm run dev · 浏览器打开 localhost:3000</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>核心价值：</b>一条 CLI 命令生成完整文档站，包含主题、搜索、导航、国际化。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">npx create-docus</div></div>
+            <div class="flow-item red"><div class="t">Step 2</div><div class="c">npm run dev</div></div>
+            <div class="flow-item dark"><div class="t">Step 3</div><div class="c">写 Markdown</div></div>
+            <div class="flow-item blue"><div class="t">Step 4</div><div class="c">部署上线</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <!-- ============ STATS ============ -->
+    <div class="stat-row" style="margin-top:30px">
+      <div class="stat">
+        <div class="stat-k">GitHub Stars</div>
+        <div class="stat-v red">2.9k</div>
+        <div class="stat-s">截至 2026-07-04</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k">最新提交</div>
+        <div class="stat-v blue">2026-06-25</div>
+        <div class="stat-s">main branch</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k">许可证</div>
+        <div class="stat-v" style="font-size:15px">MIT</div>
+        <div class="stat-s">可商用</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k">核心依赖</div>
+        <div class="stat-v blue">Nuxt 4</div>
+        <div class="stat-s">Nuxt UI 4 + Tailwind CSS 4</div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION 01: 核心价值 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">CORE VALUE</div>
+          <h2>核心价值</h2>
+          <p>Docus 是 Nuxt 官方出品的文档框架，解决"如何快速拥有漂亮文档站"的痛点。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">零配置</span></div>
+          <h3>一条命令生成</h3>
+          <p>npx create-docus my-docs 即可创建完整项目骨架，无需手动配置主题、路由、构建工具。</p>
+          <ul>
+            <li>内置 Nuxt UI 4 主题</li>
+            <li>Tailwind CSS 4 样式系统</li>
+            <li>开箱即用的组件库</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">Nuxt 4</span></div>
+          <h3>基于 Nuxt 4 驱动</h3>
+          <p>利用 Nuxt 4 的文件路由、自动导入、性能优化，默认开启 SSR/SSG 双模式。</p>
+          <ul>
+            <li>服务端渲染 (SSR)</li>
+            <li>静态站点生成 (SSG)</li>
+            <li>自动代码分割</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">AI Ready</span></div>
+          <h3>AI 功能内置</h3>
+          <p>内置 AI Assistant（对话问答）、MCP Server（AI 工具接入）、Agent Skills（技能发现）。</p>
+          <ul>
+            <li>可嵌入 AI 聊天机器人</li>
+            <li>支持 Cursor / VS Code / Claude</li>
+            <li>自动生成 llms.txt</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 02: 内置功能 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">BUILT-IN FEATURES</div>
+          <h2>内置功能</h2>
+          <p>Docus 不只是主题，是一套完整的文档解决方案，所有功能开箱即用。</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <article class="mini">
+          <h4>📱 响应式布局</h4>
+          <p>Mobile-first 设计，移动端自动适配，所有组件都经过多端测试。</p>
+        </article>
+        <article class="mini">
+          <h4>🌙 深色模式</h4>
+          <p>按 d 键切换深色/浅色，CSS 变量驱动，主题定制无侵入。</p>
+        </article>
+        <article class="mini">
+          <h4>🔍 全文搜索</h4>
+          <p>客户端搜索 + 可选 FTS5 后端，Markdown 内容全文索引。</p>
+        </article>
+        <article class="mini">
+          <h4>🌍 国际化</h4>
+          <p>原生 i18n 支持，20+ locales，自动生成多语言版本文档。</p>
+        </article>
+        <article class="mini">
+          <h4>🗺️ SEO 优化</h4>
+          <p>Sitemap / robots.txt / OG Image / metadata 全自动生成。</p>
+        </article>
+        <article class="mini">
+          <h4>⚡ 性能优化</h4>
+          <p>Nuxt 4 自动优化，图片懒加载、预取、代码分割默认启用。</p>
+        </article>
+        <article class="mini">
+          <h4>🤖 AI Assistant</h4>
+          <p>嵌入 AI 聊天机器人，基于 Vercel AI Gateway，回答文档相关问题。</p>
+        </article>
+        <article class="mini">
+          <h4>🔌 MCP Server</h4>
+          <p>内置 MCP 协议服务，AI 工具可直接查询文档内容，CI/CD 友好。</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 03: Markdown + Vue 组件 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">MARKDOWN + VUE</div>
+          <h2>Markdown + Vue 组件 (MDC)</h2>
+          <p>MDC（Markdown Components）让你在纯 Markdown 中直接使用 Vue 组件，无需 JavaScript 配置。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">MDC 语法</span></div>
+          <h3>组件即标签</h3>
+          <p>在 Markdown 中用 Vue 组件，无需 import，无需 setup，文件即组件。</p>
+          <ul>
+            <li>:callout{type="info"} — 提示框</li>
+            <li>::Badge — 徽章标签</li>
+            <li>::CodeBlock — 代码高亮块</li>
+          </ul>
+        </article>
+        <div class="code-block">
+          <div class="code-label">// MDC 示例：Markdown 中嵌入 Vue 组件</div>
+          <pre><span style="color:#888"># 安装指南</span>
+
+<span style="color:#888">用一行命令启动项目：</span>
+
+:::<span style="color:#1f63ff">terminal</span>{<span style="color:#e8c200">cmd="npx create-docus my-docs"</span>}
+::
+
+<span style="color:#888">在 Markdown 中直接用 Vue 组件：</span>
+
+<span style="color:#888">:::</span><span style="color:#1f63ff">Callout</span>{<span style="color:#e8c200">type="warning"</span>}
+<span style="color:#888">需要 Node.js 18+</span>
+<span style="color:#888">:::</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 04: 技术栈 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="label b">TECH STACK</div>
+          <h2>技术栈</h2>
+          <p>Docus 基于 Nuxt 生态最前沿的技术栈整合而来。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">框架</span></div>
+          <h3>Nuxt Content</h3>
+          <p>文件驱动内容管理，支持 Markdown/MDX，强大的内容查询 API。</p>
+          <ul>
+            <li>content/ 目录即路由</li>
+            <li>queryContent() 链式查询</li>
+            <li>内置 frontmatter 支持</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">样式</span></div>
+          <h3>Nuxt UI 4 + Tailwind</h3>
+          <p>基于 Nuxt UI 4 组件库 + Tailwind CSS 4，原子化样式，主题定制灵活。</p>
+          <ul>
+            <li>预设深色主题</li>
+            <li>CSS 变量驱动设计系统</li>
+            <li>组件覆盖零门槛</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">优化</span></div>
+          <h3>图片优化</h3>
+          <p>集成 Nuxt Image，自动 WebP/AVIF 转换、懒加载、srcset 生成。</p>
+          <ul>
+            <li>自动格式转换</li>
+            <li>CLS 优化</li>
+            <li>CDN 友好</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 05: 项目结构 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">PROJECT STRUCTURE</div>
+          <h2>项目结构</h2>
+          <p>Docus 项目结构简洁清晰，内容与代码分离，易于维护。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">目录结构</span></div>
+          <h3>核心目录</h3>
+          <p>Docus 采用约定式目录结构，内容与组件分离。</p>
+          <ul>
+            <li>content/ — Markdown 文档（自动路由）</li>
+            <li>components/ — 自定义 Vue 组件（自动导入）</li>
+            <li>pages/ — 自定义页面（可选覆盖）</li>
+            <li>assets/ — 静态资源（样式、图片）</li>
+            <li>public/ — 纯静态文件</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">扩展方式</span></div>
+          <h3>自定义组件扩展</h3>
+          <p>在 components/ 中添加 .vue 文件即可扩展 Docus，无需配置 import。</p>
+          <ul>
+            <li>组件名即文件名</li>
+            <li>支持嵌套目录</li>
+            <li>支持 props / slots / emit</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 06: 适用场景 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">06</div>
+        <div class="section-meta">
+          <div class="label b">USE CASES</div>
+          <h2>适用场景</h2>
+          <p>Docus 覆盖从个人博客到企业级文档的全部需求。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="red">
+          <div class="n">1</div>
+          <h4>技术文档</h4>
+          <p>API 文档、SDK 文档、框架文档、CLI 工具文档。Nuxt 官方所有框架文档均使用 Docus。</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">2</div>
+          <h4>API 文档</h4>
+          <p>自动生成 OpenAPI 文档展示，Markdown 中嵌入代码示例，支持版本管理。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">3</div>
+          <h4>产品文档</h4>
+          <p>产品手册、用户指南、教程、FAQ，内置搜索和国际化，多语言产品文档一条命令搞定。</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 07: 使用 SOP ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">07</div>
+        <div class="section-meta">
+          <div class="label">INSTALL SOP</div>
+          <h2>使用 SOP</h2>
+          <p>从零到上线，最快 3 分钟完成。</p>
+        </div>
+      </div>
+      <div class="code-block">
+        <div class="code-label">// Terminal · 一条命令创建文档项目</div>
+        <pre><span style="color:#888"># 创建新项目（推荐）</span>
+npx create-docus my-docs
+
+<span style="color:#888"># 或使用国际化模板</span>
+npx create-docus my-docs -t i18n
+
+<span style="color:#888"># 进入目录</span>
+cd my-docs
+
+<span style="color:#888"># 启动开发服务器</span>
+npm run dev
+
+<span style="color:#888"># 浏览器打开 http://localhost:3000</span>
+
+<span style="color:#888"># 构建生产版本</span>
+npm run build
+
+<span style="color:#888"># 预览生产构建</span>
+npm run preview</pre>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 08: FAQ ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">08</div>
+        <div class="section-meta">
+          <div class="label b">FAQ</div>
+          <h2>常见问题</h2>
+          <p>选自 GitHub Issues 和官方文档的高频问题。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="faq-item">
+          <h4>Q: Docus 和 Nuxt Content 是什么关系？</h4>
+          <p>Docus 是基于 Nuxt Content 构建的文档主题/启动器，整合了 Nuxt UI 4、Tailwind CSS 4、SEO 套件和 AI 功能。Nuxt Content 负责内容解析，Docus 负责视觉呈现和交互。</p>
+        </article>
+        <article class="faq-item">
+          <h4>Q: 是否支持自定义域名和 Vercel 部署？</h4>
+          <p>完全支持。Docus 原生支持 Vercel、Netlify、Cloudflare Pages、GitHub Pages 等所有主流部署平台，SSG 模式下无需服务端。</p>
+        </article>
+        <article class="faq-item">
+          <h4>Q: 如何添加自定义组件？</h4>
+          <p>在 components/ 目录创建 .vue 文件，Docus 自动导入。在 Markdown 中用 ::MyComponent:: MDC 语法即可调用，支持 props 和 slots。</p>
+        </article>
+        <article class="faq-item">
+          <h4>Q: Nuxt 4 集成情况如何？</h4>
+          <p>Docus 已在 Nuxt 4 分支稳定维护，2026-06-25 仍有活跃提交，全面支持 Nuxt 4 的兼容性 API 和性能优化特性。</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 09: 资源链接 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">09</div>
+        <div class="section-meta">
+          <div class="label">RESOURCES</div>
+          <h2>资源链接</h2>
+          <p>GitHub + 官方文档 + 在线 Demo。</p>
+        </div>
+      </div>
+      <div class="footer-block">
+        <h3>Docus · 官方资源</h3>
+        <p>由 Nuxt 官方团队维护，活跃社区，持续更新。</p>
+        <div class="footer-links">
+          <a class="dark-link" href="https://github.com/nuxt-content/docus" target="_blank" rel="noopener">
+            ★ GitHub · 2.9k Stars
+          </a>
+          <a class="blue-link" href="https://docus.dev" target="_blank" rel="noopener">
+            🌐 docus.dev · 官方文档
+          </a>
+          <a href="https://www.npmjs.com/package/docus" target="_blank" rel="noopener">
+            📦 npm · docus
+          </a>
+        </div>
+        <p style="margin-top:10px;font-size:13px;color:var(--muted)">维护者：Nuxt Team · 许可证：MIT · 最后提交：2026-06-25</p>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">Docus · GitHub: nuxt-content/docus · ★ 2,895 · MIT License · 硬核蓝手册风格</p>
+  </main>
+</body>
+</html>
