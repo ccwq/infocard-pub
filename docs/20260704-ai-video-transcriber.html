@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Video Transcriber · 30+平台视频转文字，自动 GPT-4o 纠错摘要</title>
+  <meta name="description" content="开源 AI 视频转录工具，支持 YouTube/TikTok/B站等 30+ 平台，自动识别 100+ 语言，转录后由 GPT-4o 纠错补全分段并生成多语言摘要。Docker 一键部署，需 OpenAI API Key。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;
+      --line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;
+      --red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;
+      --shadow:7px 7px 0 rgba(17,17,17,.12);
+      --green:#15803d;--green-soft:#eefbf1;
+      --yellow:#b45309;--yellow-soft:#fef3c7;
+      --orange:#c2410c;--orange-soft:#fff7ed;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);
+      color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative;
+    }
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(260px,.6fr);gap:14px;background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 16px 14px;margin-bottom:12px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right;overflow-wrap:anywhere;max-width:240px}
+    h1{margin:0 0 10px;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(26px,4.8vw,54px);line-height:.98;letter-spacing:-.03em;color:var(--ink)}
+    .subtitle{margin:0;max-width:60ch;font-size:13.5px;line-height:1.72;color:#3f3932}
+    .subtitle strong{color:var(--blue)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    .chip.orange{background:var(--orange-soft);border-color:var(--orange);color:var(--orange)}
+    /* === STATS === */
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;background:#111;color:#fff;border:2px solid #111;box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px}
+    .stat{padding:8px 10px;border:1.5px solid rgba(255,255,255,.18);min-width:0}
+    .stat .n{display:block;font-size:20px;font-weight:900;line-height:1;color:#ff9999;font-family:Georgia,"Times New Roman",serif}
+    .stat .d{font-size:10.5px;line-height:1.4;color:#dfd7cd}
+    /* === FLOW STEPS === */
+    .flow-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .flow-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .flow-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .flow-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:22px;line-height:1.1;letter-spacing:-.02em}
+    .flow-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .flow-step{border:1.5px solid var(--line);padding:11px 12px;background:#fff}
+    .flow-step .flow-n{width:22px;height:22px;background:var(--blue);color:#fff;font:900 11px/1;display:grid;place-items:center;border-radius:50%;margin-bottom:8px}
+    .flow-step .flow-icon{margin-bottom:8px;font-size:24px}
+    .flow-step h4{margin:0 0 5px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .flow-step p{margin:0;font-size:11px;color:var(--muted);line-height:1.55}
+    /* === PLATFORM GRID === */
+    .platform-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .platform-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .platform-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .platform-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .platform-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+    .platform-item{padding:8px 10px;border:1.5px solid var(--line);background:#fff;text-align:center;font-size:11.5px;font-weight:600}
+    .platform-item.highlight{border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+    .platform-item .p-icon{margin-bottom:4px;font-size:20px}
+    /* === FEATURES === */
+    .features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+    .feature-col{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);min-width:0;display:flex;flex-direction:column}
+    .col-head{padding:12px 12px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0}
+    .col-kicker{margin:0 0 6px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--blue);text-transform:uppercase}
+    .col-title{margin:0;font-size:20px;line-height:1.08;font-family:Georgia,"Times New Roman","Songti SC",serif;letter-spacing:-.03em}
+    .col-body{padding:12px 12px 10px;display:grid;gap:10px;flex:1}
+    .feature{padding:9px 9px 8px;border:1.5px solid var(--line);background:#fff}
+    .feature .num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:var(--red);color:#fff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:7px}
+    .feature h4{margin:0 0 4px;font-size:13px;line-height:1.3}
+    .feature p{margin:0;color:#45413b;font-size:11.5px;line-height:1.58}
+    .feature .label{display:inline-block;margin-bottom:5px;padding:2px 6px;border:1.5px solid var(--green);background:var(--green-soft);color:#14532d;font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
+    /* === CODE BLOCK === */
+    .code-block{background:#111;border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px;overflow-x:auto}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#d8e2ff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:#d8e2ff;white-space:pre;word-break:normal;overflow-x:auto}
+    .code-block .prompt{color:#f4c84c}
+    .code-block .ai{color:#a8f59f}
+    .code-block .comment{color:#8b9bbf}
+    .code-block .cmd{color:#f4a8c8}
+    .code-block .key{color:#93c5fd}
+    .code-block .val{color:#fdba74}
+    .code-block .var{color:#f9a8d4}
+    .code-block .func{color:#f9a8d4}
+    /* === TECH STACK === */
+    .stack-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .stack-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .stack-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .stack-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .stack-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .stack-col{border:1.5px solid var(--line);padding:12px;background:#fff}
+    .stack-col h4{margin:0 0 10px;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px}
+    .stack-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ede8;font-size:11.5px}
+    .stack-item:last-child{border-bottom:none}
+    .stack-item .name{font-weight:600}
+    .stack-item .desc{color:var(--muted)}
+    /* === FAQ === */
+    .faq-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .faq-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .faq-badge{background:var(--orange);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .faq-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .faq-list{display:grid;gap:10px}
+    .faq-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .faq-item h4{margin:0 0 6px;font-size:12.5px;font-weight:800;color:var(--blue);display:flex;align-items:center;gap:6px}
+    .faq-item h4::before{content:"Q:";font-weight:900}
+    .faq-item p{margin:0;font-size:11.5px;color:#45413b;line-height:1.58}
+    /* === RESOURCES === */
+    .resources{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+    .resource-col{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 14px;text-align:center}
+    .resource-col h4{margin:0 0 8px;font-size:14px;font-weight:800}
+    .resource-col p{margin:0 0 10px;font-size:11.5px;color:var(--muted)}
+    .resource-link{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--blue);color:#fff;font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;border:1.5px solid var(--blue)}
+    .resource-link:hover{background:var(--blue-soft);color:var(--blue)}
+    .resource-link.red{background:var(--red);border-color:var(--red)}
+    .resource-link.red:hover{background:var(--red-soft);color:var(--red-dark)}
+    /* === FOOTER === */
+    .footer{background:#111;color:#dfd7cd;border:2px solid #111;box-shadow:var(--shadow);padding:12px 14px;text-align:center;font-size:11px}
+    .footer a{color:#ff9999;text-decoration:underline}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker">🎥 AI Tools · Video Transcription</span>
+        <span class="source">github.com/wendy7756<br>Apache-2.0</span>
+      </div>
+      <h1>AI Video Transcriber</h1>
+      <p class="subtitle">
+        开源 <strong>AI 视频转录工具</strong>，支持 <strong>YouTube / TikTok / B站</strong> 等 <strong>30+ 平台</strong>，自动识别 <strong>100+ 语言</strong>，转录后由 <strong>GPT-4o</strong> 纠错补全分段并生成多语言摘要。Docker 一键部署。
+      </p>
+      <div class="meta-row">
+        <span class="chip blue">30+ 平台</span>
+        <span class="chip red">100+ 语言</span>
+        <span class="chip green">GPT-4o 驱动</span>
+        <span class="chip yellow">Docker 部署</span>
+        <span class="chip">Faster-Whisper</span>
+        <span class="chip">开源免费</span>
+      </div>
+    </div>
+    <div style="background:#f4efe8;border:1.5px solid var(--line);padding:12px;display:flex;flex-direction:column;justify-content:center;gap:8px">
+      <div style="text-align:center;font-size:48px;line-height:1">🎬</div>
+      <div style="text-align:center;font-weight:800;font-size:12px;color:var(--muted)">Subtitle-First<br>Architecture</div>
+      <div style="text-align:center;font-size:10.5px;color:var(--muted);line-height:1.5">优先提取字幕<br>极速转录</div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section class="stats">
+    <div class="stat">
+      <span class="n">30+</span>
+      <span class="d">支持平台数量</span>
+    </div>
+    <div class="stat">
+      <span class="n">100+</span>
+      <span class="d">自动识别语言</span>
+    </div>
+    <div class="stat">
+      <span class="n">GPT-4o</span>
+      <span class="d">AI 纠错补全</span>
+    </div>
+    <div class="stat">
+      <span class="n">Docker</span>
+      <span class="d">一键部署</span>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="flow-section">
+    <div class="flow-head">
+      <span class="flow-badge">工作流</span>
+      <h2>How It Works · 四步完成转录摘要</h2>
+    </div>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-n">1</div>
+        <div class="flow-icon">🔗</div>
+        <h4>粘贴链接</h4>
+        <p>输入 YouTube / TikTok / B站 等 30+ 平台视频链接，或直接上传本地文件</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">2</div>
+        <div class="flow-icon">📥</div>
+        <h4>下载解析</h4>
+        <p>yt-dlp 提取视频音频；有字幕的平台直接获取字幕，几秒完成</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">3</div>
+        <div class="flow-icon">🎙️</div>
+        <h4>Whisper 转录</h4>
+        <p>Faster-Whisper 高精度语音转文字，支持 100+ 语言自动检测</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">4</div>
+        <div class="flow-icon">🤖</div>
+        <h4>GPT-4o 优化</h4>
+        <p>自动纠错、补全句子、智能分段，生成多语言摘要</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLATFORM GRID -->
+  <section class="platform-section">
+    <div class="platform-head">
+      <span class="platform-badge">平台</span>
+      <h2>30+ 支持平台一览</h2>
+    </div>
+    <div class="platform-grid">
+      <div class="platform-item highlight">
+        <div class="p-icon">📺</div>
+        YouTube
+      </div>
+      <div class="platform-item highlight">
+        <div class="p-icon">🎵</div>
+        TikTok
+      </div>
+      <div class="platform-item highlight">
+        <div class="p-icon">📺</div>
+        Bilibili
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">📱</div>
+        Instagram
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">🐦</div>
+        Twitter/X
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">👍</div>
+        Facebook
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">🎧</div>
+        Apple Podcasts
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">☁️</div>
+        SoundCloud
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">📺</div>
+        Youku
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">🎬</div>
+        iQiyi
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">🐧</div>
+        腾讯视频
+      </div>
+      <div class="platform-item">
+        <div class="p-icon">📺</div>
+        抖音/西瓜
+      </div>
+    </div>
+    <p style="margin:12px 0 0;font-size:11px;color:var(--muted)">* 基于 yt-dlp，支持所有 yt-dlp 兼容平台；本地文件支持 .mp3/.mp4/.m4a/.wav/.webm/.mkv/.ogg/.flac/.txt</p>
+  </section>
+
+  <!-- KEY FEATURES -->
+  <section class="features">
+    <div class="feature-col">
+      <div class="col-head">
+        <div class="col-kicker">转录核心</div>
+        <h3 class="col-title">Transcription</h3>
+      </div>
+      <div class="col-body">
+        <div class="feature">
+          <span class="num">1</span>
+          <h4>Subtitle-First 极速架构</h4>
+          <p>优先提取平台原生字幕（YouTube 自动字幕等），无需下载音频，秒级完成转录</p>
+        </div>
+        <div class="feature">
+          <span class="num">2</span>
+          <h4>Faster-Whisper 高精度</h4>
+          <p>无字幕时使用 Faster-Whisper，比原版 Whisper 更快更省内存，支持 tiny/base/small/medium/large 模型</p>
+        </div>
+        <div class="feature">
+          <span class="num">3</span>
+          <h4>100+ 语言自动检测</h4>
+          <p>自动识别视频语种，无需手动指定，覆盖中文/英文/日韩/欧洲各语种</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature-col">
+      <div class="col-head">
+        <div class="col-kicker">AI 增强</div>
+        <h3 class="col-title">GPT-4o Optimization</h3>
+      </div>
+      <div class="col-body">
+        <div class="feature">
+          <span class="label">核心</span>
+          <h4>自动纠错与补全</h4>
+          <p>修正 Whisper 转录错别字，补全被截断的句子，让文本更通顺</p>
+        </div>
+        <div class="feature">
+          <span class="label">核心</span>
+          <h4>智能语义分段</h4>
+          <p>根据语义和停顿自动分段，便于阅读和后期编辑</p>
+        </div>
+        <div class="feature">
+          <span class="label">核心</span>
+          <h4>多语言摘要翻译</h4>
+          <p>选择任意语言生成摘要；当摘要语言与原视频不同时，自动调用 GPT-4o 翻译</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature-col">
+      <div class="col-head">
+        <div class="col-kicker">用户体验</div>
+        <h3 class="col-title">UX & Deployment</h3>
+      </div>
+      <div class="col-body">
+        <div class="feature">
+          <span class="num">✓</span>
+          <h4>进度可视化</h4>
+          <p>实时显示处理阶段：字幕提取 / Whisper 转录 / AI 优化，全程进度条</p>
+        </div>
+        <div class="feature">
+          <span class="num">✓</span>
+          <h4>移动端适配</h4>
+          <p>响应式界面，手机/平板均可使用，随时随地转录视频</p>
+        </div>
+        <div class="feature">
+          <span class="num">✓</span>
+          <h4>本地文件支持</h4>
+          <p>支持拖拽上传音视频文件，.txt 文件直接进入 AI 优化流程</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CODE EXAMPLES -->
+  <section class="code-block">
+    <div class="tag">Docker 部署</div>
+    <pre><span class="prompt">$</span> <span class="cmd">git clone https://github.com/wendy7756/AI-Video-Transcriber.git</span>
+<span class="prompt">$</span> <span class="cmd">cd AI-Video-Transcriber</span>
+<span class="prompt">$</span> <span class="cmd">cp .env.example .env</span>  <span class="comment"># 可选：设置 OPENAI_API_KEY</span>
+<span class="prompt">$</span> <span class="cmd">docker-compose up -d</span>  <span class="comment"># 一键启动</span>
+<span class="comment"># 访问 http://localhost:8000</span></pre>
+  </section>
+
+  <section class="code-block">
+    <div class="tag">本地安装脚本</div>
+    <pre><span class="prompt">$</span> <span class="cmd">git clone https://github.com/wendy7756/AI-Video-Transcriber.git</span>
+<span class="prompt">$</span> <span class="cmd">cd AI-Video-Transcriber</span>
+<span class="prompt">$</span> <span class="cmd">chmod +x install.sh && ./install.sh</span>  <span class="comment"># 自动安装依赖</span>
+<span class="prompt">$</span> <span class="cmd">python3 start.py --prod</span>  <span class="comment"># 生产模式（长视频推荐）</span></pre>
+  </section>
+
+  <section class="code-block">
+    <div class="tag">环境变量配置</div>
+    <pre><span class="comment"># .env 文件</span>
+<span class="key">OPENAI_API_KEY</span>=<span class="val">sk-your-api-key-here</span>
+<span class="key">OPENAI_BASE_URL</span>=<span class="val">https://openrouter.ai/api/v1</span>  <span class="comment"># 可选：自定义端点</span>
+<span class="key">WHISPER_MODEL_SIZE</span>=<span class="val">base</span>  <span class="comment"># tiny/base/small/medium/large</span>
+<span class="key">UPLOAD_MAX_MB</span>=<span class="val">200</span>  <span class="comment"># 本地上传文件大小限制</span>
+<span class="key">HOST</span>=<span class="val">0.0.0.0</span>
+<span class="key">PORT</span>=<span class="val">8000</span></pre>
+  </section>
+
+  <!-- TECH STACK -->
+  <section class="stack-section">
+    <div class="stack-head">
+      <span class="stack-badge">架构</span>
+      <h2>技术栈 Tech Stack</h2>
+    </div>
+    <div class="stack-grid">
+      <div class="stack-col">
+        <h4>🔧 后端 Backend</h4>
+        <div class="stack-item">
+          <span class="name">FastAPI</span>
+          <span class="desc">Python Web 框架</span>
+        </div>
+        <div class="stack-item">
+          <span class="name">yt-dlp</span>
+          <span class="desc">视频下载与解析</span>
+        </div>
+        <div class="stack-item">
+          <span class="name">FFmpeg</span>
+          <span class="desc">音频提取与标准化</span>
+        </div>
+        <div class="stack-item">
+          <span class="name">Faster-Whisper</span>
+          <span class="desc">高效语音转文字</span>
+        </div>
+        <div class="stack-item">
+          <span class="name">OpenAI API</span>
+          <span class="desc">GPT-4o 纠错摘要</span>
+        </div>
+      </div>
+      <div class="stack-col">
+        <h4>🎨 前端 Frontend</h4>
+        <div class="stack-item">
+          <span class="name">HTML5 + CSS3</span>
+          <span class="desc">响应式界面</span>
+        </div>
+        <div class="stack-item">
+          <span class="name">JavaScript ES6+</span>
+          <span class="desc">前端交互逻辑</span>
+        </div>
+        <div class="stack-item">
+          <span class="name">Marked.js</span>
+          <span class="desc">Markdown 渲染</span>
+        </div>
+        <div class="stack-item">
+          <span class="name">Font Awesome</span>
+          <span class="desc">图标库</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <div class="faq-head">
+      <span class="faq-badge">FAQ</span>
+      <h2>常见问题</h2>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <h4>需要准备什么？</h4>
+        <p>Python 3.8+、FFmpeg、一个 OpenAI API Key（或其他兼容端点如 OpenRouter）。API Key 可在 UI 设置，无需服务器端环境变量。</p>
+      </div>
+      <div class="faq-item">
+        <h4>支持哪些本地文件格式？</h4>
+        <p>支持 .mp3/.mp4/.m4a/.wav/.webm/.mkv/.ogg/.flac 音视频，以及 .txt 纯文本。默认最大 200MB，可通过 UPLOAD_MAX_MB 调整。</p>
+      </div>
+      <div class="faq-item">
+        <h4>长视频如何处理？</h4>
+        <p>系统支持任意长度视频，但处理时间随长度增加。建议使用较小 Whisper 模型（tiny/base）处理长视频；生产模式 `python3 start.py --prod` 避免 SSE 断连。</p>
+      </div>
+      <div class="faq-item">
+        <h4>内存占用多少？</h4>
+        <p>Whisper 模型内存：tiny~150MB / base~250MB / small~750MB / medium~1.5GB / large~3GB。Docker 容器空闲约 128MB，处理时 500MB-2GB。</p>
+      </div>
+      <div class="faq-item">
+        <h4>字幕提取失败怎么办？</h4>
+        <p>无字幕平台会自动回退到 Whisper 转录模式。确保网络稳定，或切换 VPN 后重试。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESOURCES -->
+  <section class="resources">
+    <div class="resource-col">
+      <h4>📦 GitHub 源码</h4>
+      <p>开源项目 · Apache-2.0 许可</p>
+      <a href="https://github.com/wendy7756/AI-Video-Transcriber" class="resource-link" target="_blank">
+        github.com/wendy7756/AI-Video-Transcriber
+      </a>
+    </div>
+    <div class="resource-col">
+      <h4>🚀 在线体验</h4>
+      <p>sipsip.ai 完整产品</p>
+      <a href="https://sipsip.ai" class="resource-link red" target="_blank">
+        sipsip.ai →
+      </a>
+    </div>
+    <div class="resource-col">
+      <h4>📖 快速上手</h4>
+      <p>支持文档 · 安装指南</p>
+      <a href="https://github.com/wendy7756/AI-Video-Transcriber#readme" class="resource-link" target="_blank">
+        查看 README
+      </a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>AI Video Transcriber · <a href="https://github.com/wendy7756/AI-Video-Transcriber" target="_blank">GitHub</a> · <a href="https://sipsip.ai" target="_blank">sipsip.ai</a></p>
+    <p style="margin-top:4px;color:#8a8078">Faster-Whisper · FastAPI · yt-dlp · GPT-4o</p>
+  </footer>
+
+</div>
+</body>
+</html>
