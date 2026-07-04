@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LingBot-Map · 蚂蚁开源实时流式 3D 感知与建图模型</title>
+  <meta name="description" content="蚂蚁集团开源 LingBot-Map：实时流式 3D 感知模型，手机拍摄视频直接转可交互 3D 地图。~20 FPS 实时处理，Geometric Context Transformer 架构防漂移，ETH3D/Oxford SOTA。适用于 AR、机器人、自动驾驶、3D 建模。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7;--purple:#6b21a8;--purple-soft:#f3e8ff}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,48px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:60ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    .chip.purple{background:var(--purple-soft);border-color:var(--purple);color:var(--purple)}
+    /* Hero right: mission / demo quote */
+    .mission{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .mission .big{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:16px;line-height:1.2;letter-spacing:-.02em;color:#fff}
+    .mission .en{font-size:10px;color:#8b9bbf;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+    .mission .tagline{font-size:11px;color:#d8e2ff;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    /* === STAT BAR === */
+    .stat-bar{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0}
+    .stat-item{border-right:1.5px solid rgba(17,17,17,.15);padding:0 14px;text-align:center}
+    .stat-item:first-child{padding-left:0}
+    .stat-item:last-child{border-right:none}
+    .stat-item .n{font:900 22px/1 Georgia,"Times New Roman",serif;color:var(--red)}
+    .stat-item .n.blue{color:var(--blue)}
+    .stat-item .n.green{color:var(--green)}
+    .stat-item .n.purple{color:var(--purple)}
+    .stat-item .n.yellow{color:var(--yellow)}
+    .stat-item .l{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
+    /* === CAPABILITY GRID === */
+    .cap-grid{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .cap-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .cap-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .cap-grid h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .cap-sub{margin:6px 0 12px;font-size:12px;color:var(--muted);line-height:1.6}
+    .cap-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .cap-card{border:1.5px solid var(--line);padding:12px 13px;background:#fff;display:grid;gap:7px}
+    .cap-icon{font-size:22px;line-height:1;margin-bottom:2px}
+    .cap-card h4{margin:0;font-size:13px;font-weight:800;line-height:1.3}
+    .cap-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .cap-tag{display:inline-flex;padding:2px 7px;border:1.5px solid var(--line);background:#f4f0e8;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:3px}
+    .cap-card.highlight{border-color:var(--red);background:var(--red-soft)}
+    .cap-card.highlight h4{color:var(--red-dark)}
+    /* === ARCHITECTURE === */
+    .arch-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .arch-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);display:flex;align-items:flex-start;gap:10px}
+    .arch-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .arch-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .arch-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+    .arch-col{padding:12px 14px;border-right:1.5px solid rgba(17,17,17,.12);min-width:0;display:grid;gap:8px}
+    .arch-col:last-child{border-right:none}
+    .arch-col .col-label{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;padding-bottom:7px;border-bottom:1.5px solid rgba(17,17,17,.12);margin-bottom:2px}
+    .arch-item{background:#fff;border:1.5px solid var(--line);padding:8px 10px}
+    .arch-item .name{font-size:12.5px;font-weight:800;line-height:1.3;margin-bottom:3px}
+    .arch-item .desc{font-size:11px;color:var(--muted);line-height:1.55;margin:0}
+    .arch-item.anchor .col-label{color:var(--blue)}
+    .arch-item.pose .col-label{color:var(--red-dark)}
+    .arch-item.memory .col-label{color:var(--green)}
+    /* === BENCHMARK BANNER === */
+    .bench-banner{background:linear-gradient(135deg,#111 0%, #1a1a1a 100%);border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,.4fr);gap:16px;align-items:center}
+    .bench-left .bench-title{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em;color:#fff;margin-bottom:6px}
+    .bench-left .bench-note{font-size:12px;line-height:1.62;color:#9b9b9b;max-width:60ch}
+    .bench-right{display:flex;flex-direction:column;gap:5px}
+    .bench-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#e0e0e0;white-space:nowrap}
+    .bench-chip .dot{width:7px;height:7px;background:var(--red);border-radius:50%;flex-shrink:0}
+    .bench-chip.green .dot{background:var(--green)}
+    .bench-chip.blue .dot{background:#4a9eff}
+    .bench-chip.purple .dot{background:var(--purple)}
+    /* === SCENARIOS === */
+    .scenario-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .scenario-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .scenario-badge{background:var(--purple);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .scenario-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .scenario-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .scenario-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .scenario-icon{font-size:20px;line-height:1}
+    .scenario-card h4{margin:0;font-size:13px;font-weight:800;line-height:1.3}
+    .scenario-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === OPEN SOURCE === */
+    .open-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .open-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px;grid-column:1/-1}
+    .open-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .open-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .open-col{display:grid;gap:8px}
+    .open-item{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;padding:9px 11px;border:1.5px solid var(--line);background:#fff}
+    .open-icon{font-size:18px;line-height:1;padding-top:1px}
+    .open-item h4{margin:0 0 2px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .open-item p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === CODE / USAGE === */
+    .code-block{background:#111;border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px;overflow-x:auto}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#d8e2ff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:#d8e2ff;white-space:pre;word-break:normal;overflow-x:auto}
+    .code-block .prompt{color:#f4c84c}
+    .code-block .ai{color:#a8f59f}
+    .code-block .comment{color:#8b9bbf}
+    .code-block .cmd{color:#f4a8c8}
+    .code-block .key{color:#93c5fd}
+    .code-block .val{color:#fdba74}
+    /* === HOW TO USE === */
+    .howto{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .howto-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .howto-badge{background:var(--red-dark);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .howto h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02epx}
+    .howto-body{padding:12px 16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+    .howto-step{padding:10px 12px;border-right:1.5px solid rgba(17,17,17,.15);min-width:0;display:grid;gap:6px}
+    .howto-step:last-child{border-right:none}
+    .howto-step .n{font:900 20px/1 Georgia,"Times New Roman",serif;color:var(--blue)}
+    .howto-step h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .howto-step p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === MODELS === */
+    .model-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .model-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .model-badge{background:var(--yellow);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .model-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .model-table{width:100%;border-collapse:collapse;border:1.5px solid var(--line)}
+    .model-table th{background:#f4f0e8;border:1.5px solid var(--line);padding:7px 11px;text-align:left;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+    .model-table td{border:1.5px solid var(--line);padding:8px 11px;font-size:11.5px;line-height:1.5}
+    .model-table tr:nth-child(even) td{background:#faf7f0}
+    .model-table td:first-child{font-weight:800}
+    .model-table a{color:var(--blue);text-decoration:underline}
+    /* === FAQ === */
+    .faq-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .faq-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .faq-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .faq-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .faq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .faq-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .faq-item .q{font-size:12.5px;font-weight:800;line-height:1.4;margin-bottom:5px}
+    .faq-item .a{font-size:11.5px;color:var(--muted);line-height:1.6;margin:0}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:12px 14px 10px;color:var(--muted);font-size:12px;line-height:1.6}
+    .footer .brand{font-weight:800;color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:14px}
+    .footer .small{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    .footer .small a{color:var(--blue)}
+    .save{display:block;width:fit-content;position:static;margin:12px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--red),#991b1b);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(153,27,27,.3);cursor:pointer}
+    /* === RESPONSIVE === */
+    @media(max-width:960px){
+      .hero,.bench-banner{grid-template-columns:1fr}
+      .arch-body,.cap-cards,.scenario-grid,.open-section,.howto-body{grid-template-columns:repeat(2,1fr)}
+      .stat-bar{grid-template-columns:repeat(3,1fr)}
+      .stat-item:nth-child(3){border-right:none}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:10px 0 72px}
+      .hero,.stat-bar,.bench-banner,.footer{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(22px,8vw,32px)}
+      .arch-body,.cap-cards,.scenario-grid,.open-section,.howto-body,.faq-grid,.stat-bar{grid-template-columns:1fr}
+      .stat-item,.arch-col{border-right:none;border-bottom:1.5px solid rgba(17,17,17,.12)}
+      .stat-item:last-child,.arch-col:last-child{border-bottom:none}
+      .footer{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">SPATIAL AI · 3D RECONSTRUCTION · ANT GROUP · APACHE-2.0</div>
+        <div class="source">github.com/Robbyant/lingbot-map</div>
+      </div>
+      <h1>LingBot-Map</h1>
+      <p class="subtitle">实时流式 3D 感知与建图——Geometric Context Transformer 架构，<strong>边看边建</strong>，无需离线后处理，长距离重建<strong>零漂移</strong>，ETH3D / Oxford 基准 SOTA。</p>
+      <div class="meta-row">
+        <span class="chip red">★ 9,670</span>
+        <span class="chip green">Apache-2.0</span>
+        <span class="chip blue">Python</span>
+        <span class="chip yellow">~20 FPS</span>
+        <span class="chip purple">GCT 架构</span>
+        <span class="chip">10K+ 帧</span>
+      </div>
+    </div>
+    <div class="mission">
+      <div class="big">边看边建图<br>实时可交互 3D</div>
+      <div class="en">Streaming 3D Reconstruction in Real Time</div>
+      <div class="tagline">Geometric Context Transformer<br>Feed-Forward · KV Cache · ~20 FPS</div>
+    </div>
+  </section>
+
+  <!-- STAT BAR -->
+  <section class="stat-bar">
+    <div class="stat-item">
+      <div class="n red">9,670</div>
+      <div class="l">GitHub Stars</div>
+    </div>
+    <div class="stat-item">
+      <div class="n blue">950</div>
+      <div class="l">Forks</div>
+    </div>
+    <div class="stat-item">
+      <div class="n green">~20</div>
+      <div class="l">FPS 实时推理</div>
+    </div>
+    <div class="stat-item">
+      <div class="n purple">10K+</div>
+      <div class="l">帧无漂移</div>
+    </div>
+    <div class="stat-item">
+      <div class="n yellow">10</div>
+      <div class="l">基准数据集 SOTA</div>
+    </div>
+  </section>
+
+  <!-- CORE CAPABILITIES -->
+  <section class="cap-grid">
+    <div class="cap-head">
+      <div class="cap-badge">CORE</div>
+      <h2>核心能力：实时流式 3D 感知</h2>
+    </div>
+    <p class="cap-sub">LingBot-Map 是前馈（Feed-Forward）3D 基础模型，支持端到端流式推理，无需迭代优化、无需离线批处理，视频帧输入直接输出可交互 3D 点云与相机位姿。</p>
+    <div class="cap-cards">
+      <div class="cap-card highlight">
+        <div class="cap-icon">⚡</div>
+        <h4>实时流式 3D 重建</h4>
+        <p>以 ~20 FPS 处理 518×378 分辨率视频流，paged KV Cache 注意力机制稳定推理超过 10,000 帧超长序列，无性能衰减。</p>
+        <span class="cap-tag red">流式推理</span>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">🧠</div>
+        <h4>Geometric Context Transformer</h4>
+        <p>架构层面统一坐标锚定、密集几何线索与长程漂移纠正三大任务，三模块协同：锚点坐标、姿态参考窗口、轨迹记忆。</p>
+        <span class="cap-tag">GCT 架构</span>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">🔒</div>
+        <h4>长距离重建零漂移</h4>
+        <p>轨迹记忆（Trajectory Memory）模块维护历史上下文，实时纠正累积误差，超长路径场景下姿态与几何精度稳定。</p>
+        <span class="cap-tag blue">防漂移</span>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">🎯</div>
+        <h4>ETH3D / Oxford SOTA</h4>
+        <p>在 ETH3D、Oxford Spires、KITTI、TUM-D、7-Scenes、Tanks &amp; Temples 等 10 个基准数据集上超越现有流式与迭代优化方法。</p>
+        <span class="cap-tag green">SOTA</span>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">📱</div>
+        <h4>手机视频直接转 3D 地图</h4>
+        <p>任意 RGB 视频输入即可重建可交互 3D 场景，无需专业深度相机或 LiDAR，普通手机拍摄即可完成高质量建图。</p>
+        <span class="cap-tag">消费级硬件</span>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">🌐</div>
+        <h4>交互式 + 离线双管线</h4>
+        <p>交互式 Demo（viser）支持浏览器实时查看；离线渲染管线（Kaolin）支持长视频批量处理与离线渲染输出。</p>
+        <span class="cap-tag purple">双模式</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section class="arch-section">
+    <div class="arch-head">
+      <div class="arch-badge">ARCH</div>
+      <h2>GCT 架构：三个核心模块</h2>
+    </div>
+    <div class="arch-body">
+      <div class="arch-col">
+        <div class="arch-item anchor" style="background:var(--blue-soft);border-color:var(--blue)">
+          <div class="col-label" style="color:var(--blue)">ANCHOR CONTEXT · 锚点坐标</div>
+          <div class="name">坐标锚定模块</div>
+          <p class="desc">建立帧间统一的 3D 坐标系，为每帧提供空间基准锚点，确保多视角几何一致性。</p>
+        </div>
+      </div>
+      <div class="arch-col">
+        <div class="arch-item pose" style="background:var(--red-soft);border-color:var(--red)">
+          <div class="col-label" style="color:var(--red-dark)">POSE-REFERENCE WINDOW · 姿态窗口</div>
+          <div class="name">姿态参考窗口</div>
+          <p class="desc">动态维护相邻帧的姿态约束窗口，结合历史参考帧估计当前相机位姿，抑制快速运动下的位姿跳变。</p>
+        </div>
+      </div>
+      <div class="arch-col">
+        <div class="arch-item memory" style="background:var(--green-soft);border-color:var(--green)">
+          <div class="col-label" style="color:#14532d">TRAJECTORY MEMORY · 轨迹记忆</div>
+          <div class="name">轨迹记忆模块</div>
+          <p class="desc">长期维护全局轨迹上下文，在回环（loop closure）时自动纠正累积漂移，确保长距离路径精度不衰减。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENCHMARK BANNER -->
+  <section class="bench-banner">
+    <div class="bench-left">
+      <div class="bench-title">10 个基准数据集 · 全线 SOTA</div>
+      <div class="bench-note">ETH3D、Oxford Spires、KITTI、TUM-D、7-Scenes、Tanks &amp; Temples、NRGBD、Droid-W、VBR、Featured Indoor 25K 帧长视频</div>
+    </div>
+    <div class="bench-right">
+      <span class="bench-chip"><span class="dot"></span>ETH3D SOTA</span>
+      <span class="bench-chip green"><span class="dot"></span>Oxford SOTA</span>
+      <span class="bench-chip blue"><span class="dot"></span>KITTI benchmark</span>
+      <span class="bench-chip purple"><span class="dot"></span>Tanks &amp; Temples</span>
+    </div>
+  </section>
+
+  <!-- APPLICATION SCENARIOS -->
+  <section class="scenario-section">
+    <div class="scenario-head">
+      <div class="scenario-badge">SCENARIOS</div>
+      <h2>应用场景：从 AR 眼镜到自动驾驶</h2>
+    </div>
+    <div class="scenario-grid">
+      <div class="scenario-card">
+        <div class="scenario-icon">🥽</div>
+        <h4>AR 眼镜实时感知</h4>
+        <p>眼镜端实时重建用户周围 3D 空间，支撑 AR 遮挡、消隐推理与空间锚定，无需云端延迟。</p>
+      </div>
+      <div class="scenario-card">
+        <div class="scenario-icon">🤖</div>
+        <h4>扫地机器人 / 服务机器人</h4>
+        <p>边移动边建图，为机器人提供实时 3D 语义地图，支撑路径规划、避障与物体操控。</p>
+      </div>
+      <div class="scenario-card">
+        <div class="scenario-icon">🚁</div>
+        <h4>无人机自主导航</h4>
+        <p>无人机飞行中实时重建 3D 环境，构建稠密地图，支持 GPS 拒止环境下的自主导航。</p>
+      </div>
+      <div class="scenario-card">
+        <div class="scenario-icon">🚗</div>
+        <h4>自动驾驶感知</h4>
+        <p>车载相机实时稠密建图，支撑动态物体感知、地图更新与长期定位。</p>
+      </div>
+      <div class="scenario-card">
+        <div class="scenario-icon">🏠</div>
+        <h4>3D 户型图快速建模</h4>
+        <p>手机拍摄室内视频，自动生成可量测 3D 户型图，用于装修设计、房产展示与 BIM 建模。</p>
+      </div>
+      <div class="scenario-card">
+        <div class="scenario-icon">🎮</div>
+        <h4>游戏 / 短视频 3D 资产</h4>
+        <p>普通视频自动提取 3D 场景几何，快速生成游戏关卡资产或短视频 3D 特效素材。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPEN SOURCE -->
+  <section class="open-section">
+    <div class="open-head">
+      <div class="open-badge">OPEN</div>
+      <h2>完整开源：代码 + 权重 + 评测基准</h2>
+    </div>
+    <div class="open-col">
+      <div class="open-item">
+        <div class="open-icon">📦</div>
+        <div><h4>完整代码仓库</h4><p>训练脚本、推理 Demo、评测管线、交互可视化（viser）、离线渲染（Kaolin）全部开源。</p></div>
+      </div>
+      <div class="open-item">
+        <div class="open-icon">🤗</div>
+        <div><h4>模型权重开放</h4><p>HuggingFace 与 ModelScope 双平台托管，lingbot-map-long（推荐）、lingbot-map、lingbot-map-stage1 三个版本。</p></div>
+      </div>
+    </div>
+    <div class="open-col">
+      <div class="open-item">
+        <div class="open-icon">📊</div>
+        <div><h4>评测基准全部发布</h4><p>ETH3D、KITTI、Oxford Spires、TUM-D、7-Scenes 等 10 个数据集的评测脚本与预处理工具全部开源。</p></div>
+      </div>
+      <div class="open-item">
+        <div class="open-icon">🎬</div>
+        <div><h4>交互式可视化</h4><p>一行命令启动浏览器 3D 可视化（http://localhost:8080），实时查看重建结果与相机轨迹。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODELS TABLE -->
+  <section class="model-section">
+    <div class="model-head">
+      <div class="model-badge">MODELS</div>
+      <h2>三个模型版本：按场景选型</h2>
+    </div>
+    <table class="model-table">
+      <thead>
+        <tr>
+          <th>模型</th>
+          <th>适用场景</th>
+          <th>推荐度</th>
+          <th>下载</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>lingbot-map-long</td>
+          <td>长序列（10K+ 帧）与大规模户外场景</td>
+          <td><strong style="color:var(--green)">★★★★★ 推荐</strong></td>
+          <td><a href="https://huggingface.co/robbyant/lingbot-map">HuggingFace</a> · <a href="https://www.modelscope.cn/models/Robbyant/lingbot-map">ModelScope</a></td>
+        </tr>
+        <tr>
+          <td>lingbot-map</td>
+          <td>短中序列，综合性能均衡</td>
+          <td><strong style="color:var(--blue)">★★★★ 平衡</strong></td>
+          <td><a href="https://huggingface.co/robbyant/lingbot-map">HuggingFace</a> · <a href="https://www.modelscope.cn/models/Robbyant/lingbot-map">ModelScope</a></td>
+        </tr>
+        <tr>
+          <td>lingbot-map-stage1</td>
+          <td>Stage-1 训练检查点，可加载到 VGGT 做双向推理</td>
+          <td><strong style="color:var(--muted)">★★ 研究用</strong></td>
+          <td><a href="https://huggingface.co/robbyant/lingbot-map">HuggingFace</a> · <a href="https://www.modelscope.cn/models/Robbyant/lingbot-map">ModelScope</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- HOW TO USE -->
+  <section class="howto">
+    <div class="howto-head">
+      <div class="howto-badge">SOP</div>
+      <h2>快速上手：4 步跑通实时 3D 重建</h2>
+    </div>
+    <div class="howto-body">
+      <div class="howto-step">
+        <div class="n">①</div>
+        <h4>创建 conda 环境</h4>
+        <p>conda create -n lingbot-map python=3.10 &amp;&amp; conda activate lingbot-map</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">②</div>
+        <h4>安装 PyTorch 2.8 + FlashInfer</h4>
+        <p>pip install torch==2.8.0 torchvision==0.23.0 cu128 &amp;&amp; pip install flashinfer-python</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">③</div>
+        <h4>安装并下载模型权重</h4>
+        <p>pip install -e . &amp;&amp; 从 HuggingFace / ModelScope 下载 .pt 权重文件</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">④</div>
+        <h4>运行 Demo 开始建图</h4>
+        <p>python demo.py --model_path /path/to/model.pt --image_folder /your/video/ --mask_sky</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- USAGE CODE -->
+  <section class="code-block">
+    <div class="tag">QUICK START · 交互式 Demo 一行命令</div>
+    <pre><span class="comment"># 基本用法：交互式 3D 可视化</span>
+<span class="prompt">$</span> <span class="cmd">python demo.py \</span>
+<span class="cmd">    --model_path /path/to/lingbot-map-long.pt \</span>
+<span class="cmd">    --image_folder example/courthouse \</span>
+<span class="cmd">    --mask_sky</span>
+
+<span class="comment"># 启动后浏览器访问 http://localhost:8080 查看实时 3D 重建</span>
+
+<span class="comment"># 长视频模式（>3000 帧）：使用窗口推理</span>
+<span class="prompt">$</span> <span class="cmd">python demo.py \</span>
+<span class="cmd">    --model_path /path/to/lingbot-map-long.pt \</span>
+<span class="cmd">    --image_folder /your/long/video/ \</span>
+<span class="cmd">    --keyframe_interval 32 \</span>
+<span class="cmd">    --backend flashinfer</span>
+
+<span class="comment"># 编译加速（首次 JIT 编译后有效）</span>
+<span class="prompt">$</span> <span class="cmd">python demo.py --compile --backend flashinfer --dtype bf16</span>
+
+<span class="comment"># 离线批量渲染（长视频，25K+ 帧）</span>
+<span class="prompt">$</span> <span class="cmd">python demo_render/batch_demo.py --model_path lingbot-map-long.pt --input_dir /data/</span></pre>
+  </section>
+
+  <section class="code-block">
+    <div class="tag">TECH STACK · 技术栈一览</div>
+    <pre><span class="key">Framework  </span><span class="val"> PyTorch 2.8.0 (CUDA 12.8)</span>
+<span class="key">Backend    </span><span class="val"> FlashInfer (paged KV Cache) / SDPA fallback</span>
+<span class="key">Inference  </span><span class="val"> Feed-Forward (无需迭代优化)</span>
+<span class="key">Vis        </span><span class="val"> Viser (浏览器实时 3D) + Kaolin (离线批量渲染)</span>
+<span class="key">Architecture</span><span class="val"> Geometric Context Transformer</span>
+<span class="key">Models     </span><span class="val"> lingbot-map-long · lingbot-map · lingbot-map-stage1</span>
+<span class="key">Datasets   </span><span class="val"> ETH3D · Oxford · KITTI · TUM-D · 7-Scenes · Tanks &amp; Temples · NRGBD · Droid-W · VBR</span>
+<span class="key">License    </span><span class="val"> Apache-2.0 (可商用)</span></pre>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <div class="faq-head">
+      <div class="faq-badge">FAQ</div>
+      <h2>常见问题</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <div class="q">Q: LingBot-Map 和传统 SLAM 方法有什么区别？</div>
+        <div class="a">传统 SLAM 需要迭代优化（Bundle Adjustment 等），计算量随轨迹长度增加而累积。LingBot-Map 是纯前馈架构，固定计算量每帧，~20 FPS 实时推理，无迭代开销，且通过轨迹记忆模块实现长期精度。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 需要什么硬件配置才能运行？</div>
+        <div class="a">推荐 NVIDIA GPU（CUDA 12.x）。FlashInfer 后端支持 paged KV Cache，显著降低长序列显存占用。CPU 模式下可使用 SDPA 后端（PyTorch 原生），精度一致但速度较慢。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 三个模型版本怎么选？</div>
+        <div class="a">长序列（10K+ 帧）选 lingbot-map-long，户外大场景推荐；一般视频选 lingbot-map（均衡性能）；研究用途需要双向推理才选 stage1。long 版本对长距离漂移抑制效果最好。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 视频分辨率有限制吗？模型输入是 518×378？</div>
+        <div class="a">518×378 是官方评测分辨率（速度和精度平衡）。代码支持任意分辨率自动 resize 到该尺寸处理，输出结果按原分辨率插值。不需要深度相机，RGB 视频即可。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 可以商用吗？Apache-2.0 许可证有什么限制？</div>
+        <div class="a">Apache-2.0 是非常宽松的开源许可证，允许商业使用，只需保留版权声明和许可证文本。不要求开源衍生代码，但建议注明基于 LingBot-Map。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 25,000 帧超长视频能跑吗？速度如何？</div>
+        <div class="a">可以。官方已发布 13 分钟室内行走视频（约 25K 帧）的评测示例。使用 lingbot-map-long + FlashInfer 后端 + --compile，~20 FPS 实时推理，长序列无性能衰减。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">LingBot-Map</div>
+      <div class="small">
+        <a href="https://github.com/Robbyant/lingbot-map">github.com/Robbyant/lingbot-map</a> ·
+        <a href="https://huggingface.co/robbyant/lingbot-map">🤗 HuggingFace</a> ·
+        <a href="https://www.modelscope.cn/models/Robbyant/lingbot-map">🤖 ModelScope</a> ·
+        <a href="https://arxiv.org/abs/2604.14141">📄 arXiv</a>
+      </div>
+      <div class="small" style="margin-top:4px">Robbyant Team · Apache-2.0 · 2026-04-15 首次发布 · 2026-07-04 信息卡</div>
+    </div>
+    <div class="small">边看边建图 · 实时可交互 3D · ETH3D / Oxford SOTA</div>
+  </footer>
+
+</main>
+<button id="save-btn" class="save" onclick="html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,logging:false,backgroundColor:null}).then(c=>{let a=document.createElement('a');a.download='lingbot-map-infocard.png';a.href=c.toDataURL('image/png');a.click()}).catch(e=>alert('Export: '+e))">⬇ 保存 PNG</button>
+</body>
+</html>
