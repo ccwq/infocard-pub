@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>shadcn/improve · 用强模型审计、弱模型执行的"计划即产品"工作流</title>
+  <style>
+    :root{--bg:#f2f2f2;--paper:#ffffff;--ink:#0a0a0a;--red:#E60012;--deep:#1A3A5C;--soft:#fff5f6;--line:#0a0a0a;--shadow:6px 6px 0 rgba(0,0,0,.12)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(780px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    /* TOP */
+    .top{display:grid;grid-template-columns:1fr 200px;border:3px solid var(--line);box-shadow:var(--shadow);background:#fff;margin-bottom:12px;overflow:hidden}
+    .hero{padding:18px 16px 14px;background:linear-gradient(135deg,var(--red) 0 55%,var(--deep) 55% 100%);color:#fff}
+    .kicker{display:inline-block;border:2px solid #fff;padding:3px 8px;font-weight:900;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+    .hero h1{font-size:clamp(20px,4vw,32px);line-height:1.05;letter-spacing:-.03em;margin:10px 0 6px;font-weight:950}
+    .lead{font-size:12px;color:#fff6f6;max-width:46ch;line-height:1.55}
+    .meta-col{border-left:3px solid var(--line);padding:12px;display:grid;gap:6px;align-content:start;background:#f7f5f5}
+    .meta-pill{border:2px solid var(--line);background:#fff;padding:6px 8px;font-weight:900;font-size:11.5px}
+    .meta-pill .lbl{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--red);margin-bottom:2px}
+    /* STATS */
+    .stats{display:flex;border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .stat{flex:1;min-width:60px;padding:8px 6px;text-align:center;border-right:2px solid var(--line);background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:17px;font-weight:950;line-height:1}
+    .stat span{font-size:9px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+    /* PILLS */
+    .pills{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+    .pill{padding:3px 9px;border:2px solid var(--line);font-size:10.5px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.deep{background:var(--deep);color:#fff;border-color:var(--deep)}
+    /* SECTION */
+    .section{border:3px solid var(--line);box-shadow:var(--shadow);background:var(--paper);margin-bottom:10px;overflow:hidden}
+    .sec-head{background:var(--ink);color:#fff;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:12px;font-weight:900}
+    .sec-head .label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+    .sec-body{padding:10px 12px}
+    /* FLOW */
+    .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px}
+    .flow-step{border:2px solid var(--line);background:#fff;padding:7px 5px;text-align:center}
+    .flow-step .n{display:inline-block;background:var(--red);color:#fff;padding:1px 5px;font-size:9px;font-weight:900;margin-bottom:4px}
+    .flow-step h4{font-size:11px;font-weight:900;margin-bottom:2px;line-height:1.25}
+    .flow-step p{margin:0;font-size:9.5px;color:#555;line-height:1.4}
+    .flow-arr{color:var(--red);font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center}
+    /* COMMANDS */
+    .cmd-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .cmd-item{border:2px solid var(--line);background:#fff;padding:7px 9px}
+    .cmd-item .cmd{background:#111;color:#e8e8e8;padding:2px 6px;font-size:11px;font-weight:800;font-family:ui-monospace,SFMono-Regular,monospace;display:block;margin-bottom:4px}
+    .cmd-item .desc{font-size:10.5px;color:#444;line-height:1.45}
+    .cmd-item .sub{display:block;font-size:9px;color:#888;margin-top:2px}
+    /* CATEGORIES */
+    .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+    .cat-item{border:2px solid var(--line);background:#fff;padding:6px 8px;font-size:10.5px;font-weight:800}
+    .cat-item .dot{width:7px;height:7px;border-radius:50%;background:var(--red);display:inline-block;margin-right:5px;vertical-align:middle}
+    /* PRINCIPLES */
+    .principles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .principle{border-left:4px solid var(--red);padding:6px 10px;background:var(--soft);font-size:11px;line-height:1.55}
+    .principle b{color:var(--red)}
+    /* QUOTE */
+    .quote{border-left:4px solid var(--deep);padding:8px 12px;background:#f0f5fa;margin-bottom:10px;font-size:11.5px;line-height:1.6}
+    .quote b{color:var(--deep)}
+    /* EXEC LOOP */
+    .exec-loop{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .exec-col{border:2px solid var(--line);background:#fff;padding:8px 10px}
+    .exec-col h4{font-size:11.5px;font-weight:900;margin-bottom:5px;color:var(--deep)}
+    .exec-col ul{margin:0;padding-left:14px;font-size:11px;line-height:1.7}
+    /* RULES */
+    .rules{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+    .rule{border:2px solid var(--line);background:#fff;padding:5px 8px;font-size:10.5px;font-weight:800;display:flex;align-items:flex-start;gap:5px}
+    .rule .icon{color:var(--red);font-weight:900;flex-shrink:0}
+    /* FOOTER */
+    .foot{border-top:3px solid var(--line);padding-top:10px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:11px;color:#666}
+    .foot a:hover{text-decoration:underline}
+    @media(max-width:640px){
+      .top{grid-template-columns:1fr}
+      .meta-col{border-left:none;border-top:3px solid var(--line)}
+      .stats{grid-template-columns:repeat(3,1fr)}
+      .stat:nth-child(3){border-right:none}
+      .stat:nth-child(4),.stat:nth-child(5){border-top:2px solid var(--line)}
+      .cmd-grid,.principles,.exec-loop,.rules,.cat-grid{grid-template-columns:1fr}
+      .flow{grid-template-columns:repeat(2,1fr)}
+      .flow-arr{display:none}
+      .page{padding:10px 0 60px}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- TOP -->
+  <header class="top">
+    <div class="hero">
+      <div class="kicker">Agent Skill · 计划即产品</div>
+      <h1>shadcn/improve</h1>
+      <p class="lead">用最强模型做审计和规划，让便宜的模型写代码。Skill 自己从来不实现任何东西——计划才是产品。</p>
+    </div>
+    <aside class="meta-col">
+      <div class="meta-pill"><span class="lbl">安装</span>npx skills add shadcn/improve</div>
+      <div class="meta-pill"><span class="lbl">协议</span>MIT</div>
+      <div class="meta-pill"><span class="lbl">格式</span>Agent Skills (agentskills.io)</div>
+      <div class="meta-pill"><span class="lbl">支持</span>Claude Code / Cursor / Codex / OpenCode</div>
+      <div class="meta-pill"><span class="lbl">来源</span>shadcn (shadcn/ui 作者)</div>
+    </aside>
+  </header>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><strong>5000+</strong><span>Stars (发布一周)</span></div>
+    <div class="stat"><strong>MIT</strong><span>License</span></div>
+    <div class="stat"><strong>9</strong><span>审计类别</span></div>
+    <div class="stat"><strong>5</strong><span>核心命令</span></div>
+    <div class="stat"><strong>6</strong><span>硬规则</span></div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill red">强模型规划</span>
+    <span class="pill deep">弱模型执行</span>
+    <span class="pill">Worktree 隔离</span>
+    <span class="pill">计划即产品</span>
+    <span class="pill">从不改源码</span>
+    <span class="pill">自包含计划</span>
+    <span class="pill">验证门</span>
+    <span class="pill">闭环执行</span>
+  </div>
+
+  <!-- 01 CORE -->
+  <div class="section">
+    <div class="sec-head"><div><span class="num">01</span> <span class="label">核心理念</span></div></div>
+    <div class="sec-body">
+      <div class="quote">
+        <b>核心洞察：</b>把智能会累积的部分（理解代码库、判断什么值得做、写规格）交给最强模型；执行交给便宜的模型。Skill 自己从来不实现任何东西，计划才是产品。
+      </div>
+      <div class="principles">
+        <div class="principle"><b>智能分层：</b>最强模型做审计、规划、判断；便宜模型只执行</div>
+        <div class="principle"><b>永不越界：</b>唯一的写入是 plans/，从不修改源代码</div>
+        <div class="principle"><b>Worktree 隔离：</b>执行器在一次性 Worktree 中编辑，不污染主分支</div>
+        <div class="principle"><b>用户决策：</b>合并始终由用户决定，Skill 只负责计划和审查</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 COMMANDS -->
+  <div class="section">
+    <div class="sec-head"><div><span class="num">02</span> <span class="label">核心命令</span></div></div>
+    <div class="sec-body">
+      <div class="cmd-grid">
+        <div class="cmd-item">
+          <span class="cmd">/improve</span>
+          <span class="desc">全局审计 → 优先级排序的发现 → 计划</span>
+          <span class="sub">完整流程：勘查 → 审计 → 审查 → 排序 → 计划化</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve quick</span>
+          <span class="desc">快速模式：热点 + 最高优先级发现</span>
+          <span class="sub">适合日常巡检，快速拿到 Top 发现</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve deep</span>
+          <span class="desc">详尽模式：每个包、每个类别都过一遍</span>
+          <span class="sub">适合全面审计，不遗漏任何角落</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve security</span>
+          <span class="desc">安全审计：专注安全，也覆盖 perf/tests/bugs</span>
+          <span class="sub">聚焦安全问题，附带其他类别发现</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve branch</span>
+          <span class="desc">增量审计：只看当前分支改动的部分</span>
+          <span class="sub">适合 Code Review 场景</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve next</span>
+          <span class="desc">产品方向：给出下一步产品方向建议</span>
+          <span class="sub">超越技术审计，提供战略视角</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve plan &lt;描述&gt;</span>
+          <span class="desc">跳过审计，直接起草计划</span>
+          <span class="sub">直接进入计划阶段</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve review-plan &lt;文件&gt;</span>
+          <span class="desc">批判收紧：审查并收紧已有计划</span>
+          <span class="sub">完善现有计划，提高可执行性</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve execute &lt;计划&gt;</span>
+          <span class="desc">执行计划：派便宜执行器执行</span>
+          <span class="sub">隔离 Worktree + Tech Lead 审查</span>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd">/improve reconcile</span>
+          <span class="desc">刷新 Backlog：验证、解锁、退役计划</span>
+          <span class="sub">保持计划列表与代码库同步</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 INTERNAL FLOW -->
+  <div class="section">
+    <div class="sec-head"><div><span class="num">03</span> <span class="label">内部流程（5 步）</span></div></div>
+    <div class="sec-body">
+      <div class="flow">
+        <div class="flow-step"><div class="n">STEP 1</div><h4>勘查</h4><p>映射技术栈、规范、构建/测试命令；读 ADR/PRD</p></div>
+        <div class="flow-arr">→</div>
+        <div class="flow-step"><div class="n">STEP 2</div><h4>审计</h4><p>并行分派 9 类子 Agent，各带证据/影响/置信度</p></div>
+        <div class="flow-arr">→</div>
+        <div class="flow-step"><div class="n">STEP 3</div><h4>审查</h4><p>Advisor 重读引用位置，丢弃假阳性，纠正归属</p></div>
+        <div class="flow-arr">→</div>
+        <div class="flow-step"><div class="n">STEP 4</div><h4>排序</h4><p>按杠杆（影响÷努力）排序，置信度加权</p></div>
+        <div class="flow-arr">→</div>
+        <div class="flow-step"><div class="n">STEP 5</div><h4>计划化</h4><p>每个发现一个文件，写入 plans/，带索引和依赖图</p></div>
+      </div>
+      <div class="cat-grid">
+        <div class="cat-item"><span class="dot"></span>正确性</div>
+        <div class="cat-item"><span class="dot"></span>安全性</div>
+        <div class="cat-item"><span class="dot"></span>性能</div>
+        <div class="cat-item"><span class="dot"></span>测试覆盖</div>
+        <div class="cat-item"><span class="dot"></span>技术债务</div>
+        <div class="cat-item"><span class="dot"></span>依赖和迁移</div>
+        <div class="cat-item"><span class="dot"></span>开发者体验</div>
+        <div class="cat-item"><span class="dot"></span>文档</div>
+        <div class="cat-item"><span class="dot"></span>方向</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 PLAN CHARACTERISTICS -->
+  <div class="section">
+    <div class="sec-head"><div><span class="num">04</span> <span class="label">计划可执行特性</span></div></div>
+    <div class="sec-body">
+      <div class="principles">
+        <div class="principle"><b>自包含：</b>所有上下文内联，精确文件路径、代码摘录、规范示例、已验证命令</div>
+        <div class="principle"><b>验证门：</b>每步以命令及预期输出结束，完成标准机器可检查</div>
+        <div class="principle"><b>硬边界：</b>明确范围外列表，STOP 条件</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 EXECUTION LOOP -->
+  <div class="section">
+    <div class="sec-head"><div><span class="num">05</span> <span class="label">闭环执行</span></div></div>
+    <div class="sec-body">
+      <div class="exec-loop">
+        <div class="exec-col">
+          <h4>execute 执行器</h4>
+          <ul>
+            <li>在隔离 git worktree 中执行</li>
+            <li>按计划执行每一步</li>
+            <li>重跑每个完成标准</li>
+            <li>检查范围合规</li>
+            <li>读 diff 对意图</li>
+          </ul>
+        </div>
+        <div class="exec-col">
+          <h4>审查结果</h4>
+          <ul>
+            <li>✅ 通过 → 批准（合并由用户决定）</li>
+            <li>🔄 退回修改（最多 2 轮）</li>
+            <li>⛔ 阻塞 → 精炼计划</li>
+          </ul>
+        </div>
+      </div>
+      <div class="exec-loop" style="margin-top:8px">
+        <div class="exec-col">
+          <h4>reconcile 刷新 Backlog</h4>
+          <ul>
+            <li>验证 DONE 计划是否仍成立</li>
+            <li>调查 BLOCKED 计划并绕过障碍</li>
+            <li>刷新漂移的计划</li>
+            <li>退役独立修复了的发现</li>
+          </ul>
+        </div>
+        <div class="exec-col">
+          <h4>--issues 发布选项</h4>
+          <ul>
+            <li>将计划发布为 GitHub Issues</li>
+            <li>自动创建带标签的 Issue</li>
+            <li>便于团队协作追踪</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 HARD RULES -->
+  <div class="section">
+    <div class="sec-head"><div><span class="num">06</span> <span class="label">硬规则</span></div></div>
+    <div class="sec-body">
+      <div class="rules">
+        <div class="rule"><span class="icon">🚫</span>从不修改源代码，唯一的写入到 plans/</div>
+        <div class="rule"><span class="icon">🛡️</span>执行器只在一次性 worktree 中编辑</div>
+        <div class="rule"><span class="icon">👤</span>合并始终由用户决定</div>
+        <div class="rule"><span class="icon">💥</span>从不运行会破坏工作树的命令</div>
+        <div class="rule"><span class="icon">🔐</span>从不复现密钥值</div>
+        <div class="rule"><span class="icon">📋</span>被要求实现？拒绝并指向计划</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="foot">
+    <div>
+      <b>GitHub:</b> <a href="https://github.com/shadcn/improve">github.com/shadcn/improve</a>
+    </div>
+    <div>
+      <b>安装：</b>npx skills add shadcn/improve
+    </div>
+    <div style="font-size:10px">
+      发布于 2026-07-06 · MIT License · Agent Skills 格式
+    </div>
+  </footer>
+
+</main>
+</body>
+</html>
