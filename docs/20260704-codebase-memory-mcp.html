@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codebase-Memory-MCP vs Codegraph · 代码知识图谱技术选型对比</title>
+  <meta name="description" content="Codebase-Memory-MCP 技术选型对比卡：纯 C/C++ 单文件架构，LZ4+ZSTD 压缩，Aho-Corasick 多模式匹配，8-13倍压缩快照。与 Codegraph 在性能/生态/实时性/部署门槛等维度的完整对比分析。">
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,48px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:60ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    /* Hero right: mission quote */
+    .mission{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .mission .big{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:16px;line-height:1.2;letter-spacing:-.02em;color:#fff}
+    .mission .en{font-size:10px;color:#8b9bbf;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+    .mission .tagline{font-size:11px;color:#d8e2ff;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--red) 0%, #991b1b 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12px;line-height:1.62;color:#fdd;margin-top:8px}
+    /* === PAIN vs SOLUTION === */
+    .compare-grid{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .compare-head{font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;padding-bottom:10px;border-bottom:1.5px solid var(--line);margin-bottom:10px}
+    .compare-head.old{color:var(--red);border-color:var(--red)}
+    .compare-head.new{color:var(--green);border-color:var(--green)}
+    .compare-list{display:grid;gap:8px}
+    .compare-item{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;padding:8px 10px;border:1.5px solid var(--line);background:#fff}
+    .compare-item.old{background:var(--red-soft);border-color:var(--red)}
+    .compare-item.new{background:var(--green-soft);border-color:var(--green)}
+    .compare-icon{font-size:16px;line-height:1;padding-top:1px}
+    .compare-item h4{margin:0 0 2px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .compare-item p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5}
+    /* === TECH ARCH === */
+    .arch-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .arch-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .arch-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .arch-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .arch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .arch-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .arch-icon{font-size:22px;margin-bottom:2px}
+    .arch-card h4{margin:0 0 2px;font-size:13px;font-weight:800;line-height:1.3;color:var(--blue)}
+    .arch-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .arch-card .tag{display:inline-flex;padding:2px 7px;border:1.5px solid var(--line);background:#f4f0e8;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px}
+    /* === SNAPSHOT / ASSET === */
+    .asset-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .asset-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .asset-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .asset-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .asset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .asset-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .asset-card .asset-icon{font-size:20px;margin-bottom:6px}
+    .asset-card h4{margin:0 0 4px;font-size:13px;font-weight:800;line-height:1.3;color:var(--green)}
+    .asset-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .asset-card .highlight{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:800;color:var(--red);font-size:18px;margin:4px 0}
+    /* === COMPARISON TABLE === */
+    .table-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .table-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .table-badge{background:var(--red-dark);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .table-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .table-wrap{padding:12px 16px;overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.5}
+    th{background:#111;color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-align:left;padding:8px 10px;border:1.5px solid #111;letter-spacing:.04em;text-transform:uppercase}
+    th.col-a{background:var(--blue)}
+    th.col-b{background:var(--muted)}
+    td{padding:8px 10px;border:1.5px solid var(--line);vertical-align:top}
+    td:first-child{font-weight:700;color:var(--ink);background:#faf7f0}
+    tr:nth-child(even) td{background:#faf8f3}
+    tr:nth-child(odd) td{background:#fff}
+    .cell-a{background:var(--blue-soft) !important;border-color:var(--blue) !important}
+    .cell-b{background:#f0ede8 !important;border-color:var(--muted) !important}
+    .dash{color:var(--muted);font-style:italic}
+    .check{color:var(--green);font-weight:800}
+    .xmark{color:var(--red);font-weight:800}
+    /* === INDUSTRY PREDICTION === */
+    .pred-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .pred-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .pred-badge{background:#111;color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .pred-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .pred-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .pred-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .pred-n{display:inline-block;margin-bottom:6px;padding:2px 7px;border:1.5px solid var(--line);background:#111;color:#fff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
+    .pred-card h4{margin:0 0 4px;font-size:13px;font-weight:800;line-height:1.3}
+    .pred-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === RECOMMENDATION === */
+    .rec-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .rec-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .rec-badge{background:var(--yellow);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .rec-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .rec-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .rec-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .rec-card.blue{border-color:var(--blue);background:var(--blue-soft)}
+    .rec-card.gray{border-color:var(--muted);background:#f0ede8}
+    .rec-card h4{margin:0 0 4px;font-size:13px;font-weight:800;line-height:1.3;color:var(--blue)}
+    .rec-card.gray h4{color:var(--muted)}
+    .rec-card p{margin:0 0 6px;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .rec-card .scenarios{display:inline-flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+    .rec-card .s{display:inline-flex;padding:2px 7px;border:1.5px solid var(--line);background:#fff;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .rec-card.blue .s{border-color:var(--blue);color:var(--blue)}
+    .rec-card.gray .s{border-color:var(--muted);color:var(--muted)}
+    /* === FAQ === */
+    .faq-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .faq-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .faq-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .faq-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .faq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .faq-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .faq-item .q{font-size:12.5px;font-weight:800;line-height:1.4;margin-bottom:5px}
+    .faq-item .a{font-size:11.5px;color:var(--muted);line-height:1.6;margin:0}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:12px 14px 10px;color:var(--muted);font-size:12px;line-height:1.6}
+    .footer .brand{font-weight:800;color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:14px}
+    .footer .small{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    .footer .small a{color:var(--blue)}
+    .save{display:block;width:fit-content;position:static;margin:12px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--red),#991b1b);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(153,27,27,.3);cursor:pointer}
+    /* === RESPONSIVE === */
+    @media(max-width:960px){
+      .hero,.compare-grid{grid-template-columns:1fr}
+      .arch-grid,.asset-grid,.pred-grid,.rec-grid{grid-template-columns:1fr 1fr}
+      .faq-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:10px 0 72px}
+      .hero,.banner,.footer{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(22px,8vw,32px)}
+      .banner .quote{font-size:18px}
+      .arch-grid,.asset-grid,.pred-grid,.rec-grid,.faq-grid{grid-template-columns:1fr}
+      .footer{flex-direction:column}
+      .table-wrap{overflow-x:auto}
+      table{font-size:11px}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">CODEBASE KNOWLEDGE GRAPH · MCP TOOL · C/C++ NATIVE</div>
+        <div class="source">技术选型对比</div>
+      </div>
+      <h1>Codebase-Memory-MCP</h1>
+      <p class="subtitle">代码知识图谱 → <strong>团队共享资产</strong>。纯 C/C++ 单文件架构，LZ4 压缩 + Aho-Corasick 多模式匹配，ZSTD 图谱快照 8-13 倍压缩——让代码索引从"每次重跑"变成"一次建好，全团队用"。</p>
+      <div class="meta-row">
+        <span class="chip red">MCP 工具</span>
+        <span class="chip green">纯 C/C++</span>
+        <span class="chip blue">ZSTD 快照</span>
+        <span class="chip yellow">8-13x 压缩</span>
+        <span class="chip">单二进文件</span>
+        <span class="chip">零外部依赖</span>
+        <span class="chip">团队共享</span>
+      </div>
+    </div>
+    <div class="mission">
+      <div class="big">一次建图谱，<br>全团队复用。</div>
+      <div class="en">Build once, share across the team</div>
+      <div class="tagline">预计算图谱 · ZSTD 压缩快照<br>符号级精确 · 零运行时开销</div>
+    </div>
+  </section>
+
+  <!-- PAIN vs SOLUTION BANNER -->
+  <section class="banner">
+    <div class="quote">传统代码索引：慢、贵、噪声大、每次 Agent 都要重跑。<br>Codebase-Memory-MCP：高信噪比 + 团队共享资产，一次构建，永久复用。</div>
+    <div class="note">核心思路转变——把代码索引从"每次请求的计算"变成"团队共享的基础设施资产"。</div>
+  </section>
+
+  <!-- PAIN vs SOLUTION -->
+  <section class="compare-grid">
+    <div>
+      <div class="compare-head old">❌ 传统方式痛点</div>
+      <div class="compare-list">
+        <div class="compare-item old">
+          <div class="compare-icon">🐢</div>
+          <div><h4>每次请求都重新索引</h4><p>LSP 或 glob 扫描每次都要重新遍历代码库，大仓库等待时间以分钟计。</p></div>
+        </div>
+        <div class="compare-item old">
+          <div class="compare-icon">💸</div>
+          <div><h4>Token 费用高</h4><p>把大量无关上下文塞进 Prompt，LLM 调用成本飞涨，且噪声大影响输出质量。</p></div>
+        </div>
+        <div class="compare-item old">
+          <div class="compare-icon">📤</div>
+          <div><h4>索引结果无法共享</h4><p>每个 Agent 实例独立索引，团队成员重复劳动，浪费算力。</p></div>
+        </div>
+        <div class="compare-item old">
+          <div class="compare-icon">🔧</div>
+          <div><h4>外部依赖复杂</h4><p>LSP 服务器依赖、版本兼容性、环境配置——部署门槛高，维护成本大。</p></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head new">✅ Codebase-Memory-MCP 方案</div>
+      <div class="compare-list">
+        <div class="compare-item new">
+          <div class="compare-icon">⚡</div>
+          <div><h4>预计算图谱，毫秒级查询</h4><p>提前构建好代码知识图谱，查询时无需重新扫描，响应速度大幅提升。</p></div>
+        </div>
+        <div class="compare-item new">
+          <div class="compare-icon">🎯</div>
+          <div><h4>符号级精确返回</h4><p>只返回最相关的符号/文件/行级信息，高信噪比，大幅减少 Token 消耗。</p></div>
+        </div>
+        <div class="compare-item new">
+          <div class="compare-icon">📦</div>
+          <div><h4>ZSTD 快照，团队共享</h4><p>压缩率 8-13 倍的图谱快照，可提交 Git，新成员直接加载无需重建。</p></div>
+        </div>
+        <div class="compare-item new">
+          <div class="compare-icon">🪶</div>
+          <div><h4>极简部署，零依赖</h4><p>纯 C/C++ 静态编译，单二进文件，无外部依赖，下载即用。</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH ARCHITECTURE -->
+  <section class="arch-section">
+    <div class="arch-head">
+      <div class="arch-badge">ARCHITECTURE</div>
+      <h2>核心技术架构：纯 C/C++ 的极致性能设计</h2>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-card">
+        <div class="arch-icon">🔩</div>
+        <h4>语言特性</h4>
+        <p>纯 C/C++ 静态编译，单二进文件，无运行时依赖，天然跨平台。</p>
+        <span class="tag">零外部依赖</span>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">⚙️</div>
+        <h4>底层算法</h4>
+        <p>LZ4 实时压缩 + Aho-Corasick 多模式匹配算法，高效精确的符号查找。</p>
+        <span class="tag">LZ4 + Aho-Corasick</span>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">💨</div>
+        <h4>内存管理</h4>
+        <p>剪完即释放，极致轻量。查询时只加载必要数据，内存占用最小化。</p>
+        <span class="tag">按需加载</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- SYMBOL PARSING -->
+  <section class="arch-section">
+    <div class="arch-head">
+      <div class="arch-badge">PARSING</div>
+      <h2>符号与类型解析：自实现，非 LSP 依赖</h2>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-card">
+        <div class="arch-icon">🏗️</div>
+        <h4>自实现解析器</h4>
+        <p>不依赖 LSP 协议栈，自行实现语法解析，规避 LSP 复杂性和版本兼容问题。</p>
+        <span class="tag">无 LSP 依赖</span>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">🌐</div>
+        <h4>多语言覆盖</h4>
+        <p>覆盖 Python / TypeScript / Go / Java / COBOL 等主流编程语言。</p>
+        <span class="tag">Python · TS · Go · Java · COBOL</span>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">🎯</div>
+        <h4>精确返回粒度</h4>
+        <p>符号级、文件级、行级精确返回，只给 Agent 最相关的上下文。</p>
+        <span class="tag">符号级精度</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ASSET MANAGEMENT -->
+  <section class="asset-section">
+    <div class="asset-head">
+      <div class="asset-badge">ASSET MGMT</div>
+      <h2>图谱资产化管理：ZSTD 快照让团队协作零摩擦</h2>
+    </div>
+    <div class="asset-grid">
+      <div class="asset-card">
+        <div class="asset-icon">📦</div>
+        <h4>ZSTD 压缩快照</h4>
+        <p>图谱数据以 graphdb.zst 文件存储，ZSTD 压缩算法实现 8-13 倍压缩率。</p>
+        <div class="highlight">8-13x</div>
+        <p>压缩率，Git 友好</p>
+      </div>
+      <div class="asset-card">
+        <div class="asset-icon">🤝</div>
+        <h4>团队新成员即用</h4>
+        <p>快照提交 Git 后，新成员 clone 直接加载，无需重新构建索引。</p>
+        <div class="highlight">0</div>
+        <p>等待时间，立即可用</p>
+      </div>
+      <div class="asset-card">
+        <div class="asset-icon">🔄</div>
+        <h4>增量更新机制</h4>
+        <p>代码变更后可增量更新图谱，无需全量重建，保持快照时效性。</p>
+        <div class="highlight">Δ</div>
+        <p>增量更新，成本可控</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARISON TABLE -->
+  <section class="table-section">
+    <div class="table-head">
+      <div class="table-badge">COMPARE</div>
+      <h2>技术选型对比表：Codebase-Memory-MCP vs Codegraph</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:18%">维度</th>
+            <th class="col-a" style="width:41%">Codebase-Memory-MCP</th>
+            <th class="col-b" style="width:41%">Codegraph</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>语言 / 架构</td>
+            <td class="cell-a">纯 C/C++，单二进文件，静态编译</td>
+            <td class="cell-b">基于现有工具链，依赖较多</td>
+          </tr>
+          <tr>
+            <td>核心卖点</td>
+            <td class="cell-a">极致性能 + 轻量 + 性价比</td>
+            <td class="cell-b">生态成熟 + Agent 工作流 + 实时同步</td>
+          </tr>
+          <tr>
+            <td>索引方式</td>
+            <td class="cell-a">预计算图谱 + ZSTD 快照，查询时无计算</td>
+            <td class="cell-b">本地监听文件系统变化，实时同步索引</td>
+          </tr>
+          <tr>
+            <td>压缩率</td>
+            <td class="cell-a"><span class="check">✓</span> 8-13 倍（ZSTD），可提交 Git</td>
+            <td class="cell-b"><span class="dash">—</span> 通常无专门压缩设计</td>
+          </tr>
+          <tr>
+            <td>语言覆盖</td>
+            <td class="cell-a">Python / TypeScript / Go / Java / COBOL 等</td>
+            <td class="cell-b">依赖语言服务器，覆盖取决于 LSP 生态</td>
+          </tr>
+          <tr>
+            <td>部署门槛</td>
+            <td class="cell-a"><span class="check">✓</span> 极低（无依赖单文件，下载即用）</td>
+            <td class="cell-b"><span class="xmark">✗</span> 需要配置 LSP 服务器和环境依赖</td>
+          </tr>
+          <tr>
+            <td>团队协同</td>
+            <td class="cell-a"><span class="check">✓</span> 快照共享，新成员免重索引</td>
+            <td class="cell-b">实时同步，但需要每个实例独立运行</td>
+          </tr>
+          <tr>
+            <td>查询延迟</td>
+            <td class="cell-a"><span class="check">✓</span> 毫秒级（预计算完毕）</td>
+            <td class="cell-b">实时，但依赖本地索引更新速度</td>
+          </tr>
+          <tr>
+            <td>Token 效率</td>
+            <td class="cell-a"><span class="check">✓</span> 高（符号级精确返回）</td>
+            <td class="cell-b">中等（返回内容粒度取决于实现）</td>
+          </tr>
+          <tr>
+            <td>复杂框架路由</td>
+            <td class="cell-a"><span class="dash">—</span> 路径匹配为主</td>
+            <td class="cell-b"><span class="check">✓</span> 跨语言桥接和框架路由更强</td>
+          </tr>
+          <tr>
+            <td>适用规模</td>
+            <td class="cell-a">超大规模仓库、低成本场景</td>
+            <td class="cell-b">中等规模、依赖 LSP 生态的场景</td>
+          </tr>
+          <tr>
+            <td>维护状态</td>
+            <td class="cell-a">活跃开发，路线图清晰</td>
+            <td class="cell-b">成熟稳定，生态完善</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- INDUSTRY PREDICTION -->
+  <section class="pred-section">
+    <div class="pred-head">
+      <div class="pred-badge">TREND</div>
+      <h2>行业趋势预测：代码知识图谱基础设施化</h2>
+    </div>
+    <div class="pred-grid">
+      <div class="pred-card">
+        <div class="pred-n">PRED 01</div>
+        <h4>C/C++/Rust 回归基础设施层</h4>
+        <p>性能敏感的基础设施工具正在从脚本语言回流到 C/C++/Rust，以换取极致性能和零依赖体验。</p>
+      </div>
+      <div class="pred-card">
+        <div class="pred-n">PRED 02</div>
+        <h4>预计算图谱成为标准做法</h4>
+        <p>代码索引从"每次请求的计算"变成"提前构建的资产"——类似数据库的读写分离思路在代码分析领域落地。</p>
+      </div>
+      <div class="pred-card">
+        <div class="pred-n">PRED 03</div>
+        <h4>IDE 原生化</h4>
+        <p>代码图谱能力将深度集成到主流 IDE（Cursor / VS Code / JetBrains），成为 Agent 工作流的标配基础设施。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- RECOMMENDATION -->
+  <section class="rec-section">
+    <div class="rec-head">
+      <div class="rec-badge">DECISION</div>
+      <h2>选型建议：按场景决策</h2>
+    </div>
+    <div class="rec-grid">
+      <div class="rec-card blue">
+        <h4>选 Codebase-Memory-MCP</h4>
+        <p>追求极致性能、超大仓库、低成本快速部署，需要团队共享图谱资产的场景。</p>
+        <div class="scenarios">
+          <span class="s">超大仓库</span>
+          <span class="s">成本敏感</span>
+          <span class="s">团队协同</span>
+          <span class="s">离线环境</span>
+          <span class="s">零运维</span>
+        </div>
+      </div>
+      <div class="rec-card gray">
+        <h4>选 Codegraph</h4>
+        <p>看重生态成熟度、实时文件监听、复杂框架的多语言桥接和深度集成能力。</p>
+        <div class="scenarios">
+          <span class="s">LSP 生态依赖</span>
+          <span class="s">实时监听需求</span>
+          <span class="s">复杂框架路由</span>
+          <span class="s">成熟工具链</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <div class="faq-head">
+      <div class="faq-badge">FAQ</div>
+      <h2>常见问题</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <div class="q">Q: Codebase-Memory-MCP 和 LSP 是什么关系？</div>
+        <div class="a">完全独立。自实现语法解析，不依赖 LSP 协议栈，避免了 LSP 的复杂性和版本兼容问题。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: ZSTD 压缩快照占用多少空间？</div>
+        <div class="a">通常比原始 JSON 图谱小 8-13 倍。一个 100MB 的图谱压缩后约 8-12MB，可直接提交 Git。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 新成员加入团队后如何使用？</div>
+        <div class="a">直接 git clone 仓库，加载已构建好的 graphdb.zst 快照，无需重新索引，即时可用。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 快照更新的频率是多少？</div>
+        <div class="a">支持增量更新——代码变更后可只更新差异部分，无需全量重建，平衡了新鲜度和计算成本。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 支持哪些 IDE 和 Agent 工具？</div>
+        <div class="a">通过 MCP 协议接入，任何支持 MCP 的工具（如 Cursor、VS Code MCP 扩展、Claude Code 等）均可使用。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 和 Codegraph 的核心差异是什么？</div>
+        <div class="a">Codebase-Memory-MCP 是"预计算 + 快照共享"模式，Codegraph 是"实时监听 + 本地同步"模式。前者适合追求极致性能和低成本，后者适合需要复杂框架路由和实时性的场景。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">Codebase-Memory-MCP</div>
+      <div class="small">
+        技术选型对比卡 · C/C++ 单文件架构 · 2026-07-04
+      </div>
+    </div>
+    <div class="small">代码知识图谱 → 团队共享资产</div>
+  </footer>
+
+</main>
+<button id="save-btn" class="save" onclick="html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,logging:false,backgroundColor:null}).then(c=>{let a=document.createElement('a');a.download='codebase-memory-mcp-comparison.png';a.href=c.toDataURL('image/png');a.click()}).catch(e=>alert('Export: '+e))">⬇ 保存 PNG</button>
+</body>
+</html>
