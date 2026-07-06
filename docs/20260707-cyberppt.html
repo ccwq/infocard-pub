@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CyberPPT：咨询风格 PPT 生成 Codex Skill</title>
+  <meta name="description" content="CyberPPT 把文档、研报和业务数据直接转成咨询风格的高密度 PPT。先从 DOCX、PDF、Excel 里提取事实和数字理成证据表，再比较故事线，定下每一页讲什么。内置 8 种咨询风格配色版式，逐页生成，主标题、正文、关键数字均可编辑。生成后有文字溢出、数字出处、页面密度等多重检查关卡。">
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7;--purple:#7c3aed;--purple-soft:#ede9fe;--teal:#0f766e;--teal-soft:#ccfbf1}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,42px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:60ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .mission{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .mission .big{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:16px;line-height:1.2;letter-spacing:-.02em;color:#fff}
+    .mission .en{font-size:10px;color:#8b9bbf;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+    .mission .tagline{font-size:11px;color:#d8e2ff;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--blue) 0%, #1e3a8a 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12px;line-height:1.62;color:#c8d9ff;margin-top:8px}
+    
+    /* === WORKFLOW === */
+    .workflow-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .workflow-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .workflow-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .workflow-head h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .workflow-body{padding:16px}
+    .workflow-steps{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+    .step{background:#faf7f0;border:2px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:150px;flex:1;position:relative}
+    .step::after{content:"→";position:absolute;right:-18px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--muted);font-weight:700}
+    .step:last-child::after{display:none}
+    .step-num{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase;color:var(--blue)}
+    .step-title{font-weight:700;font-size:13px}
+    .step-desc{font-size:11px;color:var(--muted);line-height:1.5}
+    
+    /* === STYLES GRID === */
+    .styles-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .styles-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .styles-badge{background:var(--purple);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .styles-head h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .styles-body{padding:14px 16px}
+    .styles-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .style-card{border:2px solid var(--line);padding:12px;display:grid;gap:6px}
+    .style-card.red{border-color:var(--red);background:var(--red-soft)}
+    .style-card.blue{border-color:var(--blue);background:var(--blue-soft)}
+    .style-card.green{border-color:var(--green);background:var(--green-soft)}
+    .style-card.yellow{border-color:var(--yellow);background:var(--yellow-soft)}
+    .style-card.purple{border-color:var(--purple);background:var(--purple-soft)}
+    .style-card.teal{border-color:var(--teal);background:var(--teal-soft)}
+    .style-icon{font-size:24px;line-height:1}
+    .style-name{font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase}
+    .style-card.red .style-name{color:var(--red-dark)}
+    .style-card.blue .style-name{color:var(--blue)}
+    .style-card.green .style-name{color:#14532d}
+    .style-card.yellow .style-name{color:var(--yellow)}
+    .style-card.purple .style-name{color:var(--purple)}
+    .style-card.teal .style-name{color:var(--teal)}
+    .style-desc{font-size:11px;color:var(--muted);line-height:1.5}
+    
+    /* === EDITABLE SECTION === */
+    .editable-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .editable-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .editable-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .editable-head h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .editable-body{padding:14px 16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+    .editable-item{display:grid;gap:6px;padding:12px;border:1.5px solid rgba(17,17,17,.12);background:#faf7f0}
+    .editable-icon{font-size:28px;line-height:1}
+    .editable-label{font:700 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .editable-desc{font-size:11.5px;color:var(--muted);line-height:1.55}
+    
+    /* === QC CHECKPOINTS === */
+    .qc-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .qc-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .qc-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .qc-head h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .qc-list{padding:14px 16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .qc-item{border:2px solid var(--line);padding:12px 14px;display:grid;gap:6px}
+    .qc-item.red{border-color:var(--red);background:var(--red-soft)}
+    .qc-item.blue{border-color:var(--blue);background:var(--blue-soft)}
+    .qc-item.green{border-color:var(--green);background:var(--green-soft)}
+    .qc-icon{font-size:22px;line-height:1}
+    .qc-name{font:700 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .qc-item.red .qc-name{color:var(--red-dark)}
+    .qc-item.blue .qc-name{color:var(--blue)}
+    .qc-item.green .qc-name{color:#14532d}
+    .qc-desc{font-size:11px;color:var(--muted);line-height:1.5}
+    
+    /* === INSTALL SECTION === */
+    .install-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .install-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .install-badge{background:var(--ink);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .install-head h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .install-body{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .install-col{display:grid;gap:10px}
+    .install-col-head{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid rgba(17,17,17,.15);margin-bottom:4px;color:var(--blue)}
+    .code-block{background:#1a1a1a;color:#e5e5e5;border:1px solid rgba(255,255,255,.1);padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.6;border-radius:4px;overflow-x:auto}
+    .code-block .comment{color:#6b7280}
+    .code-block .cmd{color:#fbbf24}
+    .code-block .string{color:#86efac}
+    .code-block .key{color:#93c5fd}
+    
+    /* === FEATURES LIST === */
+    .features-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .features-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .features-badge{background:var(--teal);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .features-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .features-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .feature-item{display:flex;gap:10px;padding:10px 12px;border:1.5px solid rgba(17,17,17,.1);background:#faf7f0;align-items:flex-start}
+    .feature-check{background:var(--green);color:#fff;font:800 12px/1;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;flex-shrink:0;margin-top:1px}
+    .feature-text{font-size:12px;line-height:1.55}
+    .feature-text strong{font-weight:700}
+    
+    /* === SOURCE LINK === */
+    .source-section{background:var(--blue-soft);border:2px solid var(--blue);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+    .source-info{display:grid;gap:4px}
+    .source-label{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+    .source-url{font-weight:600;font-size:13px;color:var(--blue)}
+    .source-cta{background:var(--blue);color:#fff;border:2px solid var(--blue);padding:8px 16px;font-weight:700;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer;transition:all .15s}
+    .source-cta:hover{background:#1e3a8a}
+    
+    /* === FOOTER === */
+    .footer{margin-top:16px;padding-top:12px;border-top:1px solid rgba(17,17,17,.15);text-align:center;font-size:10.5px;color:var(--muted)}
+    
+    /* Responsive */
+    @media (max-width:768px){
+      .hero{grid-template-columns:1fr}
+      .styles-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .editable-body{grid-template-columns:1fr}
+      .qc-list{grid-template-columns:1fr}
+      .install-body{grid-template-columns:1fr}
+      .features-grid{grid-template-columns:1fr}
+      .step{grid-column:1/-1}
+      .step::after{display:none}
+    }
+    @media (max-width:480px){
+      .styles-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">Codex · Skill</span>
+          <span class="source">2026-07-07</span>
+        </div>
+        <h1>CyberPPT</h1>
+        <p class="subtitle">咨询风格 PPT 生成 Codex Skill。<strong>文档→证据表→故事线→版式→逐页生成→检查关卡</strong>，一键输出高密度咨询风格演示文稿。</p>
+        <div class="meta-row">
+          <span class="chip blue">Codex</span>
+          <span class="chip green">Skill</span>
+          <span class="chip">PPT</span>
+          <span class="chip">咨询</span>
+          <span class="chip">自动化</span>
+          <span class="chip">文档生成</span>
+        </div>
+      </div>
+      <div class="mission">
+        <div class="big">高密度咨询风格</div>
+        <div class="en">High-Density Consulting Style</div>
+        <div class="tagline">8 种配色版式<br>可编辑生成<br>多重质检关卡</div>
+      </div>
+    </section>
+    
+    <!-- BANNER -->
+    <section class="banner">
+      <div class="quote">从原始文档到咨询级 PPT，一站式完成</div>
+      <div class="note">支持 DOCX、PDF、Excel 文档 → 自动提取事实和数字 → 构建证据表 → 比较故事线 → 选择版式 → 逐页生成 → 多重检查关卡。</div>
+    </section>
+    
+    <!-- WORKFLOW -->
+    <section class="workflow-section">
+      <div class="workflow-head">
+        <span class="workflow-badge">Workflow</span>
+        <h2>六步工作流</h2>
+      </div>
+      <div class="workflow-body">
+        <div class="workflow-steps">
+          <div class="step">
+            <span class="step-num">Step 01</span>
+            <span class="step-title">文档提取</span>
+            <span class="step-desc">从 DOCX、PDF、Excel 中提取事实和数字</span>
+          </div>
+          <div class="step">
+            <span class="step-num">Step 02</span>
+            <span class="step-title">证据表构建</span>
+            <span class="step-desc">将提取内容整理成结构化证据表</span>
+          </div>
+          <div class="step">
+            <span class="step-num">Step 03</span>
+            <span class="step-title">故事线比较</span>
+            <span class="step-desc">比较不同叙事角度，确定核心论点</span>
+          </div>
+          <div class="step">
+            <span class="step-num">Step 04</span>
+            <span class="step-title">版式选择</span>
+            <span class="step-desc">从 8 种咨询风格中匹配最适合的配色版式</span>
+          </div>
+          <div class="step">
+            <span class="step-num">Step 05</span>
+            <span class="step-title">逐页生成</span>
+            <span class="step-desc">主标题、正文、关键数字均可独立编辑</span>
+          </div>
+          <div class="step">
+            <span class="step-num">Step 06</span>
+            <span class="step-title">检查关卡</span>
+            <span class="step-desc">文字溢出、数字出处、页面密度多重检查</span>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- 8 STYLES -->
+    <section class="styles-section">
+      <div class="styles-head">
+        <span class="styles-badge">Styles</span>
+        <h2>8 种咨询风格配色版式</h2>
+      </div>
+      <div class="styles-body">
+        <div class="styles-grid">
+          <div class="style-card blue">
+            <span class="style-icon">📊</span>
+            <span class="style-name">数据驱动</span>
+            <span class="style-desc">适合市场分析、竞品研究等数据密集型报告</span>
+          </div>
+          <div class="style-card red">
+            <span class="style-icon">⚡</span>
+            <span class="style-name">问题导向</span>
+            <span class="style-desc">适合诊断分析、痛点挖掘等议题驱动型演示</span>
+          </div>
+          <div class="style-card green">
+            <span class="style-icon">🎯</span>
+            <span class="style-name">战略规划</span>
+            <span class="style-desc">适合愿景描绘、战略布局等长期规划类提案</span>
+          </div>
+          <div class="style-card yellow">
+            <span class="style-icon">🔄</span>
+            <span class="style-name">流程优化</span>
+            <span class="style-desc">适合运营改进、流程再造等效率提升类项目</span>
+          </div>
+          <div class="style-card purple">
+            <span class="style-icon">💡</span>
+            <span class="style-name">创新方案</span>
+            <span class="style-desc">适合新产品设计、业务创新等创意类提案</span>
+          </div>
+          <div class="style-card teal">
+            <span class="style-icon">🤝</span>
+            <span class="style-name">客户沟通</span>
+            <span class="style-desc">适合汇报沟通、客户培训等交流演示场景</span>
+          </div>
+          <div class="style-card blue">
+            <span class="style-icon">📋</span>
+            <span class="style-name">项目汇报</span>
+            <span class="style-desc">适合进度汇报、阶段总结等项目管理场景</span>
+          </div>
+          <div class="style-card green">
+            <span class="style-icon">🏆</span>
+            <span class="style-name">竞标提案</span>
+            <span class="style-desc">适合招标比稿、方案竞标等专业展示场景</span>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- EDITABLE -->
+    <section class="editable-section">
+      <div class="editable-head">
+        <span class="editable-badge">Editable</span>
+        <h2>全方位可编辑</h2>
+      </div>
+      <div class="editable-body">
+        <div class="editable-item">
+          <span class="editable-icon">📝</span>
+          <span class="editable-label">主标题编辑</span>
+          <span class="editable-desc">每一页的主标题均可独立修改，调整叙事重点和表达方式</span>
+        </div>
+        <div class="editable-item">
+          <span class="editable-icon">📄</span>
+          <span class="editable-label">正文内容编辑</span>
+          <span class="editable-desc">支持对正文内容进行精细编辑，确保信息传达准确</span>
+        </div>
+        <div class="editable-item">
+          <span class="editable-icon">🔢</span>
+          <span class="editable-label">关键数字编辑</span>
+          <span class="editable-desc">核心数据和关键数字可随时更新，保持内容时效性</span>
+        </div>
+      </div>
+    </section>
+    
+    <!-- QC CHECKPOINTS -->
+    <section class="qc-section">
+      <div class="qc-head">
+        <span class="qc-badge">QC</span>
+        <h2>多重检查关卡</h2>
+      </div>
+      <div class="qc-list">
+        <div class="qc-item red">
+          <span class="qc-icon">⚠️</span>
+          <span class="qc-name">文字溢出检查</span>
+          <span class="qc-desc">自动检测页面内容是否超出边界，确保排版美观</span>
+        </div>
+        <div class="qc-item blue">
+          <span class="qc-icon">📎</span>
+          <span class="qc-name">数字出处检查</span>
+          <span class="qc-desc">验证所有关键数据的来源标注，保证论据可溯源</span>
+        </div>
+        <div class="qc-item green">
+          <span class="qc-icon">📏</span>
+          <span class="qc-name">页面密度检查</span>
+          <span class="qc-desc">评估每页信息密度，确保阅读体验和传达效率</span>
+        </div>
+      </div>
+    </section>
+    
+    <!-- FEATURES -->
+    <section class="features-section">
+      <div class="features-head">
+        <span class="features-badge">Features</span>
+        <h2>核心能力</h2>
+      </div>
+      <div class="features-grid">
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span class="feature-text"><strong>多格式支持</strong>：DOCX、PDF、Excel 文档直接导入</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span class="feature-text"><strong>结构化输出</strong>：从非结构化文档自动提炼结构化信息</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span class="feature-text"><strong>故事线构建</strong>：辅助分析叙事逻辑，确定最佳表达路径</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span class="feature-text"><strong>专业版式</strong>：内置咨询行业标准配色与排版规范</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span class="feature-text"><strong>逐页可控</strong>：精确控制每一页的内容和呈现方式</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span class="feature-text"><strong>质量保障</strong>：多维度自动检查，确保输出品质</span>
+        </div>
+      </div>
+    </section>
+    
+    <!-- INSTALL -->
+    <section class="install-section">
+      <div class="install-head">
+        <span class="install-badge">Install</span>
+        <h2>安装与使用</h2>
+      </div>
+      <div class="install-body">
+        <div class="install-col">
+          <span class="install-col-head">Codex 中激活</span>
+          <div class="code-block">
+<span class="comment">// 在 Codex 中安装 CyberPPT</span>
+<span class="cmd">/skill install</span> cyberppt
+
+<span class="comment">// 或使用完整命令</span>
+<span class="cmd">/skill add</span> <span class="string">https://github.com/crazyykhllc-bit/CyberPPT</span>
+          </div>
+        </div>
+        <div class="install-col">
+          <span class="install-col-head">基本使用</span>
+          <div class="code-block">
+<span class="comment">// 上传文档并开始生成</span>
+<span class="cmd">/cyberppt generate</span> <span class="key">--input</span> <span class="string">document.docx</span>
+
+<span class="comment">// 选择咨询风格</span>
+<span class="cmd">/cyberppt style</span> <span class="key">--preset</span> <span class="string">strategic</span>
+
+<span class="comment">// 导出 PPTX</span>
+<span class="cmd">/cyberppt export</span> <span class="key">--format</span> <span class="string">pptx</span>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- SOURCE LINK -->
+    <section class="source-section">
+      <div class="source-info">
+        <span class="source-label">Source Code</span>
+        <span class="source-url">github.com/crazyykhllc-bit/CyberPPT</span>
+      </div>
+      <a href="https://github.com/crazyykhllc-bit/CyberPPT" class="source-cta" target="_blank">View on GitHub →</a>
+    </section>
+    
+    <!-- FOOTER -->
+    <div class="footer">
+      CyberPPT · Codex Skill · 咨询风格 PPT 生成 · 2026-07-07
+    </div>
+  </div>
+</body>
+</html>
