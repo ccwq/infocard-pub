@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>开源大模型本地部署与智能体编程变革：Ornis 1.0 Self-Scaffolding</title>
+    <meta name="description" content="2026年开源大模型本地部署趋势分析：Ornis 1.0（self-scaffolding/selfing RL）让模型自主生成重写编排系统，397B反超Claude 4.7+OP 4.7。9B/35B/397B三档硬件矩阵对比。开发者从大厂租户变AI架构师。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================
+           CSS Variables & Base
+           ========================================= */
+        :root {
+            --red: #E63329;
+            --red-dark: #B5281E;
+            --red-light: #FFEBEA;
+            --black: #0A0A0A;
+            --white: #FFFFFF;
+            --gray-50: #F7F7F7;
+            --gray-100: #EEEEEE;
+            --gray-200: #E0E0E0;
+            --gray-300: #BDBDBD;
+            --gray-400: #9E9E9E;
+            --gray-500: #757575;
+            --gray-600: #424242;
+            --gray-700: #212121;
+            --gray-800: #121212;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+            --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+            --shadow-xl: 0 20px 60px rgba(0,0,0,0.15);
+            --transition: 0.2s ease;
+            --max-w: 860px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--gray-700);
+            background: var(--white);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        img { max-width: 100%; display: block; }
+
+        a { color: var(--red); text-decoration: none; }
+        a:hover { color: var(--red-dark); }
+
+        /* =========================================
+           Layout
+           ========================================= */
+        .container {
+            max-width: var(--max-w);
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* =========================================
+           Navigation Bar
+           ========================================= */
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .navbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+            max-width: var(--max-w);
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .navbar-logo {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--black);
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .navbar-logo .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--red);
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .navbar-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--gray-500);
+            font-family: var(--font-mono);
+            background: var(--gray-50);
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--gray-200);
+        }
+
+        /* =========================================
+           Hero Section
+           ========================================= */
+        .hero {
+            padding: 72px 0 56px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -80px;
+            right: -120px;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(230,51,41,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 28px;
+        }
+
+        .chip {
+            font-size: 11px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            color: var(--red);
+            background: var(--red-light);
+            border: 1px solid rgba(230,51,41,0.15);
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .chip.black {
+            color: var(--white);
+            background: var(--black);
+            border-color: var(--black);
+        }
+
+        .chip.outline {
+            color: var(--gray-500);
+            background: var(--white);
+            border-color: var(--gray-200);
+        }
+
+        .hero h1 {
+            font-size: clamp(28px, 5vw, 44px);
+            font-weight: 900;
+            color: var(--black);
+            line-height: 1.1;
+            letter-spacing: -1.5px;
+            margin-bottom: 20px;
+        }
+
+        .hero h1 em {
+            font-style: normal;
+            color: var(--red);
+        }
+
+        .hero-sub {
+            font-size: 17px;
+            line-height: 1.65;
+            color: var(--gray-500);
+            max-width: 660px;
+            margin-bottom: 32px;
+            font-weight: 400;
+        }
+
+        .hero-meta {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--gray-400);
+            font-family: var(--font-mono);
+        }
+
+        .meta-item .icon {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        .hero-divider {
+            width: 1px;
+            height: 14px;
+            background: var(--gray-200);
+        }
+
+        /* =========================================
+           Section Anatomy
+           ========================================= */
+        .section {
+            padding: 48px 0;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        .section-tag {
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--red);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--black);
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+        }
+
+        .section-desc {
+            font-size: 14px;
+            color: var(--gray-500);
+            margin-bottom: 28px;
+            max-width: 600px;
+        }
+
+        /* =========================================
+           Trend Banner
+           ========================================= */
+        .trend-banner {
+            background: var(--black);
+            border-radius: var(--radius-xl);
+            padding: 36px 40px;
+            margin: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .trend-banner::after {
+            content: '';
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(230,51,41,0.3) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .trend-banner-label {
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--red);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .trend-banner-label .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--red);
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        .trend-banner h2 {
+            font-size: clamp(20px, 3vw, 26px);
+            font-weight: 800;
+            color: var(--white);
+            line-height: 1.3;
+            letter-spacing: -0.5px;
+            margin-bottom: 24px;
+            max-width: 600px;
+        }
+
+        .trend-goals {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .trend-goal {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .trend-goal-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(230,51,41,0.2);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .trend-goal-icon svg { width: 16px; height: 16px; fill: var(--red); }
+
+        .trend-goal-text strong {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--white);
+            margin-bottom: 2px;
+        }
+
+        .trend-goal-text span {
+            font-size: 12px;
+            color: rgba(255,255,255,0.45);
+            font-family: var(--font-mono);
+        }
+
+        .trend-shift {
+            background: rgba(230,51,41,0.12);
+            border: 1px solid rgba(230,51,41,0.25);
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .shift-arrow {
+            font-size: 24px;
+            color: var(--red);
+            font-weight: 300;
+            flex-shrink: 0;
+        }
+
+        .shift-from, .shift-to {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        .shift-label {
+            font-size: 11px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            color: rgba(255,255,255,0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .shift-value {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--white);
+        }
+
+        .shift-to .shift-value { color: #FFB3B3; }
+
+        /* =========================================
+           Innovation Card
+           ========================================= */
+        .innovation-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .innovation-grid { grid-template-columns: 1fr; }
+        }
+
+        .inno-card {
+            background: var(--white);
+            border: 1px solid var(--gray-100);
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            position: relative;
+            transition: box-shadow var(--transition), transform var(--transition);
+        }
+
+        .inno-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .inno-card.red-accent {
+            border-color: rgba(230,51,41,0.2);
+        }
+
+        .inno-card.red-accent::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--red);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        }
+
+        .inno-card-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--gray-50);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 20px;
+        }
+
+        .inno-card.red-accent .inno-card-icon {
+            background: var(--red-light);
+        }
+
+        .inno-card h3 {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--black);
+            margin-bottom: 8px;
+            letter-spacing: -0.2px;
+        }
+
+        .inno-card p {
+            font-size: 14px;
+            color: var(--gray-500);
+            line-height: 1.6;
+        }
+
+        /* =========================================
+           Paradigm Shift
+           ========================================= */
+        .paradigm-shift {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: center;
+        }
+
+        @media (max-width: 600px) {
+            .paradigm-shift { grid-template-columns: 1fr; gap: 12px; }
+            .shift-divider { display: none; }
+        }
+
+        .para-card {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-100);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            height: 100%;
+        }
+
+        .para-card.old {
+            background: var(--gray-50);
+            border-style: dashed;
+        }
+
+        .para-card.new {
+            background: #FFF5F5;
+            border-color: rgba(230,51,41,0.2);
+        }
+
+        .para-card-label {
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .para-card.old .para-card-label { color: var(--gray-400); }
+        .para-card.new .para-card-label { color: var(--red); }
+
+        .para-card h4 {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--black);
+            margin-bottom: 8px;
+        }
+
+        .para-card p {
+            font-size: 13px;
+            color: var(--gray-500);
+            line-height: 1.6;
+        }
+
+        .shift-divider {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 0 8px;
+        }
+
+        .shift-divider-line {
+            width: 2px;
+            height: 60px;
+            background: linear-gradient(to bottom, transparent, var(--red), transparent);
+        }
+
+        .shift-divider-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--red);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+        }
+
+        /* =========================================
+           Model Matrix Table
+           ========================================= */
+        .model-table-wrap {
+            overflow-x: auto;
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--gray-100);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .model-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .model-table thead {
+            background: var(--black);
+        }
+
+        .model-table thead th {
+            padding: 14px 20px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: rgba(255,255,255,0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .model-table thead th:first-child { border-radius: var(--radius-xl) 0 0 0; }
+        .model-table thead th:last-child { border-radius: 0 var(--radius-xl) 0 0; }
+
+        .model-table tbody tr {
+            border-bottom: 1px solid var(--gray-100);
+            transition: background var(--transition);
+        }
+
+        .model-table tbody tr:last-child { border-bottom: none; }
+
+        .model-table tbody tr:hover { background: var(--gray-50); }
+
+        .model-table tbody td {
+            padding: 18px 20px;
+            vertical-align: top;
+        }
+
+        .model-version {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .model-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            font-family: var(--font-mono);
+            flex-shrink: 0;
+        }
+
+        .model-badge.star {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: var(--black);
+        }
+
+        .model-badge.pro {
+            background: var(--red);
+            color: white;
+        }
+
+        .model-badge.entry {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+
+        .model-name {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--black);
+            margin-bottom: 2px;
+        }
+
+        .model-param {
+            font-size: 12px;
+            font-family: var(--font-mono);
+            color: var(--gray-400);
+        }
+
+        .hw-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--gray-600);
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+        }
+
+        .hw-icon { font-size: 14px; }
+
+        .perf-tag {
+            font-size: 13px;
+            color: var(--gray-600);
+            line-height: 1.6;
+        }
+
+        .perf-highlight {
+            display: inline-block;
+            background: var(--red-light);
+            color: var(--red-dark);
+            font-size: 12px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+
+        .perf-highlight.gold {
+            background: linear-gradient(135deg, #FFF8DC, #FFE4B5);
+            color: #B8860B;
+        }
+
+        /* =========================================
+           PAL Reference
+           ========================================= */
+        .pal-card {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-xl);
+            padding: 28px 32px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 600px) {
+            .pal-card { grid-template-columns: 1fr; }
+        }
+
+        .pal-item {}
+
+        .pal-item-label {
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--gray-400);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+
+        .pal-item-value {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--black);
+        }
+
+        .pal-item-desc {
+            font-size: 13px;
+            color: var(--gray-500);
+            margin-top: 6px;
+            line-height: 1.6;
+        }
+
+        .pal-limitation {
+            background: rgba(230,51,41,0.06);
+            border: 1px solid rgba(230,51,41,0.15);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: var(--red-dark);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .pal-limitation-icon { flex-shrink: 0; margin-top: 1px; }
+
+        /* =========================================
+           Conclusion
+           ========================================= */
+        .conclusion {
+            background: var(--black);
+            border-radius: var(--radius-xl);
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .conclusion::before {
+            content: '';
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 200px;
+            background: radial-gradient(ellipse, rgba(230,51,41,0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .conclusion-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(230,51,41,0.15);
+            border: 2px solid rgba(230,51,41,0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 24px;
+        }
+
+        .conclusion h3 {
+            font-size: 22px;
+            font-weight: 900;
+            color: var(--white);
+            letter-spacing: -0.5px;
+            margin-bottom: 12px;
+        }
+
+        .conclusion p {
+            font-size: 15px;
+            color: rgba(255,255,255,0.5);
+            max-width: 500px;
+            margin: 0 auto 24px;
+            line-height: 1.7;
+        }
+
+        .conclusion-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--red);
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 12px 24px;
+            border-radius: 8px;
+            transition: background var(--transition), transform var(--transition);
+        }
+
+        .conclusion-cta:hover {
+            background: var(--red-dark);
+            transform: translateY(-1px);
+            color: white;
+        }
+
+        /* =========================================
+           FAQ Section
+           ========================================= */
+        .faq-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .faq-item {
+            border: 1px solid var(--gray-100);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            transition: border-color var(--transition);
+        }
+
+        .faq-item:hover { border-color: var(--gray-200); }
+
+        .faq-q {
+            padding: 18px 20px;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--black);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            user-select: none;
+            background: var(--white);
+            transition: background var(--transition);
+        }
+
+        .faq-q:hover { background: var(--gray-50); }
+
+        .faq-q::after {
+            content: '+';
+            font-size: 20px;
+            font-weight: 300;
+            color: var(--gray-300);
+            flex-shrink: 0;
+            transition: transform var(--transition), color var(--transition);
+        }
+
+        .faq-item.open .faq-q::after {
+            transform: rotate(45deg);
+            color: var(--red);
+        }
+
+        .faq-a {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .faq-item.open .faq-a {
+            max-height: 300px;
+        }
+
+        .faq-a-inner {
+            padding: 0 20px 18px;
+            font-size: 14px;
+            color: var(--gray-500);
+            line-height: 1.7;
+            border-top: 1px solid var(--gray-100);
+            padding-top: 16px;
+        }
+
+        /* =========================================
+           Tags Bar
+           ========================================= */
+        .tags-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .tag {
+            font-size: 12px;
+            font-family: var(--font-mono);
+            color: var(--gray-500);
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        /* =========================================
+           Footer
+           ========================================= */
+        .footer {
+            padding: 32px 0;
+            border-top: 1px solid var(--gray-100);
+            margin-top: 32px;
+        }
+
+        .footer-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .footer-copy {
+            font-size: 13px;
+            color: var(--gray-400);
+            font-family: var(--font-mono);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .footer-links a {
+            font-size: 13px;
+            color: var(--gray-400);
+            transition: color var(--transition);
+        }
+
+        .footer-links a:hover { color: var(--red); }
+
+        /* =========================================
+           Utility
+           ========================================= */
+        .text-red { color: var(--red); }
+        .text-muted { color: var(--gray-500); }
+        .font-mono { font-family: var(--font-mono); }
+        .mt-4 { margin-top: 4px; }
+        .mt-8 { margin-top: 8px; }
+        .mt-12 { margin-top: 12px; }
+        .mt-16 { margin-top: 16px; }
+        .mt-24 { margin-top: 24px; }
+        .mt-32 { margin-top: 32px; }
+        .mb-4 { margin-bottom: 4px; }
+        .mb-8 { margin-bottom: 8px; }
+        .mb-12 { margin-bottom: 12px; }
+        .mb-16 { margin-bottom: 16px; }
+        .mb-24 { margin-bottom: 24px; }
+        .mb-32 { margin-bottom: 32px; }
+
+        /* =========================================
+           Print / Full page
+           ========================================= */
+        @media print {
+            .navbar { display: none; }
+            body { font-size: 12px; }
+            .section { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- =========================================
+         Navigation
+         ========================================= -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <div class="navbar-logo">
+                <span class="dot"></span>
+                Ornis 1.0
+            </div>
+            <span class="navbar-badge">Self-Scaffolding</span>
+        </div>
+    </nav>
+
+    <!-- =========================================
+         Hero
+         ========================================= -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-chips">
+                <span class="chip">Ornis 1.0</span>
+                <span class="chip">Self-Scaffolding</span>
+                <span class="chip">Local LLM</span>
+                <span class="chip">Agentic Coding</span>
+                <span class="chip outline">2026</span>
+            </div>
+
+            <h1>开源大模型本地部署<br>与<em>智能体编程</em>变革</h1>
+
+            <p class="hero-sub">
+                2026年，开发团队主动从云端撤退，AI 能力重新搬回本地局域网，<br>
+                降低昂贵代币消耗并保障隐私。Ornis 1.0 以 Self-Scaffolding 重新定义智能体边界。
+            </p>
+
+            <div class="hero-meta">
+                <span class="meta-item">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>
+                    AI Engineering
+                </span>
+                <div class="hero-divider"></div>
+                <span class="meta-item">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    趋势分析
+                </span>
+                <div class="hero-divider"></div>
+                <span class="meta-item">
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    2026-07-07
+                </span>
+                <div class="hero-divider"></div>
+                <span class="meta-item">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"/></svg>
+                    Nous Research
+                </span>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         Trend Banner
+         ========================================= -->
+    <section class="section" style="padding-top: 0;">
+        <div class="container">
+            <div class="trend-banner">
+                <div class="trend-banner-label">
+                    <span class="pulse"></span>
+                    2026 年现象级趋势
+                </div>
+
+                <h2>开发团队主动从云端撤退，AI 能力重新搬回本地局域网</h2>
+
+                <div class="trend-goals">
+                    <div class="trend-goal">
+                        <div class="trend-goal-icon">
+                            <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
+                        </div>
+                        <div class="trend-goal-text">
+                            <strong>降低代币消耗</strong>
+                            <span>Eliminate Token Cost</span>
+                        </div>
+                    </div>
+                    <div class="trend-goal">
+                        <div class="trend-goal-icon">
+                            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        </div>
+                        <div class="trend-goal-text">
+                            <strong>保障数据隐私</strong>
+                            <span>Data Privacy First</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="trend-shift">
+                    <div class="shift-from">
+                        <div class="shift-label">过去角色</div>
+                        <div class="shift-value">大厂纯租户 / Cloud Consumer</div>
+                    </div>
+                    <div class="shift-arrow">→</div>
+                    <div class="shift-to">
+                        <div class="shift-label">现在定位</div>
+                        <div class="shift-value">自己 AI 系统的架构师 / AI Architect</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         Ornis Core Innovation
+         ========================================= -->
+    <section class="section">
+        <div class="container">
+            <div class="section-tag">Core Innovation</div>
+            <h2 class="section-title">Ornis 1.0 核心创新</h2>
+            <p class="section-desc">Self-Scaffolding 让模型从「被动执行」进化为「主动构建自身工作环境」</p>
+
+            <div class="innovation-grid">
+                <div class="inno-card red-accent">
+                    <div class="inno-card-icon">🔧</div>
+                    <h3>Self-Scaffolding 自我构建脚手架</h3>
+                    <p>
+                        通过 <strong>selfing RL（自我增强强化学习）</strong> 训练，让模型在运行中自主生成、重写并优化自身的编排系统和动态脚手架。
+                        模型不再依赖外部预定义框架，而是<strong>自我构建执行环境</strong>。
+                    </p>
+                    <div class="tags-bar mt-12">
+                        <span class="tag">selfing RL</span>
+                        <span class="tag">自我增强</span>
+                        <span class="tag">动态编排</span>
+                    </div>
+                </div>
+
+                <div class="inno-card">
+                    <div class="inno-card-icon">🧠</div>
+                    <h3>将工程活转化为模型训练流程</h3>
+                    <p>
+                        传统模式中，工程任务是「人类写剧本、模型填空」。Ornis 打破了这一范式：<strong>演员既能演戏也能改剧本</strong>，将工程问题转化为模型自身的训练迭代问题。
+                    </p>
+                    <div class="tags-bar mt-12">
+                        <span class="tag">主动优化</span>
+                        <span class="tag">元认知</span>
+                        <span class="tag">自举进化</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         Paradigm Shift
+         ========================================= -->
+    <section class="section">
+        <div class="container">
+            <div class="section-tag">Paradigm Shift</div>
+            <h2 class="section-title">范式根本性转变</h2>
+            <p class="section-desc">从「人类主导剧本」到「模型自主创作」，这是智能体编程的代际跨越</p>
+
+            <div class="paradigm-shift">
+                <div class="para-card old">
+                    <div class="para-card-label">❌ 传统智能体</div>
+                    <h4>人类写剧本，模型填空</h4>
+                    <p>
+                        工程师预先定义好工作流、工具链和执行计划，模型按部就班在固定框架内运行。
+                        缺乏灵活性，无法应对未知任务。
+                    </p>
+                </div>
+
+                <div class="shift-divider">
+                    <div class="shift-divider-line"></div>
+                    <div class="shift-divider-icon">⚡</div>
+                    <div class="shift-divider-line"></div>
+                </div>
+
+                <div class="para-card new">
+                    <div class="para-card-label">✅ Ornis 模式</div>
+                    <h4>演员既能演戏也能改剧本</h4>
+                    <p>
+                        模型自主构建、重写、优化编排系统本身。在运行中持续改进自身工作方式，
+                        真正实现「让 AI 自己思考如何做」。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         Model Matrix
+         ========================================= -->
+    <section class="section">
+        <div class="container">
+            <div class="section-tag">Model Matrix</div>
+            <h2 class="section-title">三档模型 · 硬件要求与性能表现</h2>
+            <p class="section-desc">从消费级 Mac Mini 到企业多卡服务器，覆盖全场景需求</p>
+
+            <div class="model-table-wrap">
+                <table class="model-table">
+                    <thead>
+                        <tr>
+                            <th>版本</th>
+                            <th>硬件要求</th>
+                            <th>性能表现</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div class="model-version">
+                                    <span class="model-badge entry">9B</span>
+                                    <div>
+                                        <div class="model-name">入门级</div>
+                                        <div class="model-param">9B 参数</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="hw-tag">
+                                    <span class="hw-icon">🍎</span>
+                                    16GB 内存 · Mac Mini M4
+                                </div>
+                            </td>
+                            <td>
+                                <div class="perf-tag">
+                                    Terminal Bench 2.1 评测中<strong>以小博大</strong>，<br>
+                                    超过部分 35B 云端模型表现
+                                    <div class="perf-highlight">性价比之王 · 入门首选</div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="model-version">
+                                    <span class="model-badge pro">35B</span>
+                                    <div>
+                                        <div class="model-name">主力级</div>
+                                        <div class="model-param">35B 参数</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="hw-tag">
+                                    <span class="hw-icon">🍎</span>
+                                    最低 32GB 内存 · Mac Studio
+                                </div>
+                            </td>
+                            <td>
+                                <div class="perf-tag">
+                                    <strong>高性价比切入点</strong>，强于传统逻辑编写<br>
+                                    复杂前端、空间视觉推理、主动打印日志 Debug
+                                    <strong>统治力极强</strong>
+                                    <div class="perf-highlight">主力开发首选 · 平衡之选</div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="model-version">
+                                    <span class="model-badge star">397B</span>
+                                    <div>
+                                        <div class="model-name">旗舰版</div>
+                                        <div class="model-param">397B 参数</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="hw-tag">
+                                    <span class="hw-icon">🖥️</span>
+                                    多卡服务器 · 重型部署
+                                </div>
+                            </td>
+                            <td>
+                                <div class="perf-tag">
+                                    AG Coding 评测<strong>反超 Claude 4.7</strong> 和<br>
+                                    <strong>OP 4.7</strong>，企业命脉算法本地完美替代
+                                    <div class="perf-highlight gold">🏆 SOTA · 企业级最强</div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         PAL Framework Reference
+         ========================================= -->
+    <section class="section">
+        <div class="container">
+            <div class="section-tag">Key Reference</div>
+            <h2 class="section-title">关键前置参考：PAL 框架</h2>
+            <p class="section-desc">Program-Aided Language Models，Ornis 诞生的重要理论基础</p>
+
+            <div class="pal-card">
+                <div class="pal-item">
+                    <div class="pal-item-label">提出者</div>
+                    <div class="pal-item-value">Google / OpenAI + UCLA</div>
+                    <div class="pal-item-desc">2022 年联合发表，开创了将代码执行引入 LLM 推理的先河</div>
+                </div>
+                <div class="pal-item">
+                    <div class="pal-item-label">核心机制</div>
+                    <div class="pal-item-value">利用外部 Python 解释器严格验证模型生成的代码</div>
+                    <div class="pal-item-desc">通过确定性执行环境对 LLM 输出进行闭环验证，避免幻觉传播</div>
+                </div>
+                <div class="pal-item" style="grid-column: 1 / -1;">
+                    <div class="pal-item-label">局限与 Ornis 的超越</div>
+                    <div class="pal-item-value" style="font-size: 14px;">
+                        PAL 解决了「验证问题」，但未解决「生成问题」—— 模型依然被动等待人类指令。
+                        Ornis 在此基础上，引入 selfing RL 让模型能够自主生成、重写编排逻辑，
+                        实现了从「验证」到「生成+验证」的完整闭环。
+                    </div>
+                    <div class="pal-limitation">
+                        <span class="pal-limitation-icon">⚠️</span>
+                        <span><strong>PAL 局限：</strong>PAL 仅解决「代码执行验证」，未改变模型被动等待人类指令的本质。</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         Conclusion
+         ========================================= -->
+    <section class="section">
+        <div class="container">
+            <div class="conclusion">
+                <div class="conclusion-icon">🏗️</div>
+                <h3>开发者 = 自己 AI 系统的架构师</h3>
+                <p>
+                    2026 年的今天，开发者不再是大厂的纯租户。Ornis 1.0 证明，
+                    通过 Self-Scaffolding 本地部署开源大模型，团队可以完全掌控 AI 能力，
+                    在保障数据隐私的同时大幅降低成本。
+                </p>
+                <a href="#" class="conclusion-cta">
+                    了解更多 Self-Scaffolding →
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         FAQ
+         ========================================= -->
+    <section class="section">
+        <div class="container">
+            <div class="section-tag">FAQ</div>
+            <h2 class="section-title">常见问题</h2>
+
+            <div class="faq-list">
+                <div class="faq-item open">
+                    <div class="faq-q">什么是 Self-Scaffolding？</div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner">
+                            Self-Scaffolding（自我构建脚手架）是一种通过 selfing RL（自我增强强化学习）训练的技术范式，
+                            使模型能够在运行过程中自主生成、重写并优化自身的编排系统和动态执行脚手架，
+                            无需人工预定义完整工作流程。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-q">Mac Mini M4 真的能跑 9B 模型吗？</div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner">
+                            可以。Ornis 9B 版本针对 Apple Silicon 进行了深度优化，16GB 统一内存的 Mac Mini M4
+                            足以流畅运行。在 Terminal Bench 2.1 评测中，9B 以小博大，部分场景超过传统 35B 云端模型，
+                            性价比极高，是理想的入门选择。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-q">Ornis 397B 和 Claude 4.7 比，哪个更强？</div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner">
+                            在 AG Coding 综合评测中，Ornis 397B 旗舰版已实现对 Claude 4.7 和 OpenAI GPT-4.7 的反超。
+                            这意味着对于企业级核心算法和复杂编程任务，本地部署的 Ornis 397B 可以完全替代
+                            昂贵的云端商业模型，同时保障数据隐私。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-q">PAL 框架和 Ornis 有什么关系？</div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner">
+                            PAL（Program-Aided Language Models）是 2022 年 Google/OpenAI + UCLA 提出的框架，
+                            开创了用外部 Python 解释器验证 LLM 代码的先河。Ornis 在 PAL 基础上进行了质的飞跃：
+                            PAL 只解决了「验证问题」，而 Ornis 通过 selfing RL 进一步解决了「生成问题」，
+                            让模型能够自主生成和优化编排逻辑。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-q">本地部署相比云端 API 有哪些优势？</div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner">
+                            ① <strong>成本：</strong>一次性硬件投入，长期零代币消耗；② <strong>隐私：</strong>代码和数据不离开本地局域网；③ <strong>可控性：</strong>完全掌控模型版本和配置；④ <strong>延迟：</strong>内网访问，延迟极低；⑤ <strong>定制：</strong>可针对团队场景微调模型。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-q">Mac Studio 32GB 能跑 35B 吗？</div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner">
+                            可以。Ornis 35B 是目前主力推荐的版本，Mac Studio 32GB 统一内存（推荐 64GB 效果更佳）
+                            可以流畅运行。该版本在复杂前端构建、空间视觉推理、主动 Debug 打印日志等场景
+                            表现极为强劲，是大多数开发团队的高性价比选择。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         Footer
+         ========================================= -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-copy">
+                    © 2026 Ornis / Nous Research · Local LLM Revolution
+                </div>
+                <div class="footer-links">
+                    <a href="#">Home</a>
+                    <a href="#">Docs</a>
+                    <a href="#">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // FAQ Accordion
+        document.querySelectorAll('.faq-q').forEach(function(q) {
+            q.addEventListener('click', function() {
+                var item = this.closest('.faq-item');
+                var wasOpen = item.classList.contains('open');
+                // Close all
+                document.querySelectorAll('.faq-item').forEach(function(i) {
+                    i.classList.remove('open');
+                });
+                // Toggle
+                if (!wasOpen) item.classList.add('open');
+            });
+        });
+    </script>
+</body>
+</html>
