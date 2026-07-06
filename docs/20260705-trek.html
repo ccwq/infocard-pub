@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TREK · 开源旅行规划平台，多人实时协作+互动地图+财务管理</title>
+  <meta name="description" content="TREK 开源旅行规划平台，告别收费App。基于 WebSocket 多人实时协作、Leaflet/Mapbox GL 互动式地图规划、拖拽排序+自动AA拆分、PDF导出打包清单。NestJS+React 技术栈，支持深度定制，适合团队出行和个人规划。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7;--orange:#c2410c;--orange-soft:#fff7ed}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,52px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:60ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    .chip.orange{background:var(--orange-soft);border-color:var(--orange);color:var(--orange)}
+    /* Hero right: mission quote */
+    .mission{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .mission .big{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:16px;line-height:1.2;letter-spacing:-.02em;color:#fff}
+    .mission .en{font-size:10px;color:#8b9bbf;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+    .mission .tagline{font-size:11px;color:#d8e2ff;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--red) 0%, #991b1b 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12px;line-height:1.62;color:#fdd;margin-top:8px}
+    /* === VALUE BANNER === */
+    .value-grid{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .value-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff;text-align:center;display:grid;gap:6px}
+    .value-icon{font-size:22px;line-height:1}
+    .value-item h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3;color:var(--ink)}
+    .value-item p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    /* === FEATURE GRID (4 modules) === */
+    .feat-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .feat-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .feat-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .feat-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .feat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .feat-card{border:1.5px solid var(--line);padding:12px 14px;background:#fff;display:grid;gap:8px}
+    .feat-card .feat-icon{font-size:22px;line-height:1}
+    .feat-card h4{margin:0;font-size:13px;font-weight:800;line-height:1.3;color:var(--ink)}
+    .feat-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.6}
+    .feat-card .tech-tag{display:inline-flex;padding:2px 8px;border:1.5px solid var(--blue);background:var(--blue-soft);color:var(--blue);font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    /* === TECH STACK === */
+    .tech-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,.4fr);gap:14px;align-items:start}
+    .tech-left{}
+    .tech-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .tech-badge{background:#111;color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .tech-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .tech-stack{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .tech-item{border:1.5px solid var(--line);padding:8px 10px;background:#fff;text-align:center;display:grid;gap:4px}
+    .tech-item .icon{font-size:18px}
+    .tech-item .name{font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+    .tech-item .role{font-size:10.5px;color:var(--muted)}
+    .tech-meta{display:grid;gap:7px;align-content:start}
+    .tech-meta-item{display:flex;gap:8px;align-items:start;padding:7px 10px;border:1.5px solid var(--line);background:#fff}
+    .tech-meta-item .k{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);min-width:56px}
+    .tech-meta-item .v{font-size:11.5px;color:var(--ink);line-height:1.45}
+    /* === AUDIENCE === */
+    .audience-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .audience-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .audience-badge{background:var(--green);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .audience-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .audience-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .audience-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .audience-card .icon{font-size:20px}
+    .audience-card h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3;color:var(--ink)}
+    .audience-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === SOP === */
+    .howto{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+    .howto-head{padding:12px 16px 10px;border-bottom:1.5px solid var(--line);background:#faf7f0;display:flex;align-items:flex-start;gap:10px}
+    .howto-badge{background:var(--red-dark);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .howto h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02epx}
+    .howto-body{padding:12px 16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+    .howto-step{padding:10px 12px;border-right:1.5px solid rgba(17,17,17,.15);min-width:0;display:grid;gap:6px}
+    .howto-step:last-child{border-right:none}
+    .howto-step .n{font:900 20px/1 Georgia,"Times New Roman",serif;color:var(--blue)}
+    .howto-step h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .howto-step p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === QUICK START CODE === */
+    .code-block{background:#111;border:2px solid var(--line);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px;overflow-x:auto}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#d8e2ff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:#d8e2ff;white-space:pre;word-break:normal;overflow-x:auto}
+    .code-block .prompt{color:#f4c84c}
+    .code-block .comment{color:#8b9bbf}
+    .code-block .cmd{color:#f4a8c8}
+    .code-block .key{color:#93c5fd}
+    .code-block .val{color:#fdba74}
+    /* === ADDONS === */
+    .addon-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .addon-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .addon-badge{background:var(--orange);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .addon-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .addon-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .addon-item{border:1.5px solid var(--line);padding:8px 10px;background:#fff;display:flex;gap:8px;align-items:flex-start}
+    .addon-dot{width:8px;height:8px;background:var(--red);border-radius:50%;flex-shrink:0;margin-top:4px}
+    .addon-item .name{font:700 11.5px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+    .addon-item .desc{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:3px}
+    /* === FAQ === */
+    .faq-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .faq-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .faq-badge{background:var(--blue);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .faq-section h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    .faq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .faq-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .faq-item .q{font-size:12.5px;font-weight:800;line-height:1.4;margin-bottom:5px}
+    .faq-item .a{font-size:11.5px;color:var(--muted);line-height:1.6;margin:0}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:12px 14px 10px;color:var(--muted);font-size:12px;line-height:1.6}
+    .footer .brand{font-weight:800;color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:14px}
+    .footer .small{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    .footer .small a{color:var(--blue)}
+    .save{display:block;width:fit-content;position:static;margin:12px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--red),#991b1b);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(153,27,27,.3);cursor:pointer}
+    /* === RESPONSIVE === */
+    @media(max-width:960px){
+      .hero,.tech-section,.value-grid,.feat-grid,.faq-grid{grid-template-columns:1fr}
+      .howto-body{grid-template-columns:repeat(2,1fr)}
+      .tech-stack{grid-template-columns:repeat(3,1fr)}
+      .addon-grid{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:10px 0 72px}
+      .hero,.banner,.footer,.tech-section{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(22px,8vw,32px)}
+      .banner .quote{font-size:18px}
+      .howto-body,.feat-grid,.faq-grid,.addon-grid,.tech-stack,.audience-grid{grid-template-columns:1fr}
+      .footer{flex-direction:column}
+      .value-grid{grid-template-columns:repeat(2,1fr)}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">TREK · OPEN SOURCE TRAVEL PLANNER · AGPL v3</div>
+        <div class="source">github.com/mauriceboe/TREK</div>
+      </div>
+      <h1>TREK</h1>
+      <p class="subtitle"><strong>告别收费旅行App，搭建专属旅行规划平台。</strong>自托管、多人实时协作、互动地图、花费拆分、打包清单、旅行日记——全部开源，在自己的服务器上跑。</p>
+      <div class="meta-row">
+        <span class="chip red">★ 9,222</span>
+        <span class="chip green">🍴 760</span>
+        <span class="chip blue">AGPL v3</span>
+        <span class="chip yellow">NestJS + React</span>
+        <span class="chip orange">Docker Ready</span>
+        <span class="chip">PWA</span>
+        <span class="chip">SSO / OIDC</span>
+      </div>
+    </div>
+    <div class="mission">
+      <div class="big">Your trips.<br>Your plan.<br>Your server.</div>
+      <div class="en">Self-hosted · Real-time · Open Source</div>
+      <div class="tagline">实时协作 · 互动地图 · AA 记账<br>打包清单 · PDF 导出 · AI 集成</div>
+    </div>
+  </section>
+
+  <!-- BANNER: Core Value -->
+  <section class="banner">
+    <div class="quote">多人实时协作 · 互动式地图规划 · 智能行程管理 · 财务 AA 拆分 · 一站式出行准备</div>
+    <div class="note">告别 Wanderlog / TripIt 订阅费，用自己的服务器，搭一个完全属于团队的旅行规划平台。</div>
+  </section>
+
+  <!-- VALUE BANNER: 4 Core Pillars -->
+  <section class="value-grid">
+    <div class="value-item">
+      <div class="value-icon">👥</div>
+      <h4>多人实时协作</h4>
+      <p>WebSocket 实时同步，任何人更改瞬间同步给所有成员</p>
+    </div>
+    <div class="value-item">
+      <div class="value-icon">🗺️</div>
+      <h4>互动式地图规划</h4>
+      <p>Leaflet / Mapbox GL，地点直接在地图上标记和连线</p>
+    </div>
+    <div class="value-item">
+      <div class="value-icon">💰</div>
+      <h4>智能行程管理</h4>
+      <p>拖拽排序，自动计算并拆分旅行花费，支持多币种</p>
+    </div>
+    <div class="value-item">
+      <div class="value-icon">🧳</div>
+      <h4>一站式出行准备</h4>
+      <p>打包清单、文档附件、行程 PDF 导出，出发前一步到位</p>
+    </div>
+  </section>
+
+  <!-- FOUR FEATURE MODULES -->
+  <section class="feat-section">
+    <div class="feat-head">
+      <div class="feat-badge">FEATURES</div>
+      <h2>四大核心功能模块</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-icon">⚡</div>
+        <h4>实时同步协作</h4>
+        <p>基于 WebSocket 的实时同步，团队成员任何更改瞬间同步到所有人。支持邀请链接（一次性/可复用/带过期时间）、角色权限管理。</p>
+        <span class="tech-tag">WebSocket · OIDC · 2FA · Passkeys</span>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🗺️</div>
+        <h4>互动式地图规划</h4>
+        <p>Leaflet 或 Mapbox GL（可选），支持 3D 建筑、地形图、照片标记、点聚合、路线可视化。地点搜索支持 Google Places 或 OpenStreetMap（免费无需 API Key）。</p>
+        <span class="tech-tag">Leaflet · Mapbox GL · OSM · GPX/KML</span>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">📅💰</div>
+        <h4>智能行程与财务管理</h4>
+        <p>拖拽式日计划排列，支持跨天移动，路线自动优化。花费模块支持 Splitwise 风格拆分：按人/按天统计、多币种、结算追踪。</p>
+        <span class="tech-tag">Drag & Drop · Multi-currency · Splitwise-style</span>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">📦</div>
+        <h4>一站式出行准备</h4>
+        <p>打包清单支持模板、成员分配、行李称重（iOS 风格）。文档管理支持附件上传（≤ 50MB）。PDF 导出完整行程封面、景点图片和笔记。</p>
+        <span class="tech-tag">Packing Lists · PDF Export · Document Manager</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH STACK -->
+  <section class="tech-section">
+    <div class="tech-left">
+      <div class="tech-head">
+        <div class="tech-badge">STACK</div>
+        <h2>技术架构</h2>
+      </div>
+      <div class="tech-stack">
+        <div class="tech-item">
+          <div class="icon">🦅</div>
+          <div class="name">NestJS 11</div>
+          <div class="role">后端框架</div>
+        </div>
+        <div class="tech-item">
+          <div class="icon">⚛️</div>
+          <div class="name">React 19</div>
+          <div class="role">前端框架</div>
+        </div>
+        <div class="tech-item">
+          <div class="icon">🟢</div>
+          <div class="name">Node.js 22</div>
+          <div class="role">运行时</div>
+        </div>
+        <div class="tech-item">
+          <div class="icon">⚡</div>
+          <div class="name">Vite</div>
+          <div class="role">构建工具</div>
+        </div>
+        <div class="tech-item">
+          <div class="icon">🗄️</div>
+          <div class="name">SQLite</div>
+          <div class="role">数据库</div>
+        </div>
+        <div class="tech-item">
+          <div class="icon">🔌</div>
+          <div class="name">MCP / OAuth 2.1</div>
+          <div class="role">AI 集成</div>
+        </div>
+      </div>
+    </div>
+    <div class="tech-meta">
+      <div class="tech-meta-item">
+        <div class="k">前端</div>
+        <div class="v">React 19 + Vite · PWA · Service Worker 离线支持 · 20 种语言</div>
+      </div>
+      <div class="tech-meta-item">
+        <div class="k">后端</div>
+        <div class="v">NestJS 11 · TypeScript · WebSocket · OIDC/SSO · SMTP 邮件通知</div>
+      </div>
+      <div class="tech-meta-item">
+        <div class="k">地图</div>
+        <div class="v">Leaflet（免费/OSM）或 Mapbox GL（可选/API Key）</div>
+      </div>
+      <div class="tech-meta-item">
+        <div class="k">部署</div>
+        <div class="v">Docker 单命令启动 · Docker Compose · Helm / Kubernetes</div>
+      </div>
+      <div class="tech-meta-item">
+        <div class="k">安全</div>
+        <div class="v">TOTP 2FA · Backup Codes · Passkeys (WebAuthn) · AES 加密</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUDIENCE -->
+  <section class="audience-section">
+    <div class="audience-head">
+      <div class="audience-badge">AUDIENCE</div>
+      <h2>适用人群</h2>
+    </div>
+    <div class="audience-grid">
+      <div class="audience-card">
+        <div class="icon">👨‍👩‍👧‍👦</div>
+        <h4>团队出行</h4>
+        <p>多成员旅行需要实时同步计划、分配任务、统一记账。邀请链接 + 角色权限让管理轻松。</p>
+      </div>
+      <div class="audience-card">
+        <div class="icon">🛠️</div>
+        <h4>深度定制需求的技术玩家</h4>
+        <p>不满足于收费 App 限制，想要自己的域名、自己的数据、自己的插件系统。Docker 一键部署。</p>
+      </div>
+      <div class="audience-card">
+        <div class="icon">🤖</div>
+        <h4>AI 工作流爱好者</h4>
+        <p>MCP Server 内置 OAuth 2.1 认证，150+ 工具，AI 助手可直接管理行程、打包清单和预算。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOP: HOW TO USE -->
+  <section class="howto">
+    <div class="howto-head">
+      <div class="howto-badge">SOP</div>
+      <h2>30 秒快速上手</h2>
+    </div>
+    <div class="howto-body">
+      <div class="howto-step">
+        <div class="n">①</div>
+        <h4>一键启动 Docker</h4>
+        <p>一条命令拉起完整服务，无需手动配置数据库和依赖。</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">②</div>
+        <h4>创建第一个行程</h4>
+        <p>打开 http://localhost:3000，用种子管理员账号登录，开始规划。</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">③</div>
+        <h4>邀请团队成员</h4>
+        <p>生成邀请链接，设置过期时间和权限，成员打开即加入。</p>
+      </div>
+      <div class="howto-step">
+        <div class="n">④</div>
+        <h4>地图标记 + 规划行程</h4>
+        <p>在地图上标记地点，拖拽排列日计划，追踪花费，导出 PDF 出发。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUICK START CODE -->
+  <section class="code-block">
+    <div class="tag">QUICK START · Docker 单命令启动</div>
+    <pre><span class="comment"># 一行命令启动 TREK（推荐）</span>
+<span class="prompt">$</span> <span class="cmd">ENCRYPTION_KEY=$(openssl rand -hex 32) docker run -d -p 3000:3000 \</span>
+<span class="cmd">  -e ENCRYPTION_KEY=$ENCRYPTION_KEY \</span>
+<span class="cmd">  -v ./data:/app/data -v ./uploads:/app/uploads \</span>
+<span class="cmd">  mauriceboe/trek</span>
+
+<span class="comment"># 访问 http://localhost:3000</span>
+<span class="comment"># 查看初始管理员密码：docker logs trek</span>
+
+<span class="comment"># 生产环境：Docker Compose 部署（含 SMTP / 反向代理）</span>
+<span class="prompt">$</span> <span class="cmd">git clone https://github.com/mauriceboe/TREK.git</span>
+<span class="prompt">$</span> <span class="cmd">cd TREK && docker compose up -d</span>
+
+<span class="comment"># 可选：Helm 部署到 Kubernetes</span>
+<span class="prompt">$</span> <span class="cmd">helm repo add trek https://charts.liketrek.com</span>
+<span class="prompt">$</span> <span class="cmd">helm install trek trek/trek -n trek --create-namespace</span>
+
+<span class="comment"># SSO / OIDC 配置示例（Google / Authentik / Keycloak）</span>
+<span class="key">ADMIN_EMAIL</span>=<span class="val">admin@example.com</span>    <span class="comment"># 管理员邮箱</span>
+<span class="key">OIDC_ISSUER</span>=<span class="val">https://your-idp.com</span>   <span class="comment"># OIDC 提供商地址</span>
+<span class="key">OIDC_CLIENT_ID</span>=<span class="val">trek-client-id</span>    <span class="comment"># OAuth Client ID</span>
+<span class="key">OIDC_CLIENT_SECRET</span>=<span class="val">***</span>      <span class="comment"># OAuth Client Secret</span></pre>
+  </section>
+
+  <!-- ADDONS -->
+  <section class="addon-section">
+    <div class="addon-head">
+      <div class="addon-badge">ADDONS</div>
+      <h2>丰富的可选插件（管理员开关）</h2>
+    </div>
+    <div class="addon-grid">
+      <div class="addon-item">
+        <div class="addon-dot"></div>
+        <div>
+          <div class="name">Journey · 旅行日记</div>
+          <div class="desc">杂志风格日记，支持照片（Immich/Synology）、地图和心情记录</div>
+        </div>
+      </div>
+      <div class="addon-item">
+        <div class="addon-dot"></div>
+        <div>
+          <div class="name">Atlas · 世界地图</div>
+          <div class="desc">足迹地图、愿望清单、旅行统计、连续打卡追踪</div>
+        </div>
+      </div>
+      <div class="addon-item">
+        <div class="addon-dot"></div>
+        <div>
+          <div class="name">Collab · 协作套件</div>
+          <div class="desc">群组聊天、共享笔记、投票、每日签到</div>
+        </div>
+      </div>
+      <div class="addon-item">
+        <div class="addon-dot"></div>
+        <div>
+          <div class="name">Vacay · 假期规划</div>
+          <div class="desc">个人假期规划，100+ 国家节假日，余额结转追踪</div>
+        </div>
+      </div>
+      <div class="addon-item">
+        <div class="addon-dot"></div>
+        <div>
+          <div class="name">AirTrail · 航班同步</div>
+          <div class="desc">连接自托管 AirTrail 实例，自动导入和同步航班到预订</div>
+        </div>
+      </div>
+      <div class="addon-item">
+        <div class="addon-dot"></div>
+        <div>
+          <div class="name">Lists · 打包 & To-do</div>
+          <div class="desc">打包清单 + 待办列表，模板、成员分配、行李称重</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <div class="faq-head">
+      <div class="faq-badge">FAQ</div>
+      <h2>常见问题</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <div class="q">Q: 和 Wanderlog、TripIt 有什么区别？</div>
+        <div class="a">核心区别是完全自托管——你的数据在自己的服务器上，不交月费，不被数据变现。所有功能都是开源的，可以自己修改和扩展。缺点是需要一点运维投入。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 需要自己写代码吗？</div>
+        <div class="a">不需要。Docker 一键启动，开箱即用，有种子管理员账号。如果需要 SSO 集成或插件管理，也只需要配置环境变量，不需要写代码。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 数据存在哪里？安全吗？</div>
+        <div class="a">数据默认存在运行服务器的本地目录（./data），可通过卷挂载自定义路径。支持 TOTP 2FA、Backup Codes、Passkeys（WebAuthn）和 AES 加密存储。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 支持移动端吗？</div>
+        <div class="a">是 PWA（渐进式 Web 应用），可从浏览器直接安装到 iOS/Android 主屏。Service Worker 支持离线缓存，地图瓦片和 API 响应均可离线查看。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 可以不用 API Key 吗？</div>
+        <div class="a">可以。地图支持 OpenStreetMap（免费，无需 API Key）。地点搜索默认用 OSM，如果需要 Google Places 照片/评分/营业时间，再申请 Google API Key。</div>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 可以接入 AI 吗？</div>
+        <div class="a">内置 MCP Server，支持 OAuth 2.1 认证。AI 助手可以创建行程、规划日程、生成打包清单、管理预算。已有预置 prompt：trip-summary、packing-list、budget-overview。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">TREK · Open Source Travel Planner</div>
+      <div class="small">
+        <a href="https://github.com/mauriceboe/TREK">github.com/mauriceboe/TREK</a> ·
+        ★ 9,222 · 🍴 760 · AGPL v3 · 2026-07-05
+      </div>
+    </div>
+    <div class="small">Your trips · Your plan · Your server</div>
+  </footer>
+
+</main>
+<button id="save-btn" class="save" onclick="html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,logging:false,backgroundColor:null}).then(c=>{let a=document.createElement('a');a.download='trek-infocard.png';a.href=c.toDataURL('image/png');a.click()}).catch(e=>alert('Export: '+e))">⬇ 保存 PNG</button>
+</body>
+</html>
