@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LazyCodex · 像 LazyVim 一样用 Codex</title>
+  <meta name="description" content="LazyCodex 是面向复杂代码库的 AI Agent 工具链：将 OmO（oh-my-openagent）打包为 Codex 插件，一行命令安装，提供项目记忆、规划、执行、验证完成全流程支持。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7;--purple:#7c3aed;--purple-soft:#ede9fe}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,44px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:62ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    .chip.purple{background:var(--purple-soft);border-color:var(--purple);color:var(--purple)}
+    /* Hero right: logo/quote area */
+    .hero-visual{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .hero-visual .logo{font-size:32px;margin-bottom:8px}
+    .hero-visual .tagline{font-size:11px;color:#d8e2ff;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    .hero-visual .motto{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:13px;line-height:1.25;letter-spacing:-.02em;color:#fff;margin-top:4px}
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--red) 0%, #991b1b 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12px;line-height:1.62;color:#fdd;margin-top:8px}
+    .banner .note code{background:rgba(0,0,0,.2);padding:2px 6px;border-radius:3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    /* === SECTION HEADERS === */
+    .sec-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .sec-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .sec-badge.blue{background:var(--blue)}
+    .sec-badge.green{background:var(--green)}
+    .sec-badge.yellow{background:var(--yellow)}
+    .sec-badge.dark{background:#111}
+    .sec-badge.purple{background:var(--purple)}
+    h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    /* === INTRO SECTION === */
+    .intro-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .intro-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .intro-card{border:1.5px solid var(--line);padding:12px 14px;display:grid;gap:8px;background:#fff}
+    .intro-card .icon{font-size:20px;line-height:1}
+    .intro-card h3{margin:0;font-size:13px;font-weight:800;line-height:1.3}
+    .intro-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.6}
+    /* === INSTALL SECTION === */
+    .install-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .install-command{background:#1a1a2e;color:#e0e0ff;border:1.5px solid var(--line);padding:12px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.5;margin:10px 0;border-radius:4px}
+    .install-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+    .install-step{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .install-step .num{font:900 18px/1 Georgia,serif;color:var(--blue);margin-bottom:4px}
+    .install-step h4{margin:0 0 4px;font-size:12.5px;font-weight:800;line-height:1.3}
+    .install-step p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    /* === COMMANDS SECTION === */
+    .commands-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .command-table{width:100%;border-collapse:collapse;margin-top:10px}
+    .command-table th{background:#111;color:#fff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;text-align:left;border:1.5px solid var(--line)}
+    .command-table td{padding:8px 10px;border:1.5px solid rgba(17,17,17,.18);background:#fff;font-size:12px;vertical-align:top}
+    .command-table tr:nth-child(even) td{background:#faf7f0}
+    .command-table .cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:var(--purple)}
+    .command-table .cmd-name{background:var(--purple-soft);border:1.5px solid var(--purple);color:var(--purple);padding:2px 8px;border-radius:3px;font-weight:700}
+    /* === SKILLS GRID === */
+    .skills-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .skills-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .skill-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:4px}
+    .skill-card .name{font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue)}
+    .skill-card h4{margin:0;font-size:12px;font-weight:800;line-height:1.3}
+    .skill-card p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    /* === ARCHITECTURE === */
+    .arch-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .arch-diagram{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+    .arch-layer{border:1.5px solid var(--line);padding:12px 14px;text-align:center}
+    .arch-layer.top{background:var(--blue-soft);border-color:var(--blue)}
+    .arch-layer.mid{background:var(--purple-soft);border-color:var(--purple)}
+    .arch-layer.bottom{background:var(--green-soft);border-color:var(--green)}
+    .arch-layer h4{margin:0 0 6px;font-size:13px;font-weight:800;line-height:1.2}
+    .arch-layer p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    .arch-layer .tech{display:inline-flex;padding:2px 8px;border:1px solid currentColor;border-radius:3px;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:6px}
+    .arch-layer.top .tech{color:var(--blue);background:#fff}
+    .arch-layer.mid .tech{color:var(--purple);background:#fff}
+    .arch-layer.bottom .tech{color:var(--green);background:#fff}
+    /* === MODEL ROUTING === */
+    .model-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .model-table{width:100%;border-collapse:collapse;margin-top:10px}
+    .model-table th{background:#111;color:#fff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;text-align:left;border:1.5px solid var(--line)}
+    .model-table td{padding:8px 10px;border:1.5px solid rgba(17,17,17,.18);background:#fff;font-size:12px;vertical-align:top}
+    .model-table .model-chip{display:inline-flex;padding:2px 8px;border:1.5px solid var(--line);font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .model-chip.frontier{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .model-chip.codex{background:var(--purple-soft);border-color:var(--purple);color:var(--purple)}
+    .model-chip.efficient{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    /* === SUB AGENTS === */
+    .agents-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .agents-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .agent-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:4px}
+    .agent-card .role{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:3px;width:fit-content;background:var(--blue-soft);color:var(--blue);border-color:var(--blue)}
+    .agent-card h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .agent-card p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    /* === COMPARISON === */
+    .compare-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .compare-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .compare-card{border:1.5px solid var(--line);padding:12px 14px;display:grid;gap:8px}
+    .compare-card.omo{background:var(--purple-soft);border-color:var(--purple)}
+    .compare-card.vs{background:#f0f0f0;border-color:#999;align-items:center;text-align:center}
+    .compare-card.trad{background:var(--blue-soft);border-color:var(--blue)}
+    .compare-card h3{margin:0;font-size:14px;font-weight:800;line-height:1.2}
+    .compare-card .vs-text{font:900 24px/1 Georgia,serif;color:#666}
+    .compare-card p{margin:0;font-size:11.5px;line-height:1.6}
+    .compare-card.omo p{color:var(--purple)}
+    .compare-card.trad p{color:var(--blue)}
+    /* === STATS === */
+    .stats-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .stat-card{border:1.5px solid var(--line);padding:12px 14px;text-align:center;background:#fff}
+    .stat-card .num{font:900 28px/1 Georgia,serif;color:var(--red)}
+    .stat-card .label{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:4px}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:12px 14px 10px;color:var(--muted);font-size:12px;line-height:1.6}
+    .footer .brand{font-weight:800;color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:14px}
+    .footer .small{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    .footer .small a{color:var(--blue)}
+    .save{display:block;width:fit-content;position:static;margin:12px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--red),#991b1b);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(153,27,27,.3);cursor:pointer}
+    /* === RESPONSIVE === */
+    @media(max-width:960px){
+      .hero,.intro-grid,.install-steps,.arch-diagram,.agents-grid,.compare-grid,.stats-grid,.skills-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:10px 0 72px}
+      .hero,.banner,.footer{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(22px,8vw,32px)}
+      .banner .quote{font-size:16px}
+      .command-table,.model-table{display:block;overflow-x:auto}
+      .footer{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">LAZYCODEX · AGENT HARNESS · CODEX PLUGIN · OMO DISTRIBUTION</div>
+        <div class="source">github.com/code-yeongyu/lazycodex</div>
+      </div>
+      <h1>LazyCodex</h1>
+      <p class="subtitle">像 <strong>LazyVim</strong> 一样用 <strong>Codex</strong>——将 OmO（oh-my-openagent）打包为 Codex 插件，一行命令完成复杂代码库的 AI Agent 编排。</p>
+      <div class="meta-row">
+        <span class="chip blue">TypeScript</span>
+        <span class="chip green">MIT</span>
+        <span class="chip purple">OmO 集成</span>
+        <span class="chip yellow">npx 一键安装</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="logo">⚡</div>
+      <div class="motto">"LazyVim made Neovim usable.<br/>LazyCodex does the same for Codex."</div>
+      <div class="tagline">零配置 · 项目记忆 · 规划执行 · 验证完成</div>
+    </div>
+  </section>
+
+  <!-- BANNER -->
+  <section class="banner">
+    <div class="quote">「OmO 60K Stars 已入驻 LazyCodex——Sisyphus Labs 的质量狂魔 now for Codex」</div>
+    <div class="note">安装命令：<code>npx lazycodex-ai install</code> · 验证：<code>npx lazycodex-ai doctor</code> · 文档：<a href="https://lazycodex.ai/docs" style="color:#fff;text-decoration:underline">lazycodex.ai/docs</a></div>
+  </section>
+
+  <!-- STATS -->
+  <section class="stats-section">
+    <div class="sec-head">
+      <div class="sec-badge dark">METRICS</div>
+      <h2>项目数据</h2>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="num">2,477</div>
+        <div class="label">GitHub Stars</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">155</div>
+        <div class="label">Forks</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">14</div>
+        <div class="label">Topics</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">2026-05</div>
+        <div class="label">Created</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INTRO -->
+  <section class="intro-section">
+    <div class="sec-head">
+      <div class="sec-badge">WHAT</div>
+      <h2>这是什么</h2>
+    </div>
+    <div class="intro-grid">
+      <div class="intro-card">
+        <div class="icon">🎯</div>
+        <h3>Agent Harness</h3>
+        <p>LazyCodex 将 OmO（oh-my-openagent）打包为 Codex 插件，提供完整的 AI Agent 编排能力：项目记忆、规划、执行、验证完成。</p>
+      </div>
+      <div class="intro-card">
+        <div class="icon">⚡</div>
+        <h3>零配置体验</h3>
+        <p>一行命令安装，无需全局 npm，没有复杂配置。始终使用 npx，始终保持最新。</p>
+      </div>
+      <div class="intro-card">
+        <div class="icon">🔧</div>
+        <h3>技能系统</h3>
+        <p>内置丰富的技能库：代码审查、AI 残留清理、UI/UX、严格编程规范、LSP、AST 结构搜索等。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section class="install-section">
+    <div class="sec-head">
+      <div class="sec-badge blue">INSTALL</div>
+      <h2>安装方式</h2>
+    </div>
+    <div class="install-command">npx lazycodex-ai install</div>
+    <div class="install-steps">
+      <div class="install-step">
+        <div class="num">1</div>
+        <h4>标准安装</h4>
+        <p>使用 npx 一键安装，自动配置插件、hooks、MCP 服务器。</p>
+      </div>
+      <div class="install-step">
+        <div class="num">2</div>
+        <h4>完全自主模式</h4>
+        <p><code>npx lazycodex-ai install --no-tui --codex-autonomous</code></p>
+      </div>
+      <div class="install-step">
+        <div class="num">3</div>
+        <h4>Codex 市场安装</h4>
+        <p>在 Codex 中输入 <code>/plugins</code>，添加市场 <code>https://github.com/code-yeongyu/lazycodex</code></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMMANDS -->
+  <section class="commands-section">
+    <div class="sec-head">
+      <div class="sec-badge purple">COMMANDS</div>
+      <h2>核心命令（以 $ 开头调用）</h2>
+    </div>
+    <table class="command-table">
+      <thead>
+        <tr>
+          <th style="width:100px">命令</th>
+          <th>语法</th>
+          <th>功能</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="cmd-name">$init-deep</span></td>
+          <td><span class="cmd">$init-deep</span></td>
+          <td>生成层次化项目记忆（AGENTS.md），为未来 Agent 提供代码地标。</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">$ulw-plan</span></td>
+          <td><span class="cmd">$ulw-plan "要构建的内容"</span></td>
+          <td>Prometheus 战略规划器，将计划写入 <code>plans/&lt;slug&gt;.md</code>，不触碰产品代码。</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">$start-work</span></td>
+          <td><span class="cmd">$start-work [plan-name] [--worktree &lt;path&gt;]</span></td>
+          <td>执行计划直到每个复选框完成，打印 <strong>ORCHESTRATION COMPLETE</strong>。</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">$ulw-loop</span></td>
+          <td><span class="cmd">$ulw-loop "任务" [--completion-promise=TEXT] [--strategy=reset|continue]</span></td>
+          <td>自引用循环，直到 Oracle 验证完成。Ultrawork 模式上限 500 次，普通模式 100 次。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SKILLS -->
+  <section class="skills-section">
+    <div class="sec-head">
+      <div class="sec-badge green">SKILLS</div>
+      <h2>内置技能库</h2>
+    </div>
+    <div class="skills-grid">
+      <div class="skill-card">
+        <div class="name">$init-deep</div>
+        <h4>项目记忆</h4>
+        <p>生成 AGENTS.md 层次化上下文</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">$ulw-plan</div>
+        <h4>战略规划</h4>
+        <p>决策完整的计划文档</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">$start-work</div>
+        <h4>计划执行</h4>
+        <p>Boulder 进度追踪执行</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">$ulw-loop</div>
+        <h4>验证循环</h4>
+        <p>证据驱动的完成验证</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">review-work</div>
+        <h4>多角度审查</h4>
+        <p>实现后多角度复盘</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">remove-ai-slops</div>
+        <h4>AI 残留清理</h4>
+        <p>行为保留的 AI 代码清理</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">frontend-ui-ux</div>
+        <h4>UI/UX 技能</h4>
+        <p>精致的界面表面处理</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">programming</div>
+        <h4>严格编程</h4>
+        <p>TS/Rust/Python/Go 规范</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">LSP</div>
+        <h4>语言服务</h4>
+        <p>诊断/定义/引用/符号/重命名</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">AST-grep</div>
+        <h4>结构搜索</h4>
+        <p>跨代码结构搜索和重写</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">rules</div>
+        <h4>规则系统</h4>
+        <p>AGENTS/规则/指令文件</p>
+      </div>
+      <div class="skill-card">
+        <div class="name">comment-checker</div>
+        <h4>注释检查</h4>
+        <p>编辑后反馈</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODEL ROUTING -->
+  <section class="model-section">
+    <div class="sec-head">
+      <div class="sec-badge yellow">MODEL ROUTING</div>
+      <h2>多模型智能路由</h2>
+    </div>
+    <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">OmO 不盲目使用最强模型。根据任务类型自动选择最合适的模型，实现配额纪律。</p>
+    <table class="model-table">
+      <thead>
+        <tr>
+          <th>模型</th>
+          <th>定位</th>
+          <th>适用场景</th>
+          <th>成本</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="model-chip frontier">GPT-5.2 (xhigh)</span></td>
+          <td>前沿推理</td>
+          <td>复杂逻辑、深度推理、代码审查、bug 发现</td>
+          <td>💰💰💰</td>
+        </tr>
+        <tr>
+          <td><span class="model-chip codex">GPT-5.3-Codex</span></td>
+          <td>Codex 优化</td>
+          <td>SWE-Bench Pro、Terminal-Bench 2.0、OSWorld 验证任务</td>
+          <td>💰💰</td>
+        </tr>
+        <tr>
+          <td><span class="model-chip efficient">GPT-5.4-mini</span></td>
+          <td>高效日常</td>
+          <td>小型编辑、计算机使用、子 Agent 任务</td>
+          <td>💰</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SUB AGENTS -->
+  <section class="agents-section">
+    <div class="sec-head">
+      <div class="sec-badge">SUB-AGENTS</div>
+      <h2>子 Agent 角色</h2>
+    </div>
+    <p style="margin:0 0 12px;font-size:12px;color:var(--muted)">LazyCodex 安装可选择的 Agent 角色到 <code>~/.codex/agents/</code>，通过 <code>spawn_agent</code> 工具的 <code>agent_type</code> 参数选择。</p>
+    <div class="agents-grid">
+      <div class="agent-card">
+        <span class="role">Explorer</span>
+        <h4>探索者</h4>
+        <p>探索代码库结构，理解架构和依赖关系</p>
+      </div>
+      <div class="agent-card">
+        <span class="role">Librarian</span>
+        <h4>图书馆员</h4>
+        <p>管理和组织项目文档、知识库</p>
+      </div>
+      <div class="agent-card">
+        <span class="role">Plan</span>
+        <h4>规划师</h4>
+        <p>制定任务计划，分解复杂工作</p>
+      </div>
+      <div class="agent-card">
+        <span class="role">Momus</span>
+        <h4>评审者</h4>
+        <p>代码审查和质量评估</p>
+      </div>
+      <div class="agent-card">
+        <span class="role">Metis</span>
+        <h4>策略师</h4>
+        <p>复杂问题分析和策略制定</p>
+      </div>
+      <div class="agent-card">
+        <span class="role">Codex-Ultrawork</span>
+        <h4>超工作审查</h4>
+        <p>Ultrawork 模式下的质量保障</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section class="arch-section">
+    <div class="sec-head">
+      <div class="sec-badge blue">ARCHITECTURE</div>
+      <h2>架构设计</h2>
+    </div>
+    <div class="arch-diagram">
+      <div class="arch-layer top">
+        <h4>用户界面</h4>
+        <p>Codex CLI / Web UI<br/>OmO Commands ($command)</p>
+        <span class="tech">Codex Plugin API</span>
+      </div>
+      <div class="arch-layer mid">
+        <h4>LazyCodex 分发层</h4>
+        <p>插件安装 / Hooks / MCP 配置<br/>Agent 角色 / 技能路由</p>
+        <span class="tech">TypeScript + Node</span>
+      </div>
+      <div class="arch-layer bottom">
+        <h4>OmO 核心引擎</h4>
+        <p>Sisyphus 编排 / 多模型路由<br/>验证完成 / 技能系统</p>
+        <span class="tech">oh-my-openagent</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARISON -->
+  <section class="compare-section">
+    <div class="sec-head">
+      <div class="sec-badge dark">VS VANILLA</div>
+      <h2>对比纯 Codex</h2>
+    </div>
+    <div class="compare-grid">
+      <div class="compare-card omo">
+        <h3>🧠 LazyCodex + OmO</h3>
+        <p>项目记忆生成 · 战略规划 · 计划执行 · 验证完成循环 · 多模型智能路由 · 内置技能库 · 子 Agent 角色 · AI 残留清理</p>
+      </div>
+      <div class="compare-card vs">
+        <div class="vs-text">VS</div>
+      </div>
+      <div class="compare-card trad">
+        <h3>📦 Vanilla Codex</h3>
+        <p>基础对话 · 简单编辑 · 单模型使用 · 手动验证结果 · 无结构化规划 · 无项目上下文</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">LazyCodex</div>
+      <div class="small">
+        MIT License · by <a href="https://github.com/code-yeongyu">Jobdori</a> · Part of <a href="https://omo.dev">omo.dev</a>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div class="small">
+        <a href="https://github.com/code-yeongyu/lazycodex">GitHub</a> · 
+        <a href="https://lazycodex.ai">lazycodex.ai</a> · 
+        <a href="https://lazycodex.ai/docs">Docs</a>
+      </div>
+      <div class="small" style="margin-top:4px">⭐ 2,477 · Fork 155 · 2026-05</div>
+    </div>
+  </footer>
+
+  <button class="save" onclick="window.print()">📥 保存 / 打印</button>
+
+</main>
+<script>
+  document.querySelector('.save').addEventListener('click', () => {
+    html2canvas(document.body, { scale: 2, useCORS: true }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'lazycodex-infocard.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  });
+</script>
+</body>
+</html>
