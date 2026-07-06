@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Superpowers v6 · 多Agent架构成本优化深度拆解</title>
+  <meta name="description" content="Superpowers v6 深度分析：Fable 用 AI 审计 AI 工作流，跑 25 个实验将运行时间降 50%、Token 成本降 60%。三大策略：确定性物料脚本化、审查角色合并、模型分层路由。以及三个反向恶化的负面实验。AI 编程已从模型选择题变成硬核流程工程问题。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{--bg:#f4efe8;--paper:#fffdf8;--ink:#111111;--muted:#5f584f;--line:#1b1713;--blue:#244a9c;--blue-soft:#e9f0ff;--red:#cc0000;--red-soft:#fee8e8;--red-dark:#8b0000;--shadow:7px 7px 0 rgba(17,17,17,.12);--green:#15803d;--green-soft:#eefbf1;--yellow:#b45309;--yellow-soft:#fef3c7}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.62;position:relative}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);mix-blend-mode:multiply;opacity:.55}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:14px 0 88px;position:relative;z-index:1}
+    /* === HERO === */
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.5fr);gap:14px}
+    .hero-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px}
+    .kicker{font:700 10.5px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+    h1{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(22px,5vw,44px);line-height:.95;letter-spacing:-.03em}
+    .subtitle{margin:0;font-size:13.5px;line-height:1.72;color:#3f3932;max-width:62ch}
+    .subtitle strong{color:var(--red)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1.5px solid var(--line);background:#fff;font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.red{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    .chip.green{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .chip.yellow{background:var(--yellow-soft);border-color:var(--yellow);color:var(--yellow)}
+    /* Hero right: mission quote */
+    .mission{background:#111;color:#fff;border:2px solid #111;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:14px;text-align:center;min-width:0}
+    .mission .big{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:15px;line-height:1.25;letter-spacing:-.02em;color:#fff}
+    .mission .en{font-size:10px;color:#8b9bbf;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+    .mission .tagline{font-size:11px;color:#d8e2ff;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);line-height:1.6}
+    /* === BANNER === */
+    .banner{background:linear-gradient(135deg,var(--red) 0%, #991b1b 100%);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:13px 16px 11px;margin-bottom:12px}
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:18px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:72ch;font-size:12px;line-height:1.62;color:#fdd;margin-top:8px}
+    /* === SECTION HEADERS === */
+    .sec-head{margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+    .sec-badge{background:var(--red);color:#fff;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+    .sec-badge.blue{background:var(--blue)}
+    .sec-badge.green{background:var(--green)}
+    .sec-badge.yellow{background:var(--yellow)}
+    .sec-badge.dark{background:#111}
+    h2{margin:0;font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;line-height:1.1;letter-spacing:-.02em}
+    /* === CHALLENGE GRID === */
+    .challenge-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .challenge-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .challenge-card{border:1.5px solid var(--line);padding:12px 14px;display:grid;gap:8px}
+    .challenge-card.wrong{background:var(--red-soft);border-color:var(--red)}
+    .challenge-card.right{background:var(--green-soft);border-color:var(--green)}
+    .challenge-label{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:3px;width:fit-content}
+    .challenge-label.wrong{background:var(--red);color:#fff}
+    .challenge-label.right{background:var(--green);color:#fff}
+    .challenge-card h3{margin:0;font-size:13px;font-weight:800;line-height:1.3}
+    .challenge-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.6}
+    /* === FLOW SECTION === */
+    .flow-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .flow-table{width:100%;border-collapse:collapse}
+    .flow-table th{background:#111;color:#fff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;text-align:left;border:1.5px solid var(--line)}
+    .flow-table td{padding:8px 10px;border:1.5px solid rgba(17,17,17,.18);background:#fff;font-size:12px;vertical-align:top}
+    .flow-table tr:nth-child(even) td{background:#faf7f0}
+    .flow-table td:first-child{font-weight:800;color:var(--blue);white-space:nowrap;width:60px;text-align:center}
+    .flow-table .role-tag{display:inline-flex;padding:2px 7px;border:1.5px solid var(--line);background:#f4f0e8;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:3px}
+    /* === STRATEGY SECTIONS === */
+    .strategy-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .strategy-header{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+    .strategy-num{width:28px;height:28px;background:var(--red);color:#fff;font:900 13px/1;display:grid;place-items:center;border-radius:50%;flex-shrink:0}
+    .strategy-title-wrap h3{margin:0 0 2px;font-size:14px;font-weight:800;line-height:1.2}
+    .strategy-title-wrap .sub{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    .strategy-title-wrap .gain{display:inline-flex;padding:2px 8px;border:1.5px solid var(--green);background:var(--green-soft);color:#14532d;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-left:8px;vertical-align:middle}
+    .strategy-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .strategy-card{border:1.5px solid var(--line);padding:10px 12px;background:#fff;display:grid;gap:6px}
+    .strategy-card .label{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--blue)}
+    .strategy-card h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .strategy-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    .strategy-card .highlight{background:var(--yellow-soft);border:1.5px solid var(--yellow);padding:6px 8px;font-size:11px;line-height:1.5;color:var(--yellow)}
+    /* === MODEL ROUTING TABLE === */
+    .routing-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .routing-table{width:100%;border-collapse:collapse;margin-top:10px}
+    .routing-table th{background:#111;color:#fff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;text-align:left;border:1.5px solid var(--line)}
+    .routing-table td{padding:8px 10px;border:1.5px solid rgba(17,17,17,.18);background:#fff;font-size:12px;vertical-align:top}
+    .routing-table .model-chip{display:inline-flex;padding:2px 8px;border:1.5px solid var(--line);font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .routing-table .model-chip.cheap{background:var(--green-soft);border-color:var(--green);color:#14532d}
+    .routing-table .model-chip.expensive{background:var(--red-soft);border-color:var(--red);color:var(--red-dark)}
+    /* === NEGATIVE EXPERIMENTS === */
+    .neg-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .neg-header{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+    .neg-header h2{color:var(--red-dark)}
+    .neg-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .neg-card{border:2px solid var(--red);padding:10px 12px;background:var(--red-soft);display:grid;gap:6px}
+    .neg-card .warn{display:flex;align-items:center;gap:6px}
+    .neg-card .warn-icon{font-size:16px;line-height:1}
+    .neg-card .warn-tag{background:var(--red);color:#fff;font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:2px 7px;border-radius:3px}
+    .neg-card h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3;color:var(--red-dark)}
+    .neg-card .result{font-size:11.5px;font-weight:700;color:var(--red)}
+    .neg-card p{margin:0;font-size:11.5px;color:#5f584f;line-height:1.55}
+    /* === INSIGHTS === */
+    .insight-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .insight-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .insight-card{border:1.5px solid var(--line);padding:12px 14px;background:#fff;display:grid;gap:6px}
+    .insight-card .num{font:900 22px/1 Georgia,"Times New Roman",serif;color:var(--blue)}
+    .insight-card h4{margin:0;font-size:12.5px;font-weight:800;line-height:1.3}
+    .insight-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === INTERACTIVE === */
+    .interactive-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+    .interactive-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .interactive-card{border:1.5px solid var(--line);padding:12px 14px;background:#fff;display:grid;gap:6px}
+    .interactive-card h4{margin:0;font-size:13px;font-weight:800;line-height:1.3}
+    .interactive-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.55}
+    /* === FAQ === */
+    .faq-section{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:12px;padding:14px 16px}
+    .faq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .faq-item{border:1.5px solid var(--line);padding:10px 12px;background:#fff}
+    .faq-item .q{font-size:12.5px;font-weight:800;line-height:1.4;margin-bottom:5px}
+    .faq-item .a{font-size:11.5px;color:var(--muted);line-height:1.6;margin:0}
+    /* === FOOTER === */
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:12px 14px 10px;color:var(--muted);font-size:12px;line-height:1.6}
+    .footer .brand{font-weight:800;color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:14px}
+    .footer .small{font:700 10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    .footer .small a{color:var(--blue)}
+    .save{display:block;width:fit-content;position:static;margin:12px 0 0 auto;z-index:1;border:0;border-radius:10px;padding:11px 14px;background:linear-gradient(135deg,var(--red),#991b1b);color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;box-shadow:0 10px 24px rgba(153,27,27,.3);cursor:pointer}
+    /* === RESPONSIVE === */
+    @media(max-width:960px){
+      .hero,.challenge-grid,.strategy-body,.neg-grid,.insight-grid,.interactive-grid,.faq-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 14px,1180px);padding:10px 0 72px}
+      .hero,.banner,.footer{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(22px,8vw,32px)}
+      .banner .quote{font-size:16px}
+      .flow-table{display:block;overflow-x:auto}
+      .footer{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">SUPERPOWERS V6 · MULTI-AGENT · COST OPTIMIZATION · 25 EXPERIMENTS</div>
+        <div class="source">blog.fsck.com · Fable</div>
+      </div>
+      <h1>Superpowers v6</h1>
+      <p class="subtitle">多 Agent 架构成本优化深度拆解 — Fable 让 AI 审计 AI 工作流本身，跑 <strong>25 个实验</strong>，最终将运行时间降 <strong>50%</strong>、Token 成本降 <strong>60%</strong></p>
+      <div class="meta-row">
+        <span class="chip red">Multi-Agent</span>
+        <span class="chip blue">Cost Optimization</span>
+        <span class="chip green">Harness Engineering</span>
+        <span class="chip">Fable</span>
+        <span class="chip yellow">25 Experiments</span>
+        <span class="chip">Claude Code</span>
+      </div>
+    </div>
+    <div class="mission">
+      <div class="big">用 AI 审计<br>AI 工作流本身</div>
+      <div class="en">Audit your AI workflow with AI</div>
+      <div class="tagline">-50% 运行时间<br>-60% Token 成本</div>
+    </div>
+  </section>
+
+  <!-- CORE BANNER -->
+  <section class="banner">
+    <div class="quote">"AI 编程的真正瓶颈不是模型价格，而是流程中上下文在 Agent 交接时的重复流动"</div>
+    <div class="note">来源：Fable 团队跑完 25 个实验后的核心发现——上下文复用比模型选型更值得优化</div>
+  </section>
+
+  <!-- CHALLENGE: MYTH VS TRUTH -->
+  <section class="challenge-section">
+    <div class="sec-head">
+      <div class="sec-badge dark">BACKGROUND</div>
+      <h2>背景挑战：成本优化的真正来源</h2>
+    </div>
+    <div class="challenge-grid">
+      <div class="challenge-card wrong">
+        <div class="challenge-label wrong">❌ 传统误区</div>
+        <h3>AI 编程贵 = 模型单价贵</h3>
+        <p>认为只要换用更便宜的模型，或等待模型降价，就能解决 AI 编程成本问题。</p>
+      </div>
+      <div class="challenge-card right">
+        <div class="challenge-label right">✓ 核心真相</div>
+        <h3>成本堆积在流程设计里</h3>
+        <p>Agent 交接时反复读取并加载相同庞大上下文（git diff、终端输出），后续每步都挂在上下文里持续计费。单次推理便宜，但流程重复搬运才是无底洞。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SYSTEM FLOW -->
+  <section class="flow-section">
+    <div class="sec-head">
+      <div class="sec-badge blue">WORKFLOW</div>
+      <h2>系统基础流程：5 阶段卡片流</h2>
+    </div>
+    <table class="flow-table">
+      <thead>
+        <tr>
+          <th>阶段</th>
+          <th>角色</th>
+          <th>核心动作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>①</td>
+          <td><span class="role-tag">Brainstorming Agent</span></td>
+          <td>追问目标 / 边界 / 风险 / 验收，形成设计文档</td>
+        </tr>
+        <tr>
+          <td>②</td>
+          <td><span class="role-tag">—</span></td>
+          <td>git worktrees 隔离环境，初始化脚本，建基线测试</td>
+        </tr>
+        <tr>
+          <td>③</td>
+          <td><span class="role-tag">—</span></td>
+          <td>编写含文件路径 / 接口测试 / 命令 / 预期结果的 Plan，每步 2-5 分钟微动作</td>
+        </tr>
+        <tr>
+          <td>④</td>
+          <td><span class="role-tag">Controller + Subagent</span></td>
+          <td>TDD 红-绿-重构，Controller 派发上下文受限的 Subagent</td>
+        </tr>
+        <tr>
+          <td>⑤</td>
+          <td><span class="role-tag">Task Reviewer</span></td>
+          <td>Spec compliance + Code quality 双轨审查，分支 / PR 完整测试</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- STRATEGY 1 -->
+  <section class="strategy-section">
+    <div class="strategy-header">
+      <div class="strategy-num">1</div>
+      <div class="strategy-title-wrap">
+        <h3>确定性物料脚本化</h3>
+        <div class="sub">Script deterministic artifacts — 禁止模型用上下文窗口现查确定性信息</div>
+      </div>
+      <div class="gain">↑50% 提速 · -10% Token</div>
+    </div>
+    <div class="strategy-body">
+      <div class="strategy-card">
+        <div class="label">PROBLEM</div>
+        <h4>上下文携带终端输出</h4>
+        <p>Reviewer 在上下文内自主运行 git log/diff，庞大的终端输出被后续对话反复携带，每次都重新计费。</p>
+      </div>
+      <div class="strategy-card">
+        <div class="label">SOLUTION</div>
+        <h4>脚本预生成 Review Package</h4>
+        <p>脚本自动生成 review package（含 commit list、变更统计、上下文 diff），Reviewer 只读文件路径，禁止大模型用上下文窗口现查确定性信息。</p>
+      </div>
+      <div class="strategy-card">
+        <div class="label">DERIVATIVE</div>
+        <h4>Task Brief 机制</h4>
+        <p>Controller 不反复喂完整 Plan，脚本抽成简短 brief 文件供 Subagent 读取。减少重复传输，Subagent 按需主动拉取。</p>
+        <div class="highlight">关键原则：确定性信息 → 脚本预生成；Agent 只读文件路径，不现查</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STRATEGY 2 -->
+  <section class="strategy-section">
+    <div class="strategy-header">
+      <div class="strategy-num">2</div>
+      <div class="strategy-title-wrap">
+        <h3>审查角色合并 + 边界防爆</h3>
+        <div class="sub">Merge reviewer roles + enforce task boundary with cannot-verify warnings</div>
+      </div>
+      <div class="gain">单次 Diff 读两遍 → 一遍搞定</div>
+    </div>
+    <div class="strategy-body">
+      <div class="strategy-card">
+        <div class="label">BEFORE</div>
+        <h4>Spec Reviewer + Quality Reviewer 分立</h4>
+        <p>两个独立 Reviewer 分别读 Diff，各跑各的推理轮次，重复计算翻倍。</p>
+      </div>
+      <div class="strategy-card">
+        <div class="label">AFTER</div>
+        <h4>合并为 Task Reviewer</h4>
+        <p>读一次 Diff 同时返回 Spec 合规 + Code Quality 两个裁决，减少一次完整 Diff 读取。</p>
+      </div>
+      <div class="strategy-card">
+        <div class="label">INNOVATION</div>
+        <h4>"Cannot verify from diff" 警告状态</h4>
+        <p>需求跨越多任务时，Reviewer 主动承认"看不见"，标为警告交由 Controller 裁决，维护任务边界，防止越界扩散。</p>
+        <div class="highlight">诚实承认盲区，比假装能看见更能守住边界</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STRATEGY 3 -->
+  <section class="strategy-section">
+    <div class="strategy-header">
+      <div class="strategy-num">3</div>
+      <div class="strategy-title-wrap">
+        <h3>模型按任务形态分层路由</h3>
+        <div class="sub">Route models by task shape — 机械执行用便宜模型，判断密集用高阶模型</div>
+      </div>
+      <div class="gain">按需选模型</div>
+    </div>
+    <div class="strategy-body">
+      <div class="strategy-card">
+        <div class="label">机械执行型</div>
+        <h4>Plan 已完整，仅转写 / 跑测试 / 修小错</h4>
+        <p>不需要推理判断，只是按指令执行已知步骤，用低成本便宜模型。</p>
+      </div>
+      <div class="strategy-card">
+        <div class="label">判断密集型</div>
+        <h4>多步推理 / 架构边界 / 跨文件契约 / Plan / Review</h4>
+        <p>需要强推理能力、跨模块判断、架构级决策，用高阶闭源模型。</p>
+      </div>
+      <div class="strategy-card">
+        <div class="label">ENGINEERING RULE</div>
+        <h4>每次 Dispatch 必须显式声明 Model</h4>
+        <p>防止 Harness 默认继承最贵模型——即使选错了便宜模型，也能快速回退；但若默认用贵模型，每轮都多付钱。</p>
+        <div class="highlight">模型声明 = 成本感知的第一步</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODEL ROUTING TABLE -->
+  <section class="routing-section">
+    <div class="sec-head">
+      <div class="sec-badge yellow">MODEL ROUTING</div>
+      <h2>模型分层路由矩阵</h2>
+    </div>
+    <table class="routing-table">
+      <thead>
+        <tr>
+          <th>任务类型</th>
+          <th>特征</th>
+          <th>推荐模型层级</th>
+          <th>示例场景</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>机械执行型</td>
+          <td>Plan 已完整，仅转写 / 跑命令 / 修小错</td>
+          <td><span class="model-chip cheap">低成本便宜模型</span></td>
+          <td>执行 git 命令、转写注释、补全测试用例</td>
+        </tr>
+        <tr>
+          <td>判断密集型</td>
+          <td>多步推理、架构边界、跨文件契约</td>
+          <td><span class="model-chip expensive">高阶闭源模型</span></td>
+          <td>Plan 编写、架构决策、跨模块 Review</td>
+        </tr>
+        <tr>
+          <td>混合型</td>
+          <td>部分已知部分未知，需要上下文推断</td>
+          <td><span class="model-chip expensive">高阶闭源模型</span></td>
+          <td>Task Reviewer 双轨裁决、边界争议裁决</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- NEGATIVE EXPERIMENTS -->
+  <section class="neg-section">
+    <div class="neg-header">
+      <div class="sec-badge">⚠ NEGATIVE EXPERIMENTS</div>
+      <h2>三个反向恶化的负面实验</h2>
+    </div>
+    <div class="neg-grid">
+      <div class="neg-card">
+        <div class="warn">
+          <span class="warn-icon">🔴</span>
+          <span class="warn-tag">看起来合理</span>
+        </div>
+        <h4>限制思考预算（Thinking Budget）</h4>
+        <div class="result">Token 92→138（+50%）</div>
+        <p>Controller 前期少想后面绕路，省的思考 Token 反而被修 bug 轮次吞回。算总账反而更贵。</p>
+      </div>
+      <div class="neg-card">
+        <div class="warn">
+          <span class="warn-icon">🔴</span>
+          <span class="warn-tag">看起来合理</span>
+        </div>
+        <h4>压减 Plan 编写字数</h4>
+        <div class="result">框架性能 -62%</div>
+        <p>砍掉了测试信号、接口定义、任务边界等锚点，后续 Agent 只能靠猜，信息损失远超字数节约。</p>
+      </div>
+      <div class="neg-card">
+        <div class="warn">
+          <span class="warn-icon">🔴</span>
+          <span class="warn-tag">看起来合理</span>
+        </div>
+        <h4>低阶模型生成 Plan（如 Sonnet）</h4>
+        <div class="result">4/5 Plan 任务结构塌缩（5.8→3.6 个任务）</div>
+        <p>表面需求在但颗粒度变粗，Review 门禁失效，局部缺陷难拦截。Plan 质量是一切的下限。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENGINEERING INSIGHTS -->
+  <section class="insight-section">
+    <div class="sec-head">
+      <div class="sec-badge green">INSIGHTS</div>
+      <h2>三条工程启示</h2>
+    </div>
+    <div class="insight-grid">
+      <div class="insight-card">
+        <div class="num">01</div>
+        <h4>看上下文流动，不只看模型报价表</h4>
+        <p>连续工作数小时的成本优化，不能只看模型报价表，要看上下文的流动和证据的交接——重复搬运才是最贵的。</p>
+      </div>
+      <div class="insight-card">
+        <div class="num">02</div>
+        <h4>删锚点要谨慎，锚点是质量下限</h4>
+        <p>优化要删重复信息 / 废话，但不能粗暴砍掉测试信号、接口定义、任务边界、全局约束等核心锚点——它们是质量下限。</p>
+      </div>
+      <div class="insight-card">
+        <div class="num">03</div>
+        <h4>便宜模型多绕几轮可能更贵</h4>
+        <p>AI 编程已从单纯的模型选择题，变成了硬核流程与软件工程问题——流程设计失误比选错模型代价更大。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- INTERACTIVE -->
+  <section class="interactive-section">
+    <div class="sec-head">
+      <div class="sec-badge blue">DISCUSSION</div>
+      <h2>互动话题</h2>
+    </div>
+    <div class="interactive-grid">
+      <div class="interactive-card">
+        <h4>💬 你在哪一步最耗 Token？</h4>
+        <p>反复看文件 / 反复跑命令 / 修小 bug 绕圈——哪一步最让你感受到成本压力？</p>
+      </div>
+      <div class="interactive-card">
+        <h4>💬 是否体验过 Superpowers？</h4>
+        <p>目前如何控制 AI 开发成本？有没有用过 Fable 这类工作流审计工具？</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <div class="sec-head">
+      <div class="sec-badge dark">FAQ</div>
+      <h2>常见问题</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <div class="q">Q: Superpowers 适合小团队吗？</div>
+        <p class="a">A: 适合 2 人以上的开发团队，单人开发者可能感受不到多 Agent 交接带来的上下文冗余问题。</p>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 成本优化 60% 是怎么测出来的？</div>
+        <p class="a">A: Fable 用 AI 审计自己的 25 个实验，在相同任务下对比优化前后的 Token 消耗和运行时间。</p>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 哪些任务类型适合用便宜模型？</div>
+        <p class="a">A: Plan 已完整、只需机械执行（转写 / 跑命令 / 修小错）的任务。判断密集、跨文件推理类任务不要省。</p>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: "Cannot verify from diff" 警告有什么价值？</div>
+        <p class="a">A: 让 Reviewer 主动承认盲区，比让 Controller 收到错误裁决再返工更高效，维护了任务边界。</p>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: 压减 Plan 字数为什么会 -62% 性能？</div>
+        <p class="a">A: Plan 是后续所有 Agent 的锚点——测试信号、接口定义、任务边界都被砍掉，后续只能靠猜，信息损失远超字数节约。</p>
+      </div>
+      <div class="faq-item">
+        <div class="q">Q: Superpowers 和 Cursor / Copilot 的区别是什么？</div>
+        <p class="a">A: Superpowers 是工作流框架而非 IDE 插件；它定义了完整的 Agent 角色分工和交接协议，更适合大型代码库的多 Agent 协作。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">INFOCARD</div>
+      <div>基于 <a href="https://blog.fsck.com/2026/06/15/Superpowers-6/" target="_blank">blog.fsck.com</a> 深度分析 · 2026-07-06</div>
+    </div>
+    <div class="small">
+      Multi-Agent · Cost Optimization · Fable · Harness Engineering<br>
+      <a href="https://ccwq.github.io/infocard-pub/docs/20260706-superpowers-v6.html" target="_blank">ccwq.github.io/infocard-pub</a>
+    </div>
+  </footer>
+
+</main>
+</body>
+</html>
