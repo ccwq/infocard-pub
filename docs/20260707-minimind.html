@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiniMind · 2小时从0训练64M小参数LLM（3块钱 / 52.8K Star / GPT-3的1/2700）</title>
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === TOPBAR: diagonal red-black hero + right meta grid === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .topbar-meta{
+      padding:14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 0.8fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);padding:7px 9px 5px;
+      background:#fff;font-weight:900;font-size:14px;line-height:1.1;
+    }
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-md{border:2px solid var(--line);border-left:4px solid var(--red);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25}
+    .meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+    .meta-pill-sm{border:2px solid var(--line);border-left:4px solid #666;padding:3px 7px 3px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3}
+    .meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+    h1.demo-title{margin:10px 0 6px;font-size:clamp(20px,3.2vw,36px);font-weight:800;letter-spacing:-.03em;line-height:1.05}
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+
+    /* === OVERVIEW === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* === STATS === */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:80px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+    .stat.red-bg strong{color:var(--red)}
+    .stat.ink-bg{background:var(--ink);border-right-color:var(--red)}
+    .stat.ink-bg strong{color:#fff}
+    .stat.ink-bg span{color:#aaa}
+
+    /* === PILLS === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === SECTION === */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:12px 14px}
+
+    /* === GRID LAYOUTS === */
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:0}
+    .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+    .gcell{border-right:2px solid var(--line);padding:10px 12px}
+    .gcell:last-child{border-right:none}
+    .gcell-red{border-right:2px solid var(--line);padding:10px 12px;background:var(--soft-red)}
+    .gcell-red:last-child{border-right:none}
+
+    /* === HIGHLIGHT BOXES === */
+    .hl-red{background:var(--soft-red);border-left:4px solid var(--red);padding:8px 12px;margin:6px 0;font-size:12px;line-height:1.6}
+    .hl-ink{background:var(--ink);color:#fff;padding:8px 12px;margin:6px 0;font-size:12px;line-height:1.6}
+    .hl-box{border:1.5px solid var(--line);padding:8px 12px;margin:6px 0;background:#fff;font-size:12px;line-height:1.6}
+    .hl-box.red-box{border-color:var(--red);border-left:4px solid var(--red);background:var(--soft-red)}
+
+    /* === TABLE === */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
+    th{padding:6px 10px;border:1.5px solid var(--line);background:var(--ink);color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;text-align:left}
+    td{padding:6px 10px;border:1.5px solid var(--line);vertical-align:top}
+    tr:nth-child(even) td{background:#faf8f4}
+    td.bold{font-weight:800}
+    td.red{color:var(--red);font-weight:800}
+    td.dark{background:var(--ink);color:#fff;font-weight:700}
+
+    /* === CODE BLOCK === */
+    .code-block{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:10px 14px;margin:6px 0;font-size:11.5px;line-height:1.7;overflow-x:auto}
+    .code-block .cb-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#666;margin-bottom:4px;display:block}
+    pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+    .cm-red{color:#c8102e}.cm-lt{color:#aaa}.cm-dk{color:#888}.cm-w{color:#fff}.cm-y{color:#e8c87a}
+
+    /* === BADGE === */
+    .badge{display:inline-block;padding:2px 7px;font-size:9.5px;font-weight:800;border:1.5px solid var(--line);text-transform:uppercase;letter-spacing:.05em;margin:2px}
+    .badge.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .badge.ink{background:var(--ink);color:#fff}
+    .badge.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === DIVIDER === */
+    .divider{height:3px;background:var(--line);margin:10px 0}
+
+    /* === FOOTER === */
+    .footer{border-top:3px solid var(--line);padding:10px 0;margin-top:14px;display:flex;justify-content:space-between;align-items:center;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888}
+    .footer .src{color:var(--ink)}
+    .footer .src a{color:var(--red);text-decoration:underline;text-underline-offset:2px}
+
+    /* === STEP FLOW === */
+    .step-flow{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin:8px 0}
+    .step{background:var(--ink);color:#fff;padding:5px 10px;font-size:11px;font-weight:800;border-right:2px solid var(--red)}
+    .step.red{background:var(--red)}
+    .step.last{border-right:none}
+    .step-label{font-size:10px;color:#aaa;padding:0 6px;font-weight:700}
+
+    /* === MODEL LIST === */
+    .model-item{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:0;border-bottom:1px solid #ddd;padding:5px 8px;font-size:11.5px}
+    .model-item:last-child{border-bottom:none}
+    .model-item .name{font-weight:800;color:var(--ink)}
+    .model-item .size{color:var(--red);font-weight:800}
+    .model-item .date{color:#888}
+
+    /* === MEDIA QUERIES === */
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .grid-2,.grid-3{grid-template-columns:1fr}
+      .gcell,.gcell-red{border-right:none;border-bottom:2px solid var(--line)}
+      .stats{flex-direction:column}
+      .stat{border-right:none;border-bottom:2px solid var(--line)}
+      .step-flow{flex-direction:column;align-items:flex-start}
+      .step{border-right:none;border-bottom:2px solid var(--red)}
+      .step.last{border-bottom:none}
+      .model-item{grid-template-columns:1fr 1fr;gap:4px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══ TOPBAR ═══ -->
+  <div class="topbar">
+    <!-- Hero -->
+    <div class="topbar-hero">
+      <span class="tagline">🧠 Small LLM · Open Source</span>
+      <h1 class="demo-title">MiniMind</h1>
+      <p class="sub-line">2小时从 0 训练 64M 参数小参数 LLM<br>PyTorch 原生实现 · Pretrain + SFT + RLHF 全链路</p>
+    </div>
+    <!-- Meta Grid -->
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">
+          52.8K
+          <span class="sub">GitHub Stars</span>
+        </div>
+        <div class="meta-pill-lg">
+          6.8K
+          <span class="sub">Forks</span>
+        </div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">
+          Apache-2.0
+          <span class="sub">License</span>
+        </div>
+        <div class="meta-pill-md">
+          Python
+          <span class="sub">Language</span>
+        </div>
+        <div class="meta-pill-sm">
+          Trending
+          <span class="sub">#1 Project</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ OVERVIEW ═══ -->
+  <div class="overview">
+    <div class="overview-sentence">📦 最轻 25.8M 参数 = GPT-3 的 1/2700 | 💰 训练成本 3 元 | ⏱️ 单卡 RTX 3090 两小时从 0 训练</div>
+    <div class="overview-body">
+      <p>MiniMind 是 GitHub Trending 全球第一的超轻量开源 LLM 项目，主线最小版本仅 25.8M 参数（GPT-3 的 1/2700），可在单张消费级 GPU 上 2 小时完成 Pretrain + SFT 全流程训练，成本不足 3 元。项目以「大道至简」为理念，所有核心代码从 0 使用 PyTorch 原生实现，不依赖第三方高层封装，提供 Pretrain / SFT / DPO / GRPO / CISPO / Tool Use / Agentic RL / 模型蒸馏完整训练链路，并延伸 MiniMind-V 视觉多模态、MiniMind-O Omni 多模态等孪生项目。</p>
+    </div>
+  </div>
+
+  <!-- ═══ STATS ROW ═══ -->
+  <div class="stats">
+    <div class="stat">
+      <strong>52.8K</strong>
+      <span>⭐ Stars</span>
+    </div>
+    <div class="stat">
+      <strong>64M</strong>
+      <span>Dense 参数</span>
+    </div>
+    <div class="stat red-bg">
+      <strong>3元</strong>
+      <span>训练成本</span>
+    </div>
+    <div class="stat">
+      <strong>2h</strong>
+      <span>单卡训练</span>
+    </div>
+    <div class="stat">
+      <strong>198M</strong>
+      <span>MoE 总参</span>
+    </div>
+    <div class="stat ink-bg">
+      <strong>1/2700</strong>
+      <span>vs GPT-3</span>
+    </div>
+  </div>
+
+  <!-- ═══ TAGS ═══ -->
+  <div class="pills">
+    <span class="pill red">Pretrain</span>
+    <span class="pill red">SFT</span>
+    <span class="pill red">MoE</span>
+    <span class="pill dark">Tokenizer</span>
+    <span class="pill dark">PyTorch 原生</span>
+    <span class="pill dark">DPO · GRPO · CISPO</span>
+    <span class="pill dark">Tool Use</span>
+    <span class="pill dark">Agentic RL</span>
+    <span class="pill dark">MiniMind-V</span>
+    <span class="pill dark">MiniMind-O</span>
+    <span class="pill dark">dLM · Linear</span>
+    <span class="pill soft">LoRA 微调</span>
+    <span class="pill soft">YaRN 长文本</span>
+    <span class="pill soft">OpenAI API</span>
+  </div>
+
+  <!-- ═══ SECTION 01: TECH HIGHLIGHTS ═══ -->
+  <div class="section">
+    <div class="sec-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="num">01</span>
+        <span class="label">Tech Highlights · 技术亮点</span>
+      </div>
+      <span class="badge red">PyTorch Native</span>
+    </div>
+    <div class="sec-body">
+
+      <div class="grid-2">
+        <div class="gcell">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:6px">🔥 核心创新</div>
+          <div class="hl-box red-box">
+            <b>全链路从 0 实现</b><br>
+            不依赖 transformers / trl / peft 等高层封装，所有核心算法（Attention、FFN、MoE、RoPE、Softmax）均为 PyTorch 手写实现，理解 LLM 本质的最优起点。
+          </div>
+          <div class="hl-box">
+            <b>结构对齐 Qwen3 生态</b><br>
+            MiniMind-3 主线 Dense ≈ 64M，MoE ≈ 198M-A64M，移除了 shared expert 设计，与 Qwen3 / Qwen3-MoE 结构兼容，可直接迁移预训练知识。
+          </div>
+          <div class="hl-box">
+            <b>完整 RLHF 族算法</b><br>
+            DPO · GRPO · CISPO · PPO（均从 0 原生实现）+ RLAIF + Agentic RL，覆盖从 SFT 到对齐的完整技术栈。
+          </div>
+        </div>
+        <div class="gcell">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:6px">🧩 生态兼容</div>
+          <div class="hl-box">
+            <b>推理引擎</b>：兼容 llama.cpp / vllm / ollama / Llama-Factory<br>
+            <b>训练框架</b>：支持 transformers / trl / peft + DeepSpeed / DDP<br>
+            <b>可视化</b>：wandb / swanlab（国内友好）<br>
+            <b>评测</b>：C-Eval / C-MMLU / OpenBookQA
+          </div>
+          <div class="hl-box">
+            <b>Server &amp; WebUI</b><br>
+            <code>serve_openai_api.py</code> 提供 OpenAI API 协议服务端（支持 <code>reasoning_content</code> / <code>tool_calls</code>），可接入 FastGPT / Open-WebUI。<br>
+            <code>web_demo.py</code> 基于 Streamlit，支持思考展示、工具调用、多轮对话。
+          </div>
+          <div class="hl-box">
+            <b>模型导出</b><br>
+            <code>scripts/convert_model.py</code> 支持 LoRA 权重合并，导出完整模型权重供第三方推理。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 02: MODEL FAMILY ═══ -->
+  <div class="section">
+    <div class="sec-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="num">02</span>
+        <span class="label">Model Family · 模型族谱</span>
+      </div>
+      <span class="badge ink">2026.04</span>
+    </div>
+    <div class="sec-body">
+
+      <div class="model-item" style="background:var(--ink);color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:5px 8px">
+        <span>模型名称</span><span style="color:var(--red)">参数量</span><span>发布时间</span>
+      </div>
+      <div class="model-item">
+        <span class="name">MiniMind-3</span>
+        <span class="size">64M Dense</span>
+        <span class="date">2026.04.01</span>
+      </div>
+      <div class="model-item" style="background:#fff5f6">
+        <span class="name">MiniMind-3-MoE</span>
+        <span class="size">198M-A64M MoE</span>
+        <span class="date">2026.04.01</span>
+      </div>
+      <div class="model-item">
+        <span class="name">MiniMind2</span>
+        <span class="size">104M</span>
+        <span class="date">2025.04.26</span>
+      </div>
+      <div class="model-item" style="background:#fff5f6">
+        <span class="name">MiniMind2-Small</span>
+        <span class="size">26M</span>
+        <span class="date">2025.04.26</span>
+      </div>
+      <div class="model-item">
+        <span class="name">MiniMind2-MoE</span>
+        <span class="size">145M</span>
+        <span class="date">2025.04.26</span>
+      </div>
+      <div class="model-item" style="background:#fff5f6">
+        <span class="name">MiniMind-V1</span>
+        <span class="size">108M</span>
+        <span class="date">2024.09.01</span>
+      </div>
+      <div class="model-item">
+        <span class="name">MiniMind-V1-Small</span>
+        <span class="size">26M</span>
+        <span class="date">2024.08.28</span>
+      </div>
+      <div class="model-item" style="background:#fff5f6">
+        <span class="name">MiniMind-V1-MoE</span>
+        <span class="size">4×26M</span>
+        <span class="date">2024.09.17</span>
+      </div>
+
+      <div style="margin-top:10px">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:6px">🔗 延伸项目</div>
+        <div class="grid-3">
+          <div class="gcell">
+            <b>MiniMind-V</b><br>
+            <span style="font-size:11px;color:#555">视觉多模态扩展，孪生项目</span>
+          </div>
+          <div class="gcell">
+            <b>MiniMind-O</b><br>
+            <span style="font-size:11px;color:#555">Omni 多模态模型</span>
+          </div>
+          <div class="gcell">
+            <b>MiniMind-dLM</b><br>
+            <span style="font-size:11px;color:#555">离散扩散语言模型</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 03: TRAINING PIPELINE ═══ -->
+  <div class="section">
+    <div class="sec-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="num">03</span>
+        <span class="label">Training Pipeline · 训练阶段详解</span>
+      </div>
+    </div>
+    <div class="sec-body">
+
+      <!-- Step flow -->
+      <div class="step-flow">
+        <div class="step red">① Pretrain</div>
+        <div class="step">② Tokenizer</div>
+        <div class="step">③ SFT</div>
+        <div class="step">④ DPO / GRPO</div>
+        <div class="step">⑤ Tool Use / Agentic RL</div>
+        <div class="step last">⑥ 推理 &amp; 部署</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="gcell">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:6px">① Pretrain · 基座预训练</div>
+          <div class="hl-box">
+            基座模型从随机初始化开始，在大规模语料上进行语言建模训练，学习通用世界知识和语言能力。
+          </div>
+          <div class="hl-box">
+            <b>数据集</b>：pretrain_t2t_mini.jsonl（精简版，单卡 2h 可复现）<br>
+            <b>硬件</b>：单卡 NVIDIA RTX 3090 24GB<br>
+            <b>时长</b>：约 2 小时（1 epoch SFT 阶段）
+          </div>
+        </div>
+        <div class="gcell-red">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:6px">② Tokenizer · 分词器训练</div>
+          <div class="hl-box red-box">
+            MiniMind 项目同时开源了分词器的训练代码，支持 BPE + ByteLevel 词表构建。
+          </div>
+          <div class="hl-box">
+            <b>模板标记</b>：&lt;tool_call&gt; / &lt;tool_response&gt; / &lt;tool_call&gt;<br>
+            <b>思考标记</b>：&lt;tool_call&gt; 完整支持<br>
+            <b>Buffer token</b>：预留扩展空间
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="grid-2">
+        <div class="gcell">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:6px">③ SFT · 监督微调</div>
+          <div class="hl-box">
+            在预训练基座上，使用高质量对话数据微调，使模型学会遵循指令和对话能力。
+          </div>
+          <div class="hl-box">
+            <b>数据集</b>：sft_t2t_mini.jsonl（精简版）<br>
+            <b>Tool Call</b>：已混入主线数据，基础 full_sft 即具备工具调用能力<br>
+            <b>Adaptive Thinking</b>：chat_template 控制 &lt;tool_call&gt; 自适应开关
+          </div>
+        </div>
+        <div class="gcell">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:6px">④ RLHF · 强化学习对齐</div>
+          <div class="hl-box">
+            <b>DPO</b>：从 0 PyTorch 原生实现，离线偏好对齐<br>
+            <b>GRPO / CISPO</b>：在线强化学习，基于 rewards 自适应优化<br>
+            <b>PPO</b>：完整策略梯度算法原生实现
+          </div>
+          <div class="hl-box">
+            <b>RLAIF</b>：AI 反馈强化学习，rlaif-mini.jsonl 数据集<br>
+            <b>Agentic RL</b>：train_agent.py，支持多轮 Tool-Use 场景 GRPO / CISPO
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 04: PARAM COMPARISON TABLE ═══ -->
+  <div class="section">
+    <div class="sec-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="num">04</span>
+        <span class="label">Parameter Scale · 参数规模对比</span>
+      </div>
+    </div>
+    <div class="sec-body">
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:28%">模型</th>
+            <th style="width:20%">参数量</th>
+            <th style="width:15%">架构</th>
+            <th style="width:37%">备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold" style="color:var(--red)">MiniMind2-Small</td>
+            <td class="bold red">26M</td>
+            <td>Dense</td>
+            <td>GPT-3 的 1/2700，极致轻量，单卡秒训</td>
+          </tr>
+          <tr>
+            <td class="bold" style="color:var(--red)">MiniMind-3</td>
+            <td class="bold red">64M</td>
+            <td>Dense</td>
+            <td>主线版本，对齐 Qwen3 生态结构</td>
+          </tr>
+          <tr>
+            <td class="bold" style="color:var(--red)">MiniMind2-MoE</td>
+            <td class="bold red">145M</td>
+            <td>MoE</td>
+            <td>混合专家，稀疏激活降低计算量</td>
+          </tr>
+          <tr>
+            <td class="bold" style="color:var(--red)">MiniMind-3-MoE</td>
+            <td class="bold red">198M-A64M</td>
+            <td>MoE</td>
+            <td>最新 MoE 版本，198M 总参 / 64M 激活，无 shared expert</td>
+          </tr>
+          <tr>
+            <td class="bold">Llama-7B</td>
+            <td class="bold">7B</td>
+            <td>Dense</td>
+            <td>Meta 开源基座，≈ 109× MiniMind-3</td>
+          </tr>
+          <tr>
+            <td class="bold">Qwen-7B</td>
+            <td class="bold">7B</td>
+            <td>Dense</td>
+            <td>阿里通义千问，≈ 109× MiniMind-3</td>
+          </tr>
+          <tr>
+            <td class="bold">GPT-3 (175B)</td>
+            <td class="bold">175B</td>
+            <td>Dense</td>
+            <td>OpenAI GPT-3，MiniMind 最小版是其 1/2700</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="hl-red">
+        <b>关键洞察：</b>MiniMind 最小版仅 26M 参数（GPT-3 的 1/2700），可以在 CPU 或移动端运行，让「理解 LLM 训练全过程」不再是资源门槛。
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 05: QUICK START ═══ -->
+  <div class="section">
+    <div class="sec-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="num">05</span>
+        <span class="label">Quick Start · 快速上手</span>
+      </div>
+      <span class="badge red">Copy &amp; Run</span>
+    </div>
+    <div class="sec-body">
+
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:8px">第 0 步 · 克隆 &amp; 安装</div>
+      <div class="code-block">
+        <span class="cb-label">bash</span>
+        <pre>git clone --depth 1 https://github.com/jingyaogong/minimind
+cd minimind && pip install -r requirements.txt \
+  -i https://mirrors.aliyun.com/pypi/simple</pre>
+      </div>
+
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:8px;margin-top:10px">第 1 步 · 下载模型（ModelScope / HuggingFace）</div>
+      <div class="code-block">
+        <span class="cb-label">bash · 下载 MiniMind-3</span>
+        <pre><span class="cm-dk"># 方式 1 · ModelScope</span>
+modelscope download --model gongjy/minimind-3 --local_dir ./minimind-3
+
+<span class="cm-dk"># 方式 2 · HuggingFace</span>
+git clone https://huggingface.co/jingyaogong/minimind-3</pre>
+      </div>
+
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:8px;margin-top:10px">第 2 步 · 下载训练数据</div>
+      <div class="hl-box">
+        从 <b>ModelScope 数据集</b>：<a href="https://www.modelscope.cn/datasets/gongjy/minimind_dataset/files" style="color:var(--red);text-decoration:underline">gongjy/minimind_dataset</a><br>
+        下载 <code>pretrain_t2t_mini.jsonl</code> + <code>sft_t2t_mini.jsonl</code>，放入 <code>./dataset/</code> 目录。
+      </div>
+
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:8px;margin-top:10px">第 3 步 · 推理 &amp; 训练</div>
+      <div class="code-block">
+        <span class="cb-label">bash · CLI 推理</span>
+        <pre><span class="cm-dk"># Transformers 格式模型推理</span>
+python eval_llm.py --load_from ./minimind-3
+
+<span class="cm-dk"># PyTorch 原生格式（确保 ./out 目录有对应权重）</span>
+python eval_llm.py --load_from ./model --weight full_sft</pre>
+      </div>
+      <div class="code-block">
+        <span class="cb-label">bash · 训练命令（单卡 RTX 3090）</span>
+        <pre><span class="cm-dk"># Pretrain 基座预训练</span>
+python train_pretrain.py
+
+<span class="cm-dk"># SFT 监督微调</span>
+python train_sft.py
+
+<span class="cm-dk"># LoRA 微调（不依赖 peft 封装，从 0 实现）</span>
+python train_lora.py
+
+<span class="cm-dk"># DPO 偏好对齐</span>
+python train_dpo.py
+
+<span class="cm-dk"># Agentic RL（GRPO / CISPO）</span>
+python train_agent.py</pre>
+      </div>
+
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:8px;margin-top:10px">硬件要求</div>
+      <div class="grid-2">
+        <div class="gcell">
+          <div class="hl-box">
+            <b>最低配置（快速复现）</b><br>
+            GPU：RTX 3090 24GB × 1<br>
+            RAM：64GB+<br>
+            时长：约 2 小时（1 epoch SFT）<br>
+            成本：≈ 3 元 GPU 租金
+          </div>
+        </div>
+        <div class="gcell">
+          <div class="hl-box">
+            <b>完整训练</b><br>
+            GPU：RTX 3090 × 8（多卡 DDP）<br>
+            RAM：128GB<br>
+            支持 DeepSpeed ZeRO-2/3<br>
+            支持 wandb / swanlab 可视化
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 06: SCENARIOS ═══ -->
+  <div class="section">
+    <div class="sec-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="num">06</span>
+        <span class="label">Scenarios · 适用场景</span>
+      </div>
+    </div>
+    <div class="sec-body">
+
+      <div class="grid-2">
+        <div class="gcell">
+          <div style="font-size:13px;font-weight:900;color:var(--red);margin-bottom:6px">🎓 个人学习大模型训练</div>
+          <div class="hl-box">
+            最适合 LLM 入门者的实战项目。不是调 API，不是微调现有模型，而是<strong>从随机初始化开始，真正训练一个语言模型</strong>。每行代码都有教育价值，理解 Attention、RoPE、MoE 的最好方式就是亲手实现一遍。
+          </div>
+        </div>
+        <div class="gcell">
+          <div style="font-size:13px;font-weight:900;color:var(--red);margin-bottom:6px">🔬 低成本实验研究</div>
+          <div class="hl-box">
+            3 元成本 + 2 小时 = 完整训练循环。适合快速验证新算法想法（新注意力机制、新 tokenization 策略、新 RL 算法），在 MiniMind 上跑通后再迁移到 7B+ 大模型。
+          </div>
+        </div>
+        <div class="gcell">
+          <div style="font-size:13px;font-weight:900;color:var(--red);margin-bottom:6px">📱 嵌入式 / 边缘部署</div>
+          <div class="hl-box">
+            26M 参数的 MiniMind2-Small 可以在 CPU 或移动端运行，适合离线场景、私有化部署、成本敏感的嵌入式产品。PyTorch 模型可直接导出为 ONNX / TFLite。
+          </div>
+        </div>
+        <div class="gcell">
+          <div style="font-size:13px;font-weight:900;color:var(--red);margin-bottom:6px">🏢 企业内部模型定制</div>
+          <div class="hl-box">
+            基于 MiniMind 训练私有领域模型（医疗、法律、金融），提供 LoRA 微调 + 模型蒸馏完整流程。结合私有数据，用极低成本训练专属小模型。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 07: DATASET &amp; EXTENSIONS ═══ -->
+  <div class="section">
+    <div class="sec-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="num">07</span>
+        <span class="label">Datasets &amp; Extensions · 数据集与扩展</span>
+      </div>
+    </div>
+    <div class="sec-body">
+
+      <table>
+        <thead>
+          <tr>
+            <th>数据集</th>
+            <th>用途</th>
+            <th>规模</th>
+            <th>格式</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">pretrain_t2t_mini</td>
+            <td>预训练</td>
+            <td>精简版（单卡可训）</td>
+            <td>jsonl</td>
+          </tr>
+          <tr>
+            <td class="bold">sft_t2t_mini</td>
+            <td>SFT 微调</td>
+            <td>精简版（含 Tool Call）</td>
+            <td>jsonl</td>
+          </tr>
+          <tr>
+            <td class="bold">rlaif</td>
+            <td>RLAIF 对齐</td>
+            <td>含 rlaif-mini</td>
+            <td>jsonl</td>
+          </tr>
+          <tr>
+            <td class="bold">agent_rl / agent_rl_math</td>
+            <td>Agent 强化学习</td>
+            <td>多轮工具调用场景</td>
+            <td>jsonl</td>
+          </tr>
+          <tr>
+            <td class="bold">minimind2-DeepSeek-R1</td>
+            <td>蒸馏模型</td>
+            <td>从 DeepSeek-R1 蒸馏</td>
+            <td>权重</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:10px">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:8px">实验性扩展</div>
+        <div class="pills">
+          <span class="pill red">dLM · 离散扩散语言模型</span>
+          <span class="pill dark">Linear Attention · 线性注意力</span>
+          <span class="pill dark">YaRN · RoPE 长文本外推</span>
+          <span class="pill soft">可基于主线 AR 模型续训</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="footer">
+    <div class="src">
+      <a href="https://github.com/jingyaogong/minimind" target="_blank">github.com/jingyaogong/minimind</a>
+      &nbsp;·&nbsp;
+      <a href="https://huggingface.co/collections/jingyaogong/minimind-66caf8d999f5c7fa64f399e5" target="_blank">🤗 HuggingFace</a>
+      &nbsp;·&nbsp;
+      <a href="https://www.modelscope.cn/studios/gongjy/MiniMind" target="_blank">ModelScope 体验</a>
+    </div>
+    <div>MiniMind · Apache-2.0 · 2026-07-07</div>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>
