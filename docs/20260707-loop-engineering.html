@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loop Engineering · Claude Code 的 Agent 循环设计指南</title>
+  <meta name="description" content="Claude Code 团队 Loop Engineering 设计指南：四类循环（Turn-based/Goal-based/Time-based/Proactive）详解 + 代码质量维护 + Token 消耗管理。学会给 Agent 设计循环，而不只是写 Prompt。">
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1060px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === TOPBAR === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .kicker{
+      display:inline-block;border:2px solid #fff;padding:3px 8px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;
+    }
+    h1.demo-title{
+      margin:10px 0 6px;
+      font-size:clamp(20px,3.2vw,36px);font-weight:800;
+      letter-spacing:-.03em;line-height:1.05;
+    }
+    .sub-line{font-size:12.5px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+
+    /* topbar-meta */
+    .topbar-meta{
+      padding:9px 14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);
+      padding:7px 9px 5px;
+      background:#fff;
+      font-weight:900;
+      font-size:14px;
+      line-height:1.1;
+    }
+    .meta-pill-lg .sub{
+      display:block;
+      font-size:9.5px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.06em;color:#888;margin-top:2px;
+    }
+    .meta-pill-md{
+      border:2px solid var(--line);
+      border-left:4px solid var(--red);
+      padding:4px 7px 3px;
+      background:#fff;
+      font-weight:800;
+      font-size:11.5px;
+      line-height:1.25;
+    }
+    .meta-pill-md .sub{
+      display:block;
+      font-size:8.5px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.06em;color:#888;margin-top:1px;
+    }
+    .meta-pill-sm{
+      border:2px solid var(--line);
+      border-left:4px solid #666;
+      padding:3px 7px 3px;
+      background:#fff;
+      font-weight:700;
+      font-size:11px;
+      color:#555;
+      line-height:1.3;
+    }
+    .meta-pill-sm .sub{
+      display:block;
+      font-size:8.5px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.06em;color:#aaa;margin-top:1px;
+    }
+
+    /* overview */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:8px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* stats */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* pills */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+
+    /* section */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{
+      background:var(--ink);color:#fff;padding:7px 12px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+    .sec-body{padding:12px}
+
+    /* table */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:0}
+    th{background:var(--ink);color:#fff;padding:7px 10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;text-align:left;border:1.5px solid var(--line)}
+    td{padding:7px 10px;border:1.5px solid var(--line);vertical-align:top}
+    tr:nth-child(even) td{background:#faf8f4}
+    tr.active-row td{background:#fff5f6}
+
+    /* code block */
+    .code-block{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:12px 14px;margin:10px 0;overflow-x:auto}
+    .code-block .code-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#666;margin-bottom:6px}
+    .code-block pre{margin:0;font-size:11.5px;line-height:1.72;white-space:pre-wrap}
+
+    /* two-col layout */
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:10px}
+    .two-col .col{border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);overflow:hidden}
+    .two-col .col+.col{border-left:none}
+    .col-head{padding:7px 12px;background:var(--ink);color:#fff;display:flex;align-items:center;gap:8px}
+    .col-head .num{color:var(--red);font-size:13px;font-weight:900}
+    .col-head .label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+    .col-body{padding:10px 12px;display:grid;gap:8px}
+    .col-body p{margin:0;font-size:12px;line-height:1.6}
+    .col-body ul{margin:0;padding-left:16px}
+    .col-body li{margin-bottom:4px;font-size:12px;line-height:1.5}
+
+    /* four loop cards */
+    .loop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .loop-card{border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);overflow:hidden}
+    .loop-card-head{padding:8px 12px;background:var(--ink);color:#fff;display:flex;align-items:center;gap:8px}
+    .loop-card-head .t{font-size:12px;font-weight:800}
+    .loop-card-head .badge{padding:2px 7px;border:1.5px solid var(--red);color:var(--red);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-left:auto}
+    .loop-card-body{padding:10px 12px;display:grid;gap:5px}
+    .loop-card-body .row{display:flex;gap:6px;font-size:11.5px;line-height:1.45}
+    .loop-card-body .k{font-weight:800;color:var(--red);min-width:60px;flex-shrink:0}
+    .loop-card-body .v{color:#333}
+    .loop-card-foot{padding:6px 12px;background:#fff5f6;border-top:1.5px solid var(--line);font-size:11px;color:#888;font-style:italic}
+
+    /* three-col sections */
+    .three-col{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .three-col .col{border:2px solid var(--line);background:var(--paper);box-shadow:var(--shadow);overflow:hidden}
+    .three-col .col+.col{border-left:none}
+    .three-col .col-head{padding:7px 11px;background:var(--ink);color:#fff;display:flex;align-items:center;gap:6px}
+    .three-col .col-head .num{color:var(--red);font-size:12px;font-weight:900}
+    .three-col .col-head .label{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+    .three-col .col-body{padding:10px 11px;display:grid;gap:6px}
+    .three-col .col-body p,.three-col .col-body li{font-size:11.5px;line-height:1.55}
+    .three-col .col-body ul{padding-left:14px}
+    .three-col .col-body li{margin-bottom:3px}
+
+    /* example box */
+    .example-box{background:#fff;border:2.5px solid var(--red);padding:10px 13px;margin:8px 0;font-size:12px;line-height:1.65}
+    .example-box .ex-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--red);margin-bottom:5px}
+
+    /* tip box */
+    .tip-box{background:#fff;border:2px solid var(--line);padding:9px 12px;margin:6px 0;font-size:11.5px;line-height:1.6;display:flex;gap:8px;align-items:flex-start}
+    .tip-box .tip-icon{font-weight:900;color:var(--red);flex-shrink:0;font-size:13px}
+    .tip-box .tip-icon::before{content:"★"}
+
+    /* footer */
+    .footer{border-top:3px solid var(--line);padding:14px 0 0;margin-top:14px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px}
+    .footer .brand{font-size:12.5px;font-weight:900;color:var(--ink)}
+    .footer .small{font-size:10.5px;color:#666;font-weight:600;line-height:1.5}
+    .footer .small a{color:var(--red);font-weight:800}
+
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .two-col{grid-template-columns:1fr}
+      .two-col .col+.col{border-left:2px solid var(--line);border-top:none}
+      .loop-grid{grid-template-columns:1fr}
+      .three-col{grid-template-columns:1fr}
+      .three-col .col+.col{border-left:2px solid var(--line);border-top:none}
+      .overview{padding:10px 0}
+      .overview-sentence{font-size:13px}
+      .overview-body{font-size:12px}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">AI Engineering · Claude Code</div>
+      <h1 class="demo-title">Loop Engineering<br>设计指南</h1>
+      <p class="sub-line">给 Agent 设计循环，而不只是写 Prompt。学会用 /goal /loop /schedule 让 AI 自己找活干直到满足停止条件。</p>
+      <div class="tagline">Claude Code 官方 · 2026</div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">4<span class="sub">循环类型</span></div>
+        <div class="meta-pill-lg">/goal<span class="sub">停止条件</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">Turn-based<span class="sub">对话驱动</span></div>
+        <div class="meta-pill-md">Goal-based<span class="sub">目标驱动</span></div>
+        <div class="meta-pill-sm">Proactive<span class="sub">主动循环</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- OVERVIEW -->
+  <div class="overview">
+    <div class="overview-sentence">Loop = Agent 重复工作循环，直到满足停止条件</div>
+    <div class="overview-body">
+      <p>Claude Code 官方 Loop Engineering 设计指南定义了四类 Agent 循环模式。核心洞察：与其写一个完美的 Prompt，不如设计一个循环，让 Agent 在其中自主判断、验证、迭代。把"什么时候停"编码进系统，比告诉 Agent"做什么"更重要。</p>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><strong>4</strong><span>循环类型</span></div>
+    <div class="stat"><strong>/goal</strong><span>目标驱动</span></div>
+    <div class="stat"><strong>/loop</strong><span>定时循环</span></div>
+    <div class="stat"><strong>/schedule</strong><span>云端例程</span></div>
+    <div class="stat"><strong>Proactive</strong><span>主动模式</span></div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill red">Loop Engineering</span>
+    <span class="pill dark">Claude Code</span>
+    <span class="pill">Goal-based</span>
+    <span class="pill">Time-based</span>
+    <span class="pill">Proactive Loop</span>
+    <span class="pill">Dynamic Workflows</span>
+    <span class="pill">Auto Mode</span>
+    <span class="pill">Token 优化</span>
+  </div>
+
+  <!-- SECTION 01: 核心定义 + 四类对比表 -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <span class="label">FOUR LOOPS · 四类循环对比</span>
+    </div>
+    <div class="sec-body">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:15%">循环类型</th>
+            <th style="width:18%">触发方式</th>
+            <th style="width:22%">停止条件</th>
+            <th style="width:20%">最佳场景</th>
+            <th style="width:25%">核心命令</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong style="color:var(--red)">Turn-based</strong></td>
+            <td>用户 Prompt</td>
+            <td>Claude 自己判断完成</td>
+            <td>日常开发探索、短任务</td>
+            <td><code>claude</code> 直接对话</td>
+          </tr>
+          <tr class="active-row">
+            <td><strong style="color:var(--red)">Goal-based</strong></td>
+            <td>实时 Prompt + 目标</td>
+            <td>目标达成 或 达到最大轮次</td>
+            <td>可量化目标（Lighthouse ≥90）</td>
+            <td><code>/goal … stop after N tries</code></td>
+          </tr>
+          <tr>
+            <td><strong style="color:var(--red)">Time-based</strong></td>
+            <td>时间间隔</td>
+            <td>手动取消 或 任务完成</td>
+            <td>定时检查 CI / PR / Slack</td>
+            <td><code>/loop N m</code> · <code>/schedule</code></td>
+          </tr>
+          <tr class="active-row">
+            <td><strong style="color:var(--red)">Proactive Loop</strong></td>
+            <td>事件 / 定时，无人实时介入</td>
+            <td>各任务达目标后退出；例程本身直到手动关闭</td>
+            <td>长期 Bug / Issue / 依赖升级</td>
+            <td><code>/schedule</code> + <code>/goal</code> + <code>Dynamic Workflows</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 02: Turn-based + Goal-based -->
+  <div class="two-col">
+    <div class="col">
+      <div class="col-head">
+        <span class="num">02</span>
+        <span class="label">TURN-BASED · 对话驱动</span>
+      </div>
+      <div class="col-body">
+        <p><strong style="color:var(--red)">触发：</strong>用户发送一个 Prompt，Claude 执行一轮后等待下一条指令。</p>
+        <p><strong style="color:var(--red)">停止：</strong>Claude 自己判断任务完成，无需继续。</p>
+        <p><strong style="color:var(--red)">最佳场景：</strong>短任务、日常开发探索、一次性修改。</p>
+        <p><strong style="color:var(--red)">关键技巧：</strong></p>
+        <ul>
+          <li>把验证流程写成 <strong>Skill</strong>，让 Agent 自己验证自己的输出</li>
+          <li>Skill = 编码进文件的验收标准，不靠对话传递</li>
+          <li>适合：需要 Claude 独立完成并自行判断完成的工作</li>
+        </ul>
+        <div class="code-block">
+          <div class="code-label">SKILL.md 示例：内嵌验证 Skill</div>
+<pre>---
+name: verify-api-contract
+description: 验证 API contract 与实现是否对齐
+---
+
+# verify-api-contract
+
+## 执行步骤
+1. 读取 `src/api.ts` 中的 export 列表
+2. 读取 `docs/openapi.yaml` 中的 paths
+3. 逐个对比：export 但未定义 → ERROR；定义但未 export → WARN
+4. 运行测试：`npm test -- --grep "api"`
+5. 若有 ERROR → 报错退出；WARN → 输出警告；通过 → 输出 PASS
+
+## 验收标准
+- 所有 export 均有对应 openapi.yaml 定义
+- 测试覆盖率 ≥ 90%
+</pre>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="col-head">
+        <span class="num">03</span>
+        <span class="label">GOAL-BASED · /goal 目标驱动</span>
+      </div>
+      <div class="col-body">
+        <p><strong style="color:var(--red)">触发：</strong>用户发一条带目标的实时 Prompt。</p>
+        <p><strong style="color:var(--red)">停止：</strong>目标达成 <strong>OR</strong> 达到最大轮次。</p>
+        <p><strong style="color:var(--red)">最佳场景：</strong>有可验证退出条件的工作。</p>
+        <div class="example-box">
+          <div class="ex-label">典型命令</div>
+          <code>/goal get the homepage Lighthouse score to 90 or above, stop after 5 tries.</code>
+        </div>
+        <p><strong style="color:var(--red)">关键原则：</strong></p>
+        <ul>
+          <li>确定性标准（测试通过数、分数阈值）最有效</li>
+          <li>模糊目标（"让网站更好"）→ 模糊停止 → 浪费 Token</li>
+          <li>指定最大轮次防止无限循环</li>
+          <li>目标越具体，Agent 越少跑偏</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 04: Time-based /loop + /schedule -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="label">TIME-BASED · /loop /schedule 定时循环</span>
+    </div>
+    <div class="sec-body">
+      <div class="three-col">
+        <div class="col">
+          <div class="col-head">
+            <span class="num">A</span>
+            <span class="label">/loop</span>
+          </div>
+          <div class="col-body">
+            <p><strong>本地运行</strong>，关机即停。适合：你还在开发机前、需要多轮迭代的工作。</p>
+            <ul>
+              <li>最短间隔：1 分钟</li>
+              <li>能看到本地文件</li>
+              <li>会话关闭即停止</li>
+              <li>适合：本地 dev server 监控、代码审查循环</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="col-head">
+            <span class="num">B</span>
+            <span class="label">/schedule</span>
+          </div>
+          <div class="col-body">
+            <p><strong>云端例程</strong>，持续运行。适合：机器不在也能跑、跨设备/定时触发的工作。</p>
+            <ul>
+              <li>最长间隔：1 小时（云端限制）</li>
+              <li>看不到本地文件（需要接 GitHub 等）</li>
+              <li>持续运行直到手动关闭</li>
+              <li>适合：凌晨扫 GitHub Issue、CI 失败告警</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="col-head">
+            <span class="num">C</span>
+            <span class="label">对比</span>
+          </div>
+          <div class="col-body">
+            <p><strong>判别规则：</strong></p>
+            <ul>
+              <li>这活离不开我这台笔记本吗？→ /loop</li>
+              <li>机器不在也必须跑？→ /schedule</li>
+              <li>需要每分钟跑？→ 只能 /loop（云端最低 1 小时）</li>
+              <li>需要看到本地文件？→ /loop</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="example-box">
+        <div class="ex-label">典型命令</div>
+        <code>/loop 5m check my PR, address review comments, and fix failing CI</code>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 05: Proactive Loop -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">05</span>
+      <span class="label">PROACTIVE LOOP · 主动循环</span>
+    </div>
+    <div class="sec-body">
+      <p style="margin-bottom:10px;font-size:12.5px;line-height:1.6"><strong style="color:var(--red)">触发：</strong>事件或定时触发，<strong>无人实时介入</strong>。Agent 自主监控、决策、执行，无需人在旁边。</p>
+      <p style="margin-bottom:10px;font-size:12.5px;line-height:1.6"><strong style="color:var(--red)">停止：</strong>各子任务达目标后退出；例程本身持续运行，直到手动关闭。</p>
+      <p style="margin-bottom:10px;font-size:12.5px;line-height:1.6"><strong style="color:var(--red)">最佳场景：</strong>长期自动化流——Bug 报告处理、Issue 分类、代码迁移、依赖升级。</p>
+
+      <div class="three-col">
+        <div class="col">
+          <div class="col-head">
+            <span class="num">1</span>
+            <span class="label">触发层</span>
+          </div>
+          <div class="col-body">
+            <ul>
+              <li><code>/schedule</code> 定时触发</li>
+              <li>GitHub webhook 事件触发</li>
+              <li>GitHub Actions cron job</li>
+              <li>Auto Mode 自动轮询</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="col-head">
+            <span class="num">2</span>
+            <span class="label">工作层</span>
+          </div>
+          <div class="col-body">
+            <ul>
+              <li><code>/goal</code> 定义可量化目标</li>
+              <li>Dynamic Workflows 编排多步骤</li>
+              <li>Skill 内嵌验证标准</li>
+              <li>worktree 隔离并行任务</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="col-head">
+            <span class="num">3</span>
+            <span class="label">保障层</span>
+          </div>
+          <div class="col-body">
+            <ul>
+              <li>Sub-agent 做 maker-checker</li>
+              <li>Memory 写磁盘持久状态</li>
+              <li>MCP 接外部系统（Jira/Slack）</li>
+              <li>人工审核 + 批准 Gate</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-label">完整示例：Proactive Bug Triage Loop</div>
+<pre><span style="color:#666"># 每天 9:00 扫描未分类 Bug，自动分类并标记</span>
+<span style="color:#c8102e">/schedule</span> <span style="color:#d4d0c8">"Every day at 9am UTC"</span>
+
+<span style="color:#666"># 若发现新的 unclassified issue，自动运行：</span>
+<span style="color:#c8102e">/goal</span> <span style="color:#d4d0c8">"Classify all unclassified GitHub issues by reading their content and labels, assign priority (P0-P3), add labels, and post a summary to Slack. Stop after 3 rounds if not complete."</span>
+
+<span style="color:#666"># 每轮完成后，第二个 Agent 审查：</span>
+<span style="color:#c8102e">/goal</span> <span style="color:#d4d0c8">"Review the triage output for accuracy, fix any mislabeled issues, and confirm the Slack message is correct."</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 06: 代码质量维护 -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">06</span>
+      <span class="label">CODE QUALITY · 代码质量维护</span>
+    </div>
+    <div class="sec-body">
+      <div class="loop-grid">
+        <div class="loop-card">
+          <div class="loop-card-head">
+            <span class="badge">PILLAR 1</span>
+            <span class="t">保持代码库干净</span>
+          </div>
+          <div class="loop-card-body">
+            <div class="row"><span class="k">原则</span><span class="v">Claude 遵循现有模式，减少熵增</span></div>
+            <div class="row"><span class="k">方法</span><span class="v">在 Skill 中写入项目的 lint / format / 架构规范</span></div>
+          </div>
+        </div>
+        <div class="loop-card">
+          <div class="loop-card-head">
+            <span class="badge">PILLAR 2</span>
+            <span class="t">让 Claude 验证自己</span>
+          </div>
+          <div class="loop-card-body">
+            <div class="row"><span class="k">原则</span><span class="v">把验收标准编码进 Skill，而不是对话</span></div>
+            <div class="row"><span class="k">方法</span><span class="v">Skill = 测试命令 + 通过标准，Agent 自跑自检</span></div>
+          </div>
+        </div>
+        <div class="loop-card">
+          <div class="loop-card-head">
+            <span class="badge">PILLAR 3</span>
+            <span class="t">文档易获取</span>
+          </div>
+          <div class="loop-card-body">
+            <div class="row"><span class="k">原则</span><span class="v">框架 / 库文档有最新最佳实践</span></div>
+            <div class="row"><span class="k">方法</span><span class="v">维护一份项目内 docs/ 或在 Skill 中内嵌参考</span></div>
+          </div>
+        </div>
+        <div class="loop-card">
+          <div class="loop-card-head">
+            <span class="badge">PILLAR 4</span>
+            <span class="t">第二个 Agent 做审查</span>
+          </div>
+          <div class="loop-card-body">
+            <div class="row"><span class="k">原则</span><span class="v">用另一个 Agent 做 code review，减少偏见</span></div>
+            <div class="row"><span class="k">方法</span><span class="v">generator + evaluator 结构性分离</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="tip-box">
+        <div class="tip-icon"></div>
+        <div><strong>系统思维：</strong>单次结果不达标 → 改进系统（Skill / 验证标准 / 工作流），不只是修单个问题。把问题的根因当成"系统需要改进的地方"来处理。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 07: Token 消耗管理 -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">07</span>
+      <span class="label">TOKEN MANAGEMENT · Token 消耗管理</span>
+    </div>
+    <div class="sec-body">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:35%">策略</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>选对工具和模型</strong></td>
+            <td>小任务不用多 Agent / 循环；简单脚本 vs. LLM 推理，成本差 10-100 倍</td>
+          </tr>
+          <tr class="active-row">
+            <td><strong>定义清晰的停止条件</strong></td>
+            <td>模糊目标 = 无限循环 = 爆炸性 Token 消耗。/goal 必须带最大轮次</td>
+          </tr>
+          <tr>
+            <td><strong>大规模前先小范围试点</strong></td>
+            <td>用 /goal 先跑 1-2 次，验证 Token 消耗是否合理，再扩大规模</td>
+          </tr>
+          <tr>
+            <td><strong>确定性工作交给脚本</strong></td>
+            <td>LLM 做推理，脚本做执行。脚本比模型推理便宜 100 倍以上</td>
+          </tr>
+          <tr class="active-row">
+            <td><strong>不要比需要更频繁运行</strong></td>
+            <td>CI 检查：每天 1 次 vs. 每次 commit，Token 节省 10-50 倍</td>
+          </tr>
+          <tr>
+            <td><strong>用 /usage 审查消耗</strong></td>
+            <td>定期运行 /usage 查看 Token 报告，识别异常高消耗的循环</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 08: 选型速查表 -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">08</span>
+      <span class="label">DECISION GUIDE · 选型速查表</span>
+    </div>
+    <div class="sec-body">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:22%">你想交给 Agent 的是</th>
+            <th style="width:28%">使用场景</th>
+            <th>优先用</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>检查步骤</td>
+            <td>探索或决策中，需要判断"这行不行"</td>
+            <td><strong style="color:var(--red)">自定义验证 Skill</strong></td>
+          </tr>
+          <tr class="active-row">
+            <td>停止条件</td>
+            <td>你知道什么叫"完成"，有量化标准</td>
+            <td><strong style="color:var(--red)">/goal</strong></td>
+          </tr>
+          <tr>
+            <td>触发时机</td>
+            <td>工作在你的项目外定时发生</td>
+            <td><strong style="color:var(--red)">/loop · /schedule</strong></td>
+          </tr>
+          <tr class="active-row">
+            <td>完整 Prompt</td>
+            <td>重复性且定义清晰的工作</td>
+            <td><strong style="color:var(--red)">以上全部 + Dynamic Workflows</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 09: 入门建议 -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">09</span>
+      <span class="label">GETTING STARTED · 入门建议</span>
+    </div>
+    <div class="sec-body">
+      <div class="three-col">
+        <div class="col">
+          <div class="col-head">
+            <span class="num">01</span>
+            <span class="label">从瓶颈开始</span>
+          </div>
+          <div class="col-body">
+            <p>从你已是瓶颈的工作开始：</p>
+            <ul>
+              <li>哪些任务你每次都要重复做？</li>
+              <li>哪些 Code Review / CI 检查占了你大量时间？</li>
+              <li>哪些探索性调试让你反复查文档？</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="col-head">
+            <span class="num">02</span>
+            <span class="label">三个核心问题</span>
+          </div>
+          <div class="col-body">
+            <p>拿到一个工作，先问：</p>
+            <ul>
+              <li>能写验证检查吗？→ 是 → /goal</li>
+              <li>目标够清晰吗？→ 是 → 编码进 Skill</li>
+              <li>工作定时来吗？→ 是 → /loop /schedule</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="col-head">
+            <span class="num">03</span>
+            <span class="label">迭代改进</span>
+          </div>
+          <div class="col-body">
+            <p>不要等完美再开始：</p>
+            <ul>
+              <li>先跑起来，观察哪里卡住</li>
+              <li>哪里越界了 → 加 Skill 限制</li>
+              <li>哪里没停 → 加 /goal 轮次</li>
+              <li>迭代改进，比想清楚再动更重要</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PULLQUOTE -->
+  <div class="example-box" style="margin:10px 0;background:#0a0a0a;color:#fff;border-color:#0a0a0a;font-family:Georgia,serif;font-size:14px">
+    <div class="ex-label" style="color:#c8102e">KEY INSIGHT</div>
+    <p style="margin:0;font-style:italic">"Stop asking the AI to do everything in one shot — design a loop where it can try, verify, and retry. The loop is the product."</p>
+    <p style="margin:6px 0 0;font-size:11px;color:#888;font-style:normal">— Loop Engineering 的核心转变：从"写一个完美的 Prompt"到"设计一个让 Agent 自己迭代的系统"</p>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="brand">Loop Engineering · Claude Code</div>
+      <div class="small">
+        <a href="https://code.claude.com/docs/en/goal">code.claude.com/docs</a> ·
+        Claude Code 官方文档 ·
+        AI Engineering
+      </div>
+    </div>
+    <div class="small">
+      redswiss · 2026-07-07 · 四类循环 · /goal · /loop · /schedule · Proactive
+    </div>
+  </footer>
+
+</main>
+</body>
+</html>
