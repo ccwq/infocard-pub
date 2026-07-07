@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex 动态工作流：省 token 的多 Agent 编排术</title>
+  <meta name="description" content="开源 Skill 把 Claude Code 动态工作流搬到 Codex，比原生版本更省 token。">
+  <style>
+    :root{--bg:#f4f6f8;--paper:#fff;--ink:#0b0d12;--muted:#66717f;--faint:#9aa5b2;--line:#e2e7ee;--line2:#cdd5df;--blue:#003399;--blue2:#4b73bd;--blue3:#9db3dd;--soft:#f6f8fb;--soft-blue:#eef4ff;--black:#05070a}
+    *{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+    body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:13px;line-height:1.62}
+    .page{width:min(1180px,calc(100% - 24px));margin:0 auto;padding:18px 0 84px}.sheet{background:var(--paper);border:1px solid var(--line);box-shadow:0 18px 54px rgba(20,35,60,.08);padding:18px}.topline{display:flex;justify-content:space-between;gap:16px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:750}.brand{display:flex;align-items:center;gap:10px;color:var(--ink)}.brand:before{content:"";display:inline-block;width:22px;height:6px;background:var(--blue)}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);gap:18px;align-items:stretch;margin-bottom:18px}.hero-copy{display:grid;align-content:space-between;gap:24px;min-height:360px}.kicker{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}h1{font-size:clamp(42px,7.8vw,92px);line-height:.9;letter-spacing:-.075em;margin:0;color:var(--ink);font-weight:850}.lead{max-width:62ch;color:var(--muted);font-size:16px;line-height:1.72;margin:16px 0 0}.hero-pills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.hero-pill{padding:13px 14px;border-right:1px solid var(--line)}.hero-pill:last-child{border-right:0}.mini-bar{width:34px;height:5px;background:var(--blue);margin-bottom:12px}.hero-pill b{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}.hero-pill span{font-size:12.5px;color:var(--muted);line-height:1.45}.blue-block{background:var(--blue);color:#fff;min-height:360px;padding:22px;display:grid;align-content:space-between}.blue-block .label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:850;color:rgba(255,255,255,.75)}.blue-block .big{font-size:clamp(76px,12vw,150px);line-height:.82;letter-spacing:-.085em;font-weight:900}.blue-block .caption{max-width:32ch;font-size:15px;color:rgba(255,255,255,.82);line-height:1.55}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}.panel{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;min-width:0}.panel.gray{background:var(--soft)}.panel.black{background:var(--black);color:#fff;border-color:var(--black)}.head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px}.panel.black .head{border-color:rgba(255,255,255,.18)}.label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:900;line-height:1.25}.page-no{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:800;white-space:nowrap}.panel h2{font-size:clamp(21px,2.5vw,34px);line-height:1.02;letter-spacing:-.055em;margin:0;font-weight:850}.panel p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.7}.panel.black p{color:rgba(255,255,255,.72)}
+    .step-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}.step-card{background:var(--paper);border:1px solid var(--line);padding:18px}.step-card .num{font-size:48px;line-height:1;letter-spacing:-.06em;font-weight:900;color:var(--blue);margin-bottom:12px}.step-card h3{font-size:18px;font-weight:850;margin:0 0 8px;letter-spacing:-.03em}.step-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}.step-card code{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:3px;font-size:12px;color:var(--blue);font-weight:700;margin-top:8px}
+    .compare-table{width:100%;border-collapse:collapse;font-size:12.5px}.compare-table th{background:var(--soft);padding:10px 12px;text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);font-weight:900;border-bottom:1px solid var(--line)}.compare-table td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}.compare-table tr:last-child td{border-bottom:0}.compare-table .mode-col{font-weight:750;color:var(--ink);white-space:nowrap}.compare-table .feature-col{color:var(--muted);line-height:1.5}.compare-table .issue-col{color:#c0392b;font-size:12px}.compare-table .highlight{background:var(--soft-blue);border-left:3px solid var(--blue)}.compare-table .highlight .mode-col{color:var(--blue)}
+    .wide{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-bottom:14px}.chart-card{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px}.chart-card h2{font-size:clamp(18px,2vw,26px);line-height:1.1;letter-spacing:-.04em;margin:0;font-weight:850}.flow-diagram{background:var(--soft);border:1px solid var(--line);padding:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px}.flow-node{display:inline-flex;align-items:center;background:var(--paper);border:1px solid var(--line);padding:8px 14px;font-weight:700;color:var(--ink);white-space:nowrap}.flow-arrow{color:var(--blue);font-size:16px;font-weight:900}.note-panel{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px}.note-panel .label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:900}.note-panel .big{font-size:clamp(48px,8vw,96px);line-height:.9;letter-spacing:-.06em;font-weight:900;color:var(--blue)}.note-panel p{color:var(--muted);font-size:13px;line-height:1.65;margin:0}
+    .footer{display:flex;justify-content:space-between;padding-top:16px;border-top:1px solid var(--line);margin-top:14px;color:var(--faint);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}.footer a{color:var(--blue);text-decoration:none}
+    @media(max-width:720px){.hero{grid-template-columns:1fr}.grid3{grid-template-columns:1fr}.step-grid{grid-template-columns:1fr}.wide{grid-template-columns:1fr}.compare-table{font-size:11px}.compare-table td,.compare-table th{padding:8px}}
+    @media(max-width:390px){body{font-size:12px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="sheet">
+      <div class="topline">
+        <div class="brand">Codex · Dynamic Workflows</div>
+        <div>INFOCARD · 2026-07-07</div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div>
+            <div class="kicker">OPEN SOURCE SKILL</div>
+            <h1>Codex 动态工作流</h1>
+            <p class="lead">把 Claude Code 动态工作流的编排逻辑完整搬到 OpenAI Codex。比原生版本更省 token。</p>
+          </div>
+          <div class="hero-pills">
+            <div class="hero-pill">
+              <div class="mini-bar"></div>
+              <b>TOKEN</b>
+              <span>比 Claude Code 原生版节省。</span>
+            </div>
+            <div class="hero-pill">
+              <div class="mini-bar"></div>
+              <b>AGENTS</b>
+              <span>LLM 自动生成 JS 编排脚本。</span>
+            </div>
+            <div class="hero-pill">
+              <div class="mini-bar"></div>
+              <b>RESUME</b>
+              <span>进度实时保存，可从中断处恢复。</span>
+            </div>
+          </div>
+        </div>
+        <aside class="blue-block">
+          <div class="label">CORE VALUE</div>
+          <div class="big">JS</div>
+          <div class="caption">中间结果只存在脚本变量里，主 Agent 只看到最终答案。</div>
+        </aside>
+      </section>
+
+      <section class="step-grid">
+        <div class="step-card">
+          <div class="num">01</div>
+          <h3>安装 Skill</h3>
+          <p>跟 Codex 说安装这个 skill，Skill 会自动注入到 Codex 的工具链中。</p>
+          <code>/dynamic</code>
+        </div>
+        <div class="step-card">
+          <div class="num">02</div>
+          <h3>调用指令</h3>
+          <p>在对话框输入 <code>/dynamic</code> 调用动态工作流模式。</p>
+          <code>/dynamic</code>
+        </div>
+        <div class="step-card">
+          <div class="num">03</div>
+          <h3>描述任务</h3>
+          <p>描述你的任务目标，LLM 自动生成编排脚本、启动子代理、进入 /goal 模式执行。</p>
+          <code>/goal</code>
+        </div>
+      </section>
+
+      <section class="grid3">
+        <article class="panel">
+          <div class="head">
+            <div class="label">HOW IT WORKS · 工作原理</div>
+            <div class="page-no">PAGE 01</div>
+          </div>
+          <h2>LLM 生成 JS 编排脚本</h2>
+          <div style="display:grid;gap:12px">
+            <div style="padding:12px;background:var(--soft);border:1px solid var(--line)">
+              <div style="font-size:11px;color:var(--blue);font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">STEP 1</div>
+              <p style="margin:0;color:var(--muted);font-size:12.5px">你只需要描述任务目标（用自然语言）</p>
+            </div>
+            <div style="padding:12px;background:var(--soft);border:1px solid var(--line)">
+              <div style="font-size:11px;color:var(--blue);font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">STEP 2</div>
+              <p style="margin:0;color:var(--muted);font-size:12.5px">LLM 自动生成一段 JavaScript 编排脚本，包含：任务拆分、并行/串行逻辑、验证机制、收敛条件、错误处理</p>
+            </div>
+            <div style="padding:12px;background:var(--soft);border:1px solid var(--line)">
+              <div style="font-size:11px;color:var(--blue);font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">STEP 3</div>
+              <p style="margin:0;color:var(--muted);font-size:12.5px">JS 脚本自动调度执行，主 Agent 只接收最终答案</p>
+            </div>
+          </div>
+        </article>
+        <article class="panel">
+          <div class="head">
+            <div class="label">KEY FEATURES · 核心特性</div>
+            <div class="page-no">PAGE 02</div>
+          </div>
+          <h2>为什么更省 token？</h2>
+          <div style="display:grid;gap:10px">
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:10px;background:var(--soft);border:1px solid var(--line)">
+              <div style="width:32px;height:32px;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:900;font-size:16px;flex-shrink:0">✓</div>
+              <div>
+                <div style="font-weight:750;font-size:13px;margin-bottom:3px">中间结果隔离</div>
+                <div style="color:var(--muted);font-size:12px">子代理结果只存在 JS 变量里，主 Agent 上下文不膨胀。</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:10px;background:var(--soft);border:1px solid var(--line)">
+              <div style="width:32px;height:32px;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:900;font-size:16px;flex-shrink:0">⚔</div>
+              <div>
+                <div style="font-weight:750;font-size:13px;margin-bottom:3px">对抗性验证</div>
+                <div style="color:var(--muted);font-size:12px">部分子代理专门找漏洞、互相反驳，提升结果质量。</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:10px;background:var(--soft);border:1px solid var(--line)">
+              <div style="width:32px;height:32px;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:900;font-size:16px;flex-shrink:0">↺</div>
+              <div>
+                <div style="font-weight:750;font-size:13px;margin-bottom:3px">断点恢复</div>
+                <div style="color:var(--muted);font-size:12px">进度实时保存，中断了可从中断处继续。</div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="panel black">
+          <div class="head">
+            <div class="label">BOTTOM LINE</div>
+            <div class="page-no">PAGE 03</div>
+          </div>
+          <h2>比 Claude Code 原生版本更省 token</h2>
+          <p>传统方案里，所有中间结果都要塞进主 Agent 的上下文窗口。动态工作流通过 JS 变量做信息隔离，让主 Agent 只看到最终答案，从根本上降低 token 消耗。</p>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="chart-card">
+          <div class="head">
+            <div class="label">COMPARISON · 三种模式对比</div>
+            <div class="page-no">PAGE 04</div>
+          </div>
+          <h2>为什么动态工作流更好？</h2>
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>模式</th>
+                <th>特点</th>
+                <th>问题</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mode-col">传统 Subagent</td>
+                <td class="feature-col">子代理之间无法直接通信，所有信息靠主 Agent 中转。</td>
+                <td class="issue-col">上下文爆炸，token 消耗大。</td>
+              </tr>
+              <tr>
+                <td class="mode-col">Agent Team</td>
+                <td class="feature-col">解决了子代理之间的通信问题。</td>
+                <td class="issue-col">最多跑 3-5 个实例，多了就乱；会话一断，状态全丢。</td>
+              </tr>
+              <tr class="highlight">
+                <td class="mode-col">动态工作流 ✓</td>
+                <td class="feature-col">中间结果只存在 JS 变量里，主 Agent 只看到最终答案；内置对抗性验证；进度实时保存，可断点恢复。</td>
+                <td class="issue-col">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+        <aside class="note-panel">
+          <div>
+            <div class="label">TOKEN SAVING</div>
+            <div class="big">JS</div>
+          </div>
+          <p>中间结果隔离是省 token 的关键：主 Agent 不需要看到所有中间过程，只需要最终答案。</p>
+        </aside>
+      </section>
+
+      <footer class="footer">
+        <div>SOURCE · <a href="https://github.com/scasella/claude-dynamic-workflows-codex" target="_blank">scasella / claude-dynamic-workflows-codex</a></div>
+        <div>STYLE · infocard-bigwhite-style · 2026-07-07</div>
+      </footer>
+    </div>
+  </main>
+</body>
+</html>
