@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tutti · 多 Agent 实时协作工作空间</title>
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === topbar === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .topbar-meta{
+      padding:14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 0.8fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);
+      padding:7px 9px 5px;
+      background:#fff;
+      font-weight:900;
+      font-size:14px;
+      line-height:1.1;
+    }
+    .meta-pill-lg .sub{
+      display:block;
+      font-size:9px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:2px;
+    }
+    .meta-pill-md{
+      border:2px solid var(--line);
+      border-left:4px solid var(--red);
+      padding:4px 7px 3px;
+      background:#fff;
+      font-weight:800;
+      font-size:11.5px;
+      line-height:1.25;
+    }
+    .meta-pill-md .sub{
+      display:block;
+      font-size:8.5px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:1px;
+    }
+    .meta-pill-sm{
+      border:2px solid var(--line);
+      border-left:4px solid #666;
+      padding:3px 7px 3px;
+      background:#fff;
+      font-weight:700;
+      font-size:11px;
+      color:#555;
+      line-height:1.3;
+    }
+    .meta-pill-sm .sub{
+      display:block;
+      font-size:8px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#aaa;
+      margin-top:1px;
+    }
+
+    .kicker{
+      display:inline-block;border:2px solid #fff;padding:4px 8px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;
+    }
+    h1.demo-title{
+      margin:10px 0 6px;
+      font-size:clamp(20px,3.2vw,38px);font-weight:800;
+      letter-spacing:-.03em;line-height:1.05;
+    }
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+
+    /* === overview === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* === stats === */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* === pills === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === section === */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{
+      background:var(--ink);color:#fff;padding:7px 12px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+    .sec-body{padding:12px 14px}
+
+    /* === capability grid === */
+    .cap-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .cap-card{
+      border:2px solid var(--line);
+      padding:10px 12px;
+      background:#fff;
+      box-shadow:4px 4px 0 rgba(10,10,10,.08);
+    }
+    .cap-icon{
+      width:28px;height:28px;
+      background:var(--red);
+      border-radius:0;
+      display:flex;align-items:center;justify-content:center;
+      margin-bottom:7px;
+      font-size:14px;
+    }
+    .cap-title{
+      font-size:12px;font-weight:900;letter-spacing:.01em;
+      margin-bottom:4px;
+      color:var(--ink);
+    }
+    .cap-desc{font-size:11.5px;color:#444;line-height:1.55}
+
+    /* === scenario list === */
+    .scenario-list{list-style:none;padding:0;margin:0}
+    .scenario-list li{
+      padding:8px 0;
+      border-bottom:1.5px solid #e8e4dc;
+      display:flex;gap:10px;align-items:flex-start;
+      font-size:12px;line-height:1.55;
+    }
+    .scenario-list li:last-child{border-bottom:none}
+    .scenario-num{
+      flex-shrink:0;
+      width:20px;height:20px;
+      background:var(--red);color:#fff;
+      font-size:10px;font-weight:900;
+      display:flex;align-items:center;justify-content:center;
+      margin-top:1px;
+    }
+    .scenario-text strong{font-weight:800;color:var(--ink)}
+
+    /* === vs table === */
+    .vs-table{width:100%;border-collapse:collapse;font-size:11.5px}
+    .vs-table th{
+      background:var(--ink);color:#fff;
+      padding:6px 10px;text-align:left;font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
+    }
+    .vs-table td{
+      padding:7px 10px;border:1.5px solid var(--line);
+      vertical-align:top;line-height:1.5;
+    }
+    .vs-table tr:nth-child(even) td{background:#faf8f4}
+    .vs-table .bad{color:#999}
+    .vs-table .good{color:var(--red);font-weight:800}
+
+    /* === code block === */
+    .code-block{
+      background:#0a0a0a;color:#d4d0c8;
+      border:2px solid var(--line);
+      padding:12px 14px;
+      overflow-x:auto;
+    }
+    .code-block .cb-label{
+      font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;
+      color:#666;margin-bottom:6px;
+    }
+    .code-block pre{
+      margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:12px;line-height:1.72;white-space:pre-wrap;
+    }
+    .cb-comment{color:#666}
+    .cb-cmd{color:#e06c75}
+    .cb-str{color:#98c379}
+    .cb-kw{color:#c678dd}
+    .cb-var{color:#e5c07b}
+
+    /* === app showcase === */
+    .app-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .app-card{
+      border:2px solid var(--line);
+      padding:10px 10px 8px;
+      background:#fff;
+      text-align:center;
+      box-shadow:4px 4px 0 rgba(10,10,10,.08);
+    }
+    .app-icon{
+      width:32px;height:32px;
+      background:var(--red);
+      margin:0 auto 7px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:15px;
+    }
+    .app-name{font-size:11px;font-weight:900;margin-bottom:4px}
+    .app-desc{font-size:10.5px;color:#666;line-height:1.45}
+
+    /* === footer === */
+    .footer-block{
+      border-top:3px solid var(--line);
+      padding-top:12px;
+      display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+      font-size:11.5px;color:#555;
+    }
+    .footer-link{
+      display:inline-flex;align-items:center;gap:5px;
+      padding:5px 10px;
+      border:2px solid var(--line);
+      background:#fff;
+      font-weight:800;font-size:11px;
+    }
+    .footer-link .dot{width:7px;height:7px;border-radius:50%;background:var(--red)}
+
+    /* === mobile === */
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .cap-grid{grid-template-columns:1fr}
+      .app-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .overview{padding:10px 0}
+      .overview-sentence{font-size:13.5px}
+      .overview-body{font-size:12px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ========== TOPBAR ========== -->
+  <header class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">AI Tool · Open Source</div>
+      <h1 class="demo-title">Tutti<br>多 Agent 实时协作工作空间</h1>
+      <p class="sub-line">把 Claude Code、Codex 等 Agent 拉进同一个工作空间，<br>上下文 / 文件 / 任务全打通，切换不再重新交代背景。</p>
+      <div class="tagline">Apache 2.0 · TypeScript · Context Sharing</div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">823<span class="sub">GitHub Stars</span></div>
+        <div class="meta-pill-lg">Apache 2.0<span class="sub">License</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">TypeScript<span class="sub">Language</span></div>
+        <div class="meta-pill-md">71<span class="sub">Forks</span></div>
+        <div class="meta-pill-sm">tutti.sh<span class="sub">Website</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========== OVERVIEW ========== -->
+  <div class="overview">
+    <div class="overview-sentence">Claude Code 写完 API，Codex 要接手前端？——手动复制上下文要十几分钟，还容易遗漏关键细节。</div>
+    <div class="overview-body">
+      <p>Tutti 是一个开源实时共享工作空间，把多个 AI Agent（Claude Code ↔ Codex ↔ Gemini ↔ OpenClaw）拉进同一个空间，上下文、文件、任务、App 输出全部实时同步，Agent 之间无需手动交接，开箱即用。</p>
+    </div>
+  </div>
+
+  <!-- ========== STATS ========== -->
+  <div class="stats">
+    <div class="stat"><strong>823</strong><span>Stars</span></div>
+    <div class="stat"><strong>71</strong><span>Forks</span></div>
+    <div class="stat"><strong>4+</strong><span>内置应用</span></div>
+    <div class="stat"><strong>实时</strong><span>上下文共享</span></div>
+    <div class="stat"><strong>0</strong><span>额外订阅费用</span></div>
+  </div>
+
+  <!-- ========== PILLS ========== -->
+  <div class="pills">
+    <span class="pill red">多 Agent 协作</span>
+    <span class="pill dark">上下文共享</span>
+    <span class="pill">@ 引用历史会话</span>
+    <span class="pill red">实时工作空间</span>
+    <span class="pill">复用已有订阅</span>
+    <span class="pill dark">Claude Code ↔ Codex</span>
+    <span class="pill">内置 App 生态</span>
+    <span class="pill">Tutti · VM 云协作</span>
+  </div>
+
+  <!-- ========== CORE CAPABILITIES ========== -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <span class="label">Core Capabilities · 核心能力</span>
+    </div>
+    <div class="sec-body">
+      <div class="cap-grid">
+        <div class="cap-card">
+          <div class="cap-icon">@</div>
+          <div class="cap-title">Big @ · 上下文全打通</div>
+          <div class="cap-desc">在 Codex 中 @ Claude Code 的历史会话 / 文件 / App 调用 / 任务，无需复制粘贴。引用历史会话完整上下文，直接在对方的工作上继续构建。</div>
+        </div>
+        <div class="cap-card">
+          <div class="cap-icon">⚡</div>
+          <div class="cap-title">Claude Code ↔ Codex 无缝切换</div>
+          <div class="cap-desc">Claude 写完 API，Codex 直接 @ 接手前端开发，无需重新交代项目背景和架构决策。上下文零丢失，切换成本从十几分钟降到几秒钟。</div>
+        </div>
+        <div class="cap-card">
+          <div class="cap-icon">🔗</div>
+          <div class="cap-title">Reference with "+" · 引用文件与输出</div>
+          <div class="cap-desc">Agent 聊天框点击 "+" 引用本地文件或 App 生成的输出，任何 Agent 产生的内容都能被其他 Agent 直接使用，无需手动下载上传。</div>
+        </div>
+        <div class="cap-card">
+          <div class="cap-icon">🎯</div>
+          <div class="cap-title">任务编排与多项目协作</div>
+          <div class="cap-desc">Agent 之间共享工作视图，知道谁在做什么、任务是否冲突、该并行还是顺序执行。不同提供商的 Agent（Claude / Codex / Gemini / OpenClaw）可以协作不打架。</div>
+        </div>
+        <div class="cap-card">
+          <div class="cap-icon">🧩</div>
+          <div class="cap-title">内置 App 生态 · 可供 Agent 调用</div>
+          <div class="cap-desc">Tutti 自带应用中心：原型设计（UI/UX）、AI Canvas（生图）、文档、AI PPT。支持 Agent 直接调用，输出直接流入下一个 Agent 的工作流。</div>
+        </div>
+        <div class="cap-card">
+          <div class="cap-icon">💰</div>
+          <div class="cap-title">复用已有订阅 · 不额外付费</div>
+          <div class="cap-desc">Tutti 不替代你的 Agent，用你自己的 Claude Code / Codex / Gemini 订阅。Tutti 只是把它们拉进同一个工作空间，让信息流动起来，无需为每个功能单独付费。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== BUILT-IN APPS ========== -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">02</span>
+      <span class="label">Built-in Apps · 内置应用（Agent 可直接调用）</span>
+    </div>
+    <div class="sec-body">
+      <div class="app-grid">
+        <div class="app-card">
+          <div class="app-icon">✏️</div>
+          <div class="app-name">原型设计</div>
+          <div class="app-desc">UI/UX 原型设计工具，Codex 可 @ 调用，直接获得设计稿并接入开发，无需 Figma。</div>
+        </div>
+        <div class="app-card">
+          <div class="app-icon">🎨</div>
+          <div class="app-name">AI Canvas</div>
+          <div class="app-desc">AI 生图应用，支持图像生成、编辑、合成。你或 Agent 生成视觉素材后直接注入开发流。</div>
+        </div>
+        <div class="app-card">
+          <div class="app-icon">📄</div>
+          <div class="app-name">文档</div>
+          <div class="app-desc">结构化文档编辑，支持 Markdown 导出。Codex 起草后直接导出 HTML，产品 / 技术文档一气呵成。</div>
+        </div>
+        <div class="app-card">
+          <div class="app-icon">📊</div>
+          <div class="app-name">AI PPT</div>
+          <div class="app-desc">AI 生成 PPT，支持拖拽模块、手动编辑文字。为外部产品介绍、汇报快速生成演示文稿。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== USE CASES ========== -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">03</span>
+      <span class="label">Use Cases · 典型使用场景</span>
+    </div>
+    <div class="sec-body">
+      <ul class="scenario-list">
+        <li>
+          <span class="scenario-num">1</span>
+          <div class="scenario-text">
+            <strong>Claude Code 开发中切换到 Codex 接手</strong><br>
+            Claude Code 完成 API 层后，Codex @ 引用该会话的完整上下文（接口定义、架构决策、文件结构），直接开始前端开发，无需你手工复述。
+          </div>
+        </li>
+        <li>
+          <span class="scenario-num">2</span>
+          <div class="scenario-text">
+            <strong>多 Agent 并行协作 · 任务自动分配</strong><br>
+            你描述一个目标，Tutti 拆解成子任务，分配给最合适的 Agent（设计 / 文档 / 代码）。各 Agent 看到彼此的进度和输出，冲突自动避免或化解。
+          </div>
+        </li>
+        <li>
+          <span class="scenario-num">3</span>
+          <div class="scenario-text">
+            <strong>上下文无缝衔接 · 全流程不断档</strong><br>
+            PRD 文档 → 设计稿 → 前端代码 → PPT 演示，每一步的输出都被下一个 Agent 直接引用，整条链路没有复制粘贴，没有上下文断层。
+          </div>
+        </li>
+        <li>
+          <span class="scenario-num">4</span>
+          <div class="scenario-text">
+            <strong>Tutti · VM：跨设备多人协作</strong><br>
+            多层虚拟化技术将本地 Agent 状态实时同步到云端共享空间，多人跨设备协作，localhost 网站直接预览，Agent 任务可跨人指派。
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ========== COMPARISON ========== -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="label">Traditional vs Tutti · 传统方式 vs Tutti</span>
+    </div>
+    <div class="sec-body">
+      <table class="vs-table">
+        <thead>
+          <tr>
+            <th style="width:22%">维度</th>
+            <th style="width:39%">传统方式</th>
+            <th style="width:39%">Tutti</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>上下文切换</strong></td>
+            <td class="bad">Agent A → Agent B 需要手工复制粘贴上下文，耗时 10–20 分钟，容易遗漏关键信息</td>
+            <td class="good">@ 一下引用历史会话完整上下文，切换成本 ≈ 0</td>
+          </tr>
+          <tr>
+            <td><strong>文件/输出共享</strong></td>
+            <td class="bad">手动下载、上传、截图、粘贴；Agent 之间信息孤岛严重</td>
+            <td class="good">点击 "+" 直接引用文件或 App 输出，所有 Agent 实时可见</td>
+          </tr>
+          <tr>
+            <td><strong>设计 → 开发链路</strong></td>
+            <td class="bad">设计稿需要 Figma 导出 → 上传 → 粘贴给开发 Agent，至少 3 步手动操作</td>
+            <td class="good">Codex @ 原型设计 App → 生成 UI → 直接进入前端开发，0 步手动操作</td>
+          </tr>
+          <tr>
+            <td><strong>多订阅费用</strong></td>
+            <td class="bad">每个工具单独订阅：Claude Code + Codex + Figma + PPT 工具 + 生图工具</td>
+            <td class="good">复用已有订阅，Tutti 本身免费，Agent 工具自选，0 额外月费</td>
+          </tr>
+          <tr>
+            <td><strong>协作模式</strong></td>
+            <td class="bad">你是 Agent 之间的"信使"：复制上下文、转述需求、协调冲突</td>
+            <td class="good">你描述目标，Tutti 分配任务，Agent 自主协作，你是导演而非信使</td>
+          </tr>
+          <tr>
+            <td><strong>任务可见性</strong></td>
+            <td class="bad">每个 Agent 只知道自己的上下文，不知道谁在做什么</td>
+            <td class="good">实时共享工作视图，Agent 知道彼此进度，冲突自动发现并解决</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========== QUICK START ========== -->
+  <section class="section">
+    <div class="sec-head">
+      <span class="num">05</span>
+      <span class="label">Quick Start · 快速上手</span>
+    </div>
+    <div class="sec-body">
+      <div class="code-block">
+        <div class="cb-label">// 安装 Tutti（本地版）</div>
+        <pre><span class="cb-comment"># 克隆仓库</span>
+<span class="cb-cmd">git</span> <span class="cb-var">clone</span> https://github.com/tutti-os/tutti.git
+<span class="cb-cmd">cd</span> tutti
+
+<span class="cb-comment"># 安装依赖并启动</span>
+<span class="cb-cmd">npm</span> <span class="cb-var">install</span>
+<span class="cb-cmd">npm</span> <span class="cb-var">start</span>
+
+<span class="cb-comment"># Tutti · VM 云协作版（加入等待列表）</span>
+<span class="cb-str">→ https://tutti.sh</span>  <span class="cb-comment"># 注册获取邀请码</span></pre>
+      </div>
+
+      <div style="margin-top:12px" class="code-block">
+        <div class="cb-label">// Codex 中引用 Claude Code 的历史会话</div>
+        <pre><span class="cb-comment"># 在 Codex CLI 中：</span>
+<span class="cb-kw">@</span>claude-code:session-2025-12-01 <span class="cb-comment">// 引用 Claude Code 某次会话的完整上下文</span>
+<span class="cb-kw">@</span>claude-code:file-api.py   <span class="cb-comment">// 引用 Claude Code 产生的具体文件</span>
+<span class="cb-kw">@</span>claude-code:task-design  <span class="cb-comment">// 引用任务状态，直接继续执行</span>
+
+<span class="cb-comment"># 或者让 Codex 直接指挥 Claude Code 做某事</span>
+<span class="cb-kw">@</span>claude-code(app) <span class="cb-str">"继续完成用户认证模块的单元测试"</span>
+
+<span class="cb-comment"># 引用 App 输出</span>
+<span class="cb-kw">+</span><span class="cb-str">prototype-design/latest.png</span>  <span class="cb-comment">// 引用原型设计 App 的最新输出</span></pre>
+      </div>
+
+      <div style="margin-top:12px;padding:10px 12px;border:2px solid var(--line);background:#fff;font-size:11.5px;line-height:1.65">
+        <strong style="color:var(--red)">💡 工作流示例：</strong>PRD 文档 → @ 文档 App 起草 → @ 原型设计 App 生成 UI 稿 → @ Codex 接前端开发 → @ AI PPT 生成演示文稿。全程无需手工复制粘贴，所有上下文和输出在各 Agent 间自动流动。
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FOOTER ========== -->
+  <div class="footer-block">
+    <a class="footer-link" href="https://github.com/tutti-os/tutti"><span class="dot"></span>GitHub</a>
+    <a class="footer-link" href="https://tutti.sh"><span class="dot"></span>tutti.sh</a>
+    <a class="footer-link" href="https://discord.gg/UUemKEWtw6"><span class="dot"></span>Discord</a>
+    <span style="margin-left:auto;font-size:11px;color:#888">Apache 2.0 · © 2025 Tutti OSS</span>
+  </div>
+
+</div>
+</body>
+</html>
