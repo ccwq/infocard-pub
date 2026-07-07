@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>PocketTTS · CPU 运行的轻量语音合成</title>
+<style>
+:root{
+  --bg:#f5f2ec;
+  --paper:#fffdf9;
+  --ink:#0a0a0a;
+  --red:#c8102e;
+  --soft-red:#fff5f6;
+  --line:#0a0a0a;
+  --shadow:6px 6px 0 rgba(10,10,10,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+.topbar{
+  display:flex;justify-content:space-between;align-items:flex-end;
+  border-bottom:3px solid var(--line);padding-bottom:8px;margin-bottom:14px;
+}
+.topbar-left{display:grid;gap:6px}
+.badge{
+  display:inline-block;padding:2px 8px;
+  border:1.5px solid var(--line);background:var(--ink);color:#fff;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+}
+h1.demo-title{font-size:clamp(22px,3.8vw,42px);font-weight:800;margin:4px 0 0;letter-spacing:-.04em;line-height:.96}
+.meta{font-size:11px;color:#666;margin-top:4px}
+.tagline{
+  display:inline-block;padding:3px 8px;
+  border:2px solid var(--red);background:var(--soft-red);color:var(--red);
+  font-size:10.8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px;
+}
+
+.stats{
+  display:flex;flex-wrap:wrap;
+  border:2px solid var(--line);margin-bottom:14px;
+  overflow:hidden;box-shadow:var(--shadow);
+}
+.stat{
+  flex:1;min-width:60px;padding:10px 12px 8px;
+  border-right:2px solid var(--line);text-align:center;background:#fff;
+}
+.stat:last-child{border-right:none}
+.stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+.stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+.pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+.pill.dark{background:var(--ink);color:#fff}
+.pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+.section{
+  border:2px solid var(--line);margin-bottom:10px;
+  overflow:hidden;background:var(--paper);box-shadow:var(--shadow);
+}
+.sec-head{
+  background:var(--ink);color:#fff;padding:7px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+.sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.sec-body{padding:10px 12px}
+
+h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
+
+.grid-2,.grid-3,.grid-4{display:grid;gap:10px;margin-bottom:10px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+.card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+.card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+.card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+.card ul{margin:0;padding-left:14px}
+.card li{margin:3px 0;font-size:12px;color:#333;line-height:1.6}
+
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+tr:nth-child(even) td{background:#faf8f4}
+.check{color:var(--red);font-weight:900;font-size:13px}
+.cross{color:var(--ink);font-weight:900;font-size:13px}
+
+.flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
+.flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+.flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+.flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+
+.btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+.btn.red{background:var(--red);border-color:var(--red)}
+.btn.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+.rule{height:3px;background:var(--ink);margin:10px 0}
+.source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+.footer{margin-top:10px;text-align:center;color:#666;font-size:12px;line-height:1.68}
+.footer a{color:var(--red);font-weight:800}
+.save-btn{
+  position:fixed;right:18px;bottom:18px;z-index:999;
+  border:2px solid var(--line);border-radius:8px;
+  padding:9px 14px;
+  background:linear-gradient(135deg,var(--red) 0%,#a00a22 100%);
+  color:#fff;font-weight:900;letter-spacing:.04em;
+  box-shadow:5px 5px 0 rgba(10,10,10,.2);cursor:pointer;font-size:12px;
+}
+.save-btn:disabled{opacity:.75;cursor:progress}
+
+@media(max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 72px}
+  .grid-4,.grid-3,.grid-2{grid-template-columns:1fr}
+  .stats{flex-direction:column}
+  .stat{border-right:none;border-bottom:2px solid var(--line)}
+  .stat:last-child{border-bottom:none}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div>
+        <span class="badge">AI / LLM</span>
+        <span class="badge">TTS</span>
+      </div>
+      <h1 class="demo-title">PocketTTS</h1>
+      <p class="meta">kyutai-labs · Python · MIT · ★ 5.7k · Fork 615</p>
+      <span class="tagline">CPU 运行的轻量语音合成</span>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat">
+      <strong>1B</strong>
+      <span>参数</span>
+    </div>
+    <div class="stat">
+      <strong>200ms</strong>
+      <span>首音频延迟</span>
+    </div>
+    <div class="stat">
+      <strong>6×</strong>
+      <span>实时速</span>
+    </div>
+    <div class="stat">
+      <strong>2核</strong>
+      <span>仅用 2 CPU 核</span>
+    </div>
+    <div class="stat">
+      <strong>100M</strong>
+      <span>小模型参数</span>
+    </div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill dark">Python</span>
+    <span class="pill dark">PyTorch 2.5+</span>
+    <span class="pill red">本地运行</span>
+    <span class="pill soft">声音克隆</span>
+    <span class="pill">多语言</span>
+    <span class="pill">隐私友好</span>
+    <span class="pill">无 GPU</span>
+    <span class="pill">音频流</span>
+    <span class="pill">CLI / API</span>
+  </div>
+
+  <!-- 01 项目定位 -->
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">01</span> · <span class="label">项目定位</span></div>
+    </div>
+    <div class="sec-body">
+      <p><strong>PocketTTS</strong> 是 Kyutai Labs 开源的轻量级文本转语音（TTS）模型，专为 <strong>CPU 运行</strong>设计，无需 GPU 或云端 API。一行命令即可安装，一行代码即可生成语音。</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">核心理念</div>
+          <h4>装进 CPU 口袋的 TTS</h4>
+          <p>Forget about the hassle of using GPUs and web APIs. 一行 pip install，一次函数调用，直接生成音频。</p>
+        </div>
+        <div class="card">
+          <div class="lead">性能亮点</div>
+          <h4>超低延迟 · 极速合成</h4>
+          <ul>
+            <li>MacBook Air M4 仅用 2 核 CPU</li>
+            <li>生成速度 6 倍于实时播放</li>
+            <li>首音频块延迟仅 ~200ms</li>
+            <li>支持无限长文本输入</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 核心功能 -->
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">02</span> · <span class="label">核心功能</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">🎤 声音克隆</div>
+          <h4>20 秒音频即克隆</h4>
+          <p>上传任意 wav 文件作为参考，生成对应音色的语音。推荐提前降噪处理以获得最佳效果。</p>
+        </div>
+        <div class="card">
+          <div class="lead">🌍 多语言支持</div>
+          <h4>6 种语言原生支持</h4>
+          <ul>
+            <li>English · Français</li>
+            <li>Deutsch · Português</li>
+            <li>Italiano · Español</li>
+          </ul>
+          <p>非英语语言可选用 24 层高质量变体（更大模型，速度略慢）。</p>
+        </div>
+        <div class="card">
+          <div class="lead">🔒 隐私本地运行</div>
+          <h4>数据不出本机</h4>
+          <p>纯本地运行，无网络请求。适合对数据隐私有严格要求的场景（如企业内部应用、医疗、客服等）。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">📡 音频流式输出</div>
+          <h4>边生成边播放</h4>
+          <p>支持流式输出，可在首帧音频生成后立即开始播放，无需等待完整合成完成。</p>
+        </div>
+        <div class="card">
+          <div class="lead">🎭 预设音色库</div>
+          <h4>28+ 预置音色</h4>
+          <p>内置 alba, estelle, giovanni, lola, juergen 等多音色，覆盖英/法/德/意/西/葡语。</p>
+        </div>
+        <div class="card">
+          <div class="lead">🖥️ 多端部署</div>
+          <h4>Python / CLI / Server</h4>
+          <p>Python API、CLI 命令、本地 HTTP 服务多模式，支持 Docker、WASM、ONNX Runtime 等多平台。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 快速上手 SOP -->
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">03</span> · <span class="label">快速上手 SOP</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="flow">
+        <div class="flow-item red">pip install</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">CLI 生成</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item red">播放音频</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">安装（推荐 uvx）</div>
+          <pre style="background:#1a1a1a;color:#f5f2ec;padding:10px;border:2px solid var(--line);font-size:11px;overflow-x:auto;border-radius:0;margin:6px 0">uvx pocket-tts generate
+
+# 或 pip 安装
+pip install pocket-tts
+pocket-tts generate</pre>
+          <p style="margin-top:6px">要求：Python 3.10~3.14 + PyTorch 2.5+，<strong>无需 GPU 版 PyTorch</strong>。</p>
+        </div>
+        <div class="card">
+          <div class="lead">Python API</div>
+          <pre style="background:#1a1a1a;color:#f5f2ec;padding:10px;border:2px solid var(--line);font-size:11px;overflow-x:auto;border-radius:0;margin:6px 0">from pocket_tts import generate_audio
+
+# 基础生成
+generate_audio("Hello world", "output.wav")
+
+# 指定音色
+generate_audio("Bonjour le monde", "output.wav",
+               voice="estelle")</pre>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">CLI 完整用法</div>
+          <pre style="background:#1a1a1a;color:#f5f2ec;padding:10px;border:2px solid var(--line);font-size:11px;overflow-x:auto;border-radius:0;margin:6px 0"># 指定文本和音色
+pocket-tts generate --text "你好世界" --voice alba
+
+# 指定语言（24层高质量模型）
+pocket-tts generate --language italian_24l
+
+# 克隆自定义声音
+pocket-tts generate --voice ./my_voice.wav</pre>
+        </div>
+        <div class="card">
+          <div class="lead">本地 HTTP 服务</div>
+          <pre style="background:#1a1a1a;color:#f5f2ec;padding:10px;border:2px solid var(--line);font-size:11px;overflow-x:auto;border-radius:0;margin:6px 0"># 启动服务
+pocket-tts serve
+
+# 访问 http://localhost:8000
+# 使用 Web 界面实时合成</pre>
+          <p style="margin-top:6px">服务模式保持模型常驻内存，响应更快，适合频繁调用的应用。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 技术栈 -->
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">04</span> · <span class="label">技术栈与生态</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="grid-4">
+        <div class="card">
+          <div class="lead">核心语言</div>
+          <h4>Python</h4>
+          <p>主开发语言，API 设计简洁</p>
+        </div>
+        <div class="card">
+          <div class="lead">深度学习框架</div>
+          <h4>PyTorch 2.5+</h4>
+          <p>支持 CUDA（可选），但 CPU 推理无需 GPU</p>
+        </div>
+        <div class="card">
+          <div class="lead">模型格式</div>
+          <h4>HuggingFace</h4>
+          <p>模型托管于 HF Hub，一键下载</p>
+        </div>
+        <div class="card">
+          <div class="lead">模型大小</div>
+          <h4>100M 参数</h4>
+          <p>轻量 Transformer，约 200MB</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>实现</th>
+            <th>语言</th>
+            <th>平台</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>官方 Python</td>
+            <td>Python</td>
+            <td>跨平台</td>
+            <td>主版本，pip install 直接用</td>
+          </tr>
+          <tr>
+            <td>PocketTTS.cpp</td>
+            <td>C++</td>
+            <td>跨平台</td>
+            <td>ONNX Runtime，无 Python 依赖</td>
+          </tr>
+          <tr>
+            <td>sherpa-onnx</td>
+            <td>C++/多语言</td>
+            <td>Win/Mac/Linux/嵌入式</td>
+            <td>12 种语言绑定，WASM 支持</td>
+          </tr>
+          <tr>
+            <td>pocket-tts-candle</td>
+            <td>Rust</td>
+            <td>WASM</td>
+            <td>浏览器内运行</td>
+          </tr>
+          <tr>
+            <td>xn (Rust)</td>
+            <td>Rust</td>
+            <td>跨平台</td>
+            <td>@LaurentMazare 移植</td>
+          </tr>
+          <tr>
+            <td>Native macOS</td>
+            <td>Core ML</td>
+            <td>macOS</td>
+            <td>无需 Python，完全设备端</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 05 适用场景 -->
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">05</span> · <span class="label">适用场景</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">💼 企业内部</div>
+          <h4>私有化 TTS 部署</h4>
+          <ul>
+            <li>客服机器人语音播报</li>
+            <li>内部通知语音化</li>
+            <li>文档朗读辅助</li>
+            <li>无外网访问的安全环境</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="lead">🏥 医疗 / 隐私敏感</div>
+          <h4>数据不离院/本地</h4>
+          <ul>
+            <li>患者病历朗读</li>
+            <li>医疗记录语音转写</li>
+            <li>HIPAA 合规场景</li>
+            <li>心理咨询 / 隐私对话</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="lead">🎙️ 内容创作</div>
+          <h4>个人 / 小团队 TTS</h4>
+          <ul>
+            <li>播客 / 有声书制作</li>
+            <li>短视频配音</li>
+            <li>游戏角色语音</li>
+            <li>无 GPU 的创作者</li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">✓ 适合 PocketTTS</div>
+          <h4>轻量 / 隐私 / 无 GPU</h4>
+          <ul>
+            <li>不需要顶级音质的场景</li>
+            <li>需要本地离线运行</li>
+            <li>成本敏感，不想付云 API 费</li>
+            <li>资源受限的边缘设备</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="lead">✗ 可能不适合</div>
+          <h4>追求极致音质</h4>
+          <ul>
+            <li>专业广播 / 电影配音（需更高保真）</li>
+            <li>超多语言覆盖（当前仅 6 种）</li>
+            <li>超大规模并发（考虑云服务）</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 生态项目 -->
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">06</span> · <span class="label">生态项目精选</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">🍎 Native macOS App</div>
+          <h4>pocket-tts-macos</h4>
+          <p>Core ML 转换版，完全设备端运行，无需 Python，包含签名打包的 .app 下载。</p>
+        </div>
+        <div class="card">
+          <div class="lead">🐳 Docker / Wyoming</div>
+          <h4>pocket-tts-wyoming</h4>
+          <p>Docker 容器，通过 Wyoming 协议与 Home Assistant 语音集成，开箱即用。</p>
+        </div>
+        <div class="card">
+          <div class="lead">🖥️ OpenAI 兼容 API</div>
+          <h4>pocket-tts-openai_streaming_server</h4>
+          <p>OpenAI TTS API 兼容的流式服务器，Docker 部署，.exe 桌面客户端。</p>
+        </div>
+        <div class="card">
+          <div class="lead">🎮 游戏 / Unity</div>
+          <h4>pocket-tts-unity</h4>
+          <p>Unity 6 集成包，在游戏内实时生成 NPC 语音，支持语音克隆预设。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 07 链接 -->
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">07</span> · <span class="label">链接与资源</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">GitHub</div>
+          <h4>kyutai-labs/pocket-tts</h4>
+          <p>★ 5.7k · Fork 615 · MIT License</p>
+          <p>Issues: 53 个开放 · 最后提交: 2 周前</p>
+        </div>
+        <div class="card">
+          <div class="lead">在线体验</div>
+          <h4>Web Demo</h4>
+          <p><a href="https://kyutai.org/pocket-tts">https://kyutai.org/pocket-tts</a></p>
+          <p>无需安装，浏览器直接体验</p>
+        </div>
+        <div class="card">
+          <div class="lead">模型与音色</div>
+          <h4>HuggingFace</h4>
+          <p><a href="https://huggingface.co/kyutai/pocket-tts">模型</a> · <a href="https://huggingface.co/kyutai/tts-voices">音色库</a></p>
+          <p>含各音色许可证说明</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+  <p class="source-note">infocard-redswiss-style · 开源 TTS 卡 · 来源：kyutai-labs/pocket-tts README · MIT License</p>
+  <p class="footer">PocketTTS · CPU TTS · Kyutai Labs · <a href="https://github.com/kyutai-labs/pocket-tts">GitHub</a> · MIT License</p>
+</main>
+
+<button class="save-btn" id="saveBtn" type="button">保存 PNG</button>
+<script>
+(function(){
+  var btn=document.getElementById('saveBtn');
+  var fname='20260707-pocket-tts.png';
+  async function exportPng(){
+    btn.disabled=true;
+    var old=btn.textContent;btn.textContent='导出中…';
+    try{
+      var[{default:html2canvas}]=await Promise.all([
+        import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')
+      ]);
+      var canvas=await html2canvas(document.body,{
+        backgroundColor:'#f5f2ec',scale:2,useCORS:true,
+        scrollY:-window.scrollY,
+        windowWidth:document.documentElement.clientWidth,
+        windowHeight:document.documentElement.clientHeight
+      });
+      var link=document.createElement('a');
+      link.download=fname;link.href=canvas.toDataURL('image/png');link.click();
+      btn.textContent='已保存';
+      setTimeout(function(){btn.textContent=old},1200);
+    }catch(e){console.error(e);alert('PNG 导出失败，请查看控制台。');}
+    finally{btn.disabled=false;}
+  }
+  btn.addEventListener('click',exportPng);
+})();
+</script>
+</body>
+</html>
