@@ -7,8 +7,16 @@ const {
   readText,
   serializeIndexYaml,
 } = require("./index-build-lib");
+const { execFileSync } = require("child_process");
+const path = require("path");
+
+function runVerifyMetaTimestamps() {
+  const script = path.join(__dirname, "verify-meta-timestamps.js");
+  execFileSync(process.execPath, [script], { stdio: "inherit" });
+}
 
 function main() {
+  runVerifyMetaTimestamps();
   const expected = buildIndexData();
   const actualYaml = readText(INDEX_PATH);
   const expectedYaml = serializeIndexYaml(expected);
