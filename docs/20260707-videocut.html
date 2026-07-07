@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VideoCut · Codex 中文口播自动剪辑</title>
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === 顶栏：diagonal red-black hero + 右侧 meta pill === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .topbar-meta{
+      padding:9px 14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      background:var(--red);color:#fff;
+      padding:2px 9px;font-size:12px;font-weight:700;letter-spacing:.03em;
+      display:inline-block;white-space:nowrap;
+    }
+    .meta-chip{
+      background:var(--paper);color:var(--ink);
+      border:1.5px solid var(--line);
+      padding:2px 7px;font-size:11px;font-weight:500;
+      display:inline-block;white-space:nowrap;
+    }
+    .meta-stat{
+      display:flex;flex-direction:column;gap:1px;
+    }
+    .meta-stat-label{font-size:10px;color:#555;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+    .meta-stat-val{font-size:13px;font-weight:700}
+    .meta-stat-val.red{color:var(--red)}
+
+    /* hero 内 */
+    .hero-eyebrow{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;opacity:.75;margin-bottom:6px}
+    .hero-title{font-size:clamp(22px,3vw,30px);font-weight:900;line-height:1.1;margin-bottom:8px;letter-spacing:-.02em}
+    .hero-desc{font-size:12.5px;line-height:1.55;opacity:.88;max-width:520px}
+    .hero-tags{margin-top:10px;display:flex;flex-wrap:wrap;gap:5px}
+    .hero-tag{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35);padding:2px 8px;font-size:10.5px;font-weight:500}
+
+    /* === body layout === */
+    .body-grid{
+      display:grid;grid-template-columns:2fr 1fr;gap:14px;
+    }
+    .panel{
+      background:var(--paper);border:2px solid var(--line);
+      padding:13px;box-shadow:var(--shadow);
+    }
+    .panel-label{
+      font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+      background:var(--ink);color:#fff;padding:2px 8px;display:inline-block;margin-bottom:10px;
+    }
+    .panel-label.red{background:var(--red)}
+
+    /* === workflow steps === */
+    .workflow-list{list-style:none;display:flex;flex-direction:column;gap:0}
+    .workflow-item{
+      display:grid;grid-template-columns:28px 1fr;
+      border-bottom:1.5px dashed #d5d0c8;
+      padding:5px 0;
+    }
+    .workflow-item:last-child{border-bottom:none}
+    .step-num{
+      font-size:13px;font-weight:900;color:var(--red);font-family:ui-monospace,monospace;
+      display:flex;align-items:center;justify-content:center;
+      border:2px solid var(--red);width:22px;height:22px;border-radius:50%;
+    }
+    .step-content{}
+    .step-title{font-weight:700;font-size:12.5px}
+    .step-sub{font-size:11px;color:#555;margin-top:1px}
+
+    /* === pain points === */
+    .pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .pain-card{
+      background:#fff8f8;border:1.5px solid #e8c0c0;padding:9px 11px;
+    }
+    .pain-icon{font-size:16px;margin-bottom:3px}
+    .pain-text{font-size:11.5px;line-height:1.5}
+
+    /* === vs comparison === */
+    .vs-table{width:100%;border-collapse:collapse;font-size:12px}
+    .vs-table th{background:var(--ink);color:#fff;padding:5px 9px;text-align:left;font-size:10px;letter-spacing:.08em}
+    .vs-table td{padding:6px 9px;border-bottom:1px solid #e0dcd4;vertical-align:top}
+    .vs-table tr:last-child td{border-bottom:none}
+    .vs-table td:first-child{font-weight:700}
+    .vs-table .highlight{color:var(--red);font-weight:700}
+
+    /* === tech stack === */
+    .stack-grid{display:flex;flex-wrap:wrap;gap:5px}
+    .stack-badge{
+      background:var(--ink);color:#fff;
+      padding:3px 9px;font-size:11px;font-weight:600;
+      border:1.5px solid var(--ink);
+    }
+    .stack-badge.red-bg{background:var(--red);border-color:var(--red)}
+
+    /* === install command === */
+    .cmd-block{
+      background:#1a1a1a;color:#f0c040;
+      padding:11px 14px;font-family:ui-monospace,monospace;
+      font-size:12.5px;line-height:1.7;
+      border:2px solid var(--line);
+      overflow-x:auto;
+    }
+    .cmd-comment{color:#6a9955}
+    .cmd-prompt{color:#4ec9b0;font-weight:700}
+
+    /* === SOP steps === */
+    .sop-flow{display:flex;flex-direction:column;gap:6px}
+    .sop-row{
+      display:grid;grid-template-columns:1fr auto;
+      border:1.5px solid var(--line);
+      background:var(--paper);
+    }
+    .sop-left{padding:7px 10px;font-size:12px}
+    .sop-title{font-weight:700;margin-bottom:1px}
+    .sop-cmd{font-size:10.5px;color:#555;font-family:ui-monospace,monospace;margin-top:2px}
+    .sop-arrow{
+      display:flex;align-items:center;padding:0 10px;
+      color:var(--red);font-size:18px;font-weight:900;
+    }
+
+    /* === sidebar === */
+    .sidebar{display:flex;flex-direction:column;gap:10px}
+    .sidebar .panel-label{margin-bottom:8px}
+
+    /* === install targets === */
+    .install-targets{display:flex;flex-direction:column;gap:4px}
+    .install-row{
+      display:grid;grid-template-columns:auto 1fr;
+      gap:7px;align-items:start;
+      border:1.5px solid #ddd;padding:5px 8px;background:#fff;
+      font-size:11.5px;
+    }
+    .install-icon{font-size:14px}
+    .install-info{line-height:1.4}
+    .install-name{font-weight:700}
+    .install-path{font-family:ui-monospace,monospace;font-size:10.5px;color:#666}
+
+    /* === key files structure === */
+    .file-tree{font-family:ui-monospace,monospace;font-size:11px;line-height:1.8}
+    .file-tree .dir{color:var(--ink);font-weight:700}
+    .file-tree .file{color:#666}
+    .file-tree .indent{padding-left:14px;color:#aaa}
+
+    /* === footer === */
+    .footer{
+      margin-top:14px;
+      border-top:2px solid var(--line);
+      padding-top:10px;
+      font-size:11px;color:#777;
+      display:flex;justify-content:space-between;flex-wrap:wrap;gap:5px;
+    }
+    .footer a{color:var(--red);text-decoration:underline}
+
+    /* === responsive === */
+    @media(max-width:640px){
+      .body-grid{grid-template-columns:1fr}
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .pain-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ========== TOPBAR ========== -->
+  <div class="topbar">
+    <div class="topbar-hero">
+      <div class="hero-eyebrow">AI Agent · Codex / Claude Code Skill</div>
+      <div class="hero-title">VideoCut<br>中文口播自动剪辑</div>
+      <div class="hero-desc">
+        不是 AI 生成视频，是把剪辑流程自动化——把中文口播原片（停顿、口误、重复、废话）快速处理成可发布竖屏短片。Codex / Claude Code 读写工作流，人只看页面确认。
+      </div>
+      <div class="hero-tags">
+        <span class="hero-tag">🔥 2,550 Stars</span>
+        <span class="hero-tag">Apache-2.0</span>
+        <span class="hero-tag">FFmpeg</span>
+        <span class="hero-tag">火山引擎 ASR</span>
+        <span class="hero-tag">Codex · Claude Code</span>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-stat">
+          <span class="meta-stat-label">Stars</span>
+          <span class="meta-stat-val red">2,550</span>
+        </div>
+        <div class="meta-stat">
+          <span class="meta-stat-label">Forks</span>
+          <span class="meta-stat-val">354</span>
+        </div>
+        <div class="meta-stat">
+          <span class="meta-stat-label">License</span>
+          <span class="meta-stat-val">Apache-2.0</span>
+        </div>
+        <div class="meta-stat">
+          <span class="meta-stat-label">语言</span>
+          <span class="meta-stat-val">HTML / JS</span>
+        </div>
+      </div>
+      <div class="meta-row-low">
+        <span class="meta-chip">视频剪辑</span>
+        <span class="meta-chip">Codex</span>
+        <span class="meta-chip">中文口播</span>
+        <span class="meta-chip">AI工作流</span>
+        <span class="meta-chip">FFmpeg</span>
+        <span class="meta-chip">竖屏导出</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== BODY ========== -->
+  <div class="body-grid">
+
+    <!-- === LEFT COLUMN === -->
+    <div class="left-col" style="display:flex;flex-direction:column;gap:14px">
+
+      <!-- 8步工作流 -->
+      <div class="panel">
+        <div class="panel-label red">8 步工作流</div>
+        <ol class="workflow-list">
+          <li class="workflow-item">
+            <span class="step-num">1</span>
+            <div class="step-content">
+              <div class="step-title">自动转录</div>
+              <div class="step-sub">火山引擎录音文件识别 2.0，把口播音频转成带时间戳的 SRT 字幕</div>
+            </div>
+          </li>
+          <li class="workflow-item">
+            <span class="step-num">2</span>
+            <div class="step-content">
+              <div class="step-title">口误 / 重复 / 静音检测</div>
+              <div class="step-sub">AI 分析字幕，识别停顿过长、重复词句、口误，重新标记时间区间</div>
+            </div>
+          </li>
+          <li class="workflow-item">
+            <span class="step-num">3</span>
+            <div class="step-content">
+              <div class="step-title">审核页确认</div>
+              <div class="step-sub">生成 HTML 审核页，人工勾选要保留 / 删除的片段，Codex 读取结果</div>
+            </div>
+          </li>
+          <li class="workflow-item">
+            <span class="step-num">4</span>
+            <div class="step-content">
+              <div class="step-title">剪素材（粗剪）</div>
+              <div class="step-sub">FFmpeg 按确认区间剪辑 source_cut.mp4，生成干净的基础素材包</div>
+            </div>
+          </li>
+          <li class="workflow-item">
+            <span class="step-num">5</span>
+            <div class="step-content">
+              <div class="step-title">字幕校对</div>
+              <div class="step-sub">基于剪后视频重新转写，AI 校对字幕，输出标准 subtitles.srt</div>
+            </div>
+          </li>
+          <li class="workflow-item">
+            <span class="step-num">6</span>
+            <div class="step-content">
+              <div class="step-title">拆分镜</div>
+              <div class="step-content">按字幕行拆分镜，判断每句配什么画面（截图 / 原视频片段 / 标注动画），生成分镜审核页</div>
+            </div>
+          </li>
+          <li class="workflow-item">
+            <span class="step-num">7</span>
+            <div class="step-content">
+              <div class="step-title">时间线预览</div>
+              <div class="step-sub">HTML 时间线页面，原视频 + 截图 + 标注动画混排，可视化节奏和画面切换</div>
+            </div>
+          </li>
+          <li class="workflow-item">
+            <span class="step-num">8</span>
+            <div class="step-content">
+              <div class="step-title">导出竖屏 MP4</div>
+              <div class="step-sub">确认后 FFmpeg 合成 1080×1440 竖屏 MP4，可直接发布到抖音 / 视频号</div>
+            </div>
+          </li>
+        </ol>
+      </div>
+
+      <!-- 解决痛点 -->
+      <div class="panel">
+        <div class="panel-label red">解决痛点</div>
+        <div class="pain-grid">
+          <div class="pain-card">
+            <div class="pain-icon">⏸️</div>
+            <div class="pain-text">停顿、沉默过长，节奏拖沓</div>
+          </div>
+          <div class="pain-card">
+            <div class="pain-icon">🔁</div>
+            <div class="pain-text">重复说同一句话，啰嗦不精炼</div>
+          </div>
+          <div class="pain-card">
+            <div class="pain-icon">❌</div>
+            <div class="pain-text">口误、说错字，录完才发现</div>
+          </div>
+          <div class="pain-card">
+            <div class="pain-icon">🎬</div>
+            <div class="pain-text">Premiere 时间线操作复杂，上手门槛高</div>
+          </div>
+          <div class="pain-card">
+            <div class="pain-icon">📱</div>
+            <div class="pain-text">竖屏内容手动裁剪、加字幕效率低</div>
+          </div>
+          <div class="pain-card">
+            <div class="pain-icon">🤖</div>
+            <div class="pain-text">AI 剪辑不知道该剪哪里，靠谱程度低</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 与 VideoUse 区别 -->
+      <div class="panel">
+        <div class="panel-label">VideoCut vs VideoUse</div>
+        <table class="vs-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>VideoCut（本期）</th>
+              <th>VideoUse（通用）</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>定位</td>
+              <td class="highlight">中文口播专用</td>
+              <td>通用视频剪辑</td>
+            </tr>
+            <tr>
+              <td>输入</td>
+              <td class="highlight">口播原片（录屏 / 真人出镜）</td>
+              <td>任意视频内容</td>
+            </tr>
+            <tr>
+              <td>核心能力</td>
+              <td class="highlight">口误检测 + 自动粗剪 + 字幕校对</td>
+              <td>视频分割、转场、特效</td>
+            </tr>
+            <tr>
+              <td>输出</td>
+              <td class="highlight">1080×1440 竖屏 MP4</td>
+              <td>任意比例 MP4</td>
+            </tr>
+            <tr>
+              <td>人工介入</td>
+              <td class="highlight">审核页确认（2步人工）</td>
+              <td>可能全流程自动</td>
+            </tr>
+            <tr>
+              <td>适用场景</td>
+              <td class="highlight">教程 / 产品演示 / 知识讲解</td>
+              <td>多类型视频内容</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 技术栈 -->
+      <div class="panel">
+        <div class="panel-label">技术栈</div>
+        <div class="stack-grid">
+          <span class="stack-badge red-bg">FFmpeg</span>
+          <span class="stack-badge">火山引擎 ASR 2.0</span>
+          <span class="stack-badge">Codex API</span>
+          <span class="stack-badge">Claude Code</span>
+          <span class="stack-badge">Node.js 18+</span>
+          <span class="stack-badge">HTML/CSS</span>
+          <span class="stack-badge">SRT 字幕</span>
+          <span class="stack-badge">1080×1440</span>
+          <span class="stack-badge">npx 安装器</span>
+        </div>
+      </div>
+
+      <!-- 安装命令 -->
+      <div class="panel">
+        <div class="panel-label red">一行安装</div>
+        <div class="cmd-block">
+<span class="cmd-comment"># 一键安装到 Codex + Claude Code</span>
+<span class="cmd-prompt">npx</span> chengfeng-videocut-skills install
+
+<span class="cmd-comment"># 只安装到 Codex</span>
+<span class="cmd-prompt">npx</span> chengfeng-videocut-skills install --target codex
+
+<span class="cmd-comment"># 配置环境变量</span>
+<span class="cmd-prompt">cd</span> ~/.codex/skills/chengfeng-videocut-skills
+<span class="cmd-prompt">cp</span> .env.example .env
+<span class="cmd-comment"># 编辑 .env 填入 VOLCENGINE_API_KEY</span>
+        </div>
+      </div>
+
+    </div><!-- /left-col -->
+
+    <!-- === RIGHT COLUMN === -->
+    <div class="sidebar">
+
+      <!-- Skills 清单 -->
+      <div class="panel">
+        <div class="panel-label red">4 个 Skill</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="border:1.5px solid var(--line);padding:7px 9px;background:#fff5f5">
+            <div style="font-size:11.5px;font-weight:800;color:var(--red);margin-bottom:2px">剪口播</div>
+            <div style="font-size:11px;color:#555">审核确认后粗剪，剪后重转写并 AI 校对字幕</div>
+          </div>
+          <div style="border:1.5px solid var(--line);padding:7px 9px;background:#fff">
+            <div style="font-size:11.5px;font-weight:800;margin-bottom:2px">口播成片</div>
+            <div style="font-size:11px;color:#555">分镜页面 → 时间线预览 → 导出 1080×1440 MP4</div>
+          </div>
+          <div style="border:1.5px solid var(--line);padding:7px 9px;background:#fff">
+            <div style="font-size:11.5px;font-weight:800;margin-bottom:2px">安装</div>
+            <div style="font-size:11px;color:#555">检查 Node.js、FFmpeg、火山引擎 API Key</div>
+          </div>
+          <div style="border:1.5px solid var(--line);padding:7px 9px;background:#fff">
+            <div style="font-size:11.5px;font-weight:800;margin-bottom:2px">自进化</div>
+            <div style="font-size:11px;color:#555">把用户反馈沉淀回剪口播 / 口播成片规则</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 推荐输入结构 -->
+      <div class="panel">
+        <div class="panel-label">推荐目录结构</div>
+        <div class="file-tree">
+          <div><span class="dir">project/</span></div>
+          <div class="indent"><span class="file">source_cut.mp4</span>  ← 粗剪后视频</div>
+          <div class="indent"><span class="file">subtitles.srt</span>    ← 校对后字幕</div>
+          <div class="indent"><span class="dir">assets/</span></div>
+          <div class="indent">
+            <div class="indent"><span class="file">产品截图.png</span></div>
+            <div class="indent"><span class="file">评论截图.png</span></div>
+            <div class="indent"><span class="file">结果页.png</span></div>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:10.5px;color:#666;line-height:1.5">
+          只要有 <code>source_cut.mp4</code> + <code>subtitles.srt</code> 就能跑，截图素材可后补。
+        </div>
+      </div>
+
+      <!-- 快速使用 SOP -->
+      <div class="panel">
+        <div class="panel-label red">快速上手 SOP</div>
+        <div class="sop-flow">
+          <div class="sop-row">
+            <div class="sop-left">
+              <div class="sop-title">Step 1 · 安装依赖</div>
+              <div class="sop-cmd">npx chengfeng-videocut-skills install</div>
+            </div>
+          </div>
+          <div class="sop-arrow">↓</div>
+          <div class="sop-row">
+            <div class="sop-left">
+              <div class="sop-title">Step 2 · 填 API Key</div>
+              <div class="sop-cmd">编辑 ~/.codex/skills/.../.env</div>
+            </div>
+          </div>
+          <div class="sop-arrow">↓</div>
+          <div class="sop-row">
+            <div class="sop-left">
+              <div class="sop-title">Step 3 · 粗剪口播</div>
+              <div class="sop-cmd">用 chengfeng-videocut-skills:剪口播</div>
+            </div>
+          </div>
+          <div class="sop-arrow">↓</div>
+          <div class="sop-row">
+            <div class="sop-left">
+              <div class="sop-title">Step 4 · 确认审核页</div>
+              <div class="sop-cmd">在生成页面勾选要保留的片段</div>
+            </div>
+          </div>
+          <div class="sop-arrow">↓</div>
+          <div class="sop-row">
+            <div class="sop-left">
+              <div class="sop-title">Step 5 · 生成竖屏成片</div>
+              <div class="sop-cmd">用 chengfeng-videocut-skills:口播成片</div>
+            </div>
+          </div>
+          <div class="sop-arrow">↓</div>
+          <div class="sop-row" style="border-color:var(--red);background:#fff8f8">
+            <div class="sop-left">
+              <div class="sop-title" style="color:var(--red)">Step 6 · 导出发布</div>
+              <div class="sop-cmd">1080×1440 MP4 → 抖音 / 视频号</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 安装目标 -->
+      <div class="panel">
+        <div class="panel-label">安装目标</div>
+        <div class="install-targets">
+          <div class="install-row">
+            <span class="install-icon">🤖</span>
+            <div class="install-info">
+              <div class="install-name">OpenAI Codex</div>
+              <div class="install-path">~/.codex/skills/chengfeng-videocut-skills</div>
+            </div>
+          </div>
+          <div class="install-row">
+            <span class="install-icon">🧠</span>
+            <div class="install-info">
+              <div class="install-name">Claude Code</div>
+              <div class="install-path">~/.claude/skills/chengfeng-videocut-skills</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 来源信息 -->
+      <div class="panel" style="background:var(--ink);color:#fff">
+        <div class="panel-label" style="background:#c8102e">来源 &amp; 作者</div>
+        <div style="font-size:11.5px;line-height:1.8">
+          <div><strong>作者：</strong>chfeng / AI产品自由</div>
+          <div><strong>GitHub：</strong>Agentchengfeng</div>
+          <div><strong>X：</strong>@chengfeng240928</div>
+          <div><strong>平台：</strong>小红书 · 公众号 · B站 · 抖音</div>
+          <div style="margin-top:6px;font-size:10.5px;opacity:.65">
+            转载 / 二次发布请保留原作者、原始仓库链接、LICENSE 和 NOTICE.md。
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /sidebar -->
+  </div><!-- /body-grid -->
+
+  <!-- ========== FOOTER ========== -->
+  <div class="footer">
+    <span>
+      🔗 <a href="https://github.com/Agentchengfeng/chengfeng-videocut-skills" target="_blank">GitHub</a>
+      &nbsp;·&nbsp; Stars 2,550 &nbsp;·&nbsp; Forks 354 &nbsp;·&nbsp; Apache-2.0
+    </span>
+    <span>infocard · redswiss style · 2026-07-07</span>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>
