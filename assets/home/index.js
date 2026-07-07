@@ -398,15 +398,19 @@
 
       const readInjectedIndex = () => {
         const source = document.querySelector(INDEX_DATA_SELECTOR);
-        if (!source) {
-          throw new Error('missing injected home-index-data');
-        }
+        if (!source) return null;
         const payload = source.textContent || '{}';
         return JSON.parse(payload);
       };
 
       const fetchIndex = async () => {
-        const index = readInjectedIndex();
+        let index = readInjectedIndex();
+        if (!index) {
+          const response = await fetch(`./_index.yaml?t=${Date.now()}`, { cache: 'no-store' });
+          if (!response.ok) throw new Error(`failed to load _index.yaml: HTTP ${response.status}`);
+          const text = await response.text();
+          index = jsyaml.load(text);
+        }
         const cards = Array.isArray(index?.cards) ? index.cards : [];
         allCards.value = cards;
       };
