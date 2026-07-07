@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CubeSandbox · 腾讯云极速隔离沙箱（<5MB / 60ms / 硬件级隔离）</title>
+    <meta name="description" content="腾讯云开源 CubeSandbox：RustVMM 底层 + E2B SDK 兼容，单沙箱内存<5MB、冷启动60ms、硬件级隔离、支持自动挂起。单机并发数千 Agent，Apache 2.0 协议。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================
+           CSS Variables & Base (RedSwiss Style)
+           ========================================= */
+        :root {
+            --red: #E63329;
+            --red-dark: #B5281E;
+            --red-light: #FFEBEA;
+            --black: #0A0A0A;
+            --white: #FFFFFF;
+            --gray-50: #F7F7F7;
+            --gray-100: #EEEEEE;
+            --gray-200: #E0E0E0;
+            --gray-300: #BDBDBD;
+            --gray-400: #9E9E9E;
+            --gray-500: #757575;
+            --gray-600: #424242;
+            --gray-700: #212121;
+            --gray-800: #121212;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+            --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+            --shadow-xl: 0 20px 60px rgba(0,0,0,0.15);
+            --transition: 0.2s ease;
+            --max-w: 860px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--gray-700);
+            background: var(--white);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        img { max-width: 100%; display: block; }
+
+        a { color: var(--red); text-decoration: none; }
+        a:hover { color: var(--red-dark); }
+
+        /* =========================================
+           Layout
+           ========================================= */
+        .container {
+            max-width: var(--max-w);
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* =========================================
+           Navigation Bar
+           ========================================= */
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .navbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+            max-width: var(--max-w);
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .navbar-logo {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--black);
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .navbar-logo .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--red);
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .navbar-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--gray-500);
+            font-family: var(--font-mono);
+            background: var(--gray-50);
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--gray-200);
+        }
+
+        /* =========================================
+           Hero Section
+           ========================================= */
+        .hero {
+            padding: 72px 0 56px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -80px;
+            right: -120px;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(230,51,41,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 28px;
+        }
+
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-600);
+            background: var(--gray-50);
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--gray-200);
+            font-family: var(--font-mono);
+        }
+
+        .hero-chip.red {
+            background: var(--red-light);
+            color: var(--red-dark);
+            border-color: rgba(230,51,41,0.2);
+        }
+
+        .hero-title {
+            font-size: 48px;
+            font-weight: 900;
+            color: var(--black);
+            letter-spacing: -1.5px;
+            line-height: 1.1;
+            margin-bottom: 20px;
+        }
+
+        .hero-title span {
+            color: var(--red);
+        }
+
+        .hero-subtitle {
+            font-size: 20px;
+            font-weight: 500;
+            color: var(--gray-600);
+            line-height: 1.5;
+            margin-bottom: 32px;
+            max-width: 680px;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 48px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 12px 20px;
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+            cursor: pointer;
+            border: none;
+            font-family: var(--font-sans);
+        }
+
+        .btn-primary {
+            background: var(--red);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--red-dark);
+            color: var(--white);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-200);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-200);
+            color: var(--gray-800);
+        }
+
+        /* =========================================
+           Stats Banner
+           ========================================= */
+        .stats-banner {
+            background: var(--black);
+            border-radius: var(--radius-xl);
+            padding: 40px;
+            margin-bottom: 64px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 42px;
+            font-weight: 900;
+            color: var(--red);
+            line-height: 1;
+            margin-bottom: 8px;
+            font-family: var(--font-mono);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-desc {
+            font-size: 12px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 4px;
+        }
+
+        /* =========================================
+           Section
+           ========================================= */
+        .section {
+            margin-bottom: 64px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--gray-400);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--red);
+            display: inline-block;
+        }
+
+        .section-title-lg {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--black);
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .section-title-lg span {
+            color: var(--red);
+        }
+
+        .section-desc {
+            font-size: 16px;
+            color: var(--gray-500);
+            margin-bottom: 32px;
+            max-width: 680px;
+        }
+
+        /* =========================================
+           Architecture Card
+           ========================================= */
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .arch-card {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            transition: var(--transition);
+        }
+
+        .arch-card:hover {
+            border-color: var(--red);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .arch-card-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--red-light);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+
+        .arch-card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--black);
+            margin-bottom: 6px;
+        }
+
+        .arch-card-desc {
+            font-size: 13px;
+            color: var(--gray-500);
+            line-height: 1.5;
+        }
+
+        /* =========================================
+           Features Grid
+           ========================================= */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .feature-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--red);
+            opacity: 0;
+            transition: var(--transition);
+        }
+
+        .feature-card:hover {
+            border-color: var(--gray-300);
+            box-shadow: var(--shadow-md);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-card-icon {
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+
+        .feature-card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--black);
+            margin-bottom: 8px;
+        }
+
+        .feature-card-desc {
+            font-size: 14px;
+            color: var(--gray-500);
+            line-height: 1.6;
+        }
+
+        .feature-card-tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--red);
+            background: var(--red-light);
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-top: 12px;
+            font-family: var(--font-mono);
+        }
+
+        /* =========================================
+           Comparison Table
+           ========================================= */
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            border: 1px solid var(--gray-200);
+        }
+
+        .compare-table th {
+            background: var(--black);
+            color: var(--white);
+            font-size: 13px;
+            font-weight: 700;
+            padding: 16px 20px;
+            text-align: left;
+        }
+
+        .compare-table th:first-child {
+            width: 35%;
+        }
+
+        .compare-table th.highlight {
+            background: var(--red);
+        }
+
+        .compare-table td {
+            padding: 14px 20px;
+            font-size: 14px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .compare-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .compare-table tr:hover td {
+            background: var(--gray-50);
+        }
+
+        .compare-table .name {
+            font-weight: 600;
+            color: var(--black);
+        }
+
+        .compare-table .cube {
+            color: var(--red);
+            font-weight: 700;
+        }
+
+        .compare-table .check {
+            color: #28a745;
+        }
+
+        .compare-table .partial {
+            color: #ffc107;
+        }
+
+        .compare-table .no {
+            color: var(--gray-400);
+        }
+
+        /* =========================================
+           Use Cases
+           ========================================= */
+        .usecases-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .usecase-card {
+            background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            transition: var(--transition);
+        }
+
+        .usecase-card:hover {
+            border-color: var(--red);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .usecase-icon {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+
+        .usecase-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--black);
+            margin-bottom: 8px;
+        }
+
+        .usecase-desc {
+            font-size: 13px;
+            color: var(--gray-500);
+            line-height: 1.5;
+        }
+
+        /* =========================================
+           Quick Start
+           ========================================= */
+        .quickstart {
+            background: var(--gray-50);
+            border-radius: var(--radius-xl);
+            padding: 40px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .quickstart-step {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .quickstart-step:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .step-num {
+            width: 32px;
+            height: 32px;
+            background: var(--red);
+            color: var(--white);
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--black);
+            margin-bottom: 6px;
+        }
+
+        .step-desc {
+            font-size: 13px;
+            color: var(--gray-500);
+            margin-bottom: 12px;
+        }
+
+        .code-block {
+            background: var(--black);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: #e0e0e0;
+            line-height: 1.5;
+        }
+
+        .code-block .comment { color: #6a9955; }
+        .code-block .keyword { color: #569cd6; }
+        .code-block .string { color: #ce9178; }
+        .code-block .func { color: #dcdcaa; }
+
+        /* =========================================
+           Footer
+           ========================================= */
+        .footer {
+            background: var(--gray-50);
+            border-top: 1px solid var(--gray-200);
+            padding: 48px 0;
+            margin-top: 80px;
+        }
+
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .footer-meta {
+            font-size: 13px;
+            color: var(--gray-400);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .footer-link {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-500);
+        }
+
+        .footer-link:hover {
+            color: var(--red);
+        }
+
+        /* =========================================
+           Responsive
+           ========================================= */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 36px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
+
+            .stat-value {
+                font-size: 32px;
+            }
+
+            .arch-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .features-grid,
+            .usecases-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .compare-table {
+                font-size: 12px;
+            }
+
+            .compare-table th,
+            .compare-table td {
+                padding: 10px 12px;
+            }
+
+            .quickstart {
+                padding: 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero {
+                padding: 48px 0 40px;
+            }
+
+            .hero-title {
+                font-size: 28px;
+            }
+
+            .hero-subtitle {
+                font-size: 16px;
+            }
+
+            .stats-banner {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <div class="navbar-logo">
+                <span class="dot"></span>
+                CubeSandbox
+            </div>
+            <span class="navbar-badge">AI Infrastructure</span>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-chips">
+                <span class="hero-chip red">⚡ 60ms 冷启动</span>
+                <span class="hero-chip">🔒 硬件级隔离</span>
+                <span class="hero-chip">📦 &lt;5MB 内存</span>
+                <span class="hero-chip">🤖 E2B 兼容</span>
+                <span class="hero-chip">🦀 RustVMM</span>
+            </div>
+
+            <h1 class="hero-title">
+                腾讯云<span> CubeSandbox</span><br>
+                极速隔离沙箱
+            </h1>
+
+            <p class="hero-subtitle">
+                给 AI Agent 跑代码、搞自动化的"极速隔离房"——<br>
+                基于 RustVMM + KVM，单沙箱内存占用 &lt;5MB、冷启动 60ms、硬件级隔离、支持闲置自动挂起。单机并发数千 Agent。
+            </p>
+
+            <div class="hero-actions">
+                <a href="https://github.com/TencentCloud/CubeSandbox" class="btn btn-primary" target="_blank">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub (7.9k ★)
+                </a>
+                <a href="https://github.com/TencentCloud/CubeSandbox#quick-start" class="btn btn-secondary" target="_blank">
+                    快速开始 →
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Banner -->
+    <section class="container">
+        <div class="stats-banner">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">&lt;5MB</div>
+                    <div class="stat-label">单沙箱内存</div>
+                    <div class="stat-desc">极低资源占用</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">60ms</div>
+                    <div class="stat-label">冷启动时间</div>
+                    <div class="stat-desc">毫秒级响应</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">KVM</div>
+                    <div class="stat-label">硬件级隔离</div>
+                    <div class="stat-desc">专属 Guest OS 内核</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">数千</div>
+                    <div class="stat-label">单机并发</div>
+                    <div class="stat-desc">支持自动挂起</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">技术架构</h2>
+            <h3 class="section-title-lg">基于 <span>RustVMM</span> 的高性能沙箱</h3>
+            <p class="section-desc">
+                CubeSandbox 由腾讯云开源，采用 Rust 编写的轻量级虚拟机监控器（RustVMM）与 KVM 虚拟化技术构建。支持单机部署和集群扩展，兼容 E2B SDK，单机可并发运行数千个 AI Agent。
+            </p>
+
+            <div class="arch-grid">
+                <div class="arch-card">
+                    <div class="arch-card-icon">⚡</div>
+                    <div class="arch-card-title">CubeAPI</div>
+                    <div class="arch-card-desc">高并发 REST API 网关（Rust），兼容 E2B。换 URL 即可无缝迁移。</div>
+                </div>
+                <div class="arch-card">
+                    <div class="arch-card-icon">🎯</div>
+                    <div class="arch-card-title">CubeMaster</div>
+                    <div class="arch-card-desc">集群编排器，接收 API 请求并调度到对应 Cubelet，管理资源与集群状态。</div>
+                </div>
+                <div class="arch-card">
+                    <div class="arch-card-icon">🔀</div>
+                    <div class="arch-card-title">CubeProxy</div>
+                    <div class="arch-card-desc">反向代理，兼容 E2B 协议，将请求路由到对应沙箱实例。</div>
+                </div>
+                <div class="arch-card">
+                    <div class="arch-card-icon">🖥️</div>
+                    <div class="arch-card-title">Cubelet</div>
+                    <div class="arch-card-desc">计算节点本地调度组件，管理节点上所有沙箱实例的完整生命周期。</div>
+                </div>
+                <div class="arch-card">
+                    <div class="arch-card-icon">🔗</div>
+                    <div class="arch-card-title">CubeVS</div>
+                    <div class="arch-card-desc">基于 eBPF 的虚拟交换机，提供内核级网络隔离和安全策略执行。</div>
+                </div>
+                <div class="arch-card">
+                    <div class="arch-card-icon">🛡️</div>
+                    <div class="arch-card-title">CubeEgress</div>
+                    <div class="arch-card-desc">OpenResty 出向安全网关：L7 域名过滤、凭证注入、访问审计。</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">核心能力</h2>
+            <h3 class="section-title-lg">四大能力<span>详解</span></h3>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-card-icon">📦</div>
+                    <h4 class="feature-card-title">极致轻量</h4>
+                    <p class="feature-card-desc">
+                        单沙箱内存占用 &lt;5MB，采用激进裁剪策略，内存开销几乎不随实例规格增长。单机可运行数千个沙箱，实现前所未有的部署密度。
+                    </p>
+                    <span class="feature-card-tag">轻量级设计</span>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-card-icon">⚡</div>
+                    <h4 class="feature-card-title">毫秒级启动</h4>
+                    <p class="feature-card-desc">
+                        冷启动平均 &lt;60ms，在单并发场景下稳定；在 50 并发创建时，平均 67ms，P95 90ms，P99 137ms，始终保持亚 150ms。
+                    </p>
+                    <span class="feature-card-tag">60ms 冷启动</span>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-card-icon">🔒</div>
+                    <h4 class="feature-card-title">硬核防翻车</h4>
+                    <p class="feature-card-desc">
+                        每个沙箱拥有独立 Guest OS 内核，无 Docker 共享内核逃逸风险。基于 eBPF 的 CubeVS 提供内核级网络隔离，安全策略硬件级执行。
+                    </p>
+                    <span class="feature-card-tag">硬件级隔离</span>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-card-icon">💰</div>
+                    <h4 class="feature-card-title">省钱利器</h4>
+                    <p class="feature-card-desc">
+                        支持闲置自动挂起（AutoPause/AutoResume），空闲沙箱自动暂停，接收请求时秒级唤醒。配合高部署密度，大幅降低 AI Agent 运行成本。
+                    </p>
+                    <span class="feature-card-tag">自动挂起</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">竞品对比</h2>
+            <h3 class="section-title-lg">CubeSandbox <span>vs</span> E2B</h3>
+            <p class="section-desc">
+                CubeSandbox 完全兼容 E2B SDK，只需修改一个 URL 环境变量即可无缝切换。同时在性能和成本上有显著优势。
+            </p>
+
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th>指标</th>
+                        <th class="highlight">CubeSandbox</th>
+                        <th>E2B</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="name">启动速度</td>
+                        <td class="cube">⚡ &lt;60ms</td>
+                        <td class="partial">~200ms+</td>
+                    </tr>
+                    <tr>
+                        <td class="name">内存占用</td>
+                        <td class="cube">📦 &lt;5MB/实例</td>
+                        <td class="partial">~50MB+/实例</td>
+                    </tr>
+                    <tr>
+                        <td class="name">隔离级别</td>
+                        <td class="cube">🔒 硬件级（独立内核）</td>
+                        <td class="partial">容器级（共享内核）</td>
+                    </tr>
+                    <tr>
+                        <td class="name">部署密度</td>
+                        <td class="cube">🏆 数千实例/节点</td>
+                        <td class="partial">数十实例/节点</td>
+                    </tr>
+                    <tr>
+                        <td class="name">SDK 兼容性</td>
+                        <td class="cube check">✅ 原生 E2B 兼容</td>
+                        <td class="no">—</td>
+                    </tr>
+                    <tr>
+                        <td class="name">自动挂起</td>
+                        <td class="cube check">✅ AutoPause/Resume</td>
+                        <td class="no">❌ 不支持</td>
+                    </tr>
+                    <tr>
+                        <td class="name">快照/克隆</td>
+                        <td class="cube check">✅ 百毫秒级快照</td>
+                        <td class="partial">⚠️ 部分支持</td>
+                    </tr>
+                    <tr>
+                        <td class="name">出向安全</td>
+                        <td class="cube check">✅ CubeEgress + 凭证保险库</td>
+                        <td class="partial">⚠️ 基础过滤</td>
+                    </tr>
+                    <tr>
+                        <td class="name">许可证</td>
+                        <td class="cube">📄 Apache 2.0</td>
+                        <td class="partial">专有/商业</td>
+                    </tr>
+                    <tr>
+                        <td class="name">成本</td>
+                        <td class="cube">💰 开源免费</td>
+                        <td class="partial">按调用计费</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Use Cases -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">适用场景</h2>
+            <h3 class="section-title-lg">这些场景<span>最适合</span></h3>
+
+            <div class="usecases-grid">
+                <div class="usecase-card">
+                    <div class="usecase-icon">🤖</div>
+                    <h4 class="usecase-title">Agent 自动化测试</h4>
+                    <p class="usecase-desc">
+                        为 AI Agent 提供安全隔离的代码执行环境，测试 Agent 生成的代码不会影响主系统，支持并发测试加速。
+                    </p>
+                </div>
+
+                <div class="usecase-card">
+                    <div class="usecase-icon">💻</div>
+                    <h4 class="usecase-title">代码执行隔离</h4>
+                    <p class="usecase-desc">
+                        运行 AI 生成的不可信代码，每个请求在独立沙箱中执行，通过硬件级隔离防止恶意代码逃逸和数据泄露。
+                    </p>
+                </div>
+
+                <div class="usecase-card">
+                    <div class="usecase-icon">🏢</div>
+                    <h4 class="usecase-title">多租户沙箱服务</h4>
+                    <p class="usecase-desc">
+                        构建 SaaS 化的代码执行平台，为不同客户提供完全隔离的运行环境，支持秒级创建和销毁。
+                    </p>
+                </div>
+
+                <div class="usecase-card">
+                    <div class="usecase-icon">🔐</div>
+                    <h4 class="usecase-title">CI/CD 安全执行</h4>
+                    <p class="usecase-desc">
+                        在 CI 流水线中安全执行第三方插件或自动化脚本，即使脚本被恶意污染也无法突破沙箱边界。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">快速上手</h2>
+            <h3 class="section-title-lg">安装与<span>示例</span></h3>
+
+            <div class="quickstart">
+                <div class="quickstart-step">
+                    <div class="step-num">1</div>
+                    <div class="step-content">
+                        <h4 class="step-title">安装 CubeSandbox</h4>
+                        <p class="step-desc">在 Linux x86_64 + KVM 环境中一键安装</p>
+                        <div class="code-block">
+                            <code><span class="comment"># 一键安装</span>
+<span class="keyword">curl</span> -fsSL https://get.cubesandbox.com | <span class="keyword">bash</span>
+
+<span class="comment"># 验证安装</span>
+cubesandbox --version</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quickstart-step">
+                    <div class="step-num">2</div>
+                    <div class="step-content">
+                        <h4 class="step-title">使用 Python SDK（兼容 E2B）</h4>
+                        <p class="step-desc">只需修改 API URL 即可从 E2B 迁移</p>
+                        <div class="code-block">
+                            <code><span class="keyword">import</span> cubesandbox <span class="keyword">as</span> e2b
+
+<span class="comment"># 替换 E2B URL 为 CubeSandbox</span>
+<span class="keyword">import</span> os
+os.environ[<span class="string">"E2B_API_KEY"</span>] = <span class="string">"your-api-key"</span>
+
+sandbox = e2b.Sandbox()
+<span class="comment"># 执行代码</span>
+result = sandbox.run<span class="func">("python3", args=[<span class="string">"-c"</span>, <span class="string">"print('Hello from CubeSandbox!')"</span>])
+<span class="func">print</span>(result.stdout)</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quickstart-step">
+                    <div class="step-num">3</div>
+                    <div class="step-content">
+                        <h4 class="step-title">使用 REST API</h4>
+                        <p class="step-desc">通过 HTTP API 直接控制沙箱</p>
+                        <div class="code-block">
+                            <code><span class="comment"># 创建沙箱</span>
+<span class="keyword">curl</span> -X POST https://api.cubesandbox.com/v1/sandboxes \
+  -H <span class="string">"Authorization: Bearer $API_KEY"</span> \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"template": "ubuntu-22.04", "timeout": 300}'</span>
+
+<span class="comment"># 运行命令</span>
+<span class="keyword">curl</span> -X POST https://api.cubesandbox.com/v1/sandboxes/$ID/run \
+  -d <span class="string">'{"cmd": "echo hello"}'</span></code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-meta">
+                    <span>⭐ 7,880</span> · 
+                    <span>🍴 659</span> · 
+                    <span>📄 Apache 2.0</span> · 
+                    <span>🦀 Rust</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/TencentCloud/CubeSandbox" class="footer-link" target="_blank">GitHub</a>
+                    <a href="https://github.com/TencentCloud/CubeSandbox#quick-start" class="footer-link" target="_blank">文档</a>
+                    <a href="https://github.com/TencentCloud/CubeSandbox/discussions" class="footer-link" target="_blank">讨论</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
