@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture Diagram Generator：描述系统 → 输出深色主题独立 HTML 架构图</title>
+  <style>
+    :root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#0a0a0a;--red:#c8102e;--soft-red:#fff5f6;--line:#0a0a0a;--blue:#1447e6;--green:#0b7a4b;--purple:#7c3aed;--orange:#c2410c;--shadow:6px 6px 0 rgba(10,10,10,.10)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6}
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* topbar */
+    .topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:14px;overflow:hidden}
+    .topbar-hero{padding:18px 18px 14px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+    .kicker{display:inline-block;border:2px solid #fff;padding:4px 8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px}
+    h1.demo-title{margin:10px 0 6px;font-size:clamp(20px,3.2vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.05}
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+
+    /* meta right panel */
+    .topbar-meta{padding:14px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto;gap:0;align-content:start;background:#f6f1f1}
+    .meta-row-high{display:grid;grid-template-columns:1.4fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-low{display:grid;grid-template-columns:1.2fr 1fr 0.8fr;gap:5px}
+    .meta-pill-lg{border:2px solid var(--line);padding:7px 9px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1}
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-md{border:2px solid var(--line);border-left:4px solid var(--red);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25}
+    .meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+    .meta-pill-sm{border:2px solid var(--line);border-left:4px solid #666;padding:3px 7px 3px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3}
+    .meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+
+    /* overview */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* stats */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* pills */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+    .pill.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+    /* section */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:13px 14px}
+
+    /* comparison table */
+    .comparison-table{width:100%;border-collapse:collapse;font-size:12px;box-shadow:var(--shadow)}
+    .comparison-table th{padding:7px 10px;border:1.5px solid var(--line);background:var(--ink);color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;text-align:left}
+    .comparison-table td{padding:7px 10px;border:1.5px solid var(--line);vertical-align:top}
+    .comparison-table .highlight td{background:#fff5f6;font-weight:800}
+    .comparison-table tr:nth-child(even) td{background:#faf8f4}
+    .badge{padding:2px 6px;border:1.5px solid var(--line);font-size:10px;font-weight:800;background:#fff}
+    .badge.red{background:var(--red);color:#fff;border-color:var(--red)}
+
+    /* quick cmd */
+    .quick-cmd{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:10px 14px;margin-bottom:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;font-weight:800;letter-spacing:.02em}
+
+    /* cli-grid */
+    .cli-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .cli-card{border:2px solid var(--line);padding:10px 12px;background:#fff;box-shadow:4px 4px 0 rgba(10,10,10,.08)}
+    .cli-card .cat-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);vertical-align:middle;margin-right:5px;flex-shrink:0}
+    .cli-card .cli-name{font-weight:900;font-size:12px;margin-bottom:3px}
+    .cli-card .cli-desc{font-size:11px;color:#555;line-height:1.4}
+
+    /* arch-diagram 3-col */
+    .arch-diagram{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:4px}
+    .arch-cell{border:2px solid var(--line);padding:10px 12px;background:#fff;text-align:center}
+    .arch-cell .arch-icon{font-size:20px;margin-bottom:5px}
+    .arch-cell .arch-name{font-weight:900;font-size:12px;margin-bottom:3px}
+    .arch-cell .arch-desc{font-size:11px;color:#555;line-height:1.4}
+
+    /* scenario-list */
+    .scenario-list{display:flex;flex-direction:column;gap:8px}
+    .scenario-item{display:grid;grid-template-columns:36px 1fr;border:2px solid var(--line);background:#fff;overflow:hidden;box-shadow:4px 4px 0 rgba(10,10,10,.08)}
+    .scenario-icon{background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;padding:8px 4px}
+    .scenario-body{padding:8px 12px}
+    .scenario-name{font-weight:900;font-size:12px;margin-bottom:2px}
+    .scenario-desc{font-size:11.5px;color:#444;line-height:1.45}
+
+    /* 2-col grid inside section */
+    .two-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .two-grid .box{border:2px solid var(--line);background:#fff;padding:12px 13px;box-shadow:4px 4px 0 rgba(10,10,10,.08)}
+    .two-grid .box h4{margin:0 0 6px;font-size:12.5px;font-weight:900}
+    .two-grid .box p,.two-grid .box li{margin:0;font-size:11.5px;color:#333;line-height:1.6}
+    .two-grid .box ul{padding-left:16px;margin:6px 0 0}
+
+    /* code-block */
+    .code-block{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;white-space:pre-wrap;margin-top:8px}
+
+    /* footer-block */
+    .footer-block{border-top:3px solid var(--line);padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:#555;background:#f0ede8}
+    .footer-block strong{color:var(--ink)}
+
+    /* save btn */
+    .save{position:fixed;right:12px;bottom:12px;z-index:999;border:2px solid #111;background:linear-gradient(135deg,var(--red),#d92a45);color:#fff;border-radius:10px;padding:11px 14px;font:900 12px/1 ui-monospace;cursor:pointer}
+
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .overview{padding:10px 0}
+      .overview-sentence{font-size:13px}
+      .overview-body{font-size:12px}
+      .cli-grid{grid-template-columns:1fr 1fr}
+      .two-grid{grid-template-columns:1fr}
+      .arch-diagram{grid-template-columns:1fr}
+      .comparison-table{font-size:11px}
+      .code-block{font-size:11px}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+<article>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-hero">
+      <span class="kicker">ARCHITECTURE DIAGRAM GENERATOR</span>
+      <h1 class="demo-title">一句话生成深色主题<br>架构图 HTML</h1>
+      <p class="sub-line">纯文本描述系统结构 &rarr; Claude 生成独立 HTML（含 SVG 架构图 + Copy / PNG / PDF 导出按钮），无需设计工具</p>
+      <span class="tagline">Claude AI Skill · SVG · MIT</span>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">6.3k<span class="sub">Stars</span></div>
+        <div class="meta-pill-lg">MIT<span class="sub">License</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">HTML<span class="sub">Lang</span></div>
+        <div class="meta-pill-md">0<span class="sub">Open Issues</span></div>
+        <div class="meta-pill-sm">Cocoon AI<span class="sub">Author</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="overview">
+    <p class="overview-sentence">纯文本 → Claude → 深色主题独立 HTML（SVG 架构图 + 内建导出按钮）</p>
+    <div class="overview-body">
+      <p>Cocoon-AI/architecture-diagram-generator 是面向 Claude AI（含 Claude Code）的 Skill：通过自然语言描述系统架构，Claude 自动生成深色主题的独立 HTML 文件。产物含 SVG 架构图、Copy / PNG / PDF 导出按钮，零依赖，任何浏览器直接打开。支持 Web App、Serverless、MicroServices 等多种架构类型，MIT 许可，完全免费。</p>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><strong>6.3k</strong><span>Stars</span></div>
+    <div class="stat"><strong>505</strong><span>Forks</span></div>
+    <div class="stat"><strong>MIT</strong><span>License</span></div>
+    <div class="stat"><strong>HTML</strong><span>Lang</span></div>
+    <div class="stat"><strong>Claude</strong><span>Platform</span></div>
+    <div class="stat"><strong>0</strong><span>Issues</span></div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill red">架构图生成</span>
+    <span class="pill dark">Claude AI Skill</span>
+    <span class="pill soft">SVG 架构图</span>
+    <span class="pill">深色主题</span>
+    <span class="pill">独立 HTML</span>
+    <span class="pill">Copy / PNG / PDF</span>
+    <span class="pill">MIT</span>
+    <span class="pill blue">Claude Code</span>
+  </div>
+
+  <!-- 01 WHAT IT DOES -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <span class="label">WHAT IT DOES · CORE MECHANISM</span>
+    </div>
+    <div class="sec-body">
+      <div class="arch-diagram">
+        <div class="arch-cell">
+          <div class="arch-icon">📝</div>
+          <div class="arch-name">输入描述</div>
+          <div class="arch-desc">纯文本描述系统架构（组件 + 连接关系），或让 AI 分析代码库自动生成</div>
+        </div>
+        <div class="arch-cell" style="border-color:var(--red);border-width:2px">
+          <div class="arch-icon">🤖</div>
+          <div class="arch-name">Claude Skill</div>
+          <div class="arch-desc">Claude 调用 architecture-diagram-generator Skill，按模板生成 HTML</div>
+        </div>
+        <div class="arch-cell">
+          <div class="arch-icon">🎨</div>
+          <div class="arch-name">输出 HTML</div>
+          <div class="arch-desc">深色主题 SVG 架构图 + Copy / PNG / PDF 按钮，零依赖</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 OUTPUT FORMAT -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">02</span>
+      <span class="label">OUTPUT FORMAT · WHAT'S IN THE HTML</span>
+    </div>
+    <div class="sec-body">
+      <div class="cli-grid">
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--red)"></span><span class="cli-name">SVG 架构图</span></div>
+          <div class="cli-desc">所有组件与连接线以 SVG 矢量呈现，可无限缩放不失真</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--ink)"></span><span class="cli-name">JetBrains Mono</span></div>
+          <div class="cli-desc">字体从 Google Fonts 加载，专业技术感，适合深色背景</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:#555"></span><span class="cli-name">40px 网格背景</span></div>
+          <div class="cli-desc">深色背景（#020617）叠加 40px 点阵网格，营造工程感</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--blue)"></span><span class="cli-name">导出按钮</span></div>
+          <div class="cli-desc">Copy / PNG / PDF 按钮内置在 HTML 底部，一键复制或下载</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--purple)"></span><span class="cli-name">自包含</span></div>
+          <div class="cli-desc">单文件 HTML，零运行时依赖，发一个文件就能分享</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--green)"></span><span class="cli-name">Z-ordering</span></div>
+          <div class="cli-desc">箭头先画，被不透明组件背景遮盖，避免连接线穿组件</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--orange)"></span><span class="cli-name">组件标注</span></div>
+          <div class="cli-desc">含协议、端口、注解标签，AWS 云资源、数据库、缓存均可表示</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--soft-red)"></span><span class="cli-name">迭代友好</span></div>
+          <div class="cli-desc">通过聊天继续对话：换配色、加组件、调布局，实时更新</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 USE CASES -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">03</span>
+      <span class="label">USE CASES · SUPPORTED ARCHITECTURE TYPES</span>
+    </div>
+    <div class="sec-body">
+      <div class="scenario-list">
+        <div class="scenario-item">
+          <div class="scenario-icon">W</div>
+          <div class="scenario-body">
+            <div class="scenario-name">Web Application</div>
+            <div class="scenario-desc">React 前端 + Node.js API + PostgreSQL + Redis CDN，描述组件后自动生成完整三层架构图</div>
+          </div>
+        </div>
+        <div class="scenario-item">
+          <div class="scenario-icon">☁</div>
+          <div class="scenario-body">
+            <div class="scenario-name">AWS Serverless</div>
+            <div class="scenario-desc">Lambda / API Gateway / DynamoDB / S3 / CloudFront，AWS 云服务架构，含安全组与边界</div>
+          </div>
+        </div>
+        <div class="scenario-item">
+          <div class="scenario-icon">⚙</div>
+          <div class="scenario-body">
+            <div class="scenario-name">Microservices</div>
+            <div class="scenario-desc">多服务、消息队列、服务边界、有界上下文，适合 Kubernetes 或 Docker Compose 架构</div>
+          </div>
+        </div>
+        <div class="scenario-item">
+          <div class="scenario-icon">🔍</div>
+          <div class="scenario-body">
+            <div class="scenario-name">AI / Agent System</div>
+            <div class="scenario-desc">LLM 调用链、工具调用、Memory / RAG 架构、数据边界与 PII 流动路径</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 COMPARE -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="label">VS COMPARISON · LANDSCAPE</span>
+    </div>
+    <div class="sec-body">
+      <table class="comparison-table">
+        <tr>
+          <th style="width:18%">维度</th>
+          <th style="color:var(--red);font-weight:900">Arch Diagram Gen<br><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa">Cocoon-AI</span></th>
+          <th>Archify<br><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa">tt-a1i</span></th>
+          <th>Mermaid / PlantUML<br><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa">DSL</span></th>
+          <th>Draw.io / Visio<br><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa">GUI</span></th>
+        </tr>
+        <tr class="highlight">
+          <td><strong>入口</strong></td>
+          <td style="color:var(--red)">自然语言 + Claude</td>
+          <td>自然语言 + Claude</td>
+          <td>代码 / DSL</td>
+          <td>手工拖拽</td>
+        </tr>
+        <tr>
+          <td><strong>输出</strong></td>
+          <td style="color:var(--red)">深色 HTML（SVG）</td>
+          <td>明暗主题 HTML</td>
+          <td>SVG / PNG</td>
+          <td>PNG / SVG / PDF</td>
+        </tr>
+        <tr>
+          <td><strong>导出</strong></td>
+          <td style="color:var(--red)">Copy / PNG / PDF 内建</td>
+          <td>Copy / PNG / JPEG / WebP / SVG</td>
+          <td>需渲染器</td>
+          <td>本地软件</td>
+        </tr>
+        <tr>
+          <td><strong>图表类型</strong></td>
+          <td style="color:var(--red)">架构图（单一）</td>
+          <td>架构 / 流程 / 时序 / 数据流 / 生命周期</td>
+          <td>全类型</td>
+          <td>全类型</td>
+        </tr>
+        <tr>
+          <td><strong>迭代方式</strong></td>
+          <td style="color:var(--red)">对话自然语言</td>
+          <td>对话自然语言</td>
+          <td>改代码</td>
+          <td>手工调整</td>
+        </tr>
+        <tr>
+          <td><strong>依赖</strong></td>
+          <td style="color:var(--red)">零（独立 HTML）</td>
+          <td>零（独立 HTML）</td>
+          <td>需渲染器或插件</td>
+          <td>需桌面软件</td>
+        </tr>
+        <tr>
+          <td><strong>Stars</strong></td>
+          <td style="color:var(--red);font-weight:900">6.3k</td>
+          <td>2.9k</td>
+          <td>社区广泛</td>
+          <td>商业产品</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 05 HOW TO USE -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">05</span>
+      <span class="label">HOW TO USE · QUICK START</span>
+    </div>
+    <div class="sec-body">
+      <div class="two-grid">
+        <div class="box">
+          <h4>Step 1：安装 Skill</h4>
+          <ul>
+            <li>下载 <code>architecture-diagram.zip</code>（GitHub Release 或仓库根目录）</li>
+            <li>Claude.ai：Settings &rarr; Skills &rarr; + Create skill &rarr; Upload zip</li>
+            <li>Claude Code CLI：<code>unzip architecture-diagram.zip -d ~/.claude/skills/</code></li>
+            <li>Project Knowledge：上传 zip 到项目知识库</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h4>Step 2：获取架构描述</h4>
+          <ul>
+            <li><strong>A</strong> 让 AI 分析代码库：<code>Analyze this codebase and describe the architecture</code></li>
+            <li><strong>B</strong> 自己写：列出组件与连接关系</li>
+            <li><strong>C</strong> 问 Claude 要典型架构参考</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h4>Step 3：生成架构图</h4>
+          <p>在 Claude（已安装 Skill）中发送：</p>
+          <div class="code-block">Use your architecture diagram skill to create
+an architecture diagram from this description:
+
+[PASTE YOUR ARCHITECTURE DESCRIPTION HERE]</div>
+        </div>
+        <div class="box">
+          <h4>Step 4：迭代与导出</h4>
+          <ul>
+            <li>对话式修改：加组件、换配色、调布局</li>
+            <li>HTML 底部有 Copy / PNG / PDF 按钮</li>
+            <li>直接打开浏览器即可查看，无依赖</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 TECHNICAL DETAILS -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">06</span>
+      <span class="label">TECHNICAL DETAILS · DEEP DIVE</span>
+    </div>
+    <div class="sec-body">
+      <div class="cli-grid">
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--red)"></span><span class="cli-name">SVG ViewBox</span></div>
+          <div class="cli-desc">典型 1000–1100px 宽，响应式缩放，不同架构复杂度自动适配尺寸</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--ink)"></span><span class="cli-name">#020617 深色背景</span></div>
+          <div class="cli-desc">深色网格背景（40px 间距点阵），营造专业工程图面感</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--blue)"></span><span class="cli-name">JetBrains Mono</span></div>
+          <div class="cli-desc">从 Google Fonts 加载等宽技术字体，组件标签专业可读</div>
+        </div>
+        <div class="cli-card">
+          <div><span class="cat-dot" style="background:var(--purple)"></span><span class="cli-name">Z-ordering 渲染</span></div>
+          <div class="cli-desc">箭头层先渲染，被组件背景遮盖，防止连接线穿越组件方块</div>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <div class="quick-cmd">git clone https://github.com/Cocoon-AI/architecture-diagram-generator.git</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SISTER SKILL -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">07</span>
+      <span class="label">SISTER SKILL · RELATED TOOL</span>
+    </div>
+    <div class="sec-body">
+      <div class="two-grid">
+        <div class="box">
+          <h4 style="color:var(--red)">process-flow-diagram-generator</h4>
+          <p>同属 Cocoon AI 技能体系，但专注于<strong>流程图</strong>：审批流、CI/CD runbook、自动化管道、工具调用链。相同的深色主题设计语言，不同的图形语义（时序步骤 vs 架构组件）。</p>
+          <p style="margin-top:6px;font-size:11px;color:#555">GitHub: github.com/Cocoon-AI/process-flow-diagram-generator</p>
+        </div>
+        <div class="box">
+          <h4>适用场景建议</h4>
+          <ul>
+            <li>系统设计评审配图</li>
+            <li>技术方案 / PRD 架构说明</li>
+            <li>README / 文档系统架构展示</li>
+            <li>AI Agent 系统架构可视化</li>
+            <li>代码审查架构图生成</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-block">
+    <span><strong>Source</strong> GitHub API + README.md（已核查 stars / forks / license / output format / quick start）</span>
+    <span><strong>License</strong> MIT · <strong>Author</strong> Cocoon AI · <strong>PBC</strong> Public Benefit Corporation</span>
+    <span><strong>Skill 安装</strong> Claude.ai / Claude Code CLI / Project Knowledge</span>
+    <span><strong>Created</strong> 2025-12-22 · <strong>Last Push</strong> 2026-05-13</span>
+  </div>
+
+</article>
+</main>
+
+<button class="save" onclick="savePNG()">保存 PNG</button>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+async function savePNG(){
+  const { default: html2canvas } = html2canvas;
+  const node = document.querySelector('article');
+  const canvas = await html2canvas(node,{backgroundColor:'#fffdf9',scale:2,useCORS:true,scrollY:0});
+  const a = document.createElement('a');
+  a.download = '20260709-architecture-diagram-generator.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+</script>
+</body>
+</html>
