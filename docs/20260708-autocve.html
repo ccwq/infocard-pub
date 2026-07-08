@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AutoCVE · 多 Agent 自动化 CVE 挖掘平台</title>
+  <style>
+    :root{--bg:#0c1a12;--paper:#0f2318;--ink:#b8d4be;--green:#2ecc71;--green2:#27ae60;--green3:#1a6b3a;--green4:#e8f8ee;--border:#1e4d32;--border2:#2a6b45;--red:#e74c3c;--amber:#f39c12;--mono:'JetBrains Mono','Fira Code',monospace}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:'Inter',system-ui,-apple-system,'PingFang SC','Microsoft YaHei',Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.65}
+    a{color:var(--green);text-decoration:none}
+    code{font-family:var(--mono);background:#0a2818;padding:1.5px 5px;border-radius:3px;font-size:11.5px;color:#7dcea0}
+    pre{font-family:var(--mono);background:#080f0a;color:#7dcea0;border-radius:8px;padding:12px 14px;font-size:11.5px;line-height:1.7;overflow-x:auto;white-space:pre-wrap;margin:0}
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:20px 0 60px}
+
+    /* HEADER */
+    header{background:linear-gradient(135deg,#0c1a12 0%,#0e2318 60%,#0a1a10 100%);border-bottom:3px solid var(--border2);padding:20px 22px 16px;margin-bottom:14px;color:var(--ink)}
+    .header-inner{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+    .kicker{font:900 10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;opacity:.6;margin-bottom:7px;color:var(--green)}
+    h1{font-size:clamp(22px,4vw,40px);font-weight:950;letter-spacing:-.03em;line-height:1.05;margin:0 0 8px;color:#e8f8ee}
+    .subtitle{font-size:13px;line-height:1.6;opacity:.75;max-width:580px}
+    .header-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .badge{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border:1.5px solid var(--border2);font:850 11px/1 sans-serif;color:var(--ink)}
+    .badge.dark{background:#060d08;color:var(--green);border-color:var(--green)}
+    .badge.green{background:var(--green3);color:#e8f8ee;border-color:var(--green2)}
+    .badge.red{background:#3d1515;color:var(--red);border-color:#7d2020}
+    .badge.amber{background:#3d2e0a;color:var(--amber);border-color:#8b6914}
+    .stats{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+    .stat{border:1px solid var(--border2);padding:8px 12px;display:grid;gap:2px;flex:1;min-width:80px}
+    .stat .v{font-size:20px;font-weight:950;line-height:1;color:var(--green)}
+    .stat .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.6}
+    .header-right{border-left:2px solid var(--border2);padding-left:18px;display:flex;flex-direction:column;gap:10px;min-width:200px}
+    .meta-table{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}
+    .meta-table .k{font-weight:700;opacity:.5;text-transform:uppercase;font-size:10.5px;letter-spacing:.08em;white-space:nowrap}
+    .meta-table .v{color:#e8f8ee;font-weight:600}
+
+    /* SECTIONS */
+    .section{margin-bottom:15px}
+    .section-label{font:900 10.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--green);margin-bottom:9px;display:flex;align-items:center;gap:10px;opacity:.6}
+    .section-label::after{content:"";flex:1;height:2px;background:var(--green);opacity:.15}
+    h2{margin:0 0 10px;font-size:clamp(16px,2.5vw,26px);font-weight:950;letter-spacing:-.02em;line-height:1.15;color:#e8f8ee}
+    .card{border:2px solid var(--border);background:var(--paper);padding:13px;box-shadow:0 0 0 1px rgba(46,204,113,.05);display:grid;gap:7px}
+    .card h3{font-size:15px;font-weight:950;line-height:1.25;margin:0 0 7px;letter-spacing:-.01em;color:#e8f8ee}
+    .card p{font-size:12.5px;color:var(--ink);line-height:1.65;margin:0}
+    .card ul{margin:5px 0 0;padding-left:16px;display:grid;gap:3px}
+    .card li{font-size:12.5px;line-height:1.65;color:var(--ink)}
+    .tagrow{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px}
+    .tag{display:inline-flex;align-items:center;border:1.5px solid var(--border2);padding:3px 8px;font:850 11px/1 sans-serif;color:var(--ink)}
+    .tag.green{background:var(--green3);color:#e8f8ee;border-color:var(--green2)}
+    .tag.red{background:#3d1515;color:var(--red);border-color:#7d2020}
+    .tag.amber{background:#3d2e0a;color:var(--amber);border-color:#8b6914}
+    .tag.blue{background:#0f2d3d;color:#5dade2;border-color:#1f5276}
+
+    /* GRIDS */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:11px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .mini{border:1.5px solid var(--border);background:var(--paper);padding:11px;display:grid;gap:5px}
+    .mini h4{font-size:13.5px;font-weight:950;margin:0;line-height:1.2;letter-spacing:-.01em;color:#d0e8d4}
+    .mini p{font-size:11.5px;color:var(--ink);opacity:.75;margin:0;line-height:1.5}
+
+    /* FLOW */
+    .flow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:0;border:2px solid var(--border);overflow:hidden;background:var(--paper)}
+    .flow-item{padding:11px;border-right:1.5px solid var(--border);display:grid;gap:4px}
+    .flow-item:last-child{border-right:none}
+    .flow-item .num{font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:var(--green);opacity:.65}
+    .flow-item .name{font-size:13px;font-weight:950;margin:0;color:#d0e8d4}
+    .flow-item p{font-size:11px;color:var(--ink);opacity:.75;margin:0;line-height:1.45}
+    .flow-item .icon{font-size:17px;margin-bottom:1px}
+
+    /* MODES */
+    .mode-card{border:2px solid var(--border);background:var(--paper);padding:12px;display:grid;gap:5px;box-shadow:0 0 0 1px rgba(46,204,113,.04)}
+    .mode-card h4{font-size:13.5px;font-weight:950;margin:0;line-height:1.2;display:flex;align-items:center;gap:7px;color:#d0e8d4}
+    .mode-card .ver{font:900 10px/1 var(--mono);background:var(--green3);color:#e8f8ee;padding:2px 6px;letter-spacing:.06em;flex-shrink:0}
+    .mode-card p{font-size:11.5px;color:var(--ink);opacity:.8;margin:0;line-height:1.55}
+
+    /* CVE BADGE */
+    .cve-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1.5px solid var(--border2);background:var(--paper);font:800 12px/1 var(--mono);color:var(--green)}
+    .cve-badge.critical{border-color:var(--red);background:#3d1515;color:var(--red)}
+    .cve-badge.high{border-color:#e67e22;background:#3d2a0a;color:#e67e22}
+
+    /* TABLE */
+    .tbl{width:100%;border-collapse:collapse;font-size:12.5px;border:2px solid var(--border);background:var(--paper)}
+    .tbl th{padding:9px 12px;background:var(--green3);color:#e8f8ee;font:900 10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;text-align:left}
+    .tbl td{padding:9px 12px;border-top:1.5px solid var(--border);vertical-align:top;line-height:1.6;color:var(--ink)}
+    .tbl tr:nth-child(even) td{background:#0a2015}
+    .tbl code{font-size:11.5px}
+
+    /* WARNING */
+    .warning{border:2px solid var(--red);background:#200a0a;padding:13px;display:grid;gap:5px}
+    .warning h3{font-size:14px;font-weight:950;color:var(--red);margin:0}
+    .warning p{font-size:12.5px;color:var(--ink);opacity:.8;margin:0;line-height:1.65}
+    .warning ul{margin:5px 0 0;padding-left:16px;display:grid;gap:3px}
+    .warning li{font-size:12px;color:var(--ink);opacity:.75}
+
+    /* FOOTER */
+    .footer{background:#060d08;border-top:2px solid var(--border2);padding:14px 18px;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
+    .footer p{font-size:12px;margin:0;line-height:1.65;opacity:.6}
+    .footer a{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1.5px solid var(--border2);font:800 12px/1 sans-serif;color:var(--ink);transition:background .2s}
+    .footer a:hover{background:rgba(46,204,113,.1)}
+    .footer a.primary{background:var(--green3);border-color:var(--green2);color:#e8f8ee}
+
+    @media(max-width:720px){
+      .header-inner{flex-direction:column}
+      .header-right{border-left:0;border-top:2px solid var(--border2);padding-left:0;padding-top:12px}
+      .grid-2,.grid-3,.grid-4,.flow{grid-template-columns:1fr 1fr}
+      .flow{grid-template-columns:1fr}
+      .flow-item{border-right:0;border-bottom:1.5px solid var(--border)}
+      .footer{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <header>
+      <div class="header-inner">
+        <div class="header-left">
+          <div class="kicker">🛡️ Multi-Agent CVE Discovery Platform · Python</div>
+          <h1>AutoCVE</h1>
+          <p class="subtitle">一键完成 CVE 挖掘全流程：筛项目、审源码、验漏洞、出报告。由 Orchestrator 统一调度侦察/扫描/分诊/深挖/验证 Agent，支持快速扫描与深度审计多种模式，审计完可追问补充证据与攻击链。</p>
+          <div class="header-badges">
+            <span class="badge dark">AGPL-3.0</span>
+            <span class="badge">Python</span>
+            <span class="badge">FastAPI</span>
+            <span class="badge green">Docker</span>
+            <span class="badge">React</span>
+            <span class="badge dark">Multi-Agent</span>
+          </div>
+          <div class="stats">
+            <div class="stat"><span class="v">1,110</span><span class="l">Stars</span></div>
+            <div class="stat"><span class="v">71</span><span class="l">Forks</span></div>
+            <div class="stat"><span class="v">30</span><span class="l">CVEs</span></div>
+            <div class="stat"><span class="v">14</span><span class="l">Projects</span></div>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="meta-table">
+            <span class="k">GitHub</span><span class="v">larlarua / AutoCVE</span>
+            <span class="k">License</span><span class="v">AGPL-3.0</span>
+            <span class="k">Lang</span><span class="v">Python</span>
+            <span class="k">Stack</span><span class="v">FastAPI + React</span>
+            <span class="k">Max CVSS</span><span class="v" style="color:var(--red)">9.9</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- RESULTS -->
+    <section class="section">
+      <div class="section-label">CVE RESULTS · 实战成果</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div class="cve-badge">🎯 30 CVEs</div>
+        <div class="cve-badge">📦 14 Projects</div>
+        <div class="cve-badge critical">⚠️ Max CVSS 9.9</div>
+        <div class="cve-badge amber">⏱ 7 天测试期</div>
+      </div>
+      <div class="card">
+        <p>AutoCVE 在 7 天测试中挖掘出 <strong style="color:var(--green)">30 个安全漏洞</strong>，覆盖 Chartbrew、Lemmy、typebot.io、pimcore、froxlor、Tautulli、OpenReplay、SillyTavern 等 14 个开源项目。最高 CVSS 9.9，最低 6.5，均为中高危漏洞。</p>
+        <p style="margin-top:6px;font-size:11.5px;opacity:.65">漏洞类型包括：Improper Access Control、SSRF、Authorization Bypass、Sensitive Data Exposure、Stored XSS、CSRF、Missing Authorization 等。</p>
+      </div>
+    </section>
+
+    <!-- FLOW -->
+    <section class="section">
+      <div class="section-label">ORCHESTRATOR FLOW · Agent 调度链路</div>
+      <h2>Orchestrator 统一调度 → 5 类 Agent 协同</h2>
+      <div class="flow">
+        <div class="flow-item">
+          <div class="icon">🔎</div>
+          <div class="num">Step 01</div>
+          <div class="name">Recon</div>
+          <p>侦察 Agent：信息收集、目标识别</p>
+        </div>
+        <div class="flow-item">
+          <div class="icon">📡</div>
+          <div class="num">Step 02</div>
+          <div class="name">Scan</div>
+          <p>扫描 Agent：工具扫描、自动化检测</p>
+        </div>
+        <div class="flow-item">
+          <div class="icon">🏥</div>
+          <div class="num">Step 03</div>
+          <div class="name">Triage</div>
+          <p>分诊 Agent：误报过滤、初步筛选</p>
+        </div>
+        <div class="flow-item">
+          <div class="icon">🕵️</div>
+          <div class="num">Step 04</div>
+          <div class="name">Finding</div>
+          <p>深挖 Agent：源码分析、漏洞深挖</p>
+        </div>
+        <div class="flow-item">
+          <div class="icon">✅</div>
+          <div class="num">Step 05</div>
+          <div class="name">Verification</div>
+          <p>验证 Agent：动态验证、PoC 生成</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODES -->
+    <section class="section">
+      <div class="section-label">AUDIT MODES · 三种审计模式</div>
+      <div class="grid-3">
+        <div class="mode-card">
+          <h4>⚡ 增强扫描 <span class="ver">Scan → Triage</span></h4>
+          <p>快速分析工具扫描结果并过滤误报，适合日常监控与初步筛查。</p>
+        </div>
+        <div class="mode-card">
+          <h4>🧠 智能审计 <span class="ver" style="background:var(--green2)">Finding</span></h4>
+          <p>深度挖掘高价值漏洞，适用于 CVE 挖掘和 0Day 研究。</p>
+        </div>
+        <div class="mode-card">
+          <h4>🔍 综合审计 <span class="ver" style="background:#1a5276">Scan → Triage + Finding</span></h4>
+          <p>融合工具扫描与源码分析，开展全量审计，覆盖范围最广。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Q&A INTERACTION -->
+    <section class="section">
+      <div class="section-label">INTERACTION · 交互式审计</div>
+      <div class="grid-2">
+        <div class="mini">
+          <h4>💬 审计完可追问</h4>
+          <p>将完整审计过程作为会话上下文，用户可围绕审计结果继续追问：补充证据、解释攻击链、完善复现步骤或扩展漏洞分析。</p>
+        </div>
+        <div class="mini">
+          <h4>📊 可视化审计追踪</h4>
+          <p>集中展示活动日志、Agent Tree、工具调用、阶段进度、初步报告和审计会话，方便复盘每次审计的执行路径。</p>
+        </div>
+        <div class="mini">
+          <h4>🗂️ 智能漏洞管理</h4>
+          <p>Agent 自动提交漏洞，去重后结构化入库，漏洞管理模块统一维护，支持导出报告。</p>
+        </div>
+        <div class="mini">
+          <h4>🔌 Skills 扩展</h4>
+          <p>支持为不同 Agent 配置专属 Skills，灵活扩展各 Agent 能力边界。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STACK -->
+    <section class="section">
+      <div class="section-label">TECH STACK · 技术栈</div>
+      <div class="grid-4">
+        <div class="mini"><h4>🐍 Python 3.11+</h4><p>核心语言</p></div>
+        <div class="mini"><h4>⚡ FastAPI</h4><p>后端 API 框架</p></div>
+        <div class="mini"><h4>⚛️ React 18</h4><p>前端界面</p></div>
+        <div class="mini"><h4>🐘 PostgreSQL 15</h4><p>数据持久化</p></div>
+      </div>
+    </section>
+
+    <!-- DEPLOY -->
+    <section class="section">
+      <div class="section-label">DEPLOY · 一键部署</div>
+      <h2>Docker 一行命令启动</h2>
+      <div class="card">
+        <pre># Linux / macOS / Git Bash（一行命令）
+curl -fsSL https://raw.githubusercontent.com/larlarua/AutoCVE/v1.0.4/docker-compose.prod.yml \
+  | docker compose -f - up -d
+
+# 源码部署
+git clone https://github.com/larlarua/AutoCVE.git && cd AutoCVE && docker compose up -d --build</pre>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px">
+          <div class="mini"><h4>🖥️ 前端</h4><p>localhost:3000</p></div>
+          <div class="mini"><h4>⚙️ 后端 API</h4><p>localhost:8000</p></div>
+          <div class="mini"><h4>📘 Swagger</h4><p>localhost:8000/docs</p></div>
+          <div class="mini"><h4>🗄️ Adminer</h4><p>localhost:8080</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- WARNING -->
+    <section class="section">
+      <div class="section-label">⚠️ SECURITY · 安全合规</div>
+      <div class="warning">
+        <h3>⚠️ 仅限授权使用</h3>
+        <p>本项目仅限用于已获授权的安全研究、代码审计及学习交流，严禁将其用于未经授权的漏洞扫描、渗透测试或安全评估。</p>
+        <ul>
+          <li>提交漏洞前需遵循目标项目的 SECURITY.md、Private Vulnerability Reporting、CNA 提交流程</li>
+          <li>确保仅在获得明确授权的目标与环境中执行扫描与 PoC 测试</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div>
+        <p><strong style="font-size:13px;color:#e8f8ee">larlarua / AutoCVE</strong> · AGPL-3.0</p>
+        <p>1,110 Stars · Python + FastAPI + React · 30 CVEs · Docker 一键部署</p>
+      </div>
+      <div class="footer-links">
+        <a class="primary" href="https://github.com/larlarua/AutoCVE" target="_blank">⭐ GitHub</a>
+        <a href="https://github.com/larlarua/vulnerability-reports" target="_blank">CVE 报告</a>
+      </div>
+    </div>
+
+  </main>
+</body>
+</html>
