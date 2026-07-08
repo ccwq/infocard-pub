@@ -192,7 +192,7 @@ function resolveBusinessSortTsNs(item, metaPath, cardPath) {
 function buildIndexData() {
   const entries = [];
   const errors = [];
-  const requiredFields = ["slug", "path", "category", "title", "date", "tags"];
+  const requiredFields = ["slug", "path", "category", "title", "date", "tags", "desc"];
 
   for (const metaPath of listMetaFiles(DOCS_DIR)) {
     try {
@@ -207,12 +207,17 @@ function buildIndexData() {
         errors.push(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: target path missing -> ${data.path}`);
         continue;
       }
-
       const item = { ...data };
       // Normalize description → desc (fix legacy cards using wrong field name)
       if (item.description != null && item.desc == null) {
         item.desc = item.description;
         delete item.description;
+      }
+      // desc must be non-empty (not just present but actually filled)
+      const descValue = typeof item.desc === "string" ? item.desc.trim() : "";
+      if (!descValue) {
+        errors.push(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: desc is empty — a meaningful description is required`);
+        continue;
       }
       item.date = normalizeDateValue(item.date);
       if (Object.prototype.hasOwnProperty.call(item, "updated")) {
