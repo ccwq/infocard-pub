@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>归藏材质插画 Skill · 把文章和数据变成带标签的 3D 解释图</title>
+  <meta name="description" content="归藏（op7418）开源的 Agent 配图 Skill，把文章、笔记、图表截图、产品概念、工作汇报、教学材料变成带中文标签的克 制 3D 材质插画，支持 Claude Code / Codex，支持图表语义重画与冷门概念参考检索。">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%238a5a3c'/><text x='6' y='24' font-size='20'>🎨</text></svg>">
+  <style>
+    :root{
+      --bg:#f4efe8;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#5f584f;
+      --line:#1b1713;
+      --blue:#244a9c;
+      --blue-soft:#e9f0ff;
+      --wood:#8a5a3c;
+      --wood-soft:#efe0d2;
+      --wood-dark:#5a381f;
+      --shadow:7px 7px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),
+        radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),
+        linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);
+      color:var(--ink);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+      font-size:12.5px;
+      line-height:1.62;
+      position:relative;
+    }
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background-image:
+        repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);
+      mix-blend-mode:multiply;
+      opacity:.55;
+    }
+    .page{
+      width:min(1080px,calc(100% - 24px));
+      margin:0 auto;
+      padding:16px 0 78px;
+      position:relative;
+      z-index:1;
+    }
+
+    /* ── Hero ── */
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.35fr) minmax(260px,.85fr);
+      gap:16px;
+      background:var(--paper);
+      border:2px solid var(--line);
+      box-shadow:var(--shadow);
+      padding:16px 16px 14px;
+      margin-bottom:14px;
+    }
+    .hero-copy{min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+    .kicker{font:700 11px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right;overflow-wrap:anywhere;max-width:240px}
+    h1{
+      margin:0 0 10px;
+      font-family:Georgia,"Times New Roman","Songti SC",serif;
+      font-size:clamp(28px,5vw,56px);
+      line-height:.98;
+      letter-spacing:-.03em;
+      color:var(--ink);
+    }
+    .subtitle{
+      margin:0;
+      max-width:58ch;
+      font-size:14px;
+      line-height:1.72;
+      color:#3f3932;
+    }
+    .subtitle strong{color:var(--blue)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .chip{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:5px 10px;
+      border:1.5px solid var(--line);
+      background:#fff;
+      font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+      white-space:nowrap;
+    }
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.wood{background:var(--wood-soft);border-color:var(--wood);color:var(--wood-dark)}
+    .chip.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+    .compare{
+      background:#111;color:#fff;border:2px solid #111;box-shadow:6px 6px 0 rgba(17,17,17,.08);
+      display:flex;flex-direction:column;min-width:0;
+    }
+    .compare-head{
+      padding:10px 12px 8px;border-bottom:1.5px solid rgba(255,255,255,.18);
+      font:800 12px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;
+    }
+    .compare-body{padding:12px}
+    .compare-body .big{font-size:16px;font-weight:900;line-height:1.2;margin-bottom:8px}
+    .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    .compare-card{background:#fff;color:var(--ink);border:1.5px solid #fff;padding:10px 10px 8px;min-width:0}
+    .compare-card h3{margin:0 0 4px;font-size:12px;line-height:1.2}
+    .compare-card p{margin:0;color:#444;font-size:11.5px;line-height:1.5}
+    .compare-card .tag{display:inline-block;margin-bottom:6px;padding:2px 6px;border:1.5px solid var(--ink);font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
+
+    /* ── Banner ── */
+    .banner{
+      background:linear-gradient(135deg,var(--wood) 0%, #9a6a46 58%, var(--wood-dark) 58%, var(--wood-dark) 100%);
+      color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);
+      padding:14px 16px 12px;margin-bottom:14px;
+      display:grid;gap:8px;
+    }
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:26px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:70ch;font-size:13px;line-height:1.65;color:#f6ede4}
+
+    /* ── Process ── */
+    .process{
+      display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:0;background:#111;color:#fff;border:2px solid #111;box-shadow:var(--shadow);
+      margin-bottom:14px;overflow:hidden;
+    }
+    .step{padding:10px 10px 8px;border-right:1.5px solid rgba(255,255,255,.18);min-width:0}
+    .step:last-child{border-right:none}
+    .step .n{display:block;color:#fff;font:900 18px/1 Georgia,"Times New Roman",serif;margin-bottom:6px}
+    .step .t{display:block;font:800 11px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+    .step .d{font-size:11.5px;line-height:1.5;color:#dfd7cd}
+
+    /* ── Content grid ── */
+    .content{
+      display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px;margin-bottom:12px;
+    }
+    .col{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+    .col-head{padding:13px 14px 11px;border-bottom:1.5px solid rgba(27,23,19,.12);background:var(--paper)}
+    .col-kicker{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:0 0 5px}
+    .col-title{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:20px;font-weight:700;margin:0;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
+    .col-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:12px}
+
+    /* principle */
+    .principle{display:grid;grid-template-columns:22px minmax(0,1fr);gap:0 8px;align-items:start}
+    .principle .num{
+      display:flex;align-items:center;justify-content:center;
+      width:22px;height:22px;border:1.5px solid var(--ink);
+      font:900 12px/1 Georgia,"Times New Roman",serif;color:var(--ink);
+      background:var(--wood-soft);margin-top:1px;flex-shrink:0;
+    }
+    .principle h4{font-size:13px;font-weight:700;margin:0 0 3px;color:var(--ink);line-height:1.25}
+    .principle p{margin:0;font-size:12px;color:var(--muted);line-height:1.55}
+
+    /* mini block */
+    .mini h4{font-size:12.5px;font-weight:700;margin:0 0 4px;color:var(--ink)}
+    .mini p{margin:0;font-size:12px;color:var(--muted);line-height:1.55}
+    .mini .label{
+      display:inline-block;margin-bottom:5px;
+      padding:2px 7px;background:var(--blue-soft);border:1px solid var(--blue);
+      font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;
+    }
+
+    /* scene table */
+    .scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .scene{background:#f7f4ef;border:1.5px solid rgba(27,23,19,.18);padding:7px 9px}
+    .scene h5{font-size:11.5px;font-weight:700;margin:0 0 2px;color:var(--ink)}
+    .scene p{font-size:11px;color:var(--muted);margin:0;line-height:1.45}
+
+    /* install block */
+    .install{
+      background:#f7f4ef;border:1.5px solid rgba(27,23,19,.18);
+      padding:10px 12px;margin-top:2px;
+    }
+    .install code{
+      display:block;font:11.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;
+      color:var(--ink);background:none;padding:0;white-space:pre-wrap;word-break:break-all;
+    }
+    .install .hint{font-size:11px;color:var(--muted);margin-top:6px}
+
+    /* image gallery */
+    .gallery{
+      display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px;
+    }
+    .gallery img{width:100%;height:auto;border:1.5px solid rgba(27,23,19,.2);display:block;background:#f0ece5}
+    .gallery .cap{font-size:10.5px;color:var(--muted);margin-top:3px;text-align:center}
+
+    /* suit list */
+    .suit-list{display:flex;flex-wrap:wrap;gap:5px}
+    .tag-item{
+      display:inline-block;padding:3px 8px;
+      border:1.5px solid var(--ink);background:#fff;
+      font:700 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+    }
+    .tag-item.wood-item{background:var(--wood-soft);border-color:var(--wood);color:var(--wood-dark)}
+    .tag-item.gray-item{background:#f0f0f0;border-color:#999;color:#555}
+
+    /* footer */
+    .footer{
+      display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;
+      border-top:2px solid var(--line);padding-top:12px;margin-top:2px;
+    }
+    .brand{font:800 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);letter-spacing:.05em}
+    .brand sub{font-size:10px;color:var(--muted);font-weight:400}
+    .footer-links{display:flex;gap:8px;flex-wrap:wrap}
+    .footer-link{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:5px 10px;background:var(--blue-soft);border:1.5px solid var(--blue);
+      font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);
+      text-decoration:none;
+    }
+    .footer-link:hover{background:var(--blue);color:#fff}
+    .small{font-size:11px;color:var(--muted);line-height:1.5}
+
+    /* mobile */
+    @media(max-width:720px){
+      .hero{grid-template-columns:1fr}
+      .compare{display:none}
+      .content{grid-template-columns:1fr}
+      .scene-grid{grid-template-columns:1fr}
+      .gallery{grid-template-columns:1fr 1fr}
+      .process{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .step:nth-child(2){border-right:none}
+      .footer{flex-direction:column;align-items:flex-start}
+    }
+    @media(max-width:420px){
+      .process{grid-template-columns:1fr}
+      .step{border-right:none;border-bottom:1.5px solid rgba(255,255,255,.18)}
+      .step:last-child{border-bottom:none}
+      .gallery{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">Agent Skill · AI 配图</span>
+          <span class="source">github.com/op7418/guizang-material-illustration</span>
+        </div>
+        <h1>归藏材质插画 Skill</h1>
+        <p class="subtitle">把文章、笔记、图表截图、产品概念、工作汇报、教学材料，变成<strong>带中文标签的克 制 3D 材质解释图</strong>。搭配 Claude Code / Codex 使用，专注做"中间那张图"。</p>
+        <div class="meta-row">
+          <span class="chip dark">Claude Code</span>
+          <span class="chip blue">Codex</span>
+          <span class="chip wood">GPT-Image 2.0</span>
+          <span class="chip">MIT</span>
+          <span class="chip">归藏</span>
+        </div>
+      </div>
+      <aside class="compare">
+        <div class="compare-head">解决什么问题</div>
+        <div class="compare-body">
+          <div class="big">不是缺封面，是缺"中间那张图"</div>
+          <div class="compare-grid">
+            <div class="compare-card">
+              <span class="tag">❌ 之前</span>
+              <h3>密密麻麻截图</h3>
+              <p>直接贴图读者扫不懂；AI 画了张漂亮但谁也看不懂的装饰图。</p>
+            </div>
+            <div class="compare-card">
+              <span class="tag">✅ 现在</span>
+              <h3>带标签的解释图</h3>
+              <p>箭头标注、空间关系、扫一眼就抓到你说什么，适合放进社交卡、PPT、文档。</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- Quote banner -->
+    <section class="banner">
+      <div class="quote">从一段"能跑"的提示词到一个别人也能稳定出好图的 Skill，中间差的东西还挺多的。</div>
+      <div class="note">做了一张满意的图之后，顺手把它做成了正式的 Skill 分享出来——结果验证了需求真实存在。</div>
+    </section>
+
+    <!-- Process -->
+    <section class="process" aria-label="workflow">
+      <div class="step">
+        <span class="n">1</span><span class="t">理解材料</span>
+        <span class="d">读文章、截图、数据，找出真正需要被画出来的关系。</span>
+      </div>
+      <div class="step">
+        <span class="n">2</span><span class="t">判断类型</span>
+        <span class="d">自动匹配流程图、机制图、图表、人文场景或教育解释图。</span>
+      </div>
+      <div class="step">
+        <span class="n">3</span><span class="t">生成出图</span>
+        <span class="d">调用 GPT-Image 2.0，冷门概念先查参考，再统一归藏材质风格。</span>
+      </div>
+      <div class="step">
+        <span class="n">4</span><span class="t">QA 检查</span>
+        <span class="d">验证标签、数据、裁切和参考准确性，错了直接重新生成。</span>
+      </div>
+    </section>
+
+    <!-- Content -->
+    <section class="content">
+      <!-- Column 1: What & Visual Style -->
+      <article class="col">
+        <div class="col-head">
+          <p class="col-kicker">定位 · 视觉语言</p>
+          <h2 class="col-title">专注"中间那张图"</h2>
+        </div>
+        <div class="col-body">
+          <div class="mini">
+            <h4>视觉语言</h4>
+            <p>白底工作室光线 · 克 制 3D 材质物件 · 一个鲜明点缀色（默认 IKB 蓝）· 图内嵌入短中文标签。看起来像实体模型摆在白色桌面上拍的照片。</p>
+          </div>
+          <div class="mini">
+            <h4>视觉边界</h4>
+            <p>不做完整小红书排版（交给 Social Card Skill） · 不做 PPT 结构（交给 PPT Skill） · 不做真实摄影修图。</p>
+          </div>
+          <div class="mini">
+            <h4>图表美化原则</h4>
+            <p>只抽取语义信息（类型、标题、数据、坐标、单位）重新设计，不是给原图换皮。柱状图、甘特图、桑基图、热力图都带 3D 质感。</p>
+          </div>
+          <div class="mini">
+            <h4>冷门概念处理</h4>
+            <p>PKCE、Zettelkasten、模型 Logo、科学装置、历史物件——先检索参考信息与参考图，提取视觉线索，再统一转成归藏材质风格。</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Column 2: Scene Types -->
+      <article class="col">
+        <div class="col-head">
+          <p class="col-kicker">支持场景</p>
+          <h2 class="col-title">覆盖 10 类内容</h2>
+        </div>
+        <div class="col-body">
+          <div class="scene-grid">
+            <div class="scene">
+              <h5>📊 概念拆解图</h5>
+              <p>一个概念由哪些部分组成，适合系统性文章</p>
+            </div>
+            <div class="scene">
+              <h5>🔀 流程图解</h5>
+              <p>输入、步骤、判断、输出，含条件分支</p>
+            </div>
+            <div class="scene">
+              <h5>🔄 循环机制图</h5>
+              <p>增长飞轮、反馈回路、迭代循环</p>
+            </div>
+            <div class="scene">
+              <h5>⚖️ 对比图</h5>
+              <p>前后对比、两条路径、两种策略并列</p>
+            </div>
+            <div class="scene">
+              <h5>🏗️ 层级架构图</h5>
+              <p>系统依赖、模块关系、组织结构</p>
+            </div>
+            <div class="scene">
+              <h5">🧪 科学机制图</h5>
+              <p>杠杆原理、电磁感应、化学反应……标对位置</p>
+            </div>
+            <div class="scene">
+              <h5">🎨 人文意象图</h5>
+              <p>历史路线、文学隐喻、哲学关系，在"有氛围"和"讲明白"之间平衡</p>
+            </div>
+            <div class="scene">
+              <h5">📈 材质化图表</h5>
+              <p>柱状图、折线图、甘特图、桑基图、热力图、漏斗图</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Column 3: Install & Examples -->
+      <article class="col">
+        <div class="col-head">
+          <p class="col-kicker">安装 · 触发方式</p>
+          <h2 class="col-title">30 秒上手</h2>
+        </div>
+        <div class="col-body">
+          <div class="install">
+            <code>npx skills add https://github.com/op7418/guizang-material-illustration --skill guizang-material-illustration</code>
+            <p class="hint">或发给 Agent：「帮我安装 guizang-material-illustration」</p>
+          </div>
+          <div class="mini">
+            <h4>自然语言触发</h4>
+            <p>「用归藏材质插画 Skill，帮我把这段产品说明做成一张带中文标签的机制图」</p>
+            <p>「把这篇文章挑 3 个核心概念，各生成一张带字配图」</p>
+            <p>「帮我把这张柱状图重新画成归藏材质风格，数据和坐标不要改」</p>
+          </div>
+          <div class="mini">
+            <h4>与 PPT Skill 联动</h4>
+            <p>先生成中心配图，再交给 guizang-ppt-skill 做 PPT；或交给 Social Card Skill 排成 3:4 小红书卡片。</p>
+          </div>
+          <div>
+            <h4 style="font-size:12.5px;font-weight:700;margin:0 0 6px;color:var(--ink)">示例效果</h4>
+            <div class="gallery">
+              <figure>
+                <img src="https://pbs.twimg.com/media/HMrxOKAbsAADwBc.jpg" alt="归藏材质插画示例：PKCE 流程图" loading="lazy">
+                <figcaption class="cap">PKCE 流程图</figcaption>
+              </figure>
+              <figure>
+                <img src="https://pbs.twimg.com/media/HMrxOKBboAAc2Yy.jpg" alt="归藏材质插画示例：桑基图" loading="lazy">
+                <figcaption class="cap">材质化桑基图</figcaption>
+              </figure>
+              <figure>
+                <img src="https://pbs.twimg.com/media/HMrxOJ-acAAMTOE.jpg" alt="归藏材质插画示例：教育解释图" loading="lazy">
+                <figcaption class="cap">教育解释图</figcaption>
+              </figure>
+              <figure>
+                <img src="https://pbs.twimg.com/media/HMrxOKDaMAAVs16.jpg" alt="归藏材质插画示例：人文意象图" loading="lazy">
+                <figcaption class="cap">人文意象图</figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Suit / Not Suit -->
+    <section style="background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div>
+        <p style="font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;color:var(--blue);text-transform:uppercase;margin:0 0 8px">✅ 适合</p>
+        <div class="suit-list">
+          <span class="tag-item wood-item">文章配图</span>
+          <span class="tag-item wood-item">知识解释图</span>
+          <span class="tag-item wood-item">产品机制图</span>
+          <span class="tag-item wood-item">工作汇报</span>
+          <span class="tag-item wood-item">系统架构图</span>
+          <span class="tag-item wood-item">数据图表美化</span>
+          <span class="tag-item wood-item">教学材料</span>
+          <span class="tag-item wood-item">人文观点图</span>
+          <span class="tag-item wood-item">社交卡片中心图</span>
+          <span class="tag-item wood-item">PPT 主视觉</span>
+        </div>
+      </div>
+      <div>
+        <p style="font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:0 0 8px">❌ 不适合</p>
+        <div class="suit-list">
+          <span class="tag-item gray-item">完整小红书排版</span>
+          <span class="tag-item gray-item">PPT 结构设计</span>
+          <span class="tag-item gray-item">真实摄影修图</span>
+          <span class="tag-item gray-item">人像写真</span>
+          <span class="tag-item gray-item">长文海报排版</span>
+          <span class="tag-item gray-item">科研出版级图表</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div>
+        <div class="brand">归藏材质插画 Skill <sub>guizang-material-illustration · op7418</sub></div>
+        <div class="small">白底工作室光线 · 克 制 3D 材质 · 图内嵌入中文标签 · 材质化图表 · 冷门概念参考检索 · QA 优先交付</div>
+      </div>
+      <div class="footer-links">
+        <a class="footer-link" href="https://github.com/op7418/guizang-material-illustration" target="_blank" rel="noopener">GitHub</a>
+        <a class="footer-link" href="https://github.com/op7418/guizang-social-card-skill" target="_blank" rel="noopener">Social Card Skill</a>
+        <a class="footer-link" href="https://github.com/op7418/guizang-ppt-skill" target="_blank" rel="noopener">PPT Skill</a>
+      </div>
+    </footer>
+
+  </main>
+  <script>
+    // html2canvas save
+    async function saveCard(){
+      const{default:html2canvas}=await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.esm.min.js');
+      const el=document.querySelector('main.page');
+      const canvas=await html2canvas(el,{scale:2,useCORS:true,allowTaint:true});
+      const link=document.createElement('a');
+      link.download='归藏材质插画-Skill.png';
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+    }
+    document.addEventListener('DOMContentLoaded',function(){
+      var btn=document.getElementById('save-btn');
+      if(btn) btn.addEventListener('click',saveCard);
+    });
+  </script>
+  <script>
+    (function(){
+      function send(){
+        var h=document.body.scrollHeight;
+        window.parent.postMessage({type:'theme-height',slug:'wood',height:h},'*');
+      }
+      if(document.readyState==='complete') send();
+      else window.addEventListener('load',send);
+      setTimeout(send,500);
+      setTimeout(send,1500);
+    })();
+  </script>
+</body>
+</html>
