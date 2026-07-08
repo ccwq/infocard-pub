@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeepTime Mammalia · 交互式哺乳纲演化树</title>
+  <style>
+    :root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#0a0a0a;--red:#c8102e;--soft-red:#fff5f6;--soft-ink:#f7f5ef;--line:#0a0a0a;--shadow:6px 6px 0 rgba(10,10,10,.10)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    img{max-width:100%;display:block}
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === Topbar: diagonal red-black hero + meta pill === */
+    .topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:14px;overflow:hidden}
+    .topbar-hero{padding:18px 18px 14px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+    .kicker{display:inline-flex;align-items:center;gap:8px;padding:4px 9px;border:1.5px solid rgba(255,255,255,.4);font:900 11px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px;width:fit-content}
+    h1{margin:0 0 8px;font-size:clamp(22px,3.8vw,42px);line-height:1.0;letter-spacing:-.03em;font-weight:950}
+    .subtitle{font-size:13px;line-height:1.6;opacity:.9;max-width:560px}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .badge{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border:1.5px solid rgba(255,255,255,.3);font:850 11.5px/1 Inter,system-ui,sans-serif}
+    .badge.dark{background:#111;color:#fff;border-color:#111}
+    .badge.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .badge.blue{background:#0047ab;color:#fff;border-color:#0047ab}
+    .badge.green{background:#007a3d;color:#fff;border-color:#007a3d}
+    .badge.orange{background:#d97706;color:#fff;border-color:#d97706}
+    .badge.purple{background:#5b21b6;color:#fff;border-color:#5b21b6}
+    .topbar-meta{padding:14px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto;gap:0;align-content:start;background:#f6f1f1}
+    .meta-row-high{display:grid;grid-template-columns:1.4fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-low{display:grid;grid-template-columns:1.2fr 1fr .8fr;gap:5px}
+    .meta-cell{display:grid;gap:2px}
+    .meta-cell .v{font-size:20px;font-weight:950;line-height:1;letter-spacing:-.02em;color:var(--ink)}
+    .meta-cell .v.red{color:var(--red)}
+    .meta-cell .v.blue{color:#0047ab}
+    .meta-cell .v.green{color:#007a3d}
+    .meta-cell .l{font-size:10.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);opacity:.6}
+    .hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+    .h-stat{border:1px solid rgba(255,255,255,.2);padding:7px 10px;display:grid;gap:2px}
+    .h-stat .v{font-size:18px;font-weight:950;line-height:1;color:#fff}
+    .h-stat .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.7}
+    .inst-box{border:2px solid rgba(255,255,255,.3);background:rgba(0,0,0,.25);padding:10px 12px;margin-top:10px}
+    .inst-box .label{font:900 10px/1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.12em;opacity:.6;margin-bottom:4px}
+    pre{background:#0f1a14;border:1.5px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 11px;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.7;color:#78f2b0;overflow-x:auto;white-space:pre-wrap;margin:4px 0 0}
+
+    .section{margin-bottom:16px}
+    .section-label{font:900 11px/1 ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--ink);margin-bottom:8px;display:flex;align-items:center;gap:10px;opacity:.5}
+    .section-label::after{content:"";flex:1;height:2px;background:var(--ink);opacity:.15}
+    h2{margin:0 0 10px;font-size:clamp(17px,2.8vw,28px);font-weight:950;letter-spacing:-.02em;line-height:1.15}
+    .card{border:2px solid var(--line);background:var(--paper);padding:13px;display:grid;gap:7px;box-shadow:var(--shadow)}
+    .card h3{font-size:16px;font-weight:950;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .card p{font-size:12.5px;color:var(--ink);line-height:1.65;margin:0}
+    .card ul{margin:0;padding-left:16px;display:grid;gap:3px}
+    .card li{font-size:12.5px;line-height:1.6}
+    .tagrow{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px}
+    .tag{display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--line);padding:3px 7px;font:850 11px/1 Inter,system-ui,sans-serif;background:var(--paper)}
+    .tag.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .tag.blue{background:#0047ab;color:#fff;border-color:#0047ab}
+    .tag.green{background:#007a3d;color:#fff;border-color:#007a3d}
+    .tag.purple{background:#5b21b6;color:#fff;border-color:#5b21b6}
+    .tag.orange{background:#d97706;color:#fff;border-color:#d97706}
+    .grid-2,.grid-3{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .mini{border:1.5px solid var(--line);background:var(--paper);padding:11px;display:grid;gap:5px}
+    .mini h4{font-size:14px;font-weight:950;margin:0;line-height:1.2;letter-spacing:-.01em}
+    .mini p{font-size:11.5px;color:var(--ink);opacity:.7;margin:0;line-height:1.5}
+
+    /* Showcase grid for screenshots */
+    .showcase-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.55rem}
+    .showcase-item{border:2px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+    .showcase-img-wrap{overflow:hidden;border-bottom:2px solid var(--line);position:relative}
+    .showcase-img-wrap img{width:100%;height:200px;object-fit:cover;display:block;transition:transform .3s}
+    .showcase-img-wrap:hover img{transform:scale(1.04)}
+    .showcase-body{padding:9px 11px;display:grid;gap:3px}
+    .showcase-name{font-size:12.5px;font-weight:950;line-height:1.2}
+    .showcase-meta{font-size:10.5px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em}
+    .showcase-desc{font-size:11px;color:var(--ink);opacity:.7;line-height:1.5}
+
+    /* Timeline */
+    .timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:2px solid var(--line);overflow:hidden}
+    .t-node{border-right:1px solid var(--line);padding:10px 11px;background:var(--paper);position:relative}
+    .t-node:last-child{border-right:none}
+    .t-year{font-size:20px;font-weight:950;color:var(--red);letter-spacing:-.03em;line-height:1}
+    .t-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.6;margin-top:3px}
+    .t-desc{font-size:11px;opacity:.75;line-height:1.45;margin-top:4px}
+
+    /* Lead / intro callout */
+    .lead-call{border-left:4px solid var(--red);padding:11px 13px;background:var(--soft-red);margin-bottom:14px;font-size:13px;line-height:1.65;font-weight:600}
+
+    /* Footer */
+    .footer{border-top:3px solid var(--line);padding-top:11px;margin-top:6px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
+    .footer-left{font-size:11px;opacity:.65;line-height:1.6}
+    .footer-right a{display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--line);padding:5px 10px;font:850 11px/1 Inter,system-ui,sans-serif;background:var(--paper);box-shadow:3px 3px 0 rgba(10,10,10,.10)}
+    .footer-right a:hover{background:var(--soft-ink)}
+
+    /* Mobile */
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line);display:none}
+      .meta-row-high,.meta-row-low{display:none}
+      .grid-2,.grid-3{grid-template-columns:1fr}
+      .showcase-grid{grid-template-columns:1fr}
+      .timeline{grid-template-columns:repeat(2,1fr)}
+      .t-node:nth-child(5){border-right:none}
+      .page{padding:14px 0 80px}
+      .topbar-hero{padding:14px}
+    }
+    @media(max-width:390px){
+      .timeline{grid-template-columns:1fr}
+      .t-node{border-right:none;border-bottom:1px solid var(--line)}
+      .t-node:last-child{border-bottom:none}
+    }
+
+    #save-btn{position:fixed;bottom:20px;right:14px;z-index:999;border:0;border-radius:10px;padding:.56rem .72rem;background:linear-gradient(135deg,var(--red),#b3000f);color:#fff;font-size:.7rem;font-weight:900;font-family:ui-monospace,monospace;letter-spacing:.04em;cursor:pointer;box-shadow:3px 3px 0 rgba(0,0,0,.2)}
+    @media(max-width:720px){#save-btn{bottom:14px;right:10px;font-size:.8rem}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- === TOPBAR === -->
+  <div class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">
+        <span>🧬 生物可视化</span>
+        <span>·</span>
+        <span>交互式演化树</span>
+      </div>
+      <h1>DeepTime Mammalia</h1>
+      <p class="subtitle">交互式哺乳纲演化树 · 沉浸式科普体验<br>跨越 2 亿年的生命史诗，尽在指尖流转</p>
+      <div class="badge-row">
+        <span class="badge dark">JavaScript</span>
+        <span class="badge red">D3.js v7</span>
+        <span class="badge blue">Three.js r128</span>
+        <span class="badge green">WebGL</span>
+        <span class="badge purple">CC BY-NC-SA 4.0</span>
+      </div>
+      <div class="hero-stats">
+        <div class="h-stat"><span class="v">215 ★</span><span class="l">GitHub Stars</span></div>
+        <div class="h-stat"><span class="v">21</span><span class="l">Forks</span></div>
+      </div>
+      <div class="inst-box">
+        <div class="label">Live Demo</div>
+        <pre>mammalia-tree.pages.dev</pre>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-cell">
+          <span class="v red">167</span>
+          <span class="l">哺乳动物科</span>
+        </div>
+        <div class="meta-cell">
+          <span class="v">200 Myr</span>
+          <span class="l">跨越时间</span>
+        </div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-cell">
+          <span class="v blue">MDD v2.3</span>
+          <span class="l">分类数据源</span>
+        </div>
+        <div class="meta-cell">
+          <span class="v green">2</span>
+          <span class="l">视图模式</span>
+        </div>
+        <div class="meta-cell">
+          <span class="v">14</span>
+          <span class="l">Topics</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;opacity:.7;line-height:1.5">
+        <div>作者: <strong>Sean Wong</strong></div>
+        <div>建于: 2025-12-13</div>
+        <div>更新: 2026-07-08</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === LEAD === -->
+  <div class="lead-call">
+    从合弓纲的余晖，到新生代的繁盛。DeepTime Mammalia 基于 <strong>Mammal Diversity Database (MDD) v2.3</strong> 分类系统，将 167 个科、上千个演化节点，通过 <strong>3D 双螺旋画廊 + D3.js 动态演化树</strong> 双视图呈现，是兼具科学严谨性与沉浸式体验的生物演化可视化作品。
+  </div>
+
+  <!-- === SECTION: 核心特性 === -->
+  <div class="section">
+    <div class="section-label">Features · 核心特性</div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>🌌 沉浸式 3D 序幕</h3>
+        <p>基于 Three.js (CSS3DRenderer) 构建 DNA 双螺旋画廊，象征生命遗传密码。WebGL 粒子系统随鼠标流动，营造深邃的时间感。影院级相机过渡动画，实现从微观到宏观的无缝切换。</p>
+        <div class="tagrow">
+          <span class="tag blue">Three.js</span>
+          <span class="tag blue">WebGL</span>
+          <span class="tag green">CSS3DRenderer</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🌿 D3.js 交互式演化图谱</h3>
+        <p>高性能渲染，支持从"纲"到"科"的逐级展开/收起。全手势支持（滚轮、双指捏合、拖拽漫游）。底部集成动态地质时间轴，实时显示 MYA（Million Years Ago）。</p>
+        <div class="tagrow">
+          <span class="tag orange">D3.js v7</span>
+          <span class="tag red">双向缩放</span>
+          <span class="tag green">地质时间轴</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🌐 中英文国际化</h3>
+        <p>一键切换界面语言，节点名称、描述、UI 元素自动适配当前语言。中文/拉丁学名实时搜索与高亮定位。</p>
+        <div class="tagrow">
+          <span class="tag purple">i18n</span>
+          <span class="tag blue">中文/EN</span>
+          <span class="tag green">拉丁学名搜索</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🥚 溯源彩蛋 (Easter Egg)</h3>
+        <p>隐藏的"溯源"模式：寻找并点击界面中的"溯源"按钮，呈现穿越大灭绝的幽灵线框路径——致敬生命韧性。</p>
+        <div class="tagrow">
+          <span class="tag red">彩蛋</span>
+          <span class="tag purple">灭绝路径</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === SECTION: 截图展示 === -->
+  <div class="section">
+    <div class="section-label">Screenshots · 界面预览</div>
+    <div class="showcase-grid">
+      <div class="showcase-item">
+        <div class="showcase-img-wrap">
+          <img src="https://raw.githubusercontent.com/SeanWong17/Mammalia-tree/main/examples/gallery.png" alt="3D Spiral Gallery" loading="lazy" onerror="this.style.display='none'">
+        </div>
+        <div class="showcase-body">
+          <div class="showcase-name">3D 螺旋画廊</div>
+          <div class="showcase-meta">Three.js · CSS3DRenderer</div>
+          <div class="showcase-desc">DNA 双螺旋画廊，象征生命遗传密码，WebGL 粒子随鼠标流动</div>
+        </div>
+      </div>
+      <div class="showcase-item">
+        <div class="showcase-img-wrap">
+          <img src="https://raw.githubusercontent.com/SeanWong17/Mammalia-tree/main/examples/tree.png" alt="Evolutionary Tree" loading="lazy" onerror="this.style.display='none'">
+        </div>
+        <div class="showcase-body">
+          <div class="showcase-name">动态演化树</div>
+          <div class="showcase-meta">D3.js · 地质时间轴</div>
+          <div class="showcase-desc">逐级展开收起，底部时间轴实时显示百万年前地质年代</div>
+        </div>
+      </div>
+      <div class="showcase-item">
+        <div class="showcase-img-wrap">
+          <img src="https://raw.githubusercontent.com/SeanWong17/Mammalia-tree/main/examples/card.png" alt="Detail Card" loading="lazy" onerror="this.style.display='none'">
+        </div>
+        <div class="showcase-body">
+          <div class="showcase-name">物种资料卡</div>
+          <div class="showcase-meta">交互式信息卡</div>
+          <div class="showcase-desc">点击节点展开哺乳动物物种详情卡片，含中文名称与学名</div>
+        </div>
+      </div>
+      <div class="showcase-item">
+        <div class="showcase-img-wrap">
+          <img src="https://raw.githubusercontent.com/SeanWong17/Mammalia-tree/main/examples/egg.png" alt="Easter Egg View" loading="lazy" onerror="this.style.display='none'">
+        </div>
+        <div class="showcase-body">
+          <div class="showcase-name">溯源彩蛋</div>
+          <div class="showcase-meta">Ghost Line Path · 灭绝路径</div>
+          <div class="showcase-desc">穿越大灭绝的幽灵线框路径，致敬生命韧性</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === SECTION: 技术栈 + 架构 === -->
+  <div class="section">
+    <div class="section-label">Tech Stack · 技术栈与架构</div>
+    <div class="grid-3">
+      <div class="mini">
+        <h4>Core</h4>
+        <p>HTML5 · CSS3 · JavaScript ES6+<br>零构建依赖，开箱即用</p>
+      </div>
+      <div class="mini">
+        <h4>D3.js v7</h4>
+        <p>复杂树状数据布局与计算<br>高性能动态渲染</p>
+      </div>
+      <div class="mini">
+        <h4>Three.js r128</h4>
+        <p>WebGL 粒子背景<br>CSS3DRenderer 双螺旋</p>
+      </div>
+      <div class="mini">
+        <h4>Tween.js</h4>
+        <p>平滑补间动画<br>影院级运镜过渡</p>
+      </div>
+      <div class="mini">
+        <h4>Google Fonts</h4>
+        <p>Noto Serif SC · Playfair Display<br>中英文双语排版</p>
+      </div>
+      <div class="mini">
+        <h4>MDD v2.3</h4>
+        <p>Mammal Diversity Database<br>科学分类数据基准</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- === SECTION: 演化时间线 === -->
+  <div class="section">
+    <div class="section-label">Deep Time · 演化时间轴</div>
+    <div class="timeline">
+      <div class="t-node">
+        <div class="t-year">300 Myr</div>
+        <div class="t-label">合弓纲起源</div>
+        <div class="t-desc">二叠纪初期，合弓纲祖先出现，哺乳动物的远祖</div>
+      </div>
+      <div class="t-node">
+        <div class="t-year">252 Myr</div>
+        <div class="t-label">二叠纪大灭绝</div>
+        <div class="t-desc">生命大洗牌，合弓纲幸存者迎来辐射演化</div>
+      </div>
+      <div class="t-node">
+        <div class="t-year">66 Myr</div>
+        <div class="t-label">白垩纪末大灭绝</div>
+        <div class="t-desc">恐龙灭绝，哺乳动物大规模辐射，占据空缺生态位</div>
+      </div>
+      <div class="t-node">
+        <div class="t-year">23 Myr</div>
+        <div class="t-label">新近纪繁盛</div>
+        <div class="t-desc">现代哺乳动物各大科形成，生态位高度分化</div>
+      </div>
+      <div class="t-node">
+        <div class="t-year">现代</div>
+        <div class="t-label">今日哺乳纲</div>
+        <div class="t-desc">167 个科、上千个演化节点，跨越 2 亿年的生命网络</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === SECTION: 姊妹项目 === -->
+  <div class="section">
+    <div class="section-label">Related · 姊妹项目</div>
+    <div class="card">
+      <h3>DeepTime Sauropsida · 蜥形纲演化树</h3>
+      <p>聚焦鸟类、鳄类、龟鳖类、喙头类与有鳞类，把现生蜥形纲重新放回约 3 亿年的深时背景中。与 DeepTime Mammalia 同属 DeepTime 系列。</p>
+      <div class="tagrow">
+        <span class="tag green">DeepTime 系列</span>
+        <span class="tag blue">蜥形纲</span>
+        <span class="tag orange">3 亿年跨度</span>
+      </div>
+      <div style="margin-top:4px">
+        <a href="https://github.com/SeanWong17/Sauropsida-tree" style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--line);padding:5px 10px;font:850 11px/1 Inter,system-ui,sans-serif;background:var(--paper)">
+          → GitHub: SeanWong17/Sauropsida-tree
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- === FOOTER === -->
+  <div class="footer">
+    <div class="footer-left">
+      <div>🧬 数据来源: Mammal Diversity Database (MDD) v2.3 · Paleobiology Database</div>
+      <div>🤖 AI 辅助: Google Gemini (代码逻辑 + Shader) · nanobanana (物种复原图)</div>
+      <div style="margin-top:3px">📌 License: CC BY-NC-SA 4.0 · 不可用于商业用途</div>
+    </div>
+    <div class="footer-right">
+      <a href="https://github.com/SeanWong17/Mammalia-tree">→ GitHub</a>
+    </div>
+  </div>
+
+</div>
+
+<button id="save-btn" onclick="window.print()">保存 PNG</button>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+document.getElementById('save-btn').addEventListener('click',function(){
+  html2canvas(document.body,{scale:2,useCORS:true,logging:false}).then(function(canvas){
+    var link=document.createElement('a');link.download='mammalia-evolution-tree.png';link.href=canvas.toDataURL('image/png');link.click();
+  });
+});
+</script>
+</body>
+</html>
