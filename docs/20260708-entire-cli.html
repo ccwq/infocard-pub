@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entire CLI · Git-Native Agent Session 记录器</title>
+  <style>
+    :root{--bg:#07120d;--bg2:#0b1711;--bg3:#102018;--bg4:#0d1e14;--ink:#eaf7ef;--muted:#9fbeab;--accent:#33d17a;--accent2:#52e896;--accent3:#2db86e;--line:rgba(180,255,210,.12);--dim:rgba(180,255,210,.08)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);font-size:13px;line-height:1.6}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(780px,100%);margin:0 auto;padding:16px 14px 80px}
+
+    /* STATUS BAR */
+    .status-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--line);margin-bottom:16px;font-size:11px;color:var(--muted)}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);flex-shrink:0}
+    .dot.warn{background:#f4c84c;box-shadow:0 0 6px #f4c84c}
+
+    /* HEADER */
+    .header{margin-bottom:16px}
+    .kicker{border-left:3px solid var(--accent);padding-left:10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:8px}
+    h1{margin:0 0 8px;font-size:clamp(20px,4vw,34px);font-weight:700;color:var(--ink);letter-spacing:-.03em;line-height:1.1}
+    .subtitle{color:var(--muted);font-size:13.5px;line-height:1.65}
+
+    /* STATS ROW */
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+    .stat{background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:center}
+    .stat .v{font-size:20px;font-weight:700;color:var(--accent);line-height:1;display:block;margin-bottom:3px}
+    .stat .l{font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+
+    /* BADGE ROW */
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+    .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border:1px solid var(--line);background:var(--bg4);font:850 11.5px/1 -apple-system,sans-serif;border-radius:6px;color:var(--ink)}
+    .badge.green{background:var(--accent);border-color:var(--accent);color:#07120d;font-weight:900}
+    .badge.dark{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.15)}
+    .badge.orange{background:rgba(244,200,76,.12);border-color:rgba(244,200,76,.25);color:#f4c84c}
+
+    /* SECTIONS */
+    .section{margin-bottom:14px}
+    .section-label{font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.16em;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+    .section-label::after{content:"";flex:1;height:1px;background:var(--line)}
+    h2{font-size:clamp(16px,2.8vw,22px);font-weight:700;letter-spacing:-.02em;margin:0 0 10px;line-height:1.2}
+
+    /* FLOW */
+    .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px}
+    .flow-step{border:1px solid var(--line);background:var(--bg3);border-radius:8px;padding:10px 10px;text-align:center;position:relative}
+    .flow-step .n{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#07120d;font:950 12px/1 ui-monospace,monospace;margin-bottom:6px}
+    .flow-step .t{font-size:12px;font-weight:700;line-height:1.2;color:var(--ink)}
+    .flow-step .d{font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+    .flow-step::after{content:"→";position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:var(--accent);font-size:13px;font-weight:900;opacity:.5}
+    .flow-step:last-child::after{display:none}
+
+    /* WORKFLOW DIAGRAM */
+    .diagram{border:1px solid var(--line);background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:10px;overflow-x:auto}
+    .diagram pre{font-family:ui-monospace,monospace;font-size:12px;line-height:1.75;color:var(--accent);margin:0;white-space:pre}
+
+    /* GRID */
+    .grid-2,.grid-3{display:grid;gap:10px}
+    .grid-2{grid-template-columns:repeat(2,1fr)}
+    .grid-3{grid-template-columns:repeat(3,1fr)}
+    .card{border:1px solid var(--line);background:var(--bg3);border-radius:8px;padding:12px;display:grid;gap:7px}
+    .card h3{font-size:14px;font-weight:700;line-height:1.25;margin:0;color:var(--ink);letter-spacing:-.01em}
+    .card p{font-size:12px;color:var(--muted);line-height:1.65;margin:0}
+    .card ul{margin:0;padding-left:14px;display:grid;gap:3px}
+    .card li{font-size:12px;line-height:1.6;color:var(--muted)}
+    .card .tag{display:inline-flex;padding:2px 7px;border:1px solid var(--accent);background:rgba(51,209,122,.08);font:900 10px/1 ui-monospace,monospace;color:var(--accent);text-transform:uppercase;letter-spacing:.1em}
+
+    /* TBL */
+    .tbl{width:100%;border-collapse:collapse;font-size:12.5px;border-radius:8px;overflow:hidden}
+    .tbl th{padding:9px 12px;background:rgba(51,209,122,.08);border-bottom:1px solid var(--line);text-align:left;font:900 10.5px/1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--accent)}
+    .tbl td{padding:9px 12px;border-bottom:1px solid var(--line);color:var(--muted);line-height:1.6;vertical-align:top}
+    .tbl tr:last-child td{border-bottom:none}
+    .tbl code{font-size:11.5px;background:rgba(255,255,255,.06);padding:2px 5px;border-radius:4px;color:var(--accent2)}
+
+    /* INSTALL */
+    .install-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:8px}
+    .inst{border:1px solid var(--line);background:var(--bg3);border-radius:8px;padding:11px 13px;display:grid;gap:5px}
+    .inst .label{font:900 10px/1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);margin-bottom:2px}
+    .inst p{font-size:12px;margin:0;color:var(--muted);line-height:1.55}
+    pre{background:#0a1510;border:1px solid rgba(51,209,122,.15);border-radius:8px;padding:11px 13px;font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.7;color:var(--accent2);overflow-x:auto;white-space:pre-wrap;margin:0}
+
+    /* AGENTS */
+    .agent-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}
+    .agent{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);background:var(--bg4);border-radius:7px;font-size:12px;font-weight:700}
+    .agent::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent2);box-shadow:0 0 5px var(--accent2);flex-shrink:0}
+
+    /* ALERT */
+    .alert{border:1px solid rgba(244,200,76,.2);background:rgba(244,200,76,.06);border-radius:8px;padding:11px 13px;margin-bottom:10px;display:grid;gap:5px}
+    .alert strong{font-size:13px;line-height:1.35;color:#f4c84c}
+    .alert p{margin:0;font-size:12px;line-height:1.6;color:var(--muted)}
+
+    /* COMPARE */
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .compare-box{border:1px solid var(--line);border-radius:8px;padding:12px}
+    .compare-box.old{background:rgba(255,255,255,.03)}
+    .compare-box.new{background:rgba(51,209,122,.06);border-color:rgba(51,209,122,.2)}
+    .compare-box h4{font-size:13.5px;font-weight:700;margin:0 0 6px;color:var(--ink)}
+    .compare-box.old h4{color:var(--muted)}
+    .compare-box.new h4{color:var(--accent)}
+    .compare-box ul{margin:0;padding-left:14px;display:grid;gap:4px}
+    .compare-box li{font-size:12px;line-height:1.6;color:var(--muted)}
+
+    /* FOOTER */
+    .footer{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:13px 15px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin-top:6px}
+    .footer p{font-size:12px;margin:0;line-height:1.65;color:var(--muted)}
+    .footer a{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--line);border-radius:7px;font:800 12px/1 -apple-system,sans-serif;color:var(--ink);transition:border-color .2s}
+    .footer a:hover{border-color:var(--accent)}
+    .footer a.green{background:var(--accent);border-color:var(--accent);color:#07120d}
+
+    @media(max-width:600px){
+      .stats{grid-template-columns:repeat(2,1fr)}
+      .grid-2,.grid-3,.compare{grid-template-columns:1fr}
+      .flow{grid-template-columns:1fr 1fr}
+      .flow-step::after{display:none}
+      .footer{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- STATUS BAR -->
+    <div class="status-bar">
+      <span class="dot"></span>
+      <span class="label">entire.io</span>
+      <span>·</span>
+      <span>Git-Native Agent Session Recorder</span>
+      <span>·</span>
+      <span>Go</span>
+    </div>
+
+    <!-- HEADER -->
+    <header class="header">
+      <div class="kicker">Git Workflow · Agent Session Indexer</div>
+      <h1>Entire CLI</h1>
+      <p class="subtitle">把 agent session 和 commit 一起索引，连 prompt、response、动过的文件全部可追。Entire 把 agent context 放在单独分支里，不污染主线 Git 历史。</p>
+      <div class="badge-row">
+        <span class="badge green">4,639 Stars</span>
+        <span class="badge">Claude Code</span>
+        <span class="badge">Codex</span>
+        <span class="badge">Gemini</span>
+        <span class="badge">Pi</span>
+        <span class="badge">Cursor</span>
+        <span class="badge dark">Go</span>
+        <span class="badge dark">MIT</span>
+      </div>
+    </header>
+
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat"><span class="v">4,639</span><span class="l">GitHub Stars</span></div>
+      <div class="stat"><span class="v">357</span><span class="l">Forks</span></div>
+      <div class="stat"><span class="v">Go</span><span class="l">Language</span></div>
+      <div class="stat"><span class="v">MIT</span><span class="l">License</span></div>
+    </div>
+
+    <!-- FLOW: 5 Steps -->
+    <section class="section">
+      <div class="section-label">WORKFLOW · 5 步工作流</div>
+      <div class="flow">
+        <div class="flow-step">
+          <span class="n">1</span>
+          <div class="t">entire enable</div>
+          <div class="d">在 Git 仓库启用 Entire</div>
+        </div>
+        <div class="flow-step">
+          <span class="n">2</span>
+          <div class="t">Work as Usual</div>
+          <div class="d">Claude Code / Codex / Gemini 正常工作</div>
+        </div>
+        <div class="flow-step">
+          <span class="n">3</span>
+          <div class="t">Git Commit</div>
+          <div class="d">提交时自动创建 Checkpoint</div>
+        </div>
+        <div class="flow-step">
+          <span class="n">4</span>
+          <div class="t">entire status</div>
+          <div class="d">随时查看当前 session 状态</div>
+        </div>
+        <div class="flow-step">
+          <span class="n">5</span>
+          <div class="t">entire session resume</div>
+          <div class="d">恢复到任意 Checkpoint 继续</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DIAGRAM -->
+    <section class="section">
+      <div class="section-label">HOW IT WORKS · 分支架构</div>
+      <div class="diagram">
+        <pre>Your Branch                    entire/checkpoints/v1
+     │                                  │
+     ▼                                  │
+[Base Commit]                           │
+     │                                  │
+     │  ┌─── Agent works ───┐           │
+     │  │  Step 1           │           │
+     │  │  Step 2           │           │
+     │  │  Step 3           │           │
+     │  └───────────────────┘           │
+     │                                  │
+     ▼                                  ▼
+[Your Commit] ────────────────► [Session Metadata]
+     │                    (transcript, prompts, files touched)
+     ▼</pre>
+      </div>
+    </section>
+
+    <!-- WHAT IT CAPTURES -->
+    <section class="section">
+      <div class="section-label">CAPTURE · 记录内容</div>
+      <h2>每次 Commit 附带哪些 Session 数据</h2>
+      <div class="grid-3">
+        <div class="card">
+          <div class="tag">Prompts</div>
+          <h3>完整 Prompt 记录</h3>
+          <p>每次交互的 Prompt 历史，支持溯源"当时为什么这么改"</p>
+        </div>
+        <div class="card">
+          <div class="tag">Responses</div>
+          <h3>AI 响应记录</h3>
+          <p>完整的 AI 回复轨迹，包括思考过程和输出</p>
+        </div>
+        <div class="card">
+          <div class="tag">Files</div>
+          <h3>文件修改轨迹</h3>
+          <p>Agent 动过的每个文件路径 + 修改内容关联</p>
+        </div>
+        <div class="card">
+          <div class="tag">Token Usage</div>
+          <h3>Token 消耗量</h3>
+          <p>每个 Session 的 Token 使用统计，便于审计</p>
+        </div>
+        <div class="card">
+          <div class="tag">Tool Calls</div>
+          <h3>工具调用记录</h3>
+          <p>Read / Write / Bash / Edit 等所有工具调用的完整日志</p>
+        </div>
+        <div class="card">
+          <div class="tag">Checkpoint</div>
+          <h3>可回退快照</h3>
+          <p>每个 Commit 对应一个 Checkpoint，随时恢复到该状态</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- AGENTS SUPPORTED -->
+    <section class="section">
+      <div class="section-label">AGENTS · 支持的 Agent</div>
+      <div class="agent-row">
+        <span class="agent">Claude Code</span>
+        <span class="agent">OpenAI Codex</span>
+        <span class="agent">Google Gemini CLI</span>
+        <span class="agent">Pi Agent</span>
+        <span class="agent">Cursor IDE</span>
+        <span class="agent">GitHub Copilot CLI</span>
+      </div>
+      <div class="alert">
+        <strong>⚠ 限制说明</strong>
+        <p>Cursor：`entire rewind` 暂不可用，其他命令正常。Copilot：仅支持 CLI，不支持 VS Code 内嵌版。Pi：子 agent 捕获暂不可用。</p>
+      </div>
+    </section>
+
+    <!-- INSTALL SOP -->
+    <section class="section">
+      <div class="section-label">INSTALL SOP · 多平台安装</div>
+      <div class="install-row">
+        <div class="inst">
+          <div class="label">macOS (Homebrew)</div>
+          <p>先 tap，再 install stable：</p>
+        </div>
+        <div class="inst">
+          <div class="label">Linux/macOS (curl)</div>
+          <p>一行命令安装脚本：</p>
+        </div>
+        <div class="inst">
+          <div class="label">Windows (Scoop)</div>
+          <p>添加 bucket 后 install：</p>
+        </div>
+        <div class="inst">
+          <div class="label">Go (dev/manual)</div>
+          <p>编译安装最新版本：</p>
+        </div>
+      </div>
+      <pre>brew tap entireio/tap && brew trust entireio/tap && brew install --cask entire
+# Stable:   curl -fsSL https://entire.io/install.sh | bash
+# Nightly:   curl -fsSL https://entire.io/install.sh | bash -s -- --channel nightly
+# Windows:   scoop bucket add entire https://github.com/entireio/scoop-bucket.git && scoop install entire/cli
+# Go:        go install github.com/entireio/cli/cmd/entire@latest</pre>
+    </section>
+
+    <!-- KEY COMMANDS -->
+    <section class="section">
+      <div class="section-label">COMMANDS · 核心命令</div>
+      <table class="tbl">
+        <thead>
+          <tr><th>命令</th><th>作用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>entire enable</code></td><td>在当前 Git 仓库启用 Entire（安装 Git hooks）</td></tr>
+          <tr><td><code>entire enable --agent &lt;name&gt;</code></td><td>非交互式指定 Agent（如 cursor / claude / codex）</td></tr>
+          <tr><td><code>entire status</code></td><td>查看当前 session 状态</td></tr>
+          <tr><td><code>entire agent</code></td><td>添加或移除 Agent hook</td></tr>
+          <tr><td><code>entire configure</code></td><td>更新非 Agent 设置（遥测/hooks/Checkpoint remote）</td></tr>
+          <tr><td><code>entire session resume &lt;branch&gt;</code></td><td>恢复指定分支的最新 Checkpoint，继续工作</td></tr>
+          <tr><td><code>entire clean --force</code></td><td>清理当前 Commit 的孤立数据</td></tr>
+          <tr><td><code>entire disable</code></td><td>禁用 Entire（Git hooks 移除，代码历史不动）</td></tr>
+          <tr><td><code>entire doctor</code></td><td>诊断 Entire 配置和连接状态</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- AUTO SUMMARIZATION -->
+    <section class="section">
+      <div class="section-label">AUTO SUMMARIZE · 自动摘要</div>
+      <h2>Commit 时自动生成 AI 摘要</h2>
+      <div class="card" style="margin-bottom:10px">
+        <p style="font-size:12.5px;color:var(--muted)">当 Claude CLI 已安装并认证，Entire 在 commit 时自动生成摘要：捕获意图、结果、教训、摩擦点和未完成项。</p>
+        <div style="margin-top:8px;font-size:12px;color:var(--accent2)">requirements: <code>claude</code> 命令在 PATH 中可用。摘要生成非阻塞，失败只记录日志，不阻止 commit。</div>
+      </div>
+      <pre>{
+  "strategy_options": {
+    "summarize": {
+      "enabled": true
+    }
+  }
+}</pre>
+    </section>
+
+    <!-- VS BEFORE -->
+    <section class="section">
+      <div class="section-label">VS BEFORE · 对比</div>
+      <div class="compare">
+        <div class="compare-box old">
+          <h4>❌ 无 Entire（现状）</h4>
+          <ul>
+            <li>Agent 干了什么、为什么这么改，全靠记忆</li>
+            <li>新成员加入，看不懂某段代码的历史</li>
+            <li>Agent 跑偏了，只能手动 reset</li>
+            <li>团队多人用 Agent，commit 历史没有任何上下文</li>
+            <li>"这段 CSS 为什么这么写？"——查不到了</li>
+            <li>无法审计 Agent 的行为边界</li>
+          </ul>
+        </div>
+        <div class="compare-box new">
+          <h4>✅ 有 Entire</h4>
+          <ul>
+            <li>每条 commit 附带完整 prompt/response 记录</li>
+            <li>新成员看到从 Prompt → Change → Commit 的完整路径</li>
+            <li>随时 Rewind 到任意 Checkpoint，恢复到正确状态</li>
+            <li>团队共享 Agent session，分支隔离，互不污染</li>
+            <li>"当时为什么这么改？"→ 查 Transcript</li>
+            <li>Session 数据存单独分支，主线 Git 历史干净</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div>
+        <p><strong style="color:var(--ink)">entireio / cli</strong> · MIT License</p>
+        <p>Agent Context 单独分支 <code>entire/checkpoints/v1</code> · 安全自动抹除检测到的 Secret · Stable + Nightly 双通道</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="green" href="https://github.com/entireio/cli" target="_blank">⭐ GitHub</a>
+        <a href="https://entire.io" target="_blank">entire.io</a>
+      </div>
+    </div>
+
+  </main>
+</body>
+</html>
