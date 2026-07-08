@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="零成本跑通 DeepSeek-R1 蒸馏版（7B/14B/32B）LoRA 微调全流程：ModelScope 免费 GPU + bitsandbytes 8位量化 + PEFT LoRA，冻结 99.94% 参数，仅微调 0.06% 适配器，24G 显存可跑。">
+  <title>DeepSeek-R1 轻量化 LoRA 微调全流程：零成本在 ModelScope 跑起来</title>
+  <style>
+    :root{--bg:#0b1020;--paper:#0f1629;--ink:#e8edf5;--muted:#8898b8;--line:#2a3a5c;--blue:#4f9eff;--soft-blue:#1a3a6a;--red:#ff4f6a;--soft-red:#3a1020;--green:#3dffa0;--soft-green:#0a2a1a;--amber:#ffb84f;--soft-amber:#2a1e00}
+    *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"PingFang SC","Microsoft YaHei",monospace;line-height:1.62} body{background-image:linear-gradient(rgba(79,158,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(79,158,255,.04) 1px,transparent 1px);background-size:42px 42px}.page{width:min(1120px,calc(100% - 28px));margin:0 auto;padding:22px 0 72px}.shell{background:var(--paper);border:2px solid var(--line);box-shadow:8px 8px 0 rgba(79,158,255,.15);padding:18px}.num{font-size:96px;line-height:1;font-weight:900;color:var(--blue);opacity:.12;position:absolute;top:-10px;left:-6px}.panel{position:relative;border:2px solid var(--line);background:var(--paper);overflow:hidden}.panel-bar{height:10px;background:linear-gradient(90deg,var(--blue) 0 33%,var(--red) 33% 66%,var(--green) 66% 100%)}.panel-body{padding:16px;display:flex;flex-direction:column;gap:10px}.kicker{width:max-content;padding:4px 10px;border:2px solid var(--line);background:var(--soft-blue);color:var(--blue);font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;border-radius:2px}.panel-title{font-size:17px;font-weight:900;color:var(--ink);margin:0;letter-spacing:-.03em}.panel-desc{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;color:var(--muted);margin:0;line-height:1.55}.tag-row{display:flex;flex-wrap:wrap;gap:6px}.tag{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border:1.5px solid var(--line);background:var(--bg);color:var(--muted);font-size:10.5px;font-weight:700;border-radius:2px}.tag.blue{border-color:var(--blue);color:var(--blue);background:var(--soft-blue)}.tag.red{border-color:var(--red);color:var(--red);background:var(--soft-red)}.tag.green{border-color:var(--green);color:var(--green);background:var(--soft-green)}.tag.amber{border-color:var(--amber);color:var(--amber);background:var(--soft-amber)}table{width:100%;border-collapse:collapse;font-size:12.5px}.td,.th{padding:8px 10px;border:1.5px solid var(--line);text-align:left}.th{background:var(--bg);color:var(--blue);font-weight:700;white-space:nowrap}.tr{background:var(--bg)}.tr:nth-child(even){background:rgba(255,255,255,.025)}code{font-size:11.5px;background:var(--bg);border:1.5px solid var(--line);padding:1px 5px;border-radius:2px;color:var(--green)}.pre{font-size:11px;background:var(--bg);border:1.5px solid var(--line);padding:11px 13px;border-radius:2px;overflow-x:auto;white-space:pre;line-height:1.65;color:var(--ink)}.callout{border:2px solid var(--line);background:var(--soft-blue);padding:10px 13px;border-left:5px solid var(--blue);border-radius:2px}.callout.red{border-left-color:var(--red);background:var(--soft-red)}.callout.green{border-left-color:var(--green);background:var(--soft-green)}.callout p{margin:0;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12px;color:var(--ink);line-height:1.5}.callout strong{font-size:12.5px}.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}@media(max-width:680px){.grid-2,.grid-3{grid-template-columns:1fr}}.section-gap{margin-top:14px}.save{position:fixed;right:18px;bottom:18px;z-index:999;border:2px solid var(--line);border-radius:8px;background:linear-gradient(135deg,var(--blue),#2563eb);color:#fff;font-weight:900;font-size:12px;padding:10px 15px;box-shadow:4px 4px 0 rgba(0,0,0,.4);cursor:pointer}@media(max-width:720px){.page{width:min(100% - 34px,1120px);padding-bottom:86px}.save{right:12px;bottom:12px}}
+    body{overflow-x:hidden}
+    @media(max-width:720px){.shell{box-shadow:none}.num{font-size:64px}}
+  </style>
+</head>
+<body>
+<div class="page">
+  <!-- HERO -->
+  <div class="shell" style="margin-bottom:14px">
+    <div class="hero" style="display:grid;grid-template-columns:1.08fr .92fr;border:2px solid var(--line)">
+      <div style="grid-column:1/-1;height:10px;background:linear-gradient(90deg,var(--blue) 0 33%,var(--red) 33% 66%,var(--green) 66% 100%);border-bottom:2px solid var(--line)"></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:10px">
+        <span class="kicker">模型微调 · QLoRA · 零成本</span>
+        <h1 style="font-size:clamp(22px,4vw,46px);line-height:.95;margin:0;letter-spacing:-.05em;color:var(--ink)">DeepSeek-R1<br>LoRA 微调全流程</h1>
+        <p style="font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;font-size:13px;color:var(--muted);margin:0;max-width:60ch">零成本跑通 DeepSeek-R1 蒸馏版（7B/14B/32B）轻量化微调：ModelScope 免费 GPU + bitsandbytes 8位量化 + PEFT LoRA，24G 显存可跑，冻结 99.94% 参数，仅微调 0.06% 适配器。</p>
+        <div class="tag-row">
+          <span class="tag blue">MIT License</span>
+          <span class="tag green">免费 GPU</span>
+          <span class="tag">671B MoE / 37B 激活</span>
+          <span class="tag">QLoRA 8bit</span>
+          <span class="tag">24G 显存</span>
+        </div>
+      </div>
+      <div style="padding:18px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em">来源与许可</div>
+        <div style="font-size:12.5px;color:var(--ink)"><strong style="color:var(--blue)">DeepSeek</strong>（深度求索 / 幻方量化）</div>
+        <div style="font-size:12px;color:var(--muted);font-family:system-ui">MIT License · 完全开源可商用</div>
+        <div style="font-size:12px;color:var(--muted)">蒸馏版 HuggingFace 150万模型中点赞破万</div>
+        <div style="font-size:12px;color:var(--muted)">对标 OpenAI o1 正式版</div>
+        <div style="font-size:12px;color:var(--muted)">支持 SFT / RL / 蒸馏</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--muted)">信息可信度分层：</div>
+        <div style="font-size:11px;color:var(--green)">✓ 模型卡事实（MIT、671B MoE、37B 激活）</div>
+        <div style="font-size:11px;color:var(--blue)">· 用户提供的操作步骤</div>
+        <div style="font-size:11px;color:var(--amber)">? ModelScope 额度实时政策（外围报道）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 1: 算力平台 -->
+  <div class="grid-3" style="margin-bottom:14px">
+    <div class="panel" style="position:relative;overflow:hidden">
+      <div class="num">01</div>
+      <div class="panel-bar"></div>
+      <div class="panel-body">
+        <span class="kicker">模块一 · 算力平台</span>
+        <h2 class="panel-title">环境准备</h2>
+        <p class="panel-desc">魔搭社区（ModelScope）免费 Notebook 云端 GPU，新用户赠送 PAI-DSW 免费额度，内置官方镜像含 transformers / peft / bitsandbytes。</p>
+        <div class="callout">
+          <p><strong>⚠ 防断连：</strong>训练时长超过 30 分钟需定期点击网页或使用自动刷新脚本（如 <code>while true; do echo ping; sleep 50; done</code>），防止连接断开导致训练中断。</p>
+        </div>
+        <div class="tag-row" style="margin-top:4px">
+          <span class="tag green">免费 PAI-DSW</span>
+          <span class="tag">24G 显存</span>
+          <span class="tag blue">A10 / T4</span>
+          <span class="tag">国内镜像源</span>
+        </div>
+        <div class="callout green" style="margin-top:4px">
+          <p><strong>pip 安装建议：</strong>切换国内镜像源加速</p>
+          <p><code>pip install -i https://mirrors.aliyun.com/pypi/simple/ transformers peft bitsandbytes accelerate</code></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODULE 2: 数据处理 -->
+    <div class="panel" style="position:relative;overflow:hidden">
+      <div class="num">02</div>
+      <div class="panel-bar"></div>
+      <div class="panel-body">
+        <span class="kicker">模块二 · 数据处理</span>
+        <h2 class="panel-title">数据准备</h2>
+        <p class="panel-desc">将原始问答数据转换为标准 JSONL 格式，90% 训练 / 10% 测试，max_length=512 截断与补齐。</p>
+        <div class="tag-row">
+          <span class="tag">JSONL 格式</span>
+          <span class="tag">prompt / completion</span>
+          <span class="tag">90% / 10%</span>
+          <span class="tag">max_length=512</span>
+        </div>
+        <div style="margin-top:6px;font-size:11.5px;color:var(--muted);font-weight:700">数据格式示例：</div>
+        <div class="pre">{"prompt":"问题内容","completion":"答案内容"}</div>
+        <div style="margin-top:4px;font-size:11.5px;color:var(--muted);font-weight:700">分词截断函数：</div>
+        <div class="pre">def tokenize(example, tokenizer, max_len=512):
+    prompt = tokenizer.encode(example["prompt"], truncation=True, max_length=max_len//2)
+    completion = tokenizer.encode(example["completion"], truncation=True, max_length=max_len//2)
+    input_ids = prompt + completion
+    attention_mask = [1]*len(input_ids)
+    pad_id = tokenizer.pad_token_id or 0
+    padding = [pad_id]*(max_len - len(input_ids))
+    input_ids += padding
+    attention_mask += [0]*len(padding)
+    return {"input_ids":input_ids,"attention_mask":attention_mask}</div>
+      </div>
+    </div>
+
+    <!-- MODULE 3: 8位量化 -->
+    <div class="panel" style="position:relative;overflow:hidden">
+      <div class="num">03</div>
+      <div class="panel-bar"></div>
+      <div class="panel-body">
+        <span class="kicker">模块三 · 模型量化</span>
+        <h2 class="panel-title">8位量化（QLoRA）</h2>
+        <p class="panel-desc">采用 bitsandbytes NF4 量化压缩模型体积，QLoRA = 4bit NF4 + LoRA，使 7B 模型显存占用降低 60%+，7B 约需 7–10G 显存，24G 显存足够。</p>
+        <div style="font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:6px">显存占用对照：</div>
+        <table>
+          <tr><th class="th">模型规模</th><th class="th">FP16 显存</th><th class="th">QLoRA 8bit 显存</th></tr>
+          <tr class="tr"><td class="td">7B</td><td class="td">~14 GB</td><td class="td" style="color:var(--green)">~7–10 GB ✓</td></tr>
+          <tr class="tr"><td class="td">14B</td><td class="td">~28 GB</td><td class="td">~14–18 GB</td></tr>
+          <tr class="tr"><td class="td">32B</td><td class="td">~64 GB</td><td class="td">~24–30 GB</td></tr>
+        </table>
+        <div style="margin-top:8px;font-size:11.5px;color:var(--muted);font-weight:700">量化加载代码：</div>
+        <div class="pre">from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+bnb_cfg = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype="float16",
+    bnb_4bit_use_double_quant=True
+)
+model = AutoModelForCausalLM.from_pretrained(
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    quantization_config=bnb_cfg,
+    device_map="auto"
+)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 4: LoRA 配置 -->
+  <div class="grid-2" style="margin-bottom:14px">
+    <!-- MODULE 4 -->
+    <div class="panel" style="position:relative;overflow:hidden">
+      <div class="num">04</div>
+      <div class="panel-bar"></div>
+      <div class="panel-body">
+        <span class="kicker">模块四 · LoRA 配置</span>
+        <h2 class="panel-title">PEFT LoRA 参数设置</h2>
+        <p class="panel-desc">冻结原模型 99.94% 参数，仅微调约 0.06% 的 LoRA 适配器权重，显存友好且效果显著。</p>
+        <table style="margin-bottom:6px">
+          <tr><th class="th">参数</th><th class="th">推荐值</th><th class="th">说明</th></tr>
+          <tr class="tr"><td class="td"><code>r</code></td><td class="td" style="color:var(--green)">8 或 16</td><td class="td">LoRA 秩，性价比最高</td></tr>
+          <tr class="tr"><td class="td"><code>lora_alpha</code></td><td class="td" style="color:var(--green)">2 × r（如 16/32）</td><td class="td">缩放因子，控制影响权重</td></tr>
+          <tr class="tr"><td class="td"><code>target_modules</code></td><td class="td"><code>["q_proj","v_proj","k_proj","o_proj"]</code></td><td class="td">Attention 层全挂载</td></tr>
+          <tr class="tr"><td class="td"><code>lora_dropout</code></td><td class="td">0.05</td><td class="td">防过拟合</td></tr>
+          <tr class="tr"><td class="td"><code>task_type</code></td><td class="td"><code>CAUSAL_LM</code></td><td class="td">因果语言模型任务</td></tr>
+        </table>
+        <div style="font-size:11.5px;color:var(--muted);font-weight:700">PEFT LoraConfig：</div>
+        <div class="pre">from peft import LoraConfig, get_peft_model
+
+lora_cfg = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    target_modules=["q_proj","v_proj","k_proj","o_proj"],
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM"
+)
+model = get_peft_model(model, lora_cfg)
+model.print_trainable_parameters()
+# 输出：trainable params: 1.6M || all params: 6.7B || trainable%: 0.024%</div>
+      </div>
+    </div>
+
+    <!-- MODULE 5: 训练管理 -->
+    <div class="panel" style="position:relative;overflow:hidden">
+      <div class="num">05</div>
+      <div class="panel-bar"></div>
+      <div class="panel-body">
+        <span class="kicker">模块五 · 训练管理</span>
+        <h2 class="panel-title">训练与参数配置</h2>
+        <p class="panel-desc">TrainingArguments 控制训练行为，根据数据量选择 epochs，根据显存调整 batch_size，开启 FP16 加速。</p>
+        <table style="margin-bottom:6px">
+          <tr><th class="th">参数</th><th class="th">推荐值</th><th class="th">说明</th></tr>
+          <tr class="tr"><td class="td"><code>output_dir</code></td><td class="td"><code>"./deepseek-lora-output"</code></td><td class="td">输出路径（含 checkpoint）</td></tr>
+          <tr class="tr"><td class="td"><code>num_train_epochs</code></td><td class="td" style="color:var(--green)">少数据 10 / 多数据 1–3</td><td class="td">50条≈10轮，数万条≈1–3轮</td></tr>
+          <tr class="tr"><td class="td"><code>per_device_train_batch_size</code></td><td class="td" style="color:var(--green)">4（OOM 时调 2 或 1）</td><td class="td">单卡批次大小</td></tr>
+          <tr class="tr"><td class="td"><code>gradient_accumulation_steps</code></td><td class="td">4</td><td class="td">梯度累积扩大有效批次</td></tr>
+          <tr class="tr"><td class="td"><code>fp16</code></td><td class="td" style="color:var(--green)">True</td><td class="td">FP16 混合精度，显存砍半</td></tr>
+          <tr class="tr"><td class="td"><code>learning_rate</code></td><td class="td">1e-4</td><td class="td">LoRA 默认学习率</td></tr>
+          <tr class="tr"><td class="td"><code>warmup_ratio</code></td><td class="td">0.03</td><td class="td">预热步数比例</td></tr>
+          <tr class="tr"><td class="td"><code>logging_steps</code></td><td class="td">10</td><td class="td">日志输出频率</td></tr>
+          <tr class="tr"><td class="td"><code>save_strategy</code></td><td class="td"><code>"epoch"</code></td><td class="td">每轮保存 checkpoint</td></tr>
+        </table>
+        <div class="callout red" style="margin-top:4px">
+          <p><strong>⚠ 硬约束：必须搬运至 GPU</strong><br>模型从内存加载后，必须显式搬运至 GPU 显存：<code>model = model.to("cuda")</code><br>离线或无独显环境（Mac / 轻薄本）虽能用 CPU 跑，但速度极慢，强烈建议使用云端 GPU。</p>
+        </div>
+        <div class="callout green" style="margin-top:4px">
+          <p><strong>完整训练代码入口：</strong></p>
+          <div class="pre">from transformers import Trainer, TrainingArguments
+from peft import LoraConfig, get_peft_model
+
+model = model.to("cuda")
+trainer = Trainer(
+    model=model,
+    args=TrainingArguments(
+        output_dir="./deepseek-lora-output",
+        num_train_epochs=10,
+        per_device_train_batch_size=4,
+        gradient_accumulation_steps=4,
+        fp16=True,
+        learning_rate=1e-4,
+        warmup_ratio=0.03,
+        logging_steps=10,
+        save_strategy="epoch"
+    ),
+    train_dataset=train_dataset
+)
+trainer.train()</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFERENCE -->
+  <div class="shell">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span class="kicker">推理调用</span>
+    </div>
+    <div class="grid-2">
+      <div>
+        <div style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px">合并 LoRA 权重推理：</div>
+        <div class="pre">from peft import PeftModel
+model = PeftModel.from_pretrained(base_model, "./deepseek-lora-output/checkpoint-10")
+merged = model.merge_and_unload()
+
+inputs = tokenizer("你的问题", return_tensors="pt").to("cuda")
+outputs = merged.generate(**inputs, max_new_tokens=256)
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px">蒸馏版推荐路径（HuggingFace）：</div>
+        <table>
+          <tr><th class="th">模型</th><th class="th">显存需求</th><th class="th">场景</th></tr>
+          <tr class="tr"><td class="td">DeepSeek-R1-Distill-Qwen-1.5B</td><td class="td" style="color:var(--green)">~3 GB</td><td class="td">快速实验</td></tr>
+          <tr class="tr"><td class="td">DeepSeek-R1-Distill-Qwen-7B</td><td class="td" style="color:var(--green)">~7–10 GB ✓</td><td class="td">主流推荐</td></tr>
+          <tr class="tr"><td class="td">DeepSeek-R1-Distill-Qwen-14B</td><td class="td">~14–18 GB</td><td class="td">高配需求</td></tr>
+          <tr class="tr"><td class="td">DeepSeek-R1-Distill-Llama-70B</td><td class="td">~40+ GB</td><td class="td">多卡场景</td></tr>
+        </table>
+        <div class="callout" style="margin-top:8px">
+          <p><strong>HuggingFace：</strong>DeepSeek-R1 在 150 万模型中点赞破万（2025-01），MIT 许可，完全开源可商用蒸馏。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<button class="save" onclick="(()=>{import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js').then(()=>html2canvas(document.body,{scale:2,useCORS:true}).then(c=>{const a=document.createElement('a');a.download='deepseek-r1-lora-finetuning.png';a.href=c.toDataURL('image/png');a.click()}))})()">保存 PNG</button>
+</body>
+</html>
