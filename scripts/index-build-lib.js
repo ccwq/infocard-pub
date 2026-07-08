@@ -7,8 +7,10 @@ const yaml = require("../assets/home/vendor/js-yaml.min.js");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DOCS_DIR = path.join(ROOT_DIR, "docs");
-const INDEX_PATH = path.join(ROOT_DIR, "_index.yaml");
-const INDEX_HTML_PATH = path.join(ROOT_DIR, "index.html");
+const DIST_DIR = path.join(ROOT_DIR, "dist");
+const INDEX_PATH = path.join(DIST_DIR, "_index.yaml");
+const INDEX_HTML_PATH = path.join(DIST_DIR, "index.html");
+const SOURCE_INDEX_HTML_PATH = path.join(ROOT_DIR, "index.html");
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATETIME_RE =
   /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/;
@@ -287,13 +289,38 @@ function extractInjectedIndexData(htmlText) {
   return JSON.parse(match[1]);
 }
 
+function copyStaticTreeToDist() {
+  fs.rmSync(DIST_DIR, { recursive: true, force: true });
+  fs.mkdirSync(DIST_DIR, { recursive: true });
+  const skip = new Set([".git", "node_modules", "dist", ".claude", ".DS_Store"]);
+
+  function copyDir(src, dst) {
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+      if (skip.has(entry.name)) continue;
+      const from = path.join(src, entry.name);
+      const to = path.join(dst, entry.name);
+      if (entry.isDirectory()) {
+        fs.mkdirSync(to, { recursive: true });
+        copyDir(from, to);
+      } else if (entry.isFile()) {
+        fs.mkdirSync(path.dirname(to), { recursive: true });
+        fs.copyFileSync(from, to);
+      }
+    }
+  }
+
+  copyDir(ROOT_DIR, DIST_DIR);
+}
+
 function writeGeneratedArtifacts(indexData) {
+  copyStaticTreeToDist();
   writeText(INDEX_PATH, serializeIndexYaml(indexData));
-  const htmlText = readText(INDEX_HTML_PATH);
+  const htmlText = readText(SOURCE_INDEX_HTML_PATH);
   writeText(INDEX_HTML_PATH, injectIndexDataIntoHtml(htmlText, indexData));
 }
 
 module.exports = {
+  DIST_DIR,
   INDEX_HTML_PATH,
   INDEX_PATH,
   ROOT_DIR,
