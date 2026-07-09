@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TencentDB Agent Memory — AI Agent 四层渐进式记忆系统</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --red:#e05050;--teal:#3dd9c4;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+      background-image:
+        radial-gradient(circle at 15% 10%, rgba(88,195,255,.14) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(61,217,196,.16) 0 9%, transparent 10%),
+        radial-gradient(circle at 55% 95%, rgba(132,89,255,.10) 0 8%, transparent 9%);
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === hero === */
+    .hero{
+      display:grid;grid-template-columns:1fr auto;
+      gap:18px;align-items:center;
+      border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px;
+    }
+    .hero-badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:3px 10px;border-radius:20px;
+      background:rgba(88,195,255,.14);border:1px solid rgba(88,195,255,.35);
+      font-size:10.5px;font-weight:700;color:var(--cyan);letter-spacing:.06em;margin-bottom:8px;
+    }
+    .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);flex-shrink:0;animation:pulse 2s infinite}
+    h1.hero-title{
+      font-size:clamp(20px,3.5vw,40px);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin-bottom:8px;
+      background:linear-gradient(135deg,#fff 30%,var(--cyan) 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .hero-desc{font-size:13px;color:var(--muted);max-width:60ch;line-height:1.65}
+    .hero-desc strong{color:var(--ink)}
+    .hero-logo{
+      flex-shrink:0;border-radius:14px;overflow:hidden;
+      border:1px solid var(--line);box-shadow:var(--shadow);
+      max-width:160px;
+    }
+    .hero-logo img{width:100%;height:auto;display:block}
+
+    /* === pills === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{
+      padding:3px 10px;border-radius:6px;font-size:10.5px;font-weight:700;
+      border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);
+    }
+    .pill.cyan{background:rgba(88,195,255,.15);border-color:rgba(88,195,255,.4);color:var(--cyan)}
+    .pill.green{background:rgba(45,179,106,.15);border-color:rgba(45,179,106,.4);color:#4ade80}
+    .pill.blue{background:rgba(74,120,255,.15);border-color:rgba(74,120,255,.4);color:#7fa0ff}
+    .pill.purple{background:rgba(132,89,255,.15);border-color:rgba(132,89,255,.4);color:var(--purple)}
+    .pill.yellow{background:rgba(244,200,76,.14);border-color:rgba(244,200,76,.4);color:var(--yellow)}
+    .pill.teal{background:rgba(61,217,196,.14);border-color:rgba(61,217,196,.4);color:var(--teal)}
+
+    /* === stat row === */
+    .stat-row{
+      display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;
+      overflow:hidden;margin-bottom:14px;background:var(--panel);
+    }
+    .stat-item{
+      flex:1;min-width:80px;padding:10px 14px;
+      border-right:1px solid var(--line);text-align:center;
+    }
+    .stat-item:last-child{border-right:none}
+    .stat-item strong{display:block;font-size:18px;font-weight:900;color:var(--ink);line-height:1}
+    .stat-item span{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+    .stat-item.hi strong{color:var(--green)}
+
+    /* === section === */
+    .section{
+      border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden;
+      background:var(--panel);box-shadow:0 4px 20px rgba(0,0,0,.25);
+    }
+    .sec-head{
+      padding:9px 16px;background:var(--panel-2);border-bottom:1px solid var(--line);
+      display:flex;align-items:center;gap:10px;
+    }
+    .sec-num{
+      font-size:11px;font-weight:900;color:var(--cyan);
+      background:rgba(88,195,255,.14);border:1px solid rgba(88,195,255,.3);
+      border-radius:4px;padding:1px 6px;letter-spacing:.04em;
+    }
+    .sec-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+    .sec-body{padding:14px 16px}
+
+    /* === benchmark cards === */
+    .bench-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+    .bench-card{
+      border:1px solid var(--line);border-radius:8px;padding:10px 13px;background:var(--panel-2);
+    }
+    .bench-card h4{font-size:11.5px;font-weight:800;color:var(--cyan);margin-bottom:6px;letter-spacing:.02em}
+    .bench-card .big{font-size:22px;font-weight:900;line-height:1;color:var(--green);display:block}
+    .bench-card .label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-top:2px}
+    .bench-card .sub{font-size:11px;color:var(--muted);margin-top:5px;display:block}
+
+    /* === pyramid layer === */
+    .pyramid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:center}
+    .pyramid-img{border-radius:10px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow)}
+    .pyramid-img img{width:100%;height:auto;display:block}
+    .layer-list{display:flex;flex-direction:column;gap:5px}
+    .layer-item{
+      border-radius:6px;padding:7px 12px;
+      border:1px solid;
+    }
+    .layer-item.l3{border-color:rgba(88,195,255,.5);background:rgba(88,195,255,.08)}
+    .layer-item.l2{border-color:rgba(74,120,255,.5);background:rgba(74,120,255,.08)}
+    .layer-item.l1{border-color:rgba(61,217,196,.5);background:rgba(61,217,196,.08)}
+    .layer-item.l0{border-color:rgba(132,89,255,.5);background:rgba(132,89,255,.08)}
+    .layer-item .name{font-size:11.5px;font-weight:800;margin-bottom:2px}
+    .layer-item .desc{font-size:11px;color:var(--muted);line-height:1.45}
+
+    /* === short-term memory flow === */
+    .flow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11.5px}
+    .flow-step{
+      padding:4px 10px;border-radius:6px;font-weight:700;
+      background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--ink);
+    }
+    .flow-step.highlight{border-color:rgba(88,195,255,.4);background:rgba(88,195,255,.10);color:var(--cyan)}
+    .flow-arrow{color:var(--cyan);font-size:14px;font-weight:900;flex-shrink:0}
+
+    /* === table === */
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:6px 10px;border:1px solid var(--line);text-align:left}
+    th{background:rgba(88,195,255,.08);color:var(--cyan);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    td code{font-size:11px;color:var(--yellow)}
+    td .tag{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700}
+    td .tag.green{background:rgba(45,179,106,.15);color:#4ade80}
+    td .tag.blue{background:rgba(74,120,255,.15);color:#7fa0ff}
+    td .tag.purple{background:rgba(132,89,255,.15);color:var(--purple)}
+    td .tag.teal{background:rgba(61,217,196,.14);color:var(--teal)}
+
+    /* === code block === */
+    .code-block{background:#080c18;border:1px solid rgba(88,195,255,.2);border-radius:8px;padding:13px 15px;overflow-x:auto}
+    .code-block pre{margin:0;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;color:#c8d8f0;white-space:pre-wrap;word-break:break-all}
+    .code-block .comment{color:#5a6a8a}
+    .code-block .cmd{color:#58c3ff}
+    .code-block .key{color:#c8d8f0}
+    .code-block .val{color:#2db36a}
+    .code-block .url{color:#f4c84c}
+
+    /* === screenshot === */
+    .screenshot{border-radius:10px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:10px}
+    .screenshot img{width:100%;height:auto;display:block}
+    .screenshot-caption{
+      padding:5px 10px;font-size:10.5px;color:var(--muted);font-weight:600;
+      background:rgba(255,255,255,.03);border-top:1px solid var(--line);
+    }
+
+    /* === footer === */
+    .footer-bar{
+      border-top:1px solid var(--line);padding:12px 0 4px;
+      display:flex;flex-wrap:wrap;gap:8px 16px;
+      font-size:11px;color:var(--muted);align-items:center;
+    }
+    .footer-bar a{font-weight:700;color:var(--cyan);text-decoration:underline;text-underline-offset:2px}
+    .footer-bar .sep{border-left:1px solid rgba(255,255,255,.15);padding-left:16px}
+
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+    @media(max-width:720px){
+      .hero{grid-template-columns:1fr}
+      .hero-logo{max-width:120px}
+      .bench-grid{grid-template-columns:1fr}
+      .pyramid{grid-template-columns:1fr}
+      .footer-bar{flex-direction:column;align-items:flex-start}
+      .footer-bar .sep{border-left:none;padding-left:0}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div>
+      <div class="hero-badge"><span class="dot"></span>腾讯云 · 开源 · AI Agent 记忆系统</div>
+      <h1 class="hero-title">TencentDB Agent Memory</h1>
+      <p class="hero-desc">
+        <strong>全本地四层渐进式记忆系统</strong>，为零外部 API 依赖的 AI Agent 提供短期记忆压缩与长期个性化记忆。
+        拒绝粗暴塞满上下文，拒绝不可逆的有损压缩——记忆应该分层，且可符号化。
+      </p>
+    </div>
+    <div class="hero-logo">
+      <img src="../assets/img/tdb-agent-memory/logo.png" alt="TencentDB Agent Memory" loading="lazy" />
+    </div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill cyan">四层渐进记忆</span>
+    <span class="pill green">-61% Token 消耗</span>
+    <span class="pill blue">短期符号记忆</span>
+    <span class="pill purple">长期分层记忆</span>
+    <span class="pill yellow">Mermaid 符号化</span>
+    <span class="pill teal">零 API 依赖</span>
+    <span class="pill">OpenClaw 插件</span>
+    <span class="pill">Hermes Gateway</span>
+    <span class="pill">TypeScript</span>
+    <span class="pill">白盒可调试</span>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-row">
+    <div class="stat-item hi"><strong>7,976</strong><span>GitHub Stars</span></div>
+    <div class="stat-item"><strong>735</strong><span>Forks</span></div>
+    <div class="stat-item"><strong>253</strong><span>Issues</span></div>
+    <div class="stat-item hi"><strong>-61%</strong><span>Token 节省</span></div>
+    <div class="stat-item hi"><strong>+52%</strong><span>成功率提升</span></div>
+    <div class="stat-item"><strong>2026-04</strong><span>开源时间</span></div>
+    <div class="stat-item"><strong>MIT</strong><span>License</span></div>
+  </div>
+
+  <!-- BENCHMARK -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <span class="sec-label">Performance Benchmark · 性能数据</span>
+    </div>
+    <div class="sec-body">
+      <div class="bench-grid">
+        <div class="bench-card">
+          <h4>短期记忆（WideSearch Benchmark）</h4>
+          <span class="big">-61.38%</span>
+          <span class="label">Token 消耗降低</span>
+          <span class="sub">OpenClaw 成功率相对提升 51.52%，端到端任务完成率提升明显。</span>
+        </div>
+        <div class="bench-card">
+          <h4>长期记忆（PersonaMem Benchmark）</h4>
+          <span class="big">48% → 76%</span>
+          <span class="label">准确率提升（+28pt）</span>
+          <span class="sub">跨会话用户偏好识别从 48% 提升到 76%，精准度大幅提升。</span>
+        </div>
+      </div>
+      <table>
+        <tr>
+          <th>记忆能力</th><th>基准工具</th><th>OpenClaw 成功率</th><th>插件后成功率</th><th>相对提升</th>
+        </tr>
+        <tr>
+          <td>短期记忆</td><td>WideSearch</td><td style="color:var(--red);font-weight:800">—</td>
+          <td>—</td><td style="color:var(--green);font-weight:800">+51.52%</td>
+        </tr>
+        <tr>
+          <td>长期记忆</td><td>PersonaMem</td>
+          <td>48%</td><td>76%</td><td style="color:var(--green);font-weight:800">+28pt</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- CORE ARCHITECTURE -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <span class="sec-label">Core Architecture · 核心架构：分层 + 符号化</span>
+    </div>
+    <div class="sec-body">
+      <div class="pyramid">
+        <div>
+          <!-- Long-term layering table -->
+          <p style="font-size:11.5px;color:var(--muted);margin-bottom:8px">
+            <strong style="color:var(--ink)">长期记忆分层（L0 → L3）：</strong>
+          </p>
+          <div class="layer-list">
+            <div class="layer-item l3">
+              <div class="name" style="color:var(--cyan)">L3 Persona · 用户画像层</div>
+              <div class="desc">跨会话用户偏好、工作流习惯、输出格式偏好。每天 48% → 76% 精准识别。</div>
+            </div>
+            <div class="layer-item l2">
+              <div class="name" style="color:#7fa0ff">L2 Scenario · 场景块层</div>
+              <div class="desc">从对话日志中提炼可复用的解决方案模式和场景上下文（SOP / 工具惯例）。</div>
+            </div>
+            <div class="layer-item l1">
+              <div class="name" style="color:var(--teal)">L1 Atom · 原子事实层</div>
+              <div class="desc">对话日志中提取的原子化事实片段，作为场景块和用户画像的底层基础。</div>
+            </div>
+            <div class="layer-item l0">
+              <div class="name" style="color:var(--purple)">L0 Conversation · 对话日志层</div>
+              <div class="desc">原始对话记录，上下文窗口底部存档。按需检索，不主导推理。</div>
+            </div>
+          </div>
+        </div>
+        <div class="pyramid-img">
+          <img src="../assets/img/tdb-agent-memory/memory-pyramid-en.jpg" alt="Memory Pyramid L0-L3" loading="lazy" />
+          <div class="screenshot-caption">记忆金字塔：L0 对话日志 → L1 原子事实 → L2 场景块 → L3 用户画像（来源：TencentDB-Agent-Memory 仓库）</div>
+        </div>
+      </div>
+
+      <!-- Short-term memory flow -->
+      <p style="font-size:11.5px;color:var(--muted);margin:12px 0 8px">
+        <strong style="color:var(--ink)">短期记忆符号化管道（任务内）：</strong>
+      </p>
+      <div class="flow">
+        <div class="flow-step">refs/*.md<br><span style="font-size:10px;font-weight:400;color:var(--muted)">原始工具输出</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">jsonl<br><span style="font-size:10px;font-weight:400;color:var(--muted)">步级摘要</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step highlight">Mermaid Canvas<br><span style="font-size:10px;font-weight:400;color:var(--cyan)">轻量状态图（上下文顶）</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">Agent 推理<br><span style="font-size:10px;font-weight:400;color:var(--muted)">仅关注顶层</span></div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.55">
+        <strong>Mermaid 符号化原理：</strong>工具输出（refs/*.md）→ 步级摘要（jsonl）→ 最终压缩为紧凑的 Mermaid 流程图符号。
+        上下文窗口仅保留顶层 Mermaid 结构；出错误时通过 <code>node_id</code> 按需下钻到中底层检索，Token 消耗降低 61.38%。
+      </p>
+    </div>
+  </div>
+
+  <!-- INTEGRATIONS -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <span class="sec-label">Integrations · 支持的 Agent 平台</span>
+    </div>
+    <div class="sec-body">
+      <table>
+        <tr>
+          <th>平台</th><th>集成方式</th><th>安装方式</th><th>要求</th>
+        </tr>
+        <tr>
+          <td><strong>OpenClaw</strong></td>
+          <td>官方插件，零配置启用</td>
+          <td><code>openclaw plugin install @tencentdb-agent-memory</code></td>
+          <td><span class="tag purple">OpenClaw ≥ 2026.3.13</span></td>
+        </tr>
+        <tr>
+          <td><strong>Hermes</strong></td>
+          <td>Gateway 插件侧</td>
+          <td>Docker（绿色部署）或附加到现有实例</td>
+          <td><span class="tag teal">Hermes ≥ 0.3.4</span></td>
+        </tr>
+        <tr>
+          <td><strong>其他 Agent</strong></td>
+          <td>SDK / 手动集成</td>
+          <td>NPM: <code>@tencentdb-agent-memory/memory-tencentdb</code></td>
+          <td><span class="tag blue">Node.js ≥ 22.16</span></td>
+        </tr>
+      </table>
+      <div class="code-block" style="margin-top:10px">
+<pre><span class="comment">// OpenClaw 零配置启用（默认开启长期记忆）</span>
+<span class="cmd">openclaw</span> plugin install @tencentdb-agent-memory
+<span class="comment"># 编辑 ~/.openclaw/plugins.yaml 启用：</span>
+<span class="key">plugins:</span>
+  <span class="key">@tencentdb-agent-memory:</span>
+    <span class="key">shortTerm:</span>
+      <span class="key">enabled:</span> <span class="val">true</span>
+      <span class="key">mermaidCanvas:</span> <span class="val">true</span>
+    <span class="key">longTerm:</span>
+      <span class="key">enabled:</span> <span class="val">true</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREENSHOTS -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <span class="sec-label">Architecture Diagrams · 架构图</span>
+    </div>
+    <div class="sec-body">
+      <div class="screenshot">
+        <img src="../assets/img/tdb-agent-memory/flowchart1.png" alt="Memory System Flowchart 1" loading="lazy" />
+        <div class="screenshot-caption">记忆系统架构图 1（来源：TencentDB-Agent-Memory 仓库）</div>
+      </div>
+      <div class="screenshot">
+        <img src="../assets/img/tdb-agent-memory/flowchart2.png" alt="Memory System Flowchart 2" loading="lazy" />
+        <div class="screenshot-caption">记忆系统架构图 2（来源：TencentDB-Agent-Memory 仓库）</div>
+      </div>
+      <p style="font-size:10.5px;color:var(--muted);margin-top:8px">
+        <em>以上图片均来自 <a href="https://github.com/TencentCloud/TencentDB-Agent-Memory" target="_blank" style="color:var(--cyan);font-weight:700">TencentCloud/TencentDB-Agent-Memory</a> 仓库，MIT 协议。</em>
+      </p>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-bar">
+    <a href="https://github.com/TencentCloud/TencentDB-Agent-Memory" target="_blank">github.com/TencentCloud/TencentDB-Agent-Memory</a>
+    <a href="https://www.npmjs.com/package/@tencentdb-agent-memory/memory-tencentdb" target="_blank">NPM 包</a>
+    <span class="sep">MIT License</span>
+    <span class="sep">TypeScript · Node.js ≥ 22.16</span>
+    <span class="sep">OpenClaw + Hermes 插件</span>
+    <span class="sep">最后更新: 2026-07-09</span>
+  </div>
+
+</div>
+</body>
+</html>
