@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shifu — 复杂任务规划分派 SOP</title>
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === topbar === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .topbar-meta{
+      padding:14px;
+      border-left:3px solid var(--line);
+      display:grid;grid-template-rows:auto auto;gap:0;align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;grid-template-columns:1.4fr 1fr;gap:5px;
+      padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;grid-template-columns:1.2fr 1fr 0.8fr;gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);padding:7px 9px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1;
+    }
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-sm{
+      border:2px solid var(--line);border-left:4px solid #666;padding:3px 7px 3px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3;
+    }
+    .meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+    h1.demo-title{margin:10px 0 6px;font-size:clamp(20px,3.2vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.05}
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+
+    /* === overview === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* === pills === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === stat === */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* === section === */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+    .sec-body{padding:12px 14px}
+
+    /* === flow diagram === */
+    .flow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:12px;margin:8px 0}
+    .flow-step{
+      padding:5px 12px;border-radius:4px;font-weight:800;font-size:11.5px;
+      border:2px solid var(--line);background:#fff;
+    }
+    .flow-step.贵的{border-color:var(--red);color:var(--red);background:var(--soft-red)}
+    .flow-step.便宜{border-color:#1a7a1a;color:#1a7a1a;background:#f0fff0}
+    .flow-step.产出{border-color:var(--ink);color:var(--ink);background:#f7f7f7}
+    .flow-arrow{font-size:16px;font-weight:900;color:var(--ink);flex-shrink:0}
+
+    /* === cmd table === */
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+    th{background:var(--ink);color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    td code{font-size:11.5px;background:#f0eee8;padding:1px 5px;border-radius:3px;color:var(--red);font-weight:700}
+    td .desc{font-size:11.5px;color:#555;line-height:1.45}
+
+    /* === comparison table === */
+    .comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .comp-col{border:2px solid var(--line);border-radius:4px;overflow:hidden}
+    .comp-head{
+      padding:6px 12px;background:var(--ink);color:#fff;
+      font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+    }
+    .comp-head.贵的{background:var(--red)}
+    .comp-body{padding:10px 12px;background:#fff}
+    .comp-body ul{margin:0;padding-left:14px}
+    .comp-body li{margin-bottom:3px;font-size:12px;color:#333;line-height:1.45}
+
+    /* === code block === */
+    .code-block{
+      background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);border-radius:6px;
+      padding:12px 14px;overflow-x:auto;
+    }
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;white-space:pre-wrap;word-break:break-all}
+    .code-block .comment{color:#666}
+    .code-block .cmd{color:#58c3ff;font-weight:700}
+    .code-block .path{color:#f4c84c}
+    .code-block .val{color:#2db36a}
+    .code-block .tag{color:#c8102e}
+
+    /* === diff vs improve === */
+    .diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .diff-item{border:2px solid var(--line);padding:9px 12px;background:#fff;box-shadow:3px 3px 0 rgba(10,10,10,.08)}
+    .diff-item h4{font-size:11.5px;font-weight:900;margin-bottom:4px;color:var(--ink)}
+    .diff-item p{font-size:11.5px;color:#555;margin:0;line-height:1.5}
+    .diff-item .shifu{color:var(--red);font-weight:800}
+
+    /* === footer === */
+    .footer-bar{
+      border-top:3px solid var(--line);padding:12px 0 4px;
+      display:flex;flex-wrap:wrap;gap:8px 16px;
+      font-size:11px;color:#555;align-items:center;
+    }
+    .footer-bar a{font-weight:700;color:var(--red);text-decoration:underline;text-underline-offset:2px}
+    .footer-bar .sep{border-left:2px solid #ccc;padding-left:16px}
+
+    /* === hard rules === */
+    .rules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px;margin-top:8px}
+    .rule{border:2px solid var(--line);padding:7px 10px;background:#fff;border-left:4px solid var(--red)}
+    .rule strong{font-size:11.5px;font-weight:900;display:block;color:var(--ink)}
+    .rule span{font-size:11px;color:#555;line-height:1.45}
+
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .comp-grid,.diff-grid{grid-template-columns:1fr}
+      .footer-bar{flex-direction:column;align-items:flex-start}
+      .footer-bar .sep{border-left:none;padding-left:0}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-hero">
+      <div class="tagline">Agent Skill · 开源 · MIT</div>
+      <h1 class="demo-title">Shifu</h1>
+      <p class="sub-line">复杂任务规划分派 SOP · 贵模型规划 + 便宜模型执行 · 省成本利器</p>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">6<span class="sub">Stars</span></div>
+        <div class="meta-pill-lg">0<span class="sub">Forks</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-sm">MIT<span class="sub">License</span></div>
+        <div class="meta-pill-sm">skills.sh<span class="sub">格式</span></div>
+        <div class="meta-pill-sm">2026-07<span class="sub">开源</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="overview">
+    <div class="overview-sentence">让贵的模型只做"规划"，让便宜的模型执行——双模型分工协作大幅降本</div>
+    <div class="overview-body">
+      <p>Shifu 是一个 Agent Skill（技能文件），将复杂任务拆解为自包含的规格说明（spec），交给便宜的模型执行，贵模型只负责理解全局、判断边界、写无歧义规格。最终 reconcile 由贵模型审查便宜模型的修改，直到通过。灵感来自 shadcn 的 improve，但更简单通用。</p>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><strong>2种</strong><span>运行模式</span></div>
+    <div class="stat"><strong>6个</strong><span>核心指令</span></div>
+    <div class="stat"><strong>自动</strong><span>Subagent 循环</span></div>
+    <div class="stat"><strong>手动</strong><span>精准控制</span></div>
+    <div class="stat"><strong>MD 规格</strong><span>跨 Agent 通用</span></div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill red">规划 → 分派 → 审查</span>
+    <span class="pill dark">Claude Code</span>
+    <span class="pill dark">Cursor</span>
+    <span class="pill dark">Codex</span>
+    <span class="pill dark">OpenCode</span>
+    <span class="pill soft">零实现自身</span>
+    <span class="pill soft">规格即产品</span>
+    <span class="pill">省钱大法</span>
+    <span class="pill">双模型协作</span>
+    <span class="pill">自动循环</span>
+  </div>
+
+  <!-- CORE FLOW -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <span class="label">Core Loop · 核心循环</span>
+    </div>
+    <div class="sec-body">
+      <div class="flow">
+        <div class="flow-step 贵的">贵模型（Fable5 / GPT5.5 / Claude…）</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step 产出">写 plans/001-xxx.md</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step 便宜">便宜模型（Composer2.5 / DeepSeek V4 Pro…）</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step 产出">实现 / 测试 / 上线</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step 贵的">贵模型 Reconcile 审查</div>
+      </div>
+      <div class="code-block" style="margin-top:10px">
+<pre><span class="comment"># 安装 Shifu Skill</span>
+<span class="cmd">npx</span> skills add vikingmute/shifu
+
+<span class="comment"># 启动自动循环（Claude Code / Cursor / Codex 等）</span>
+<span class="cmd">/shifu</span> add JWT authentication middleware with Redis session store
+
+<span class="comment"># Shifu 自动：分析 → 拆解 → 写 plans/ → 派发便宜模型 → 审查结果</span></pre>
+      </div>
+      <p style="font-size:11.5px;color:#555;margin-top:8px;line-height:1.6">
+        <strong>核心理念：</strong>规格是产品，实现交给执行者。Shifu 本身不写一行代码——它只是写规格说明（spec）的机器。
+        便宜模型拿到规格后独立执行，贵模型最终 reconcile 审查，直到通过。
+      </p>
+    </div>
+  </div>
+
+  <!-- TWO MODES -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">02</span>
+      <span class="label">Two Modes · 两种运行模式</span>
+    </div>
+    <div class="sec-body">
+      <div class="comp-grid">
+        <div class="comp-col">
+          <div class="comp-head 贵的">🤖 自动模式（推荐）</div>
+          <div class="comp-body">
+            <ul>
+              <li>Claude Code / Cursor / Codex / Claude Code 等现代 Agent 原生支持 subagent</li>
+              <li>在同一个会话内完成：规划 → 派发 → 审查完整循环</li>
+              <li>无需切换窗口，发送一条指令自动跑完</li>
+              <li>适合：大型 feature、分支并行的复杂重构</li>
+            </ul>
+          </div>
+        </div>
+        <div class="comp-col">
+          <div class="comp-head">🖥️ 手动模式</div>
+          <div class="comp-body">
+            <ul>
+              <li>Agent 不支持 subagent，或需要更精准的控制</li>
+              <li>逐条执行 <code>/shifu</code> 指令，人工控制每一步</li>
+              <li>步骤：规划 → 确认规格 → 手动派发给便宜模型 → 人工 reconcile</li>
+              <li>适合：精确控制、调试阶段、小团队流程把控</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMMANDS -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">03</span>
+      <span class="label">Command Reference · 指令参考</span>
+    </div>
+    <div class="sec-body">
+      <table>
+        <tr>
+          <th style="width:36%">指令</th>
+          <th>说明</th>
+        </tr>
+        <tr>
+          <td><code>/shifu &lt;description&gt;</code></td>
+          <td><span class="desc">标准分析：理解任务 → 拆解边界 → 生成规格文件到 <code>plans/</code> 目录</span></td>
+        </tr>
+        <tr>
+          <td><code>/shifu quick &lt;description&gt;</code></td>
+          <td><span class="desc">轻量版：子任务更少、分析更浅，适合简单功能</span></td>
+        </tr>
+        <tr>
+          <td><code>/shifu deep &lt;description&gt;</code></td>
+          <td><span class="desc">深度版：细粒度拆解，分析更彻底，适合大型重构</span></td>
+        </tr>
+        <tr>
+          <td><code>/shifu execute &lt;plan-id&gt;</code></td>
+          <td><span class="desc">派发单个规格给 worker 模型执行（默认用便宜模型）</span></td>
+        </tr>
+        <tr>
+          <td><code>/shifu execute &lt;plan-id&gt; --model &lt;model&gt;</code></td>
+          <td><span class="desc">指定 worker 模型执行某个规格</span></td>
+        </tr>
+        <tr>
+          <td><code>/shifu execute all</code></td>
+          <td><span class="desc">按依赖顺序派发所有就绪规格给 worker</span></td>
+        </tr>
+        <tr>
+          <td><code>/shifu review &lt;plan-id&gt;</code></td>
+          <td><span class="desc">贵模型审查已有规格，优化收紧（reconcile 前置步骤）</span></td>
+        </tr>
+        <tr>
+          <td><code>/shifu status</code></td>
+          <td><span class="desc">查看所有 plans 的当前状态（pending / running / done / blocked）</span></td>
+        </tr>
+        <tr>
+          <td><code>/shifu reconcile</code></td>
+          <td><span class="desc">全局审查：验证完成项、解除阻塞、更新状态，让贵模型介入修改直到通过</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- VS IMPROVE -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="label">vs improve · 与 shadcn improve 对比</span>
+    </div>
+    <div class="sec-body">
+      <div class="diff-grid">
+        <div class="diff-item">
+          <h4>Shifu 更简单</h4>
+          <p>只写规格说明（markdown），任何 Agent / 人类都能读取执行，无需理解内部实现。</p>
+        </div>
+        <div class="diff-item">
+          <h4>Shifu 更通用</h4>
+          <p>不绑定特定 Agent，支持 Claude Code / Cursor / Codex / OpenCode / Gemini 等所有 skills.sh 兼容平台。</p>
+        </div>
+        <div class="diff-item">
+          <h4>双模型协作原生</h4>
+          <p>内置 <code>execute</code> / <code>reconcile</code> 机制，便宜模型执行 + 贵模型审查形成闭环，improve 没有这一层。</p>
+        </div>
+        <div class="diff-item">
+          <h4>规格即产品</h4>
+          <p>Shifu 本身零实现——它只输出规格文件，交付物清晰、可复用、可版本化追踪。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HARD RULES -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">05</span>
+      <span class="label">Hard Rules · 硬规则</span>
+    </div>
+    <div class="sec-body">
+      <p style="font-size:12px;font-weight:800;color:var(--ink);margin-bottom:4px">Shifu 的 5 条不可违背原则：</p>
+      <div class="rules-grid">
+        <div class="rule">
+          <strong>规格是产品</strong>
+          <span>Shifu 不写代码，只写规格。实现是执行者的事，不是规划者的事。</span>
+        </div>
+        <div class="rule">
+          <strong>规划者不实现</strong>
+          <span>贵模型只负责理解全局、拆解边界、写无歧义规格，绝不直接改代码。</span>
+        </div>
+        <div class="rule">
+          <strong>规格自包含</strong>
+          <span>每个 plans/*.md 独立可执行，包含上下文、验收标准、边界条件，无需额外信息。</span>
+        </div>
+        <div class="rule">
+          <strong>Reconcile 强制通过</strong>
+          <span>便宜模型的修改必须经过贵模型 reconcile 审查，不合格就打回，直到最终通过。</span>
+        </div>
+        <div class="rule">
+          <strong>小 feature 不用</strong>
+          <span>一行能搞定的事不要启动 Shifu，工具开销大于收益时不要用。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-bar">
+    <a href="https://github.com/vikingmute/shifu" target="_blank">github.com/vikingmute/shifu</a>
+    <a href="https://skills.sh/vikingmute/shifu" target="_blank">skills.sh 安装页</a>
+    <span class="sep">MIT License</span>
+    <span class="sep">vikingmute</span>
+    <span class="sep">2026-07-09</span>
+  </div>
+
+</div>
+</body>
+</html>
