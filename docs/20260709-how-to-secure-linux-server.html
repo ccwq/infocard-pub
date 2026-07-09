@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How-To-Secure-A-Linux-Server — Linux 服务器安全加固完整指南</title>
+  <style>
+    :root{
+      --bg:#061208;--bg2:#0b1a12;--panel:#0e2016;--panel2:#081510;
+      --ink:#d8f0e0;--muted:#7aaa88;--line:rgba(255,255,255,.10);
+      --green:#2db36a;--green2:#3dd9c4;--yellow:#f4c84c;--red:#e05050;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+      background-image:
+        radial-gradient(circle at 8% 12%, rgba(45,179,106,.09) 0 10%, transparent 11%),
+        radial-gradient(circle at 92% 88%, rgba(61,217,196,.09) 0 9%, transparent 10%);
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === hero === */
+    .hero{
+      display:grid;grid-template-columns:1fr auto;
+      gap:18px;align-items:center;
+      border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px;
+    }
+    .hero-badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:3px 10px;border-radius:20px;
+      background:rgba(45,179,106,.14);border:1px solid rgba(45,179,106,.35);
+      font-size:10.5px;font-weight:700;color:var(--green);letter-spacing:.06em;margin-bottom:8px;
+    }
+    .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;animation:pulse 2s infinite}
+    h1.hero-title{
+      font-size:clamp(20px,3.5vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin-bottom:8px;
+      background:linear-gradient(135deg,#d8f0e0 30%,var(--green) 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .hero-desc{font-size:13px;color:var(--muted);max-width:60ch;line-height:1.65}
+    .hero-desc strong{color:var(--ink)}
+    .hero-logo{
+      flex-shrink:0;border-radius:12px;overflow:hidden;
+      border:1px solid var(--line);box-shadow:var(--shadow);
+      background:var(--panel2);padding:12px;
+      display:flex;flex-direction:column;align-items:center;gap:6px;
+      min-width:130px;
+    }
+    .logo-icon{font-size:32px;line-height:1}
+    .logo-text{font-size:10px;font-weight:900;color:var(--green);text-align:center;letter-spacing:.04em;text-transform:uppercase}
+    .hero-logo .sub{font-size:9px;color:var(--muted);text-align:center}
+
+    /* === pills === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{
+      padding:3px 10px;border-radius:6px;font-size:10.5px;font-weight:700;
+      border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);
+    }
+    .pill.green{background:rgba(45,179,106,.15);border-color:rgba(45,179,106,.4);color:var(--green)}
+    .pill.teal{background:rgba(61,217,196,.14);border-color:rgba(61,217,196,.4);color:var(--green2)}
+    .pill.yellow{background:rgba(244,200,76,.14);border-color:rgba(244,200,76,.4);color:var(--yellow)}
+    .pill.red{background:rgba(224,80,80,.14);border-color:rgba(224,80,80,.4);color:var(--red)}
+    .pill.cyan{background:rgba(88,195,255,.14);border-color:rgba(88,195,255,.4);color:#58c3ff}
+
+    /* === stat row === */
+    .stat-row{
+      display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;
+      overflow:hidden;margin-bottom:14px;background:var(--panel);
+    }
+    .stat-item{
+      flex:1;min-width:75px;padding:10px 14px;
+      border-right:1px solid var(--line);text-align:center;
+    }
+    .stat-item:last-child{border-right:none}
+    .stat-item strong{display:block;font-size:18px;font-weight:900;color:var(--ink);line-height:1}
+    .stat-item span{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+    .stat-item.hi strong{color:var(--green)}
+    .stat-item.warn strong{color:var(--yellow)}
+
+    /* === section === */
+    .section{
+      border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden;
+      background:var(--panel);box-shadow:0 4px 20px rgba(0,0,0,.25);
+    }
+    .sec-head{
+      padding:9px 16px;background:var(--panel2);border-bottom:1px solid var(--line);
+      display:flex;align-items:center;gap:10px;
+    }
+    .sec-num{
+      font-size:11px;font-weight:900;color:var(--green);
+      background:rgba(45,179,106,.14);border:1px solid rgba(45,179,106,.3);
+      border-radius:4px;padding:1px 6px;letter-spacing:.04em;
+    }
+    .sec-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+    .sec-body{padding:14px 16px}
+
+    /* === section cards === */
+    .sec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .sec-item{
+      border:1px solid rgba(45,179,106,.2);border-radius:8px;padding:9px 12px;
+      background:var(--panel2);
+    }
+    .sec-item h4{font-size:12px;font-weight:800;color:var(--green);margin-bottom:4px;display:flex;align-items:center;gap:5px}
+    .sec-item p{font-size:11.5px;color:var(--muted);line-height:1.5}
+    .sec-item .num{font-size:10px;font-weight:900;color:var(--green2);min-width:20px}
+    .sec-item.highlight{border-color:rgba(224,80,80,.3);background:rgba(224,80,80,.06)}
+    .sec-item.highlight h4{color:var(--red)}
+    .sec-item.highlight .num{color:var(--red)}
+
+    /* === table === */
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:6px 10px;border:1px solid var(--line);text-align:left}
+    th{background:rgba(45,179,106,.08);color:var(--green);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    td code{font-size:11px;color:var(--yellow)}
+    td .tag{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700}
+    td .tag.green{background:rgba(45,179,106,.15);color:var(--green)}
+    td .tag.red{background:rgba(224,80,80,.14);color:var(--red)}
+
+    /* === code block === */
+    .code-block{background:#030e08;border:1px solid rgba(45,179,106,.2);border-radius:8px;padding:12px 14px;overflow-x:auto}
+    .code-block pre{margin:0;font-family:ui-monospace,monospace;font-size:12px;line-height:1.72;color:#b8d8c0;white-space:pre-wrap;word-break:break-all}
+    .code-block .comment{color:#4a6a50}
+    .code-block .cmd{color:#58c3ff;font-weight:700}
+    .code-block .path{color:#f4c84c}
+    .code-block .val{color:#2db36a}
+    .code-block .warn{color:var(--red)}
+
+    /* === footer === */
+    .footer-bar{
+      border-top:1px solid var(--line);padding:12px 0 4px;
+      display:flex;flex-wrap:wrap;gap:8px 16px;
+      font-size:11px;color:var(--muted);align-items:center;
+    }
+    .footer-bar a{font-weight:700;color:var(--green);text-decoration:underline;text-underline-offset:2px}
+    .footer-bar .sep{border-left:1px solid rgba(255,255,255,.15);padding-left:16px}
+
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+    @media(max-width:720px){
+      .hero{grid-template-columns:1fr}
+      .hero-logo{max-width:120px}
+      .sec-grid{grid-template-columns:1fr}
+      .footer-bar{flex-direction:column;align-items:flex-start}
+      .footer-bar .sep{border-left:none;padding-left:0}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div>
+      <div class="hero-badge"><span class="dot"></span>安全加固 · 服务器运维 · 永久更新</div>
+      <h1 class="hero-title">How-To-Secure-A-Linux-Server</h1>
+      <p class="hero-desc">
+        <strong>最完整的 Linux 服务器安全加固指南</strong>，涵盖 SSH 加固、2FA 双因素认证、Firewall 防火墙配置、系统审计、自动安全更新等，
+        面向家庭服务器 / VPS，提供可直接复制粘贴的命令，带 Ansible Playbook 支持。
+      </p>
+    </div>
+    <div class="hero-logo">
+      <div class="logo-icon">🛡️</div>
+      <div class="logo-text">Linux Server<br>Hardening Guide</div>
+      <div class="sub">CC-BY-SA-4.0</div>
+    </div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill green">SSH 加固</span>
+    <span class="pill green">2FA / MFA</span>
+    <span class="pill teal">Firewall UFW/firewalld</span>
+    <span class="pill yellow">系统审计</span>
+    <span class="pill red">自动安全更新</span>
+    <span class="pill cyan">sudo / su 限制</span>
+    <span class="pill">FireJail 沙箱</span>
+    <span class="pill">NTP 时间同步</span>
+    <span class="pill">Panic Kill Switch</span>
+    <span class="pill">Ansible Playbook</span>
+    <span class="pill">隐藏端口</span>
+    <span class="pill">Fail2Ban</span>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-row">
+    <div class="stat-item hi"><strong>28,919</strong><span>Stars</span></div>
+    <div class="stat-item"><strong>1,932</strong><span>Forks</span></div>
+    <div class="stat-item"><strong>7</strong><span>章节</span></div>
+    <div class="stat-item"><strong>40+</strong><span>具体步骤</span></div>
+    <div class="stat-item"><strong>280+</strong><span>分钟阅读</span></div>
+    <div class="stat-item"><strong>2019-</strong><span>持续维护</span></div>
+    <div class="stat-item warn"><strong>CC</strong><span>BY-SA-4.0</span></div>
+  </div>
+
+  <!-- CHAPTERS -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <span class="sec-label">Guide Chapters · 七大章节</span>
+    </div>
+    <div class="sec-body">
+      <div class="sec-grid">
+        <div class="sec-item">
+          <h4><span class="num">①</span> Before You Start</h4>
+          <p>安装前准备：确定安全原则、选 Linux 发行版、了解 Pre/Post 安装需求，提供 Ansible Playbook 支持。</p>
+        </div>
+        <div class="sec-item highlight">
+          <h4><span class="num">②</span> The SSH Server（核心）</h4>
+          <p>SSH 公私钥配置、AllowGroups 白名单、sshd_config 安全加固、移除短 DH 密钥、2FA/MFA 双因素认证。</p>
+        </div>
+        <div class="sec-item">
+          <h4><span class="num">③</span> The Basics</h4>
+          <p>限制 sudo/su 使用者、FireJail 沙箱运行、NTP 时间同步、强制安全密码策略、自动安全更新与告警。</p>
+        </div>
+        <div class="sec-item">
+          <h4><span class="num">④</span> The Network</h4>
+          <p>防火墙配置（UFW/firewalld）、端口隐藏与最小暴露、网络参数 sysctl 加固、Fail2Ban 防暴力破解。</p>
+        </div>
+        <div class="sec-item">
+          <h4><span class="num">⑤</span> The Auditing</h4>
+          <p>auditd 系统审计、进程与文件监控、/proc 隐藏敏感信息、审计日志集中管理。</p>
+        </div>
+        <div class="sec-item highlight">
+          <h4><span class="num">⑥</span> The Danger Zone</h4>
+          <p>危险操作区：误操作可能锁死服务器，需仔细阅读。提供 Panic Kill Switch 紧急终止按钮。</p>
+        </div>
+        <div class="sec-item">
+          <h4><span class="num">⑦</span> The Miscellaneous</h4>
+          <p>邮件告警配置（MSMTP）、备份策略、随机熵池增强、其他安全加固项。</p>
+        </div>
+        <div class="sec-item">
+          <h4><span class="num">📋</span> linux-kernel-sysctl</h4>
+          <p>独立文档：Linux 内核 sysctl 网络安全参数加固，包含 IP 转发控制、SYN flood 防护等。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SSH HARDENING -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <span class="sec-label">SSH Server Hardening · SSH 加固核心步骤</span>
+    </div>
+    <div class="sec-body">
+      <table>
+        <tr>
+          <th>步骤</th><th>内容</th><th>重要性</th>
+        </tr>
+        <tr>
+          <td><strong>SSH 公私钥</strong></td>
+          <td>生成 Ed25519 密钥对，禁用密码登录，公钥写入 <code>authorized_keys</code></td>
+          <td><span class="tag red">必做</span></td>
+        </tr>
+        <tr>
+          <td><strong>AllowGroups 白名单</strong></td>
+          <td>创建专用 SSH 用户组，限制仅该组成员可通过 SSH 登录，禁止 root 直接登录</td>
+          <td><span class="tag red">必做</span></td>
+        </tr>
+        <tr>
+          <td><strong>sshd_config 加固</strong></td>
+          <td>禁用空密码、禁用 X11Forwarding、限制 MaxAuthTries、修改默认端口、禁用 UserKnownHostsFile / StrictHostKeyChecking</td>
+          <td><span class="tag green">推荐</span></td>
+        </tr>
+        <tr>
+          <td><strong>移除短 DH 密钥</strong></td>
+          <td>删除 1024-bit 以下弱 Diffie-Hellman 密钥组，强制使用 ECDHE 等强密钥交换</td>
+          <td><span class="tag green">推荐</span></td>
+        </tr>
+        <tr>
+          <td><strong>2FA / MFA</strong></td>
+          <td>配置 Google Authenticator 或 TOTP，SSH 登录强制二次验证，防暴力破解</td>
+          <td><span class="tag green">推荐</span></td>
+        </tr>
+      </table>
+      <div class="code-block" style="margin-top:10px">
+<pre><span class="comment"># 1. 生成 Ed25519 SSH 密钥对</span>
+<span class="cmd">ssh-keygen</span> -t ed25519 -C "your_email@example.com"
+
+<span class="comment"># 2. 复制公钥到服务器</span>
+<span class="cmd">ssh-copy-id</span> -i ~/.ssh/id_ed25519.pub user@your-server-ip
+
+<span class="comment"># 3. 创建 SSH 白名单用户组并加入你的用户</span>
+<span class="cmd">sudo groupadd</span> sshusers
+<span class="cmd">sudo usermod</span> -aG sshusers your_username
+
+<span class="comment"># 4. 编辑 /etc/ssh/sshd_config 启用白名单</span>
+<span class="cmd">sudo nano</span> /etc/ssh/sshd_config
+<span class="path">AllowGroups sshusers</span>
+<span class="path">PermitRootLogin no</span>
+<span class="path">PasswordAuthentication no</span>
+
+<span class="comment"># 5. 重载 SSH 配置（保持当前连接！先测试新窗口登录）</span>
+<span class="cmd">sudo systemctl reload</span> sshd</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- BASICS -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <span class="sec-label">The Basics · 系统基础安全</span>
+    </div>
+    <div class="sec-body">
+      <div class="sec-grid">
+        <div class="sec-item">
+          <h4>🔒 Limit sudo / su</h4>
+          <p>限制谁可以用 sudo（wheel 组），禁止普通用户 su 到 root，防范权限升级攻击。</p>
+        </div>
+        <div class="sec-item">
+          <h4>🧱 FireJail 沙箱</h4>
+          <p>用 FireJail 沙箱化运行不可信应用，网络隔离、文件系统只读、限制资源配额。</p>
+        </div>
+        <div class="sec-item">
+          <h4>🕐 NTP 时间同步</h4>
+          <p>配置 NTP 客户端确保系统时间准确，审计日志时间戳正确，防时间戳混淆攻击。</p>
+        </div>
+        <div class="sec-item">
+          <h4">🔐 强制安全密码</h4>
+          <p>配置 pam_cracklib 或 libpwquality，强制密码长度、复杂度、过期策略，定期改密。</p>
+        </div>
+        <div class="sec-item">
+          <h4>⚡ 自动安全更新</h4>
+          <p>配置 unattended-upgrades（Debian/Ubuntu）或 dnf-automatic（RHEL/Fedora），自动打补丁不发愁。</p>
+        </div>
+        <div class="sec-item">
+          <h4>🚨 Panic Kill Switch</h4>
+          <p>紧急情况下一键切断所有 SSH 会话、锁定用户账户、记录证据的应急处置脚本。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANSIBLE -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <span class="sec-label">Ansible Playbook Support · Ansible 自动化支持</span>
+    </div>
+    <div class="sec-body">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">
+        本指南提供完整的 <a href="https://github.com/moltenbit/How-To-Secure-A-Linux-Server-With-Ansible" target="_blank" style="color:var(--green);font-weight:700">Ansible Playbook</a>（by <strong>moltenbit</strong>），
+        一键自动化部署全套安全配置，适合管理多台服务器。
+      </p>
+      <div class="code-block">
+<pre><span class="comment"># 克隆 Ansible Playbook 仓库</span>
+<span class="cmd">git clone</span> https://github.com/moltenbit/How-To-Secure-A-Linux-Server-With-Ansible.git
+
+<span class="comment"># 编辑 inventory 配置服务器 IP</span>
+<span class="cmd">nano inventory</span>
+
+<span class="comment"># 一键自动化部署所有安全配置</span>
+<span class="cmd">ansible-playbook</span> -i inventory site.yml --ask-become-pass</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-bar">
+    <a href="https://github.com/imthenachoman/How-To-Secure-A-Linux-Server" target="_blank">github.com/imthenachoman/How-To-Secure-A-Linux-Server</a>
+    <a href="https://github.com/moltenbit/How-To-Secure-A-Linux-Server-With-Ansible" target="_blank">Ansible Playbook</a>
+    <span class="sep">CC-BY-SA-4.0</span>
+    <span class="sep">纯 Markdown</span>
+    <span class="sep">2019 至今持续维护</span>
+    <span class="sep">面向家庭服务器 / VPS</span>
+    <span class="sep">2026-07-09</span>
+  </div>
+
+</div>
+</body>
+</html>
