@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claudian：把 AI 编程 Agent 嵌进 Obsidian 侧边栏</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --red:#ff6b6b;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        linear-gradient(160deg, var(--bg) 0%, #0a0f1e 100%);
+      min-height:100vh;
+    }
+    .wrap{max-width:780px;margin:0 auto;padding:48px 20px 80px}
+    /* ─── hero ─── */
+    .hero{text-align:center;padding:56px 0 48px}
+    .hero-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(88,195,255,.12);border:1px solid rgba(88,195,255,.28);border-radius:99px;padding:4px 14px;font-size:12px;color:var(--cyan);margin-bottom:20px}
+    .hero h1{font-size:clamp(22px,4vw,34px);font-weight:700;margin:0 0 16px;line-height:1.25;letter-spacing:-.5px}
+    .hero h1 em{font-style:normal;color:var(--cyan)}
+    .hero-sub{font-size:15px;color:var(--muted);max-width:540px;margin:0 auto;line-height:1.65}
+    /* ─── stats ─── */
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:32px 0}
+    .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 16px;text-align:center}
+    .stat-n{font-size:22px;font-weight:700;color:var(--cyan)}
+    .stat-l{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.3px}
+    /* ─── section ─── */
+    .sec{margin:28px 0}
+    .sec-h{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+    .sec-h-dot{width:8px;height:8px;border-radius:50%;background:var(--cyan)}
+    .sec-h h2{font-size:14px;font-weight:600;margin:0;letter-spacing:.2px}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:12px}
+    .panel h3{font-size:13px;font-weight:600;margin:0 0 10px;color:var(--yellow)}
+    .panel p,.panel li{font-size:13px;color:var(--muted);line-height:1.7;margin:0}
+    ul{padding-left:18px}
+    li{margin:4px 0}
+    .badge{display:inline-block;background:rgba(88,195,255,.1);border:1px solid rgba(88,195,255,.22);border-radius:6px;padding:2px 9px;font-size:11px;color:var(--cyan);margin:3px 3px 3px 0}
+    .badge-green{background:rgba(45,179,106,.1);border-color:rgba(45,179,106,.22);color:var(--green)}
+    .badge-purple{background:rgba(132,89,255,.1);border-color:rgba(132,89,255,.22);color:var(--purple)}
+    .badge-yellow{background:rgba(244,200,76,.1);border-color:rgba(244,200,76,.22);color:var(--yellow)}
+    .badge-red{background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.22);color:var(--red)}
+    /* ─── diff table ─── */
+    .diff{width:100%;border-collapse:collapse;font-size:13px}
+    .diff th{background:var(--panel-2);color:var(--cyan);padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);font-size:11px;letter-spacing:.4px;text-transform:uppercase}
+    .diff td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--muted);vertical-align:top}
+    .diff td:first-child{color:var(--ink);font-weight:500}
+    .diff tr:last-child td{border-bottom:none}
+    .check{color:var(--green);font-weight:700}
+    .cross{color:var(--red);font-weight:700}
+    /* ─── flow ─── */
+    .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:20px 0}
+    .flow-step{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--ink);text-align:center;flex:1;min-width:100px}
+    .flow-step span{display:block;font-size:10px;color:var(--muted);margin-top:3px}
+    .flow-arrow{font-size:18px;color:var(--cyan);flex:none}
+    /* ─── footer ─── */
+    .footer{border-top:1px solid var(--line);padding-top:24px;margin-top:40px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
+    .footer a{color:var(--cyan);text-decoration:none;font-size:12px}
+    .footer a:hover{text-decoration:underline}
+    .save-btn{display:inline-flex;align-items:center;gap:6px;background:var(--blue);border:none;border-radius:8px;color:#fff;padding:8px 18px;font-size:12px;cursor:pointer;font-family:inherit}
+    .save-btn:hover{background:#3a6bff}
+    /* ─── mobile ─── */
+    @media(max-width:540px){
+      .diff{font-size:12px}
+      .flow{flex-direction:column;align-items:stretch}
+      .flow-arrow{text-align:center}
+      .flow-step{min-width:unset}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- hero -->
+  <div class="hero">
+    <div class="hero-pill">⬡ Obsidian 插件 &nbsp;·&nbsp; AI Agent 工作台</div>
+    <h1>Claudian：把 <em>AI 编程 Agent</em> 嵌进 Obsidian 侧边栏</h1>
+    <p class="hero-sub">把 Claude Code / Codex / OpenCode / Pi 直接嵌进 Obsidian vault，让笔记库成为 Agent 的工作目录，告别窗口横跳，在笔记库内完成文件读写、搜索、bash 与多步工作流。</p>
+  </div>
+
+  <!-- stats -->
+  <div class="stats">
+    <div class="stat"><div class="stat-n">632+</div><div class="stat-l">GitHub Commits</div></div>
+    <div class="stat"><div class="stat-n">BRAT</div><div class="stat-l">推荐安装方式</div></div>
+    <div class="stat"><div class="stat-n">4</div><div class="stat-l">支持 Agent</div></div>
+    <div class="stat"><div class="stat-n">多 Provider</div><div class="stat-l">同一会话模型</div></div>
+  </div>
+
+  <!-- 1. 核心定位 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>核心定位</h2></div>
+    <div class="panel">
+      <p>Claudian 是 Obsidian 第三方插件，将多个 AI 编程 Agent（Claude Code / Codex / OpenCode / Pi）嵌入 vault 侧边栏，让 vault 直接成为 Agent 的工作目录。</p>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+      <span class="badge">Obsidian 插件</span>
+      <span class="badge badge-green">Claude 默认 Provider</span>
+      <span class="badge badge-purple">Codex 可选 Provider</span>
+      <span class="badge badge-yellow">Pi / OpenCode</span>
+      <span class="badge badge-red">侧边栏原生对话</span>
+    </div>
+  </div>
+
+  <!-- 2. 解决什么问题 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>解决什么问题</h2></div>
+    <div class="panel">
+      <h3>传统方案的割裂体验</h3>
+      <p>Obsidian 用户想要 AI 编程能力，通常需要在 Obsidian 编辑器和 Claude Code 终端之间来回切换——体验割裂、上下文丢失、窗口横跳。</p>
+    </div>
+    <div class="panel">
+      <h3>Claudian 的原生整合</h3>
+      <p>Claudian 把 Agent 完整嵌进 Obsidian 侧边栏，vault 成为 Agent 的工作目录，所有操作在笔记库内一步到位，不再需要切换窗口。</p>
+    </div>
+  </div>
+
+  <!-- 3. 核心能力 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>核心能力</h2></div>
+    <div class="panel">
+      <ul>
+        <li><strong>侧边栏原生对话</strong>：在 Obsidian 侧边栏直接与 Agent 对话，无需额外终端窗口</li>
+        <li><strong>Vault 成为工作目录</strong>：Agent 直接读写 vault 内的文件，无需路径配置</li>
+        <li><strong>文件读写</strong>：Agent 在 vault 内读取、创建、修改 Markdown 与其他文件</li>
+        <li><strong>全文搜索</strong>：Agent 可搜索 vault 内所有内容</li>
+        <li><strong>Bash 执行</strong>：在 vault 上下文中执行终端命令</li>
+        <li><strong>多步工作流</strong>：复杂任务通过多步骤在 vault 内闭环完成</li>
+        <li><strong>选中文本操作</strong>：选中笔记内容，直接让 Agent 处理或解释</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 4. 多 Provider 架构 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>多 Provider 架构</h2></div>
+    <div class="panel">
+      <h3>Provider 模型</h3>
+      <p>Claudian 基于多 Provider 架构设计：<strong>Claude</strong> 是默认全功能 Provider；<strong>Codex</strong> 是可选 Provider，通过 <code>Conversation.providerId</code> + <code>providerState</code> 接入同一 conversation model。多 Provider 共享同一会话上下文，可在同一对话中切换。</p>
+    </div>
+    <div class="panel">
+      <h3>支持的 Agent</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+        <span class="badge badge-green">Claude Code（默认）</span>
+        <span class="badge badge-purple">Codex（可选）</span>
+        <span class="badge badge-yellow">OpenCode</span>
+        <span class="badge badge-red">Pi</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 对比 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>与终端套壳插件的差异</h2></div>
+    <table class="diff">
+      <thead><tr><th>维度</th><th>终端套壳插件</th><th>Claudian 原生嵌入</th></tr></thead>
+      <tbody>
+        <tr><td>对话入口</td><td>外部终端窗口</td><td class="check">Obsidian 侧边栏 ✓</td></tr>
+        <tr><td>Vault 感知</td><td>需手动配置路径</td><td class="check">自动以 vault 为工作目录 ✓</td></tr>
+        <tr><td>上下文传递</td><td>跨窗口复制粘贴</td><td class="check">侧边栏内直接共享 ✓</td></tr>
+        <tr><td>文件操作</td><td>Agent 读写本地文件</td><td class="check">直接在 vault 内闭环 ✓</td></tr>
+        <tr><td>多 Provider</td><td>通常单一模型</td><td class="check">Claude / Codex / OpenCode / Pi 共享同一会话 ✓</td></tr>
+        <tr><td>安装方式</td><td>各异</td><td class="check">BRAT 插件管理器统一安装 ✓</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 6. 工作流 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>典型工作流</h2></div>
+    <div class="flow">
+      <div class="flow-step">Obsidian<br><span>打开侧边栏</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">选中笔记<br><span>或直接对话</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Agent 读写<br><span>vault 文件</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">搜索 / bash<br><span>多步工作流</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">结果写回<br><span>笔记内完成</span></div>
+    </div>
+  </div>
+
+  <!-- 7. 安装方式 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>安装与配置</h2></div>
+    <div class="panel">
+      <h3>前提条件</h3>
+      <ul>
+        <li>已安装 Obsidian</li>
+        <li>已安装 <strong>BRAT</strong>（Beta Reviewers Auto-update Tools）插件</li>
+        <li>已安装 Claude Code / Codex / OpenCode / Pi 其中之一</li>
+        <li>或已配置兼容模型（DeepSeek / GLM 等）</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>安装步骤</h3>
+      <ul>
+        <li>Obsidian → 设置 → 第三方插件 → 搜索并启用 <strong>BRAT</strong></li>
+        <li>BRAT 设置 → Add Beta plugin → 填入 <code>YishenTu/claudian</code></li>
+        <li>重启 Obsidian，在第三方插件列表找到 Claudian 并启用</li>
+        <li>配置 Claude CLI 路径（或兼容模型 API）</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 8. 风险与边界 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>风险与边界</h2></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <span class="badge badge-red">文件操作权限</span>
+      <span class="badge badge-red">本地 CLI 依赖</span>
+      <span class="badge badge-yellow">社区插件稳定性</span>
+      <span class="badge badge-yellow">模型配置复杂度</span>
+      <span class="badge badge-yellow">Obsidian 版本兼容性</span>
+      <span class="badge badge-yellow">隐私与安全边界</span>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <p>Claudian 在 vault 内执行文件读写和 bash 命令，Agent 权限边界取决于 Claude Code 自身的安全设置。建议明确 vault 内哪些目录可被 Agent 修改，避免误操作重要笔记。</p>
+    </div>
+  </div>
+
+  <!-- 9. 来源 -->
+  <div class="sec">
+    <div class="sec-h"><div class="sec-h-dot"></div><h2>信息来源</h2></div>
+    <div class="panel">
+      <ul>
+        <li>GitHub 仓库：<a href="https://github.com/YishenTu/claudian" target="_blank">YishenTu/claudian</a></li>
+        <li>README 原文："An Obsidian plugin that embeds AI coding agents (Claude Code, Codex, Opencode, Pi, and more to come) in your vault."</li>
+        <li>CLAUDE.md 架构说明：Claudian 是多 Provider 产品，Claude 为全功能默认 Provider</li>
+        <li>热度数据：632 commits（2026 年中旬快照）；社区中文博客多篇评测</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div class="footer">
+    <div>
+      <a href="https://github.com/YishenTu/claudian" target="_blank">↗ GitHub · YishenTu/claudian</a>
+    </div>
+    <button class="save-btn" onclick="html2canvas(document.body,{scale:2,useCORS:true}).then(c=>c.getBlob().then(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='claudian.png';a.click();URL.revokeObjectURL(u)}))">↓ 保存 PNG</button>
+  </div>
+
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</body>
+</html>
