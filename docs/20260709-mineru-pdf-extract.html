@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#c8102e">
+  <meta name="description" content="MinerU：PDF/网页/电子书 → Markdown/JSON 端到端提取工具。66.9K GitHub Stars，上海AI实验室出品。支持自动识别PDF类型、标题/正文/图片/表格/公式提取，2024年7月登顶GitHub Trending。">
+  <title>MinerU：开源 PDF 高质量数据提取工具</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:#f5f2ec;color:#0a0a0a;font-size:12.6px;line-height:1.6;
+    }
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:0 0 80px}
+
+    /* ─── TOPBAR ─── */
+    .topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid #0a0a0a;margin-bottom:14px;overflow:hidden}
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,#c8102e 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .hero-title{font-size:clamp(16px,4vw,20px);font-weight:900;letter-spacing:.02em;line-height:1.1;margin-bottom:6px}
+    .hero-sub{font-size:.75rem;color:rgba(255,255,255,.82);line-height:1.4;max-width:440px}
+    .topbar-meta{
+      padding:14px;border-left:3px solid #0a0a0a;
+      display:grid;grid-template-rows:auto auto;gap:0;align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;grid-template-columns:1.4fr 1fr;gap:5px;
+      padding-bottom:6px;border-bottom:2px solid #0a0a0a;margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;grid-template-columns:1.2fr 1fr 0.8fr;gap:5px;
+    }
+    .meta-pill-lg{border:2px solid #0a0a0a;padding:7px 9px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1}
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-md{border:2px solid #0a0a0a;border-left:4px solid #c8102e;padding:5px 8px 4px;background:#fff;font-weight:700;font-size:.78rem;line-height:1.2}
+    .meta-pill-md .sub{font-size:.62rem;font-weight:400;color:#666;display:block;margin-top:1px}
+
+    /* ─── WARNING ─── */
+    .warning-box{display:flex;background:#fff5f5;border-bottom:1px solid #c8102e;font-size:.78rem;margin-bottom:12px}
+    .warning-bar{width:4px;background:#c8102e;flex-shrink:0}
+    .warning-text{padding:.55rem .85rem;color:#c8102e;line-height:1.5}
+    .warning-text strong{font-weight:700}
+
+    /* ─── STATS ─── */
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:3px solid #0a0a0a;margin-bottom:14px}
+    .stat{padding:.65rem .4rem;text-align:center;border-right:2px solid #0a0a0a;background:#fffdf9}
+    .stat:last-child{border-right:none}
+    .stat-num{font-size:1.5rem;font-weight:900;color:#c8102e;font-family:'Courier New',monospace;line-height:1}
+    .stat-label{font-size:.62rem;color:#666;margin-top:.15rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+
+    /* ─── SECTION ─── */
+    .section{display:flex;border-bottom:1px solid #ddd;margin-bottom:0}
+    .section-num{width:2.5rem;background:#c8102e;color:#fff;font-size:1rem;font-weight:900;display:flex;align-items:flex-start;padding:.55rem .3rem;flex-shrink:0;font-family:'Courier New',monospace;line-height:1.1}
+    .section-body{flex:1;padding:.55rem .85rem}
+    .section-title{font-size:.92rem;font-weight:700;color:#0a0a0a;margin-bottom:.3rem;letter-spacing:-.01em}
+    .section-content{font-size:.78rem;line-height:1.65;color:#333}
+
+    /* ─── FEATURE GRID ─── */
+    .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid #ddd}
+    .feat-item{padding:.6rem .7rem;border-right:1px solid #ddd;background:#fffdf9}
+    .feat-item:nth-child(3n){border-right:none}
+    .feat-icon{font-size:1.1rem;margin-bottom:.25rem}
+    .feat-title{font-size:.75rem;font-weight:800;color:#0a0a0a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem}
+    .feat-desc{font-size:.72rem;color:#555;line-height:1.5}
+
+    /* ─── MINI TABLE ─── */
+    .mini-table{width:100%;border-collapse:collapse;font-size:.77rem;margin:.25rem 0}
+    .mini-table th,.mini-table td{padding:.42rem .6rem;border:1px solid #ddd;text-align:left}
+    .mini-table th{background:#0a0a0a;color:#fff;font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    .mini-table td code{font-size:.72rem;background:#eef4ff;padding:1px 4px;border-radius:2px;color:#0036a3}
+    tr:nth-child(even) td{background:#f8f9fc}
+
+    /* ─── ARCH GRID ─── */
+    .arch-grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ddd}
+    .arch-col{padding:.55rem .8rem;border-right:1px solid #ddd}
+    .arch-col:last-child{border-right:none}
+    .arch-col-title{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;color:#0036a3;border-bottom:1.5px solid #0036a3;padding-bottom:.25rem}
+    .arch-col li{font-size:.73rem;margin-bottom:.2rem;color:#333;line-height:1.5}
+
+    /* ─── CODE ─── */
+    .code-box{background:#1a1a2e;padding:.6rem .8rem;margin:.3rem 0;overflow-x:auto;border-radius:4px}
+    .code-box pre{margin:0;white-space:pre}
+    .code-box code{color:#e0e0e0;font-size:.73rem;font-family:'Courier New',monospace;line-height:1.6}
+
+    /* ─── ENGINE TABLE ─── */
+    .engine-grid{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid #ddd}
+    .engine-card{padding:.55rem .7rem;border-right:1px solid #ddd;background:#fffdf9}
+    .engine-card:last-child{border-right:none}
+    .engine-name{font-size:.75rem;font-weight:800;color:#c8102e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem}
+    .engine-gpu{font-size:.68rem;font-weight:700;color:#0036a3;margin-bottom:.15rem}
+    .engine-desc{font-size:.7rem;color:#555;line-height:1.45}
+
+    /* ─── TAG ROW ─── */
+    .tag-row{display:flex;flex-wrap:wrap;gap:.3rem;margin:.3rem 0}
+    .tag{padding:.18rem .5rem;border:1.5px solid #0036a3;font-size:.68rem;font-weight:700;background:#eef4ff;color:#0036a3;border-radius:2px}
+    .tag.red{border-color:#c8102e;background:#fff0f0;color:#c8102e}
+    .tag.green{border-color:#006b3c;background:#dcfce7;color:#006b3c}
+    .tag.yellow{border-color:#e8c200;background:#fffbe6;color:#6b5000}
+
+    /* ─── LICENSE BOX ─── */
+    .license-box{display:flex;border-bottom:1px solid #ddd}
+    .license-bar{width:4px;background:#006b3c;flex-shrink:0}
+    .license-body{padding:.55rem .8rem;font-size:.77rem;line-height:1.6;color:#333;flex:1}
+    .license-body strong{font-weight:800;color:#006b3c}
+
+    /* ─── FOOTER ─── */
+    .footer{display:flex;justify-content:space-between;align-items:center;padding:.65rem .85rem;background:#eee;font-size:.67rem;color:#666;margin-top:0}
+    .footer-source{color:#888;line-height:1.5}
+    .footer-source a{color:#0036a3;text-decoration:underline}
+    .save-btn{
+      background:linear-gradient(135deg,#c8102e,#a90f27);color:#fff;border:none;
+      padding:.4rem .85rem;border-radius:6px;font-size:.72rem;
+      font-family:'Courier New',monospace;cursor:pointer;
+      position:fixed;bottom:18px;right:18px;z-index:999;
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid #0a0a0a;grid-template-rows:unset}
+      .meta-row-high{grid-template-columns:1fr 1fr}
+      .meta-row-low{grid-template-columns:1fr 1fr 1fr}
+      .stats{grid-template-columns:repeat(2,1fr)}
+      .stats .stat:nth-child(2){border-right:none}
+      .stats .stat:nth-child(3){border-top:2px solid #0a0a0a}
+      .stats .stat:nth-child(4){border-top:2px solid #0a0a0a}
+      .feat-grid{grid-template-columns:1fr}
+      .feat-item{border-right:none;border-bottom:1px solid #ddd}
+      .arch-grid{grid-template-columns:1fr}
+      .arch-col{border-right:none;border-bottom:1px solid #ddd}
+      .engine-grid{grid-template-columns:1fr}
+      .engine-card{border-right:none;border-bottom:1px solid #ddd}
+      .save-btn{bottom:12px;right:12px}
+    }
+    @media(max-width:400px){
+      .stat-num{font-size:1.2rem}
+      .section-num{width:2rem;font-size:.85rem}
+      .meta-pill-lg{font-size:12px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══ TOPBAR ═══ -->
+  <div class="topbar">
+    <div class="topbar-hero">
+      <div class="hero-title">MinerU — PDF 高质量数据提取工具</div>
+      <div class="hero-sub">一站式开源数据提取：将 PDF / 网页 / 电子书转换为 Markdown 与 JSON，上海人工智能实验室出品</div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">66.9K<span class="sub">GitHub Stars</span></div>
+        <div class="meta-pill-lg">5.6K<span class="sub">Forks</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">Apache 2.0<span class="sub">License</span></div>
+        <div class="meta-pill-md">2024-07<span class="sub">首发</span></div>
+        <div class="meta-pill-md">Python<span class="sub">语言</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ WARNING ═══ -->
+  <div class="warning-box">
+    <div class="warning-bar"></div>
+    <div class="warning-text">
+      <strong>⚠ 数据核验注记：</strong>当前 Stars 为 <strong>66.9K</strong>（≈ 6.69 万），接近但未达到「7 万 star」说法，差约 3.1K（约 4.6%）；公式准确率 92.5% 来源单一（2026-06 评测文），缺乏原始论文验证；VLM 超越 GPT-4o/Gemini-2.5 Pro 的说法为官方/媒体引用，无公开 Benchmark 链接。
+    </div>
+  </div>
+
+  <!-- ═══ STATS ═══ -->
+  <div class="stats">
+    <div class="stat"><div class="stat-num">66.9K</div><div class="stat-label">GitHub Stars</div></div>
+    <div class="stat"><div class="stat-num">2024-07</div><div class="stat-label">GitHub Trending 登顶</div></div>
+    <div class="stat"><div class="stat-num">12 亿</div><div class="stat-label">VLM 参数规模</div></div>
+    <div class="stat"><div class="stat-num">84 种</div><div class="stat-label">OCR 支持语言</div></div>
+  </div>
+
+  <!-- ═══ SEC 01: 核心能力 ═══ -->
+  <div class="section">
+    <div class="section-num">01</div>
+    <div class="section-body">
+      <div class="section-title">核心能力：PDF → Markdown 一键提取</div>
+      <div class="section-content">
+        MinerU 将任意 PDF（文本型/扫描版/乱码）自动识别类型后，提取结构化内容并导出为 Markdown/JSON，是 AI 语料清洗的核心工具。
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE GRID -->
+  <div class="feat-grid">
+    <div class="feat-item">
+      <div class="feat-icon">📄</div>
+      <div class="feat-title">标题提取</div>
+      <div class="feat-desc">布局检测识别标题层级，多栏排版还原阅读顺序</div>
+    </div>
+    <div class="feat-item">
+      <div class="feat-icon">🖼️</div>
+      <div class="feat-title">图片提取</div>
+      <div class="feat-desc">提取并嵌入 Markdown，支持图片描述生成（部分场景）</div>
+    </div>
+    <div class="feat-item">
+      <div class="feat-icon">📊</div>
+      <div class="feat-title">表格提取</div>
+      <div class="feat-desc">HTML 格式输出，支持旋转/无边框/跨页表格</div>
+    </div>
+    <div class="feat-item">
+      <div class="feat-icon">🔢</div>
+      <div class="feat-title">公式提取</div>
+      <div class="feat-desc">行内/行间公式 → LaTeX，含序号识别（宣称准确率 92.5%）</div>
+    </div>
+    <div class="feat-item">
+      <div class="feat-icon">🔍</div>
+      <div class="feat-title">PDF 类型自识别</div>
+      <div class="feat-desc">自动检测扫描 PDF 和乱码 PDF，切换 OCR pipeline</div>
+    </div>
+    <div class="feat-item">
+      <div class="feat-icon">📦</div>
+      <div class="feat-title">多格式输出</div>
+      <div class="feat-desc">Markdown + JSON（按阅读顺序）+ 中间格式 + 可视化结果</div>
+    </div>
+  </div>
+
+  <!-- ═══ SEC 02: 技术架构 ═══ -->
+  <div class="section">
+    <div class="section-num">02</div>
+    <div class="section-body">
+      <div class="section-title">技术架构：模型层 + 解析引擎</div>
+      <div class="section-content">
+        MinerU 采用多模型流水线：布局检测 → 区域识别 → 内容提取 → 阅读顺序恢复 → 格式输出。
+      </div>
+    </div>
+  </div>
+
+  <div class="arch-grid">
+    <div class="arch-col">
+      <div class="arch-col-title">模型层</div>
+      <ul>
+        <li><strong>布局检测</strong>：DocLayout-YOLO_ft, YOLO-v10_ft, LayoutLMv3_ft</li>
+        <li><strong>公式检测</strong>：YOLOv8_ft（定位行内/块公式）</li>
+        <li><strong>公式识别</strong>：UniMERNet（图像 → LaTeX）</li>
+        <li><strong>OCR</strong>：PaddleOCR（84 种语言）</li>
+        <li><strong>表格识别</strong>：PaddleOCR + TableMaster / StructEqTable</li>
+        <li><strong>阅读顺序</strong>：规则引擎（非专用模型）</li>
+      </ul>
+    </div>
+    <div class="arch-col">
+      <div class="arch-col-title">2.x / 2.5 新增能力</div>
+      <ul>
+        <li>复杂长数学公式，中英文混合方程式解析</li>
+        <li>旋转表格、无边框表格、跨页表格识别</li>
+        <li>印章文字识别（针对中国文档圆形印章）</li>
+        <li>VLM 架构（12 亿参数，超越通用模型）</li>
+        <li>多语言混合识别（中文/英文混排）</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SEC 03: 解析引擎 ═══ -->
+  <div class="section">
+    <div class="section-num">03</div>
+    <div class="section-body">
+      <div class="section-title">三种解析引擎：按需选型</div>
+    </div>
+  </div>
+
+  <div class="engine-grid">
+    <div class="engine-card">
+      <div class="engine-name">pipeline</div>
+      <div class="engine-gpu">CPU 或 6G 显存 GPU</div>
+      <div class="engine-desc">个人日常使用，轻量级文档处理</div>
+    </div>
+    <div class="engine-card">
+      <div class="engine-name">vlm-transformers</div>
+      <div class="engine-gpu">8G 显存 GPU</div>
+      <div class="engine-desc">学术论文、复杂版式、深度理解场景</div>
+    </div>
+    <div class="engine-card">
+      <div class="engine-name">vlm-vllm</div>
+      <div class="engine-gpu">8G+ 显存 GPU</div>
+      <div class="engine-desc">企业级批量处理，加速 20-30 倍</div>
+    </div>
+  </div>
+
+  <!-- ═══ SEC 04: 安装与使用 ═══ -->
+  <div class="section">
+    <div class="section-num">04</div>
+    <div class="section-body">
+      <div class="section-title">安装与使用</div>
+    </div>
+  </div>
+
+  <div class="code-box"><pre><code>pip install mineru
+# 或 uv
+uv pip install -U "mineru[core]"
+
+# Web API
+mineru-api --host 0.0.0.0 --port 8000
+
+# Python SDK
+from mineru import pipeline
+result = pipeline("your.pdf")
+result.save("output.md")</code></pre></div>
+
+  <!-- ═══ SEC 05: License ═══ -->
+  <div class="section">
+    <div class="section-num">05</div>
+    <div class="section-body">
+      <div class="section-title">License：Apache 2.0 + 商业条款补充</div>
+    </div>
+  </div>
+
+  <div class="license-box">
+    <div class="license-bar"></div>
+    <div class="license-body">
+      <strong>Apache License 2.0</strong>，商业使用无需单独许可。<br>
+      但：<strong>MAU 超过 1 亿</strong> 或 <strong>月收入超过 2000 万美元</strong> 需申请商业许可；提供在线服务需标注归属（MinerU Team）。
+    </div>
+  </div>
+
+  <!-- ═══ SEC 06: 核验结论 ═══ -->
+  <div class="section">
+    <div class="section-num">06</div>
+    <div class="section-body">
+      <div class="section-title">核心功能核验结论</div>
+    </div>
+  </div>
+
+  <table class="mini-table">
+    <thead>
+      <tr>
+        <th>功能点</th>
+        <th>状态</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>GitHub Stars 66.9K</td><td style="color:#006b3c;font-weight:800">✅ 已核验</td><td>接近「7 万」说法，差约 4.6%</td></tr>
+      <tr><td>2024-07 登顶 Trending</td><td style="color:#006b3c;font-weight:800">✅ 已核验</td><td>有独立博客记录（CSDN 2024-07-31）</td></tr>
+      <tr><td>自动识别 PDF 类型</td><td style="color:#006b3c;font-weight:800">✅ 已核验</td><td>自动切换 OCR pipeline</td></tr>
+      <tr><td>标题/正文/图片提取</td><td style="color:#006b3c;font-weight:800">✅ 已核验</td><td>布局检测 + 阅读顺序恢复</td></tr>
+      <tr><td>表格 → HTML</td><td style="color:#006b3c;font-weight:800">✅ 已核验</td><td>支持旋转/无边框/跨页表格</td></tr>
+      <tr><td>公式 → LaTeX</td><td style="color:#006b3c;font-weight:800">✅ 已核验</td><td>行内/行间，含序号识别</td></tr>
+      <tr><td>一键导出 Markdown</td><td style="color:#006b3c;font-weight:800">✅ 已核验</td><td>CLI / Python SDK / Web API</td></tr>
+      <tr><td>公式准确率 92.5%</td><td style="color:#e8c200;font-weight:800">🟡 存疑</td><td>来源单一，缺乏原始论文验证</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ═══ SEC 07: 来源索引 ═══ -->
+  <div class="section">
+    <div class="section-num">07</div>
+    <div class="section-body">
+      <div class="section-title">来源索引</div>
+    </div>
+  </div>
+
+  <div class="tag-row">
+    <span class="tag">github.com/opendatalab/MinerU（Stars 66.9K, Forks 5.6K）</span>
+    <span class="tag">CSDN 登顶 Trending 记录（2024-07-31）</span>
+    <span class="tag">CSDN MinerU 原理解析（2025-02-26）</span>
+    <span class="tag">CSDN MinerU 深度评测（2026-06）</span>
+    <span class="tag">知乎历史 star 数据（17.4K, 2024-11）</span>
+    <span class="tag yellow">⚠ 公式准确率来源待独立验证</span>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="footer">
+    <div class="footer-source">
+      调研：Hermes Agent &nbsp;|&nbsp; 时间：2026-07-09 &nbsp;|&nbsp; 存疑项见顶栏 Warning
+    </div>
+    <button class="save-btn" onclick="window.print()">🖨 打印 / 保存</button>
+  </div>
+
+</div>
+</body>
+</html>

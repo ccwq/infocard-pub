@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LongCat-Video-Avatar：美团开源 136B 参数音频驱动虚拟人</title>
+  <style>
+    :root{
+      --red:#c8102e;
+      --accent:#222;
+      --black:#0a0a0a;
+      --paper:#fffdf9;
+      --page-bg:#f5f2ec;
+      --blue:#0036a3;
+      --blue-bg:#eef4ff;
+      --yellow:#e8c200;
+      --yellow-bg:#fff1b0;
+      --green:#15803d;
+      --green-bg:#dcfce7;
+      --text:#111;
+      --muted:#555;
+      --max:780px;
+      --mono:'IBM Plex Mono','Cascadia Code',ui-monospace,Menlo,monospace;
+      --sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:var(--sans);background:var(--page-bg);color:var(--text)}
+    .page{width:100%;max-width:var(--max);margin:0 auto;padding:.5rem .48rem 9rem}
+
+    /* ── HEADER ── */
+    header{
+      background:var(--black);
+      color:#fff;
+      padding:15px 20px 13px;
+      border-bottom:3px solid var(--red);
+      margin-bottom:.75rem;
+    }
+    .tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border:1.5px solid rgba(255,255,255,.3);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px;background:rgba(255,255,255,.08)}
+    h1{font-size:clamp(1.35rem,4.5vw,1.95rem);font-weight:900;letter-spacing:-.03em;margin:0 0 9px;line-height:1.1}
+    .sub{font-size:12.5px;line-height:1.7;color:rgba(255,255,255,.65);max-width:55ch}
+    .top-links{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+    .top-links a{padding:5px 10px;border:1px solid rgba(255,255,255,.22);font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;color:#fff}
+    .top-links a:hover{border-color:#fff}
+
+    /* ── STATS BAR ── */
+    .stats{display:flex;flex-wrap:wrap;border:1.5px solid var(--black);background:#fff;margin-bottom:.75rem}
+    .stat{flex:1 1 25%;min-width:120px;padding:11px 8px;border-right:1.5px solid var(--black);text-align:center}
+    .stat:last-child{border-right:none}
+    .stat .num{font-size:clamp(.95rem,2.5vw,1.3rem);font-weight:900;color:var(--red);font-variant-numeric:tabular-nums;line-height:1;font-family:var(--mono)}
+    .stat .label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+
+    /* ── LEAD ── */
+    .lead{border-left:3px solid var(--red);background:var(--paper);padding:.84rem .86rem .9rem;margin-bottom:.75rem;font-size:13px;line-height:1.8;font-weight:500}
+
+    /* ── SECTION ── */
+    .section{background:var(--paper);margin-bottom:.6rem}
+    .sec-head{background:var(--black);color:#fff;padding:7px 12px;display:flex;align-items:center;gap:10px}
+    .sec-no{background:var(--accent);color:#fff;font-size:10px;font-weight:900;padding:2px 7px;flex-shrink:0}
+    .sec-head h2{font-size:.82rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin:0}
+    .sec-body{padding:.84rem .86rem .9rem}
+
+    /* ── PILLS ── */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.6rem}
+    .pill{padding:3px 9px;border:1.5px solid var(--black);font-size:10px;font-weight:700;background:#fff}
+    .pill.blue{background:var(--blue-bg);border-color:var(--blue);color:var(--blue)}
+    .pill.green{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+    .pill.yellow{background:var(--yellow-bg);border-color:var(--yellow);color:#7a6000}
+    .pill.red{background:#fff0f2;border-color:var(--red);color:var(--red)}
+
+    /* ── ARCH ── */
+    .arch{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0;border:2px solid var(--black);margin-bottom:.6rem;background:#fff;font-size:11.5px}
+    .arch-node{padding:10px 12px;text-align:center}
+    .arch-node strong{display:block;font-size:12.5px;font-weight:800;margin-bottom:3px}
+    .arch-node span{color:var(--muted);font-size:10.5px}
+    .arch-node img{width:100%;max-width:64px;height:auto;display:block;margin:0 auto 5px}
+    .arch-arr{width:28px;display:flex;align-items:center;justify-content:center;background:var(--black);color:#fff;font-size:16px;font-weight:900}
+
+    /* ── TABLE ── */
+    .tbl{overflow-x:auto;border:1.5px solid var(--black);margin-bottom:.6rem}
+    table{width:100%;border-collapse:collapse;font-size:11.5px}
+    th,td{border:1px solid var(--black);padding:6px 9px;vertical-align:top;text-align:left}
+    th{background:var(--black);color:#fff;font-size:10px;letter-spacing:.07em;text-transform:uppercase}
+    td{background:var(--paper)}
+    tr:nth-child(even) td{background:#f9f7f2}
+    td code{font-family:var(--mono);font-size:10.5px;background:#eee;padding:1px 4px}
+
+    /* ── TIMELINE ── */
+    .timeline{display:flex;flex-wrap:wrap;gap:0;border:1.5px solid var(--black);margin-bottom:.6rem;background:#fff}
+    .tl-item{flex:1 1 45%;min-width:180px;padding:9px 12px;border-right:1px solid var(--black);border-bottom:1px solid var(--black)}
+    .tl-item:nth-child(even){border-right:none}
+    .tl-item:nth-last-child(-n+2){border-bottom:none}
+    .tl-date{font-size:10px;font-weight:800;color:var(--muted);letter-spacing:.05em;margin-bottom:3px}
+    .tl-ver{font-size:12.5px;font-weight:900;color:var(--red);margin-bottom:2px}
+    .tl-desc{font-size:11px;color:var(--text);line-height:1.5}
+
+    /* ── COMPARE GRID ── */
+    .compare-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:.6rem}
+    .cmp-box{border:1.5px solid var(--black);padding:9px 11px;background:#fff}
+    .cmp-box .name{font-size:12px;font-weight:800;margin-bottom:4px}
+    .cmp-box .note{font-size:10.5px;color:var(--muted);line-height:1.55}
+    .cmp-box.free{border-color:var(--green);background:var(--green-bg)}
+    .cmp-box.free .name{color:var(--green)}
+
+    /* ── CLOSING ── */
+    .closing{border:2px solid var(--black);padding:.84rem .86rem .9rem;margin-bottom:.6rem;background:var(--black);color:#fff}
+    .closing h3{font-size:.82rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin:0 0 8px;color:var(--yellow)}
+    .closing ul{margin:.32rem 0 0 1rem;line-height:2;font-size:12.5px}
+    .closing li strong{color:var(--yellow)}
+
+    /* ── FOOTER ── */
+    .footer{padding:10px 0 0;border-top:1.5px solid var(--black);margin-top:.6rem;font-size:11px;color:var(--muted);line-height:1.7}
+    .footer-links{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
+    .footer-links a{padding:4px 9px;border:1.5px solid var(--black);font-size:10.5px;font-weight:700;color:var(--text)}
+
+    /* ── SAVE BTN ── */
+    #save-btn{position:fixed;bottom:20px;right:14px;z-index:999;border:0;border-radius:10px;padding:.56rem .72rem;background:linear-gradient(135deg,#1a1a1a,#333);color:#fff;font-size:.7rem;font-weight:900;font-family:var(--mono);letter-spacing:.04em;cursor:pointer;box-shadow:3px 3px 0 rgba(0,0,0,.2)}
+    #save-btn:disabled{opacity:.5;cursor:not-allowed}
+
+    /* ── MOBILE ── */
+    @media(max-width:720px){
+      .page{padding:.4rem .3rem 8rem}
+      .stats{flex-direction:column}
+      .stat{border-right:none;border-bottom:1.5px solid var(--black);flex:unset}
+      .stat:last-child{border-bottom:none}
+      .arch{grid-template-columns:1fr;gap:0}
+      .arch-arr{width:100%;height:24px}
+      .compare-grid{grid-template-columns:1fr}
+      .tl-item{flex:1 1 100%;border-right:none}
+      #save-btn{bottom:14px;right:10px;font-size:.8rem}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="tag">🎬 开源虚拟人 &nbsp;·&nbsp; 美团 LongCat 团队</div>
+    <h1>LongCat-Video-Avatar</h1>
+    <div class="sub">输入一张照片 + 一段音频，生成人物说话视频——136 亿参数开源音频驱动虚拟人，MIT 许可证可商用</div>
+    <div class="top-links">
+      <a href="https://github.com/meituan-longcat/LongCat-Video" target="_blank" rel="noreferrer">⚡ GitHub</a>
+      <a href="https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5" target="_blank" rel="noreferrer">🤗 HuggingFace</a>
+      <a href="https://meigen-ai.github.io/LongCat-Video-Avatar-1.5-Page/" target="_blank" rel="noreferrer">🌐 官网</a>
+      <a href="https://arxiv.org/abs/2605.26486" target="_blank" rel="noreferrer">📄 Tech Report</a>
+    </div>
+  </header>
+
+  <!-- ── STATS ── -->
+  <div class="stats">
+    <div class="stat">
+      <div class="num">136B</div>
+      <div class="label">参数量</div>
+    </div>
+    <div class="stat">
+      <div class="num">5 分钟</div>
+      <div class="label">原生视频时长</div>
+    </div>
+    <div class="stat">
+      <div class="num">8 步</div>
+      <div class="label">DMD 蒸馏推理</div>
+    </div>
+    <div class="stat">
+      <div class="num">MIT</div>
+      <div class="label">许可证 · 可商用</div>
+    </div>
+  </div>
+
+  <!-- ── LEAD ── -->
+  <div class="lead">
+    美团 LongCat 团队开源的 <strong>LongCat-Video-Avatar</strong> 以 MIT 许可证释放 136 亿参数 Diffusion Transformer 视频生成底座，结合 Whisper-Large 音频编码器，实现「照片+音频→说话视频」的 ATI2V 任务。与 HeyGen、D-ID 等商业平台相比，完全免费、可私有部署、支持 5 分钟长视频。
+  </div>
+
+  <!-- ── S01: 核心能力 ── -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="sec-no">01</div>
+      <h2>核心能力验证</h2>
+    </div>
+    <div class="sec-body">
+      <div class="pills">
+        <span class="pill green">✅ 照片+音频同步说话</span>
+        <span class="pill blue">✅ 完全开源</span>
+        <span class="pill green">✅ 5 分钟长视频</span>
+        <span class="pill yellow">✅ 中国实验室出品</span>
+        <span class="pill blue">✅ ATI2V 任务模式</span>
+        <span class="pill green">✅ 多人对话支持</span>
+      </div>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr><th>验证项</th><th>结论</th><th>来源</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>照片+音频同步说话</td><td>✅ ATI2V 模式，Whisper-Large 唇形同步达 SOTA</td><td>GitHub README</td></tr>
+            <tr><td>开源</td><td>✅ GitHub + HuggingFace + ModelScope，MIT License</td><td>项目仓库</td></tr>
+            <tr><td>视频时长</td><td>✅ 原生支持 5 分钟（720p / 30fps）</td><td>项目官网</td></tr>
+            <tr><td>中国实验室</td><td>✅ 美团（Meituan）LongCat 团队</td><td>公众号「龙猫 LongCat」</td></tr>
+            <tr><td>多人对话</td><td>✅ v1.5 支持多流音频输入</td><td>Tech Report</td></tr>
+            <tr><td>商业可用</td><td>✅ MIT 许可证，无使用限制</td><td>GitHub License</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S02: 技术架构 ── -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="sec-no">02</div>
+      <h2>技术架构</h2>
+    </div>
+    <div class="sec-body">
+      <div class="arch">
+        <div class="arch-node">
+          <strong>🎤 音频输入</strong>
+          <span>参考图 + 音频文件</span>
+        </div>
+        <div class="arch-arr">→</div>
+        <div class="arch-node">
+          <strong>🧠 Whisper-Large</strong>
+          <span>v1.5 音频编码器<br>语义特征提取</span>
+        </div>
+        <div class="arch-arr">→</div>
+        <div class="arch-node">
+          <strong>⚡ LongCat-Video</strong>
+          <span>136B DiT<br>Block-Causal Attention</span>
+        </div>
+        <div class="arch-arr">→</div>
+        <div class="arch-node">
+          <strong>🎬 视频帧序列</strong>
+          <span>720p / 30fps<br>唇形同步驱动</span>
+        </div>
+      </div>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr><th>组件</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>基础模型</td><td>LongCat-Video，136 亿参数 Diffusion Transformer</td></tr>
+            <tr><td>音频编码器</td><td>v1.0: Wav2Vec2 → <strong>v1.5: Whisper-Large</strong>（更大、更准）</td></tr>
+            <tr><td>注意力机制</td><td>Block-Causal Attention，O(n log n)，高效长视频</td></tr>
+            <tr><td>推理加速</td><td>DMD 蒸馏至 8 步（效率提升约 15 倍）</td></tr>
+            <tr><td>多流音频</td><td>支持单流 + 多流（多人对话）</td></tr>
+            <tr><td>后训练</td><td>GRPO（Group Relative Policy Optimization）多奖励 RLHF</td></tr>
+            <tr><td>评测数据集</td><td>HDTF、CelebV-HQ、EMTD、EvalTalker，达 SOTA</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S03: 版本沿革 ── -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="sec-no">03</div>
+      <h2>版本沿革</h2>
+    </div>
+    <div class="sec-body">
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-date">2025 年 8 月</div>
+          <div class="tl-ver">InfiniteTalk</div>
+          <div class="tl-desc">美团首个音频驱动虚拟人开源项目，吸引全球数万名开发者</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-date">2025 年 10 月</div>
+          <div class="tl-ver">LongCat-Video</div>
+          <div class="tl-desc">136 亿参数视频生成基础模型，侧重长视频能力</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-date">2025 年 12 月 18 日</div>
+          <div class="tl-ver">LongCat-Video-Avatar 1.0</div>
+          <div class="tl-desc">整合 InfiniteTalk + LongCat-Video，虚拟人专项优化</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-date">2026 年 5 月 21 日</div>
+          <div class="tl-ver">LongCat-Video-Avatar 1.5</div>
+          <div class="tl-desc">音频编码器升级（DMD 蒸馏 8 步推理、多人对话、商用化）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S04: 与商业平台对比 ── -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="sec-no">04</div>
+      <h2>与商业平台对比</h2>
+    </div>
+    <div class="sec-body">
+      <div class="compare-grid">
+        <div class="cmp-box free">
+          <div class="name">LongCat-Video-Avatar（开源）</div>
+          <div class="note">免费 · MIT 许可证 · 私有部署 · 可定制模型 · 支持 5 分钟长视频 · 中文原生优化</div>
+        </div>
+        <div class="cmp-box">
+          <div class="name">HeyGen（美国）</div>
+          <div class="note">订阅制 $29/月起 · 云端 API · 1-2 分钟/条 · 商业级唇形同步</div>
+        </div>
+        <div class="cmp-box">
+          <div class="name">D-ID（以色列）</div>
+          <div class="note">按分钟计费 · 免费 20 分钟体验 · 云端处理</div>
+        </div>
+        <div class="cmp-box">
+          <div class="name">可灵 Kling（快手）/ 即梦 Jimeng（字节）</div>
+          <div class="note">国内厂商 SaaS · 订阅+按量混合计费 · 中文优化</div>
+        </div>
+      </div>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr><th>维度</th><th>LongCat-Video-Avatar</th><th>HeyGen / D-ID / Synthesia</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>费用</td><td><strong>完全免费，无用量限制</strong></td><td>$29+/月起</td></tr>
+            <tr><td>许可证</td><td>MIT（商业可用）</td><td>专有，平台限制</td></tr>
+            <tr><td>部署方式</td><td>自托管（需 GPU）</td><td>云端 API，无需硬件</td></tr>
+            <tr><td>视频时长</td><td>5 分钟（原生）</td><td>通常 1-2 分钟/条</td></tr>
+            <tr><td>唇形同步</td><td>SOTA（Whisper-Large）</td><td>商业级</td></tr>
+            <tr><td>可定制/微调</td><td>✅ 完全可改</td><td>❌ 黑盒</td></tr>
+            <tr><td>长视频支持</td><td>✅ 原生</td><td>❌ 通常需付费升级</td></tr>
+            <tr><td>多人对话</td><td>✅ v1.5 支持</td><td>部分支持</td></tr>
+            <tr><td>中文优化</td><td>✅ 美团原生中文优化</td><td>有限</td></tr>
+            <tr><td>硬件要求</td><td>16GB+ 显存（推荐）</td><td>无（云端）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S05: 开源资源 ── -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="sec-no">05</div>
+      <h2>开源资源</h2>
+    </div>
+    <div class="sec-body">
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr><th>资源</th><th>地址</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>GitHub</td><td><code>github.com/meituan-longcat/LongCat-Video</code></td></tr>
+            <tr><td>HuggingFace</td><td><code>huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5</code></td></tr>
+            <tr><td>ModelScope</td><td><code>modelscope.cn/models/meituan-longcat/LongCat-Video-Avatar-1.5</code></td></tr>
+            <tr><td>Tech Report（PDF）</td><td><code>github.com/meituan-longcat/LongCat-Video/…LongCat-Video-Avatar-1.5-Tech-Report.pdf</code></td></tr>
+            <tr><td>Apple M 系列移植</td><td><code>github.com/xocialize/longcat-avatar-mlx</code>（MLX 移植版）</td></tr>
+            <tr><td>公众号</td><td>「龙猫 LongCat」</td></tr>
+            <tr><td>X / Twitter</td><td><code>@Meituan_LongCat</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CLOSING ── -->
+  <div class="closing">
+    <h3>关键结论</h3>
+    <ul>
+      <li><strong>免费 + 商用</strong>：MIT 许可证，无用量限制，无商业授权费</li>
+      <li><strong>技术领先</strong>：Whisper-Large 音频编码 + 136B DiT，唇形同步 SOTA</li>
+      <li><strong>长视频优势</strong>：原生 5 分钟，无分段拼接；DMD 蒸馏 8 步推理</li>
+      <li><strong>中文原生</strong>：美团团队开发，中文场景优化，开箱即用</li>
+      <li><strong>硬件门槛</strong>：需自备 GPU（推荐 16GB+ 显存），适合有技术能力的团队</li>
+    </ul>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <div class="footer">
+    <div>来源：</div>
+    <div class="footer-links">
+      <a href="https://github.com/meituan-longcat/LongCat-Video" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5" target="_blank" rel="noreferrer">HuggingFace</a>
+      <a href="https://meigen-ai.github.io/LongCat-Video-Avatar-1.5-Page/" target="_blank" rel="noreferrer">项目官网</a>
+      <a href="https://arxiv.org/abs/2605.26486" target="_blank" rel="noreferrer">Tech Report</a>
+    </div>
+    <div>调研基于公开网络信息 · 2026-07-09</div>
+  </div>
+
+</div>
+<button id="save-btn" onclick="window.print()">保存 PNG</button>
+<script>
+document.getElementById('save-btn').addEventListener('click',()=>{window.print()});
+</script>
+</body>
+</html>
