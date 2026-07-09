@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BrowserSkill：腾讯开源浏览器桥接工具</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-left{padding:28px 28px 24px}
+    .hero-left .tag{display:inline-block;background:var(--ink);color:var(--paper);font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 8px;margin-bottom:10px}
+    .hero-left h1{font-size:clamp(20px,3.2vw,28px);font-weight:900;line-height:1.18;letter-spacing:-.02em;margin-bottom:10px}
+    .hero-left h1 span{display:block;color:var(--muted);font-size:.6em;font-weight:500;letter-spacing:0;margin-top:4px}
+    .hero-left .desc{color:var(--muted);font-size:13px;line-height:1.55;margin-bottom:14px}
+    .hero-left .badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+    .hero-left .badge{display:inline-flex;align-items:center;gap:4px;background:var(--soft-ink);border:1.5px solid var(--line);font-size:11px;font-weight:600;padding:3px 8px}
+    .hero-left .badge.red{background:var(--soft-red)}
+    .hero-left .badge.blue{background:var(--soft-blue)}
+    .hero-right{position:relative;border-left:3px solid var(--line);padding:20px 24px;display:flex;flex-direction:column;justify-content:center}
+    .hero-right .arch-label{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:8px}
+    .arch-diagram{font-family:ui-monospace,monospace;font-size:12px;line-height:1.9;background:var(--soft-ink);border:2px solid var(--line);padding:10px 14px}
+    .arch-diagram .layer{display:flex;align-items:center;gap:6px}
+    .arch-diagram .arrow{color:var(--blue);font-size:14px}
+    .arch-diagram .comp{font-weight:700}
+    .arch-diagram .sub{color:var(--muted);font-size:10px}
+    .hero-foot{grid-column:1/-1;border-top:3px solid var(--line);padding:10px 14px;display:flex;gap:0;background:var(--paper)}
+    .hero-foot a{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11.5px;font-weight:600;padding:7px 10px;color:var(--ink);border-right:2px solid var(--line);transition:background .12s}
+    .hero-foot a:last-child{border-right:none}
+    .hero-foot a:hover{background:var(--soft-blue)}
+
+    .sections{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+    .card{border:3px solid var(--line);background:var(--paper);padding:20px}
+    .card.full{grid-column:1/-1}
+    .card h2{font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;padding-bottom:7px;border-bottom:2px solid var(--line);display:flex;align-items:center;gap:6px}
+    .card h2 .num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:var(--red);color:#fff;font-size:10px;font-weight:900;border-radius:0}
+    .card h2 .num.blue{background:var(--blue)}
+
+    .feature-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+    .feature-list li{display:flex;gap:10px;font-size:12.5px;line-height:1.5}
+    .feature-list li::before{content:attr(data-num);flex-shrink:0;width:18px;height:18px;background:var(--ink);color:var(--paper);font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px}
+    .feature-list li span{color:var(--muted)}
+    .feature-list li strong{font-weight:700;color:var(--ink)}
+
+    .big-table{width:100%;border-collapse:collapse;font-size:12px}
+    .big-table th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 10px;border-bottom:2px solid var(--line);background:var(--soft-ink)}
+    .big-table td{padding:7px 10px;border-bottom:1.5px solid rgba(17,17,17,.1);vertical-align:top}
+    .big-table tr:last-child td{border-bottom:none}
+    .big-table td:first-child{font-weight:600;white-space:nowrap}
+    .big-table .mono{font-family:ui-monospace,monospace;font-size:11px;background:var(--soft-ink);padding:2px 5px;border:1.5px solid var(--line)}
+
+    .prompt-box{background:var(--soft-ink);border:2px solid var(--line);padding:12px 14px;font-size:11.5px;line-height:1.65;font-family:ui-monospace,monospace;margin-top:10px}
+    .prompt-box .prompt-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-family:Inter,system-ui,sans-serif}
+    .prompt-box code{display:block;padding:6px 8px;background:var(--paper);border:1.5px solid var(--line);margin-top:4px;font-size:11px}
+
+    .card-foot{margin-top:14px;border:3px solid var(--line);background:var(--paper);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+    .card-foot .meta{font-size:11px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+    .card-foot .meta strong{color:var(--ink);font-weight:700}
+    .card-foot .actions{display:flex;gap:8px}
+    .card-foot .actions a{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:7px 14px;border:2.5px solid var(--line);background:var(--paper);transition:all .12s}
+    .card-foot .actions a:hover{background:var(--soft-blue)}
+    .card-foot .actions a.primary{background:var(--ink);color:var(--paper)}
+    .card-foot .actions a.primary:hover{background:var(--red)}
+
+    @media(max-width:720px){
+      .hero{grid-template-columns:1fr}
+      .hero-right{border-left:none;border-top:3px solid var(--line)}
+      .sections{grid-template-columns:1fr}
+      .card.full{grid-column:1}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-left">
+      <div class="tag">Tencent · Browser Automation</div>
+      <h1>BrowserSkill<span>腾讯开源浏览器桥接工具</span></h1>
+      <p class="desc">让 AI Agent 通过 <code>bsk</code> CLI 操作你已登录的浏览器而不打断你的工作。智能体发任务 → 本地守护进程 WebSocket → 浏览器扩展 → 独立 Agent Window。</p>
+      <div class="badges">
+        <span class="badge red">★ 136</span>
+        <span class="badge">Fork 12</span>
+        <span class="badge blue">MIT</span>
+        <span class="badge">Rust</span>
+        <span class="badge">Chrome / Edge</span>
+        <span class="badge">macOS · Linux · Win</span>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="arch-label">工作流</div>
+      <div class="arch-diagram">
+        <div class="layer">
+          <span class="comp">Claude Code / Cursor / Codex…</span>
+          <span class="sub">调用 shell，发送 bsk 任务</span>
+        </div>
+        <div class="layer"><span class="arrow">→</span></div>
+        <div class="layer">
+          <span class="comp">bsk CLI / Daemon</span>
+          <span class="sub">本地守护进程，WebSocket 转发</span>
+        </div>
+        <div class="layer"><span class="arrow">→</span></div>
+        <div class="layer">
+          <span class="comp">Browser Extension</span>
+          <span class="sub">在独立 Agent Window 执行</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-foot">
+      <a href="https://github.com/Tencent/BrowserSkill">📂 GitHub</a>
+      <a href="https://github.com/Tencent/BrowserSkill#readme">📖 README</a>
+      <a href="https://github.com/Tencent/BrowserSkill#quick-start">⚡ 快速开始</a>
+      <a href="https://github.com/Tencent/BrowserSkill/blob/trunk/README.zh-CN.md">🇨🇳 中文文档</a>
+    </div>
+  </div>
+
+  <!-- CARDS -->
+  <div class="sections">
+
+    <!-- 01 核心能力 -->
+    <div class="card">
+      <h2><span class="num">01</span>核心能力</h2>
+      <ul class="feature-list">
+        <li data-num="A"><strong>复用登录态</strong>：Agent 直接使用你已登录的网站，无需维护测试账号</li>
+        <li data-num="B"><strong>不打断工作</strong>：浏览器任务在独立的 Agent Window 运行，不影响你的正常浏览</li>
+        <li data-num="C"><strong>人类介入</strong>：遇到验证码、登录、确认弹窗时，Agent 可请求人工接管后继续</li>
+        <li data-num="D"><strong>无锁定</strong>：不绑定特定模型、框架或 harness，任何能调用 shell 的 Agent 均可使用</li>
+      </ul>
+    </div>
+
+    <!-- 02 支持 Agent -->
+    <div class="card">
+      <h2><span class="num">02</span>支持 Agent</h2>
+      <ul class="feature-list">
+        <li data-num="A"><strong>Cursor / Claude Code</strong>：主流 AI 代码编辑器</li>
+        <li data-num="B"><strong>Codex / OpenClaw</strong>：OpenAI / OpenClaw 系列</li>
+        <li data-num="C"><strong>CodeBuddy / WorkBuddy</strong>：腾讯自研 Agent 产品</li>
+        <li data-num="D"><strong>Pi / Hermes Agent</strong>：其他 shell-capable Agent</li>
+        <li data-num="E"><strong>通用</strong>：任何能调用 shell 的 AI 智能体</li>
+      </ul>
+    </div>
+
+    <!-- 03 安装使用 -->
+    <div class="card full">
+      <h2><span class="num blue">03</span>安装与使用</h2>
+      <table class="big-table">
+        <tr><th>安装 Agent</th><td><code class="mono">npx @anthropic-ai/claude-code@latest --init</code> 或 Agent 内直接安装扩展</td></tr>
+        <tr><th>安装 bsk CLI</th><td><code class="mono">bsk install</code></td></tr>
+        <tr><th>安装浏览器扩展</th><td>Chrome Web Store 或手动加载 <code>extension/chrome/</code> 目录</td></tr>
+        <tr><th>验证安装</th><td><code class="mono">bsk --version</code></td></tr>
+        <tr><th>使用示例</th><td><code class="mono">bsk "go to github.com and check my notifications"</code></td></tr>
+        <tr><th>运行时要求</th><td>macOS（Apple Silicon / Intel）/ Linux（x64 / ARM64）/ Windows x64</td></tr>
+      </table>
+      <div class="prompt-box">
+        <div class="prompt-label">Quick Start（README）</div>
+        <code>bsk install
+bsk "open github.com and check my starred repos"
+bsk "find the latest release notes for BrowserSkill"</code>
+      </div>
+    </div>
+
+    <!-- 04 与同类对比 -->
+    <div class="card full">
+      <h2><span class="num blue">04</span>对比同类项目</h2>
+      <table class="big-table">
+        <tr><th>项目</th><th>定位</th><th>BrowserSkill 差异</th></tr>
+        <tr><td>Playwright / Puppeteer</td><td>无 AI 控制的浏览器自动化</td><td>BrowserSkill 由 LLM Agent 驱动，无需手写脚本</td></tr>
+        <tr><td>browser-use</td><td>Python 浏览器 Agent</td><td>BrowserSkill 专注桥接层，不限制 Agent 类型</td></tr>
+        <tr><td>Stagehand</td><td>AI 浏览器操作框架</td><td>BrowserSkill 支持复用已有登录态</td></tr>
+        <tr><td>Pi / Camoufox</td><td>反检测浏览器</td><td>BrowserSkill 桥接真实浏览器，不替代浏览器</td></tr>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="card-foot">
+    <div class="meta">
+      <span>⭐ <strong>136</strong> Stars</span>
+      <span>🍴 <strong>12</strong> Forks</span>
+      <span>📅 2026-06-22</span>
+      <span>📄 MIT</span>
+      <span>🔧 Rust</span>
+    </div>
+    <div class="actions">
+      <a href="https://github.com/Tencent/BrowserSkill" class="primary">GitHub →</a>
+      <a href="https://github.com/Tencent/BrowserSkill/blob/trunk/README.zh-CN.md">中文文档</a>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
