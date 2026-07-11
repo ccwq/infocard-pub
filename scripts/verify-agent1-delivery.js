@@ -15,10 +15,6 @@ const MIME_EXTENSIONS = {
   'image/avif': new Set(['.avif']),
 };
 
-function nonemptyFile(filePath) {
-  try { return fs.statSync(filePath).isFile() && fs.statSync(filePath).size > 0; } catch (_) { return false; }
-}
-
 function contentMatchesExtension(filePath, extension) {
   const bytes = fs.readFileSync(filePath);
   if (extension === '.png') return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
@@ -30,11 +26,10 @@ function contentMatchesExtension(filePath, extension) {
   return false;
 }
 
-function assetPath(bundle, rootDir, localPath) {
+function assetPath(bundle, assetRoot, localPath) {
   if (typeof localPath !== 'string' || localPath.trim() === '' || localPath.includes('\\') || path.posix.isAbsolute(localPath)) return null;
   const parts = localPath.split('/');
   if (parts.includes('..')) return null;
-  const assetRoot = path.resolve(rootDir, bundle.asset_dir);
   const repoRelativePrefix = `${bundle.asset_dir}/`;
   const relative = localPath.startsWith(repoRelativePrefix) ? localPath.slice(repoRelativePrefix.length) : localPath;
   const resolved = path.resolve(assetRoot, relative);
@@ -50,18 +45,23 @@ function localPathSet(entries) {
   return new Set(entries.map((entry) => entry && entry.local_path));
 }
 
-function validateAssetEntries(entries, field, bundle, rootDir, errors, checkDisk) {
+function validateAssetEntries(entries, field, bundle, assetRoot, errors, checkDisk) {
   if (!Array.isArray(entries)) {
     errors.push({ field, message: 'must be an array' });
     return;
   }
+  const seen = new Set();
   entries.forEach((entry, index) => {
     const entryField = `${field}.${index}`;
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
       errors.push({ field: entryField, message: 'must be an object' });
       return;
     }
-    const filePath = assetPath(bundle, rootDir, entry.local_path);
+    if (typeof entry.local_path === 'string') {
+      if (seen.has(entry.local_path)) errors.push({ field: `${entryField}.local_path`, message: 'must be unique' });
+      seen.add(entry.local_path);
+    }
+    const filePath = assetPath(bundle, assetRoot, entry.local_path);
     if (!filePath) {
       errors.push({ field: `${entryField}.local_path`, message: 'must stay under bundle.asset_dir' });
       return;
@@ -77,33 +77,54 @@ function validateAssetEntries(entries, field, bundle, rootDir, errors, checkDisk
       } else if (!MIME_EXTENSIONS[entry.mime_type].has(extension)) {
         errors.push({ field: `${entryField}.mime_type`, message: 'must match local file extension' });
       }
+      if (!Number.isInteger(entry.bytes) || entry.bytes <= 0) {
+        errors.push({ field: `${entryField}.bytes`, message: 'must be a positive integer' });
+      }
     }
     if (!checkDisk) return;
-    if (!nonemptyFile(filePath)) {
+    let stat;
+    let realFilePath;
+    try {
+      stat = fs.statSync(filePath);
+      realFilePath = fs.realpathSync(filePath);
+    } catch (error) {
+      errors.push({ field: `${entryField}.local_path`, message: `must be readable: ${error.message}` });
+      return;
+    }
+    if (!stat.isFile() || stat.size <= 0) {
       errors.push({ field: `${entryField}.local_path`, message: 'must exist and contain bytes' });
       return;
     }
-    const realAssetRoot = fs.realpathSync(path.resolve(rootDir, bundle.asset_dir));
-    const realFilePath = fs.realpathSync(filePath);
-    if (!realFilePath.startsWith(`${realAssetRoot}${path.sep}`)) {
+    if (!realFilePath.startsWith(`${assetRoot}${path.sep}`)) {
       errors.push({ field: `${entryField}.local_path`, message: 'resolved file must stay under bundle.asset_dir' });
       return;
     }
-    if (!contentMatchesExtension(filePath, extension)) {
-      errors.push({ field: `${entryField}.local_path`, message: 'file content must match its image extension' });
+    try {
+      if (!contentMatchesExtension(filePath, extension)) {
+        errors.push({ field: `${entryField}.local_path`, message: 'file content must match image extension' });
+      }
+    } catch (error) {
+      errors.push({ field: `${entryField}.local_path`, message: `must be readable: ${error.message}` });
+      return;
     }
-    if (Number.isInteger(entry.bytes) && entry.bytes >= 0 && fs.statSync(filePath).size !== entry.bytes) {
+    if (Number.isInteger(entry.bytes) && entry.bytes > 0 && stat.size !== entry.bytes) {
       errors.push({ field: `${entryField}.bytes`, message: 'must match bytes on disk' });
     }
   });
 }
 
 function readRequired(filePath, field, errors) {
-  if (!nonemptyFile(filePath)) {
-    errors.push({ field, message: 'must exist and be nonempty' });
+  try {
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile() || stat.size <= 0) {
+      errors.push({ field, message: 'must exist and be nonempty' });
+      return null;
+    }
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (error) {
+    errors.push({ field, message: `must be readable: ${error.message}` });
     return null;
   }
-  return fs.readFileSync(filePath, 'utf8');
 }
 
 function parseJson(text, field, errors) {
@@ -120,6 +141,22 @@ function verifyAgent1Delivery(bundle, rootDir = process.cwd()) {
   if (!contract.valid) errors.push(...contract.errors.map((error) => ({ ...error, field: `bundle.${error.field}` })));
   if (!bundle || typeof bundle.slug !== 'string' || typeof bundle.asset_dir !== 'string') return { valid: false, errors };
 
+  const lexicalRoot = path.resolve(rootDir);
+  const lexicalAssetRoot = path.resolve(rootDir, bundle.asset_dir);
+  let realRoot;
+  let realAssetRoot;
+  try {
+    realRoot = fs.realpathSync(lexicalRoot);
+    realAssetRoot = fs.realpathSync(lexicalAssetRoot);
+  } catch (error) {
+    errors.push({ field: 'bundle.asset_dir', message: `must resolve to a readable directory: ${error.message}` });
+  }
+  if (realRoot && realAssetRoot
+      && (!lexicalAssetRoot.startsWith(`${lexicalRoot}${path.sep}`)
+          || !realAssetRoot.startsWith(`${realRoot}${path.sep}`))) {
+    errors.push({ field: 'bundle.asset_dir', message: 'resolved directory must stay under repository root and expected path' });
+  }
+  const assetRoot = realAssetRoot || lexicalAssetRoot;
   const deliveryDir = path.join(rootDir, '.tmp', 'infocard', bundle.slug);
   const facts = parseJson(readRequired(path.join(deliveryDir, 'facts.json'), 'facts', errors), 'facts', errors);
   readRequired(path.join(deliveryDir, 'research.md'), 'research', errors);
@@ -131,11 +168,11 @@ function verifyAgent1Delivery(bundle, rootDir = process.cwd()) {
     if (!facts.repo_meta || typeof facts.repo_meta !== 'object' || Array.isArray(facts.repo_meta)) errors.push({ field: 'facts.repo_meta', message: 'must be an object' });
     if (!isNonemptyStringArray(facts.claims)) errors.push({ field: 'facts.claims', message: 'must be a nonempty string array' });
     if (!isNonemptyStringArray(facts.required_sections)) errors.push({ field: 'facts.required_sections', message: 'must be a nonempty string array' });
-    validateAssetEntries(facts.assets, 'facts.assets', bundle, rootDir, errors, false);
+    validateAssetEntries(facts.assets, 'facts.assets', bundle, assetRoot, errors, false);
   } else if (facts !== null) errors.push({ field: 'facts', message: 'must be a JSON object' });
 
   if (manifest && typeof manifest === 'object' && !Array.isArray(manifest)) {
-    validateAssetEntries(manifest.assets, 'manifest.assets', bundle, rootDir, errors, true);
+    validateAssetEntries(manifest.assets, 'manifest.assets', bundle, assetRoot, errors, true);
     if (Array.isArray(manifest.assets) && manifest.assets.length === 0
         && (typeof manifest.reason !== 'string' || manifest.reason.trim() === '')) {
       errors.push({ field: 'manifest.reason', message: 'must explain why there are no assets' });

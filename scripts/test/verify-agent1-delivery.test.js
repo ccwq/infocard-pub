@@ -9,6 +9,12 @@ const test = require('node:test');
 
 const ROOT = path.resolve(__dirname, '../..');
 const MODULE_PATH = path.join(ROOT, 'scripts/verify-agent1-delivery.js');
+const fixtureRoots = new Set();
+
+test.afterEach(() => {
+  for (const root of fixtureRoots) fs.rmSync(root, { recursive: true, force: true });
+  fixtureRoots.clear();
+});
 
 function bundle() {
   return {
@@ -27,6 +33,7 @@ function bundle() {
 
 function fixture(options = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent1-delivery-'));
+  fixtureRoots.add(root);
   const value = bundle();
   const factsDir = path.join(root, '.tmp/infocard', value.slug);
   const assetDir = path.join(root, value.asset_dir);
@@ -198,6 +205,70 @@ test('rejects asset symlinks that resolve outside asset_dir', (t) => {
   const result = verifyAt(f);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((error) => error.field === 'manifest.assets.0.local_path'));
+});
+
+test('rejects asset_dir symlink that resolves outside repository root', (t) => {
+  const f = fixture();
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'agent1-external-'));
+  fixtureRoots.add(external);
+  fs.rmSync(f.assetDir, { recursive: true });
+  fs.writeFileSync(path.join(external, 'hero.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  fs.writeFileSync(path.join(external, 'manifest.json'), JSON.stringify(f.manifest));
+  try {
+    fs.symlinkSync(external, f.assetDir, 'dir');
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) return t.skip(`symlink denied: ${error.code}`);
+    throw error;
+  }
+  const result = verifyAt(f);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some((error) => error.field === 'bundle.asset_dir'));
+});
+
+test('rejects duplicate local_path entries within facts and manifest independently', () => {
+  for (const field of ['facts', 'manifest']) {
+    const f = fixture();
+    f[field].assets.push({ ...f[field].assets[0] });
+    fs.writeFileSync(path.join(f.factsDir, 'facts.json'), JSON.stringify(f.facts));
+    fs.writeFileSync(path.join(f.assetDir, 'manifest.json'), JSON.stringify(f.manifest));
+    const result = verifyAt(f);
+    assert.equal(result.valid, false, field);
+    assert.ok(result.errors.some((error) => error.field === `${field}.assets.1.local_path`), field);
+  }
+});
+
+test('returns structured asset errors for missing files and directories', () => {
+  for (const kind of ['missing', 'directory']) {
+    const f = fixture();
+    const hero = path.join(f.assetDir, 'hero.png');
+    fs.rmSync(hero);
+    if (kind === 'directory') fs.mkdirSync(hero);
+    assert.doesNotThrow(() => verifyAt(f));
+    const result = verifyAt(f);
+    assert.equal(result.valid, false, kind);
+    assert.ok(result.errors.some((error) => error.field === 'manifest.assets.0.local_path'), kind);
+  }
+});
+
+test('returns structured delivery errors when required files cannot be read', (t) => {
+  if (typeof process.getuid !== 'function' || process.getuid() === 0) return t.skip('permission test is not portable as root');
+  const f = fixture();
+  fs.chmodSync(path.join(f.factsDir, 'facts.json'), 0o000);
+  const result = verifyAt(f);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some((error) => error.field === 'facts'));
+});
+
+test('requires manifest asset bytes to be a positive integer matching disk size', () => {
+  for (const bytes of [undefined, 0, -1, 1.5]) {
+    const f = fixture();
+    if (bytes === undefined) delete f.manifest.assets[0].bytes;
+    else f.manifest.assets[0].bytes = bytes;
+    fs.writeFileSync(path.join(f.assetDir, 'manifest.json'), JSON.stringify(f.manifest));
+    const result = verifyAt(f);
+    assert.equal(result.valid, false, String(bytes));
+    assert.ok(result.errors.some((error) => error.field === 'manifest.assets.0.bytes'));
+  }
 });
 
 test('accepts complete asset and explicit no-assets deliveries', () => {
