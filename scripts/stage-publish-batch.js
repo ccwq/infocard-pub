@@ -37,31 +37,34 @@ function resolveInside(root, relative, label) {
 }
 function parseStatus() {
   // This required porcelain preflight detects tracked modifications and index state.
-  const raw = git(['status', '--porcelain=v1', '-z']);
-  const entries = raw.split('\0').filter(Boolean);
-  const paths = [];
+  const entries = git(['status', '--porcelain=v1', '-z']).split('\0').filter(Boolean);
+  const paths = []; const renamesOrCopies = []; const unmerged = [];
   for (let index = 0; index < entries.length; index += 1) {
     const item = entries[index];
     if (item.length < 4) throw new Error('invalid git status record');
-    const status = item.slice(0, 2);
-    const file = item.slice(3);
-    // porcelain collapses an untracked directory to `?? directory/`; expand it
-    // below with git's ignore-aware exact-file listing before any staging decision.
-    if (status !== '??') {
-      safeRelative(file, 'git path');
-      paths.push({ file, status });
+    const status = item.slice(0, 2); const file = item.slice(3);
+    const renamedOrCopied = status.includes('R') || status.includes('C');
+    if (renamedOrCopied) {
+      const source = entries[++index];
+      if (!source) throw new Error('invalid git rename or copy record');
+      safeRelative(file, 'git rename or copy destination'); safeRelative(source, 'git rename or copy source');
+      paths.push({ file, status }); renamesOrCopies.push({ source, destination: file });
+    } else if (status !== '??') {
+      safeRelative(file, 'git path'); paths.push({ file, status });
+      if (status[0] === 'u') unmerged.push(file);
     }
-    // porcelain v1 rename/copy records have a second NUL-delimited old path.
-    if (status[0] === 'R' || status[0] === 'C' || status[1] === 'R' || status[1] === 'C') index += 1;
   }
   const untracked = git(['ls-files', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean);
-  for (const file of untracked) {
-    safeRelative(file, 'untracked git path');
-    paths.push({ file, status: '??' });
-  }
-  return paths;
+  for (const file of untracked) { safeRelative(file, 'untracked git path'); paths.push({ file, status: '??' }); }
+  const unmergedIndex = git(['ls-files', '-u', '-z']).split('\0').filter(Boolean).map((record) => {
+    const tab = record.indexOf('\t');
+    if (tab < 0) throw new Error('invalid unmerged index record');
+    return safeRelative(record.slice(tab + 1), 'unmerged index path');
+  });
+  return { paths, renamesOrCopies, unmerged: [...new Set([...unmerged, ...unmergedIndex])].sort() };
 }
 function changed(entry) { return entry.status !== '  ' && entry.status !== '!!'; }
+function trackedDeletion(entry) { return entry.status.includes('D'); }
 function existingRegularFile(root, relative) {
   const absolute = resolveInside(root, relative, relative);
   if (!fs.existsSync(absolute)) return false;
@@ -127,7 +130,24 @@ function main(argv) {
   try {
     const { bundles, stage } = parseArgs(argv);
     const allow = buildAllowlist(bundles);
-    const status = parseStatus().filter(changed);
+    const preflight = parseStatus();
+    // Renames/copies can implicitly stage a source-side deletion, so both sides
+    // must be in this batch. Unmerged entries must never be resolved by staging.
+    const unsafeStatus = [
+      ...preflight.unmerged.map((file) => ({ type: 'unmerged', file })),
+      ...preflight.renamesOrCopies
+        .filter(({ source, destination }) => !allow.has(source) || !allow.has(destination))
+        .map(({ source, destination }) => ({ type: 'rename_or_copy', source, destination })),
+    ];
+    if (unsafeStatus.length) return {
+      code: 1,
+      result: {
+        ok: false,
+        error: preflight.unmerged.length ? 'unsafe unmerged git state' : 'unsafe rename or copy status',
+        allowed_changes: [], unrelated_changes: [], unexpected_staged: [], unsafe_status: unsafeStatus,
+      },
+    };
+    const status = preflight.paths.filter(changed);
     const changedAllow = status.filter((entry) => allow.has(entry.file)).map((entry) => entry.file);
     // Index outputs become allowlisted only under the documented generated-output condition.
     const batchHasContentChange = changedAllow.length > 0;
@@ -141,7 +161,11 @@ function main(argv) {
     const base = { ok: unexpected.length === 0, stage, allowed_changes: allowedChanges, unrelated_changes: unrelated, unexpected_staged: unexpected, generated_index_changes: generated.sort() };
     if (unexpected.length) return { code: 1, result: { ...base, error: 'pre-existing staged files outside allowlist' } };
     if (!stage) return { code: 0, result: base };
-    for (const file of allowedChanges) if (existingRegularFile(ROOT, file)) git(['add', '--', file]);
+    for (const file of allowedChanges) {
+      const entry = status.find((candidate) => candidate.file === file);
+      if (trackedDeletion(entry)) git(['add', '-u', '--', file]);
+      else if (existingRegularFile(ROOT, file)) git(['add', '--', file]);
+    }
     const after = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean);
     for (const file of after) safeRelative(file, 'staged git path');
     const afterUnexpected = after.filter((file) => !allow.has(file)).sort();
