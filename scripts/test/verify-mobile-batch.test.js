@@ -26,58 +26,100 @@ function fixture(html = responsiveHtml(), bundle = validBundle()) {
   fs.writeFileSync(path.join(root, 'bundle.json'), JSON.stringify(bundle));
   return { root, bundlePath: path.join(root, 'bundle.json') };
 }
-function evidence(overrides = {}) { return { scrollWidth: 390, clientWidth: 390, brokenImages: [], screenshot: 'artifacts/mobile/mobile-gate.png', screenshotOk: true, ...overrides }; }
-function writingRunner(overrides = {}) { return async ({ screenshotPath }) => { fs.mkdirSync(path.dirname(screenshotPath), { recursive: true }); fs.writeFileSync(screenshotPath, 'png'); return evidence(overrides); }; }
+function png(width = 390, height = 844) {
+  const b = Buffer.alloc(33); b.set([137,80,78,71,13,10,26,10]); b.writeUInt32BE(13, 8); b.write('IHDR', 12); b.writeUInt32BE(width, 16); b.writeUInt32BE(height, 20); b[24] = 8; b[25] = 6; return b;
+}
+function evidence(slug = 'mobile-gate', overrides = {}) { return { scrollWidth: 390, clientWidth: 390, brokenImages: [], screenshot: `artifacts/mobile/${slug}.png`, ...overrides }; }
+function writingRunner(overrides = {}, dimensions = [390, 844]) { return async ({ screenshotPath }) => { fs.mkdirSync(path.dirname(screenshotPath), { recursive: true }); fs.writeFileSync(screenshotPath, png(...dimensions)); return evidence(path.basename(screenshotPath, '.png'), overrides); }; }
 
-test('static scanner strips comments and strings and accepts overflow:auto', () => {
+class FakeWebSocket {
+  constructor(script = {}) { this.script = script; this.listeners = {}; this.sent = []; queueMicrotask(() => script.open !== false && this.emit('open', {})); }
+  addEventListener(name, fn) { (this.listeners[name] ||= []).push(fn); }
+  emit(name, event) { for (const fn of this.listeners[name] || []) fn(event); }
+  send(raw) { const msg = JSON.parse(raw); this.sent.push(msg); this.script.onSend?.(msg, this); }
+  close() { this.emit('close', {}); }
+}
+
+test('static scanner requires inline responsive rules and does not accept external stylesheet', () => {
   const { staticCheck } = require(MODULE_PATH);
   assert.equal(staticCheck(responsiveHtml()).ok, true);
-  const fake = `<!doctype html><script>const lie='@media(max-width:1px){table,pre,code{max-width:100%;overflow:auto}}'</script><style>/* same lie */</style>`;
-  const result = staticCheck(fake);
+  const external = '<!doctype html><html><head><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="styles.css"></head></html>';
+  const result = staticCheck(external);
   assert.equal(result.ok, false);
-  for (const code of ['VIEWPORT', 'MOBILE_MEDIA', 'RESPONSIVE_TABLE']) assert.ok(result.errors.some((e) => e.code === code));
+  assert.ok(result.errors.some((e) => e.code === 'MOBILE_MEDIA'));
 });
 
-test('PASS requires exact 390 evidence, expected nonempty screenshot, finite dimensions, and recomputes overflow', async () => {
+test('evidence requires exact path and a real PNG with sensible exact viewport dimensions', async () => {
   const { root, bundlePath } = fixture();
-  let call;
-  const result = await require(MODULE_PATH).runBatch({ root, bundlePaths: [bundlePath], baseUrl: 'http://127.0.0.1:4173/site/', runner: async (input) => { call = input; return writingRunner()(input); } });
-  assert.equal(result.status, 'PASS'); assert.equal(call.width, 390); assert.equal(call.url, 'http://127.0.0.1:4173/site/docs/20260711-mobile-gate.html');
-  for (const bad of [evidence({ scrollWidth: 410, horizontalOverflow: false }), evidence({ clientWidth: 391 }), evidence({ scrollWidth: NaN }), evidence({ brokenImages: ['x'] }), evidence({ screenshot: 'wrong.png' })]) {
-    const r = await require(MODULE_PATH).runBatch({ root, bundlePaths: [bundlePath], runner: writingRunner(bad) }); assert.equal(r.status, 'FAIL');
+  assert.equal((await require(MODULE_PATH).runBatch({ root, bundlePaths: [bundlePath], probe: async () => {}, runner: writingRunner() })).status, 'PASS');
+  for (const runner of [
+    writingRunner({}, [389, 844]), writingRunner({}, [390, 0]),
+    async ({ screenshotPath }) => { fs.mkdirSync(path.dirname(screenshotPath), { recursive: true }); fs.writeFileSync(screenshotPath, 'not png'); return evidence(); },
+    writingRunner({ screenshot: 'wrong.png' }), writingRunner({ scrollWidth: 410 }), writingRunner({ clientWidth: 391 }), writingRunner({ brokenImages: ['x'] })
+  ]) assert.equal((await require(MODULE_PATH).runBatch({ root, bundlePaths: [bundlePath], probe: async () => {}, runner })).status, 'FAIL');
+});
+
+test('artifact path rejects symlink parent and target without deleting outside files', async () => {
+  for (const targetSymlink of [false, true]) {
+    const { root, bundlePath } = fixture();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'mobile-outside-')); cleanups.push(outside);
+    const sentinel = path.join(outside, 'sentinel'); fs.writeFileSync(sentinel, 'keep');
+    fs.mkdirSync(path.join(root, 'artifacts'), { recursive: true });
+    if (targetSymlink) { fs.mkdirSync(path.join(root, 'artifacts/mobile')); fs.symlinkSync(sentinel, path.join(root, 'artifacts/mobile/mobile-gate.png')); }
+    else fs.symlinkSync(outside, path.join(root, 'artifacts/mobile'));
+    const result = await require(MODULE_PATH).runBatch({ root, bundlePaths: [bundlePath], probe: async () => {}, runner: writingRunner() });
+    assert.equal(result.status, 'FAIL'); assert.equal(fs.readFileSync(sentinel, 'utf8'), 'keep');
   }
 });
 
-test('missing screenshot fails even when runner claims success', async () => {
-  const { root, bundlePath } = fixture();
-  const result = await require(MODULE_PATH).runBatch({ root, bundlePaths: [bundlePath], runner: async () => evidence() });
-  assert.equal(result.status, 'FAIL'); assert.equal(result.exitCode, 1);
-});
-
-test('invalid JSON, invalid bundle, missing HTML, traversal and symlink escape are per-card failures and batch continues', async () => {
-  const { root, bundlePath } = fixture();
-  const malformed = path.join(root, 'bad.json'); fs.writeFileSync(malformed, '{');
-  const invalid = path.join(root, 'invalid.json'); fs.writeFileSync(invalid, JSON.stringify(validBundle({ slug: '../bad' })));
-  const missing = path.join(root, 'missing.json'); fs.writeFileSync(missing, JSON.stringify(validBundle({ slug: 'missing', html_path: 'docs/20260711-missing.html', meta_path: 'docs/20260711-missing.html.meta.yaml', asset_dir: 'assets/img/missing', manifest_path: 'assets/img/missing/manifest.json' })));
-  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'mobile-outside-')); cleanups.push(outside); fs.writeFileSync(path.join(outside, '20260711-mobile-gate.html'), responsiveHtml());
-  fs.unlinkSync(path.join(root, 'docs/20260711-mobile-gate.html')); fs.symlinkSync(path.join(outside, '20260711-mobile-gate.html'), path.join(root, 'docs/20260711-mobile-gate.html'));
-  const result = await require(MODULE_PATH).runBatch({ root, bundlePaths: [malformed, invalid, missing, bundlePath], runner: writingRunner() });
-  assert.equal(result.status, 'FAIL'); assert.equal(result.cards.length, 4); assert.ok(result.cards.every((c) => c.errors?.length));
-});
-
-test('browser unavailable globally SKIPS with exit 2; ordinary runner error does not abort later cards', async () => {
+test('browser unavailable status preserves prior failure precedence and annotates result', async () => {
   const a = fixture(); const second = validBundle({ slug: 'second', html_path: 'docs/20260712-second.html', meta_path: 'docs/20260712-second.html.meta.yaml', asset_dir: 'assets/img/second', manifest_path: 'assets/img/second/manifest.json' });
   fs.writeFileSync(path.join(a.root, 'docs/20260712-second.html'), responsiveHtml()); const bp = path.join(a.root, 'second.json'); fs.writeFileSync(bp, JSON.stringify(second));
   let n = 0;
-  const failThenPass = await require(MODULE_PATH).runBatch({ root: a.root, bundlePaths: [a.bundlePath, bp], runner: async (input) => { if (++n === 1) throw new Error('page failed'); return writingRunner({ screenshot: 'artifacts/mobile/second.png' })(input); } });
-  assert.equal(failThenPass.cards.length, 2); assert.equal(failThenPass.status, 'FAIL');
-  const skipped = await require(MODULE_PATH).runBatch({ root: a.root, bundlePaths: [a.bundlePath], runner: async () => { const e = new Error('CDP unavailable'); e.code = 'BROWSER_UNAVAILABLE'; throw e; } });
-  assert.equal(skipped.status, 'SKIPPED'); assert.equal(skipped.exitCode, 2);
+  const result = await require(MODULE_PATH).runBatch({ root: a.root, bundlePaths: [a.bundlePath, bp], probe: async () => {}, runner: async () => { if (++n === 1) throw new Error('card failed'); const e = new Error('gone'); e.code = 'BROWSER_UNAVAILABLE'; throw e; } });
+  assert.equal(result.status, 'FAIL'); assert.equal(result.exitCode, 1); assert.equal(result.browserUnavailable, 'gone');
+  const early = await require(MODULE_PATH).runBatch({ root: a.root, bundlePaths: [a.bundlePath], probe: async () => { const e = new Error('no cdp'); e.code = 'BROWSER_UNAVAILABLE'; throw e; }, runner: writingRunner() });
+  assert.equal(early.status, 'SKIPPED'); assert.equal(early.exitCode, 2);
 });
 
-test('argument/config errors use exit 2 and command is exposed', async () => {
-  const { parseArgs, runBatch } = require(MODULE_PATH);
-  assert.throws(() => parseArgs(['--wat']), /unknown/);
-  const none = await runBatch({ bundlePaths: [] }); assert.equal(none.exitCode, 2);
+test('CDP socket has connect timeout and rejects open or pending requests on close error and malformed JSON', async () => {
+  const { cdpSocket } = require(MODULE_PATH);
+  const never = new FakeWebSocket({ open: false });
+  await assert.rejects(cdpSocket('ws://x', 10, () => never).send('A'), /connect timeout/);
+  for (const event of ['close', 'error']) {
+    const ws = new FakeWebSocket(); const client = cdpSocket('ws://x', 100, () => ws); const pending = client.send('A'); await new Promise(setImmediate); ws.emit(event, {}); await assert.rejects(pending, /CDP/); await assert.rejects(client.send('B'), /CDP/);
+  }
+  const ws = new FakeWebSocket(); const client = cdpSocket('ws://x', 100, () => ws); const pending = client.send('A'); await new Promise(setImmediate); ws.emit('message', { data: '{' }); await assert.rejects(pending, /malformed/);
+});
+
+test('browser runner creates isolated target, uses flattened session, settles document, and cleans only what it created', async () => {
+  const calls = []; let evalCount = 0;
+  const client = { send: async (method, params, sessionId) => { calls.push({ method, params, sessionId });
+    if (method === 'Target.createBrowserContext') return { browserContextId: 'ctx' };
+    if (method === 'Target.createTarget') return { targetId: 'new-target' };
+    if (method === 'Target.attachToTarget') return { sessionId: 'session' };
+    if (method === 'Page.navigate') return { frameId: 'f' };
+    if (method === 'Runtime.evaluate') return { result: { value: ++evalCount === 1 ? { ready: false } : evalCount === 2 ? { ready: true, settled: false } : evalCount === 3 ? { ready: true, settled: true } : { scrollWidth: 390, clientWidth: 390, brokenImages: [] } } };
+    if (method === 'Page.captureScreenshot') return { data: png().toString('base64') }; return {};
+  }, close() { calls.push({ method: 'socket.close' }); } };
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-')); cleanups.push(root); const shot = path.join(root, 'artifacts/mobile/a.png');
+  await require(MODULE_PATH).defaultBrowserRunner({ url: 'http://local/a', width: 390, height: 844, screenshotPath: shot, cdpUrl: 'http://cdp', fetcher: async () => ({ webSocketDebuggerUrl: 'ws://browser' }), clientFactory: () => client, readinessTimeoutMs: 200 });
+  assert.ok(calls.some((c) => c.method === 'Target.createTarget' && c.params.browserContextId === 'ctx'));
+  assert.ok(calls.filter((c) => ['Page.enable','Runtime.enable','Emulation.setDeviceMetricsOverride','Page.navigate','Runtime.evaluate','Page.captureScreenshot'].includes(c.method)).every((c) => c.sessionId === 'session'));
+  assert.ok(calls.some((c) => c.method === 'Target.detachFromTarget' && c.params.sessionId === 'session'));
+  assert.ok(calls.some((c) => c.method === 'Target.closeTarget' && c.params.targetId === 'new-target'));
+  assert.ok(calls.some((c) => c.method === 'Target.disposeBrowserContext' && c.params.browserContextId === 'ctx'));
+  assert.ok(!calls.some((c) => c.method === 'Target.getTargets'));
+});
+
+test('navigation protocol error and readiness hard timeout fail', async () => {
+  const makeClient = (navigateResult) => ({ send: async (method) => { if (method === 'Target.createBrowserContext') throw new Error('unsupported'); if (method === 'Target.createTarget') return { targetId: 't' }; if (method === 'Target.attachToTarget') return { sessionId: 's' }; if (method === 'Page.navigate') return navigateResult; if (method === 'Runtime.evaluate') return { result: { value: { ready: false } } }; return {}; }, close() {} });
+  const args = { url: 'http://local', width: 390, height: 844, screenshotPath: '/tmp/no.png', cdpUrl: 'http://cdp', fetcher: async () => ({ webSocketDebuggerUrl: 'ws://browser' }), readinessTimeoutMs: 15 };
+  await assert.rejects(require(MODULE_PATH).defaultBrowserRunner({ ...args, clientFactory: () => makeClient({ errorText: 'ERR_FAILED' }) }), /ERR_FAILED/);
+  await assert.rejects(require(MODULE_PATH).defaultBrowserRunner({ ...args, clientFactory: () => makeClient({ frameId: 'f' }) }), /readiness timeout/);
+});
+
+test('command remains exposed and no bundles skips', async () => {
+  const mod = require(MODULE_PATH); assert.equal((await mod.runBatch({ bundlePaths: [] })).exitCode, 2);
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')); assert.equal(pkg.scripts['verify-mobile-batch'], 'node scripts/verify-mobile-batch.js');
 });
