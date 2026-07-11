@@ -9,6 +9,7 @@ const test = require('node:test');
 
 const ROOT = path.resolve(__dirname, '../..');
 const GENERATOR = path.join(ROOT, 'scripts/generate-card-meta.js');
+const SAFE_META_WRITE = path.join(ROOT, 'scripts/lib/safe-meta-write.py');
 const VERIFY = path.join(ROOT, 'scripts/verify-bundle.js');
 const fixtureRoots = new Set();
 
@@ -207,20 +208,60 @@ test('atomic create failure after fsync leaves no final metadata file', () => {
   assert.deepEqual(fs.readdirSync(path.dirname(f.metaPath)), []);
 });
 
-test('descriptor traversal resists parent component swap race', () => {
-  const f = fixture({ meta_path: 'docs/nested/card.meta.yaml' });
-  fs.mkdirSync(path.join(f.root, 'docs', 'nested'), { recursive: true });
-  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'generate-card-meta-swap-'));
-  fixtureRoots.add(external);
+test('normal generator ignores inherited swap hook environment and leaves tree intact', () => {
+  const f = fixture();
+  fs.mkdirSync(path.join(f.root, 'docs'), { recursive: true });
   const result = run(GENERATOR, ['--bundle', f.bundlePath, '--write'], f.root, {
     SAFE_META_WRITE_SWAP_COMPONENT: 'docs',
   });
-  assert.equal(result.status, 1, result.stdout);
-  assert.equal(fs.existsSync(path.join(external, 'nested', 'card.meta.yaml')), false);
-  assert.equal(fs.existsSync(f.metaPath), false);
+  assert.equal(result.status, 0, result.stdout);
+  assert.equal(fs.existsSync(f.metaPath), true);
+  assert.equal(fs.existsSync(path.join(f.root, 'docs.safe-meta-write-swapped')), false);
+  assert.equal(fs.statSync(path.join(f.root, 'docs')).isDirectory(), true);
 });
 
-test('--replace without --write rejected usage error', () => {
+test('helper test-only swap restores original tree and removes swapped marker', () => {
+  const f = fixture({
+    html_path: 'docs/nested/card',
+    meta_path: 'docs/nested/card.meta.yaml',
+  });
+  fs.mkdirSync(path.join(f.root, 'docs', 'nested'), { recursive: true });
+  const result = spawnSync('python3', [
+    SAFE_META_WRITE, f.root, f.bundle.meta_path, 'create',
+    '--test-swap-component', 'docs',
+  ], {
+    cwd: f.root,
+    encoding: 'utf8',
+    input: 'test metadata',
+    env: { ...process.env, SAFE_META_WRITE_ENABLE_TEST_HOOKS: '1' },
+  });
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(fs.existsSync(f.metaPath), false);
+  assert.equal(fs.existsSync(path.join(f.root, 'docs.safe-meta-write-swapped')), false);
+  assert.equal(fs.statSync(path.join(f.root, 'docs')).isDirectory(), true);
+  assert.deepEqual(fs.readdirSync(path.join(f.root, 'docs')), ['nested']);
+});
+
+test('helper rejects hidden swap argument without test sentinel', () => {
+  const f = fixture();
+  fs.mkdirSync(path.join(f.root, 'docs'), { recursive: true });
+  const result = spawnSync('python3', [
+    SAFE_META_WRITE, f.root, f.bundle.meta_path, 'create',
+    '--test-swap-component', 'docs',
+  ], {
+    cwd: f.root,
+    encoding: 'utf8',
+    input: 'test metadata',
+    env: { ...process.env, SAFE_META_WRITE_ENABLE_TEST_HOOKS: '' },
+  });
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(JSON.parse(result.stdout).error, /test hooks are disabled/);
+  assert.equal(fs.existsSync(f.metaPath), false);
+  assert.equal(fs.existsSync(path.join(f.root, 'docs.safe-meta-write-swapped')), false);
+  assert.equal(fs.statSync(path.join(f.root, 'docs')).isDirectory(), true);
+});
+
+test('--replace without --write is rejected as usage error', () => {
   const f = fixture();
   const result = run(GENERATOR, ['--bundle', f.bundlePath, '--replace'], f.root);
   assert.equal(result.status, 2);

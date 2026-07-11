@@ -16,6 +16,12 @@ def fail(message):
 
 
 def main(argv):
+    test_swap = None
+    if len(argv) == 5 and argv[3] == "--test-swap-component":
+        if os.environ.get("SAFE_META_WRITE_ENABLE_TEST_HOOKS") != "1":
+            return fail("test hooks are disabled")
+        test_swap = argv[4]
+        argv = argv[:3]
     if len(argv) != 3 or argv[2] not in ("create", "replace"):
         return fail("usage: safe-meta-write.py ROOT RELATIVE_TARGET create|replace")
     root, relative, mode = argv
@@ -28,13 +34,18 @@ def main(argv):
     data = sys.stdin.buffer.read()
     root_fd = parent_fd = temp_fd = None
     temp_name = None
+    swapped_parent_fd = None
+    swapped_component = None
+    swapped_name = None
     try:
         root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         parent_fd = os.dup(root_fd)
-        swap = os.environ.get("SAFE_META_WRITE_SWAP_COMPONENT")
         for component in parts[:-1]:
-            if swap == component:
-                os.rename(component, component + ".safe-meta-write-swapped", src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            if test_swap == component and swapped_component is None:
+                swapped_parent_fd = os.dup(parent_fd)
+                swapped_component = component
+                swapped_name = component + ".safe-meta-write-swapped"
+                os.rename(component, swapped_name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
             next_fd = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
             os.close(parent_fd)
             parent_fd = next_fd
@@ -86,6 +97,16 @@ def main(argv):
                 pass
         return fail(error)
     finally:
+        if swapped_parent_fd is not None:
+            try:
+                os.rename(
+                    swapped_name,
+                    swapped_component,
+                    src_dir_fd=swapped_parent_fd,
+                    dst_dir_fd=swapped_parent_fd,
+                )
+            finally:
+                os.close(swapped_parent_fd)
         if parent_fd is not None:
             try:
                 os.close(parent_fd)
