@@ -48,7 +48,7 @@ test('prints minimal safe YAML with locked mechanical fields and explicit Agent2
   const output = JSON.parse(result.stdout);
   assert.equal(output.valid, true);
   assert.equal(output.written, false);
-  assert.match(output.yaml, /slug: "yaml-safe-card"/);
+  assert.match(output.yaml, /slug: yaml-safe-card/);
   assert.match(output.yaml, /path: "docs\/20260711-yaml-safe-card\.html"/);
   assert.match(output.yaml, /style: "darkblue"/);
   assert.match(output.yaml, /category: "开发工具: Agent"/);
@@ -120,7 +120,7 @@ test('verify-bundle accepts YAML block arrays while checking mechanical fields',
   fs.mkdirSync(path.dirname(f.metaPath), { recursive: true });
   fs.writeFileSync(f.metaPath, [
     `slug: ${f.bundle.slug}`, `path: ${f.bundle.html_path}`, `style: ${f.bundle.style}`,
-    `category: ${f.bundle.category}`, `source_url: ${f.bundle.source_url}`,
+    `category: ${JSON.stringify(f.bundle.category)}`, `source_url: ${JSON.stringify(f.bundle.source_url)}`,
     'title: Agent2 title', 'desc: Agent2 desc', 'tags:', '  - one', '  - "two: three"', '',
   ].join('\n'));
   const result = run(VERIFY, ['--bundle', f.bundlePath], f.root);
@@ -138,8 +138,62 @@ test('verify-bundle reports malformed existing meta as structured JSON', () => {
   assert.ok(body.errors.some((error) => error.field === 'meta'));
 });
 
+test('verify-bundle uses repository YAML semantics for comments, hashes, escaped quotes, and arrays', () => {
+  const f = fixture();
+  fs.mkdirSync(path.dirname(f.metaPath), { recursive: true });
+  fs.writeFileSync(f.metaPath, [
+    `slug: ${f.bundle.slug} # generated`,
+    `path: "${f.bundle.html_path}" # generated`,
+    `style: '${f.bundle.style}'`,
+    `category: "开发工具: Agent" # comment`,
+    `source_url: 'https://example.com/a?q=x:y&quote="yes"' # comment`,
+    'title: "Agent \\"Two\\" # literal"',
+    'tags:', '  - one', '  - "two # literal"', '',
+  ].join('\n'));
+  const result = run(VERIFY, ['--bundle', f.bundlePath], f.root);
+  assert.equal(result.status, 0, result.stdout);
+});
 
-test('--replace without --write is rejected as usage error', () => {
+test('verify-bundle rejects duplicate mechanical keys before YAML parsing', () => {
+  const f = fixture();
+  fs.mkdirSync(path.dirname(f.metaPath), { recursive: true });
+  fs.writeFileSync(f.metaPath, [
+    'slug: wrong', `slug: ${f.bundle.slug}`, `path: ${f.bundle.html_path}`,
+    `style: ${f.bundle.style}`, `category: ${f.bundle.category}`,
+    `source_url: ${f.bundle.source_url}`, '',
+  ].join('\n'));
+  const result = run(VERIFY, ['--bundle', f.bundlePath], f.root);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(JSON.parse(result.stdout).errors[0].message, /duplicate mechanical key.*slug/i);
+});
+
+test('generator refuses an external symlinked parent and leaves external files untouched', () => {
+  const f = fixture();
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'generate-card-meta-external-'));
+  fixtureRoots.add(external);
+  fs.symlinkSync(external, path.join(f.root, 'docs'));
+  const sentinel = path.join(external, path.basename(f.metaPath));
+  fs.writeFileSync(sentinel, 'external sentinel');
+  const result = run(GENERATOR, ['--bundle', f.bundlePath, '--write', '--replace'], f.root);
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(fs.readFileSync(sentinel, 'utf8'), 'external sentinel');
+});
+
+test('generator refuses an external symlink target and leaves it untouched', () => {
+  const f = fixture();
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'generate-card-meta-target-'));
+  fixtureRoots.add(external);
+  fs.mkdirSync(path.dirname(f.metaPath), { recursive: true });
+  const sentinel = path.join(external, 'sentinel.yaml');
+  fs.writeFileSync(sentinel, 'external target');
+  fs.symlinkSync(sentinel, f.metaPath);
+  const result = run(GENERATOR, ['--bundle', f.bundlePath, '--write', '--replace'], f.root);
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(fs.readFileSync(sentinel, 'utf8'), 'external target');
+  assert.equal(fs.lstatSync(f.metaPath).isSymbolicLink(), true);
+});
+
+test('--replace without --write is rejected as a usage error', () => {
   const f = fixture();
   const result = run(GENERATOR, ['--bundle', f.bundlePath, '--replace'], f.root);
   assert.equal(result.status, 2);

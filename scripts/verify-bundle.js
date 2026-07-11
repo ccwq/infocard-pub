@@ -3,47 +3,30 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const yaml = require('../assets/home/vendor/js-yaml.min.js');
 const { loadBundle, validateBundle, bundleAllowlist } = require('./lib/publish-bundle');
 
 const MECHANICAL_FIELDS = {
-  slug: 'slug',
-  path: 'html_path',
-  style: 'style',
-  category: 'category',
-  source_url: 'source_url',
+  slug: 'slug', path: 'html_path', style: 'style', category: 'category', source_url: 'source_url',
 };
 
-function parseScalar(raw, lineNumber) {
-  const value = raw.trim();
-  if (!value) return '';
-  if (value.startsWith('"')) {
-    try {
-      const parsed = JSON.parse(value);
-      if (typeof parsed !== 'string') throw new Error('must be a string');
-      return parsed;
-    } catch (error) {
-      throw new Error(`line ${lineNumber}: invalid quoted scalar (${error.message})`);
-    }
+function rejectDuplicateMechanicalKeys(text) {
+  const seen = new Set();
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    const match = /^([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)/.exec(line);
+    if (!match || !Object.hasOwn(MECHANICAL_FIELDS, match[1])) continue;
+    if (seen.has(match[1])) throw new Error(`line ${index + 1}: duplicate mechanical key ${match[1]}`);
+    seen.add(match[1]);
   }
-  if (value.startsWith("'")) {
-    if (!value.endsWith("'") || value.length < 2) throw new Error(`line ${lineNumber}: invalid quoted scalar`);
-    return value.slice(1, -1).replaceAll("''", "'");
-  }
-  if (value.startsWith('[') || value.startsWith('{')) return value;
-  return value.replace(/\s+#.*$/, '').trim();
 }
 
 function parseMeta(text) {
-  const result = {};
-  const lines = text.split(/\r?\n/);
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (!line.trim() || /^\s*#/.test(line) || /^\s/.test(line)) continue;
-    const match = /^([A-Za-z_][A-Za-z0-9_-]*):(?:\s*(.*))?$/.exec(line);
-    if (!match) throw new Error(`line ${index + 1}: invalid top-level YAML`);
-    result[match[1]] = parseScalar(match[2] || '', index + 1);
+  rejectDuplicateMechanicalKeys(text);
+  const parsed = yaml.load(text, { schema: yaml.FAILSAFE_SCHEMA });
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('metadata must be a YAML mapping');
   }
-  return result;
+  return parsed;
 }
 
 function verifyMeta(bundle, root = process.cwd()) {
@@ -70,15 +53,11 @@ function main(argv) {
     process.stdout.write(`${JSON.stringify({ valid: false, errors: [{ field: 'bundle', message: 'usage: --bundle path' }] })}\n`);
     return 2;
   }
-
   try {
     const bundle = loadBundle(argv[bundleIndex + 1]);
     const bundleResult = validateBundle(bundle);
     const metaResult = bundleResult.valid ? verifyMeta(bundle) : { valid: true, errors: [] };
-    const result = {
-      valid: bundleResult.valid && metaResult.valid,
-      errors: [...bundleResult.errors, ...metaResult.errors],
-    };
+    const result = { valid: bundleResult.valid && metaResult.valid, errors: [...bundleResult.errors, ...metaResult.errors] };
     process.stdout.write(`${JSON.stringify({ ...result, allowlist: result.valid ? bundleAllowlist(bundle) : [] })}\n`);
     return result.valid ? 0 : 1;
   } catch (error) {
@@ -88,5 +67,4 @@ function main(argv) {
 }
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
-
 module.exports = { parseMeta, verifyMeta, main };
