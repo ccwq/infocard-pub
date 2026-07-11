@@ -41,6 +41,15 @@ function assetPath(bundle, rootDir, localPath) {
   return resolved.startsWith(`${assetRoot}${path.sep}`) ? resolved : null;
 }
 
+function isNonemptyStringArray(value) {
+  return Array.isArray(value) && value.length > 0
+    && value.every((entry) => typeof entry === 'string' && entry.trim() !== '');
+}
+
+function localPathSet(entries) {
+  return new Set(entries.map((entry) => entry && entry.local_path));
+}
+
 function validateAssetEntries(entries, field, bundle, rootDir, errors, checkDisk) {
   if (!Array.isArray(entries)) {
     errors.push({ field, message: 'must be an array' });
@@ -62,12 +71,22 @@ function validateAssetEntries(entries, field, bundle, rootDir, errors, checkDisk
       errors.push({ field: `${entryField}.local_path`, message: 'must use an accepted image extension' });
       return;
     }
-    if (entry.mime_type && (!MIME_EXTENSIONS[entry.mime_type] || !MIME_EXTENSIONS[entry.mime_type].has(extension))) {
-      errors.push({ field: `${entryField}.mime_type`, message: 'must match the local file extension' });
+    if (field === 'manifest.assets') {
+      if (typeof entry.mime_type !== 'string' || !MIME_EXTENSIONS[entry.mime_type]) {
+        errors.push({ field: `${entryField}.mime_type`, message: 'must be an accepted image MIME type' });
+      } else if (!MIME_EXTENSIONS[entry.mime_type].has(extension)) {
+        errors.push({ field: `${entryField}.mime_type`, message: 'must match local file extension' });
+      }
     }
     if (!checkDisk) return;
     if (!nonemptyFile(filePath)) {
       errors.push({ field: `${entryField}.local_path`, message: 'must exist and contain bytes' });
+      return;
+    }
+    const realAssetRoot = fs.realpathSync(path.resolve(rootDir, bundle.asset_dir));
+    const realFilePath = fs.realpathSync(filePath);
+    if (!realFilePath.startsWith(`${realAssetRoot}${path.sep}`)) {
+      errors.push({ field: `${entryField}.local_path`, message: 'resolved file must stay under bundle.asset_dir' });
       return;
     }
     if (!contentMatchesExtension(filePath, extension)) {
@@ -110,8 +129,8 @@ function verifyAgent1Delivery(bundle, rootDir = process.cwd()) {
     if (facts.source_url !== bundle.source_url) errors.push({ field: 'facts.source_url', message: 'must equal bundle.source_url' });
     if (typeof facts.retrieved_at !== 'string' || facts.retrieved_at.trim() === '') errors.push({ field: 'facts.retrieved_at', message: 'must be nonempty' });
     if (!facts.repo_meta || typeof facts.repo_meta !== 'object' || Array.isArray(facts.repo_meta)) errors.push({ field: 'facts.repo_meta', message: 'must be an object' });
-    if (!Array.isArray(facts.claims) || facts.claims.length === 0) errors.push({ field: 'facts.claims', message: 'must be a nonempty array' });
-    if (!Array.isArray(facts.required_sections) || facts.required_sections.length === 0) errors.push({ field: 'facts.required_sections', message: 'must be a nonempty array' });
+    if (!isNonemptyStringArray(facts.claims)) errors.push({ field: 'facts.claims', message: 'must be a nonempty string array' });
+    if (!isNonemptyStringArray(facts.required_sections)) errors.push({ field: 'facts.required_sections', message: 'must be a nonempty string array' });
     validateAssetEntries(facts.assets, 'facts.assets', bundle, rootDir, errors, false);
   } else if (facts !== null) errors.push({ field: 'facts', message: 'must be a JSON object' });
 
@@ -122,6 +141,16 @@ function verifyAgent1Delivery(bundle, rootDir = process.cwd()) {
       errors.push({ field: 'manifest.reason', message: 'must explain why there are no assets' });
     }
   } else if (manifest !== null) errors.push({ field: 'manifest', message: 'must be a JSON object' });
+
+  if (facts && typeof facts === 'object' && !Array.isArray(facts)
+      && manifest && typeof manifest === 'object' && !Array.isArray(manifest)
+      && Array.isArray(facts.assets) && Array.isArray(manifest.assets)) {
+    const factsPaths = localPathSet(facts.assets);
+    const manifestPaths = localPathSet(manifest.assets);
+    const samePaths = factsPaths.size === manifestPaths.size
+      && [...factsPaths].every((localPath) => manifestPaths.has(localPath));
+    if (!samePaths) errors.push({ field: 'facts.assets', message: 'local_path set must equal manifest.assets' });
+  }
 
   return { valid: errors.length === 0, errors };
 }

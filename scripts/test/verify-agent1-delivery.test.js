@@ -43,7 +43,7 @@ function fixture(options = {}) {
     required_sections: ['overview'],
     assets: [{ local_path: 'hero.png' }],
   };
-  const manifest = { assets: [{ local_path: 'hero.png', bytes: image.length }] };
+  const manifest = { assets: [{ local_path: 'hero.png', mime_type: 'image/png', bytes: image.length }] };
   fs.writeFileSync(path.join(factsDir, 'facts.json'), JSON.stringify(facts));
   fs.writeFileSync(path.join(assetDir, 'manifest.json'), JSON.stringify(manifest));
   fs.writeFileSync(path.join(root, 'bundle.json'), JSON.stringify(value));
@@ -138,6 +138,66 @@ test('requires an explicit nonempty reason when manifest has no assets', () => {
   const result = verifyAt(f);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((error) => error.field === 'manifest.reason'));
+});
+
+test('requires facts and manifest asset local_path sets to agree', () => {
+  for (const [factsAssets, manifestAssets] of [
+    [[{ local_path: 'hero.png' }], []],
+    [[], [{ local_path: 'hero.png', mime_type: 'image/png', bytes: 8 }]],
+    [[{ local_path: 'other.png' }], [{ local_path: 'hero.png', mime_type: 'image/png', bytes: 8 }]],
+  ]) {
+    const f = fixture();
+    f.facts.assets = factsAssets;
+    f.manifest.assets = manifestAssets;
+    if (manifestAssets.length === 0) f.manifest.reason = 'No useful images.';
+    fs.writeFileSync(path.join(f.factsDir, 'facts.json'), JSON.stringify(f.facts));
+    fs.writeFileSync(path.join(f.assetDir, 'manifest.json'), JSON.stringify(f.manifest));
+    const result = verifyAt(f);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((error) => error.field === 'facts.assets'));
+  }
+});
+
+test('requires supported manifest MIME types matching image extensions', () => {
+  for (const mimeType of [undefined, 'application/octet-stream', 'image/jpeg']) {
+    const f = fixture();
+    f.manifest.assets = [{ local_path: 'hero.png', bytes: 8 }];
+    if (mimeType !== undefined) f.manifest.assets[0].mime_type = mimeType;
+    fs.writeFileSync(path.join(f.assetDir, 'manifest.json'), JSON.stringify(f.manifest));
+    const result = verifyAt(f);
+    assert.equal(result.valid, false, String(mimeType));
+    assert.ok(result.errors.some((error) => error.field === 'manifest.assets.0.mime_type'));
+  }
+  assert.deepEqual(verifyAt(fixture()), { valid: true, errors: [] });
+});
+
+test('requires claims and required_sections to contain only nonempty strings', () => {
+  for (const field of ['claims', 'required_sections']) {
+    for (const invalid of [[42], [null], ['   ']]) {
+      const f = fixture();
+      f.facts[field] = invalid;
+      fs.writeFileSync(path.join(f.factsDir, 'facts.json'), JSON.stringify(f.facts));
+      const result = verifyAt(f);
+      assert.equal(result.valid, false, `${field}: ${JSON.stringify(invalid)}`);
+      assert.ok(result.errors.some((error) => error.field.startsWith(`facts.${field}`)));
+    }
+  }
+});
+
+test('rejects asset symlinks that resolve outside asset_dir', (t) => {
+  const f = fixture();
+  const outside = path.join(f.root, 'outside.png');
+  fs.writeFileSync(outside, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  fs.unlinkSync(path.join(f.assetDir, 'hero.png'));
+  try {
+    fs.symlinkSync(outside, path.join(f.assetDir, 'hero.png'));
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) return t.skip(`symlink denied: ${error.code}`);
+    throw error;
+  }
+  const result = verifyAt(f);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some((error) => error.field === 'manifest.assets.0.local_path'));
 });
 
 test('accepts complete asset and explicit no-assets deliveries', () => {
