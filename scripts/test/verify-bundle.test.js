@@ -77,7 +77,39 @@ test('all required repository style names are accepted', () => {
   }
 });
 
-test('bundleAllowlist contains only publish outputs for the bundle', () => {
+test('wiki paths reject drive-qualified and UNC paths', () => {
+  const { validateBundle } = require(MODULE_PATH);
+  const paths = ['C:/wiki/page.md', 'C:\\wiki\\page.md', '//server/share/page.md'];
+
+  for (const field of ['raw_path', 'knowledge_path']) {
+    for (const invalidPath of paths) {
+      const bundle = validBundle();
+      bundle.wiki[field] = invalidPath;
+      const result = validateBundle(bundle);
+      assert.equal(result.valid, false, `${field}: ${invalidPath}`);
+      assert.ok(result.errors.some((error) => error.field === `wiki.${field}`));
+    }
+  }
+});
+
+test('html_path date prefix must be a real calendar date', () => {
+  const { validateBundle } = require(MODULE_PATH);
+  for (const date of ['00000000', '20260230', '20261301']) {
+    const result = validateBundle(validBundle({
+      html_path: `docs/${date}-publish-bundle-validator.html`,
+      meta_path: `docs/${date}-publish-bundle-validator.html.meta.yaml`,
+    }));
+    assert.equal(result.valid, false, date);
+    assert.ok(result.errors.some((error) => error.field === 'html_path'), date);
+  }
+  const leapDay = validateBundle(validBundle({
+    html_path: 'docs/20240229-publish-bundle-validator.html',
+    meta_path: 'docs/20240229-publish-bundle-validator.html.meta.yaml',
+  }));
+  assert.equal(leapDay.valid, true);
+});
+
+test('bundleAllowlist contains only publish outputs from bundle', () => {
   const { bundleAllowlist } = require(MODULE_PATH);
   assert.deepEqual(bundleAllowlist(validBundle()), [
     'docs/20260711-publish-bundle-validator.html',
@@ -108,4 +140,30 @@ test('CLI emits JSON and exits according to validation result', () => {
   });
   assert.notEqual(fail.status, 0);
   assert.equal(JSON.parse(fail.stdout).valid, false);
+});
+
+test('CLI reports missing --bundle argument as JSON with exit code 2', () => {
+  for (const args of [[], ['--bundle']]) {
+    const result = spawnSync(process.execPath, ['scripts/verify-bundle.js', ...args], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 2);
+    assert.equal(JSON.parse(result.stdout).valid, false);
+  }
+});
+
+test('CLI reports bundle load errors as JSON with nonzero exit', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-bundle-cli-errors-'));
+  const invalidJsonPath = path.join(dir, 'invalid.json');
+  fs.writeFileSync(invalidJsonPath, '{not json');
+
+  for (const bundlePath of [path.join(dir, 'missing.json'), invalidJsonPath, dir]) {
+    const result = spawnSync(process.execPath, ['scripts/verify-bundle.js', '--bundle', bundlePath], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, bundlePath);
+    assert.equal(JSON.parse(result.stdout).valid, false, bundlePath);
+  }
 });
