@@ -28,7 +28,25 @@ function staticCheck(html) {
 }
 function parseArgs(argv) {
   const result = { bundlePaths: [], bundleGlobs: [], baseUrl: 'http://127.0.0.1:4173', root: ROOT, cdpUrl: DEFAULT_CDP };
-  for (let i = 0; i < argv.length; i++) { const flag = argv[i]; if (!['--bundle','--bundles','--base-url','--root','--artifacts-dir','--cdp-url'].includes(flag)) throw new Error(`unknown argument: ${flag}`); const value = argv[++i]; if (!value) throw new Error(`missing value ${flag}`); if (flag === '--bundle') result.bundlePaths.push(value); else if (flag === '--bundles') result.bundleGlobs.push(value); else if (flag === '--base-url') result.baseUrl = value; else if (flag === '--root') result.root = path.resolve(value); else if (flag === '--cdp-url') result.cdpUrl = value; else result.artifactsDir = path.resolve(value); }
+  const flags = new Set(['--bundle', '--bundles', '--base-url', '--root', '--artifacts-dir', '--cdp-url']);
+  for (let i = 0; i < argv.length; i++) {
+    const flag = argv[i];
+    if (!flags.has(flag)) throw new Error(`unknown argument: ${flag}`);
+    if (flag === '--bundles') {
+      const values = [];
+      while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) values.push(argv[++i]);
+      if (!values.length) throw new Error('missing value --bundles');
+      result.bundleGlobs.push(...values);
+      continue;
+    }
+    const value = argv[++i];
+    if (!value) throw new Error(`missing value ${flag}`);
+    if (flag === '--bundle') result.bundlePaths.push(value);
+    else if (flag === '--base-url') result.baseUrl = value;
+    else if (flag === '--root') result.root = path.resolve(value);
+    else if (flag === '--cdp-url') result.cdpUrl = value;
+    else result.artifactsDir = path.resolve(value);
+  }
   return result;
 }
 function expandGlob(pattern) { const absolute = path.resolve(pattern), star = absolute.search(/[?*]/); if (star < 0) return fs.existsSync(absolute) ? [absolute] : []; const split = absolute.lastIndexOf(path.sep, star), dir = absolute.slice(0, split) || path.parse(absolute).root, base = absolute.slice(split + 1), regex = new RegExp(`^${base.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`); return fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && regex.test(e.name)).map((e) => path.join(dir, e.name)).sort() : []; }
@@ -66,7 +84,7 @@ async function defaultBrowserRunner({ url, width, height, screenshotPath, cdpUrl
   } finally { if (cdp) { if (sessionId) try { await cdp.send('Target.detachFromTarget', { sessionId }); } catch {} if (targetId) try { await cdp.send('Target.closeTarget', { targetId }); } catch {} if (contextId) try { await cdp.send('Target.disposeBrowserContext', { browserContextId: contextId }); } catch {} cdp.close(); } }
 }
 function pngDimensions(file) { const b = fs.readFileSync(file); if (b.length < 24 || !b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) || b.toString('ascii',12,16) !== 'IHDR') throw new Error('invalid PNG'); return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) }; }
-function validateEvidence(e, screenshotPath, root, slug) { const errors = [], expected = path.relative(root, screenshotPath).replaceAll(path.sep, '/'); if (!e || !Number.isFinite(e.scrollWidth) || !Number.isFinite(e.clientWidth)) errors.push('scroll/client widths must be finite'); else { if (e.clientWidth !== WIDTH) errors.push(`clientWidth must equal ${WIDTH}`); if (e.scrollWidth > e.clientWidth + 1) errors.push('horizontal overflow'); } if (!Array.isArray(e?.brokenImages) || e.brokenImages.length) errors.push('broken images detected or evidence malformed'); if (e?.screenshot !== expected || expected !== `artifacts/mobile/${slug}.png`) errors.push('unexpected screenshot path'); try { const stat = fs.statSync(screenshotPath), d = pngDimensions(screenshotPath); if (!stat.isFile() || !stat.size) throw new Error(); if (d.width !== WIDTH || d.height < 1) errors.push(`PNG dimensions must be ${WIDTH}px wide and nonzero`); } catch { errors.push('screenshot must be a nonempty valid PNG'); } return errors; }
+function validateEvidence(e, screenshotPath, root, slug) { const errors = [], expected = path.relative(root, screenshotPath).replaceAll(path.sep, '/'); if (!e || !Number.isFinite(e.scrollWidth) || !Number.isFinite(e.clientWidth)) errors.push('scroll/client widths must be finite'); else { e.horizontalOverflow = e.scrollWidth > e.clientWidth + 1; if (e.clientWidth !== WIDTH) errors.push(`clientWidth must equal ${WIDTH}`); if (e.horizontalOverflow) errors.push('horizontal overflow'); } if (!Array.isArray(e?.brokenImages) || e.brokenImages.length) errors.push('broken images detected or evidence malformed'); if (e?.screenshot !== expected || expected !== `artifacts/mobile/${slug}.png`) errors.push('unexpected screenshot path'); try { const stat = fs.statSync(screenshotPath), d = pngDimensions(screenshotPath); if (!stat.isFile() || !stat.size) throw new Error(); if (d.width !== WIDTH || d.height < 1) errors.push(`PNG dimensions must be ${WIDTH}px wide and nonzero`); } catch { errors.push('screenshot must be a nonempty valid PNG'); } return errors; }
 async function runBatch(options = {}) {
   const root = path.resolve(options.root || ROOT), runner = options.runner || defaultBrowserRunner, bundlePaths = resolveBundlePaths(options.bundlePaths || [], options.bundleGlobs || []); if (!bundlePaths.length) return { status:'SKIPPED', reason:'no bundles supplied', exitCode:2, cards:[] };
   const probe = options.probe || ((cdpUrl) => probeBrowser(cdpUrl)); try { await probe(options.cdpUrl || DEFAULT_CDP); } catch (error) { if (error.code === 'BROWSER_UNAVAILABLE') return { status:'SKIPPED', reason:error.message, browserUnavailable:error.message, exitCode:2, cards:[] }; throw error; }

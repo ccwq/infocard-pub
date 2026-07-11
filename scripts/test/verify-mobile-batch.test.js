@@ -59,6 +59,25 @@ test('evidence requires exact path and a real PNG with sensible exact viewport d
   ]) assert.equal((await require(MODULE_PATH).runBatch({ root, bundlePaths: [bundlePath], probe: async () => {}, runner })).status, 'FAIL');
 });
 
+test('browser evidence recomputes and returns horizontal overflow instead of trusting runner evidence', async () => {
+  const { root, bundlePath } = fixture();
+  const mod = require(MODULE_PATH);
+  const passed = await mod.runBatch({ root, bundlePaths: [bundlePath], probe: async () => {}, runner: writingRunner({ horizontalOverflow: true }) });
+  assert.equal(passed.status, 'PASS');
+  assert.equal(passed.cards[0].browser.horizontalOverflow, false);
+  const overflow = await mod.runBatch({ root, bundlePaths: [bundlePath], probe: async () => {}, runner: writingRunner({ scrollWidth: 392, horizontalOverflow: false }) });
+  assert.equal(overflow.status, 'FAIL');
+  assert.equal(overflow.cards[0].browser.horizontalOverflow, true);
+  assert.ok(overflow.cards[0].errors.includes('horizontal overflow'));
+});
+
+test('parseArgs consumes all shell-expanded --bundles values until the next flag and keeps repeated values', () => {
+  const { parseArgs } = require(MODULE_PATH);
+  const parsed = parseArgs(['--bundles', 'a.json', 'b.json', 'c.json', '--base-url', 'http://example.test', '--bundles', 'quoted-*.json']);
+  assert.deepEqual(parsed.bundleGlobs, ['a.json', 'b.json', 'c.json', 'quoted-*.json']);
+  assert.equal(parsed.baseUrl, 'http://example.test');
+});
+
 test('artifact path rejects symlink parent and target without deleting outside files', async () => {
   for (const targetSymlink of [false, true]) {
     const { root, bundlePath } = fixture();
