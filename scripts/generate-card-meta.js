@@ -3,6 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { loadBundle, validateBundle } = require('./lib/publish-bundle');
 
 function yamlString(value) { return JSON.stringify(String(value)); }
@@ -40,33 +41,22 @@ function assertSafeTarget(root, target) {
   while (!fs.existsSync(parent)) parent = path.dirname(parent);
   if (!isWithin(root, fs.realpathSync(parent))) throw new Error('meta parent resolves outside repository root');
 }
-function writeAll(fd, content) {
-  fs.writeFileSync(fd, content, 'utf8');
-  fs.fsyncSync(fd);
-  fs.closeSync(fd);
-}
 function writeMeta(root, target, content, replace) {
   assertSafeTarget(root, target);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   assertSafeTarget(root, target);
-  if (!replace) {
-    const fd = fs.openSync(target, 'wx');
-    try { writeAll(fd, content); } catch (error) { try { fs.closeSync(fd); } catch (_) {} throw error; }
-    return;
-  }
-  try { if (fs.lstatSync(target).isSymbolicLink()) throw new Error('symlink target refused'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  const temp = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.${Date.now()}.tmp`);
-  let fd;
-  try {
-    fd = fs.openSync(temp, 'wx');
-    writeAll(fd, content); fd = undefined;
-    assertSafeTarget(root, target);
-    try { if (fs.lstatSync(target).isSymbolicLink()) throw new Error('symlink target refused'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-    if (!isWithin(root, fs.realpathSync(path.dirname(target)))) throw new Error('meta parent resolves outside repository root');
-    fs.renameSync(temp, target);
-  } finally {
-    if (fd !== undefined) try { fs.closeSync(fd); } catch (_) {}
-    try { fs.unlinkSync(temp); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const helper = path.join(__dirname, 'lib/safe-meta-write.py');
+  const relative = path.relative(root, target);
+  const result = spawnSync('python3', [helper, root, relative, replace ? 'replace' : 'create'], {
+    input: content,
+    encoding: 'utf8',
+    shell: false,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    let message = result.stderr.trim() || result.stdout.trim() || `safe metadata write failed (${result.status})`;
+    try { message = JSON.parse(result.stdout).error || message; } catch (_) {}
+    throw new Error(message);
   }
 }
 function main(argv) {

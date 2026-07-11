@@ -37,8 +37,12 @@ function fixture(overrides = {}) {
   return { root, bundle, bundlePath: path.join(root, 'bundle.json'), metaPath: path.join(root, bundle.meta_path) };
 }
 
-function run(script, args, cwd) {
-  return spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8' });
+function run(script, args, cwd, env = {}) {
+  return spawnSync(process.execPath, [script, ...args], {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  });
 }
 
 test('prints minimal safe YAML with locked mechanical fields and explicit Agent2 placeholders', () => {
@@ -193,7 +197,30 @@ test('generator refuses an external symlink target and leaves it untouched', () 
   assert.equal(fs.lstatSync(f.metaPath).isSymbolicLink(), true);
 });
 
-test('--replace without --write is rejected as a usage error', () => {
+test('atomic create failure after fsync leaves no final metadata file', () => {
+  const f = fixture();
+  const result = run(GENERATOR, ['--bundle', f.bundlePath, '--write'], f.root, {
+    SAFE_META_WRITE_FAIL_AFTER_FSYNC: '1',
+  });
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(fs.existsSync(f.metaPath), false);
+  assert.deepEqual(fs.readdirSync(path.dirname(f.metaPath)), []);
+});
+
+test('descriptor traversal resists parent component swap race', () => {
+  const f = fixture({ meta_path: 'docs/nested/card.meta.yaml' });
+  fs.mkdirSync(path.join(f.root, 'docs', 'nested'), { recursive: true });
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'generate-card-meta-swap-'));
+  fixtureRoots.add(external);
+  const result = run(GENERATOR, ['--bundle', f.bundlePath, '--write'], f.root, {
+    SAFE_META_WRITE_SWAP_COMPONENT: 'docs',
+  });
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(fs.existsSync(path.join(external, 'nested', 'card.meta.yaml')), false);
+  assert.equal(fs.existsSync(f.metaPath), false);
+});
+
+test('--replace without --write rejected usage error', () => {
   const f = fixture();
   const result = run(GENERATOR, ['--bundle', f.bundlePath, '--replace'], f.root);
   assert.equal(result.status, 2);
