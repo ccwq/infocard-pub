@@ -76,8 +76,18 @@ test('rejects a rename from an unrelated source to an allowlisted destination wi
   write(root, 'docs/unrelated.html', 'source'); git(root, ['add', 'docs/unrelated.html']); git(root, ['commit', '-qm', 'track unrelated source']);
   fs.rmSync(path.join(root, destination)); git(root, ['mv', 'docs/unrelated.html', destination]);
   const before = git(root, ['diff', '--cached', '--raw', '-z']); const result = run(root, ['--bundle', file, '--stage']);
-  assert.equal(result.status, 1); assert.equal(result.json.error, 'unsafe rename or copy status');
+  assert.equal(result.status, 1); assert.equal(result.json.error, 'rename/copy changes are unsupported; stage as explicit delete/add');
   assert.deepEqual(result.json.unsafe_status, [{ type: 'rename_or_copy', source: 'docs/unrelated.html', destination }]);
+  assert.equal(git(root, ['diff', '--cached', '--raw', '-z']), before);
+});
+
+test('rejects a rename between two allowlisted paths without changing the index or staging it', () => {
+  const root = fixture(); const file = makeBundle(root); const source = bundle().html_path; const destination = 'assets/img/boat/renamed.html';
+  git(root, ['add', 'docs', 'assets']); git(root, ['commit', '-qm', 'track bundle outputs']);
+  git(root, ['mv', source, destination]);
+  const before = git(root, ['diff', '--cached', '--raw', '-z']); const result = run(root, ['--bundle', file, '--stage']);
+  assert.equal(result.status, 1); assert.equal(result.json.error, 'rename/copy changes are unsupported; stage as explicit delete/add');
+  assert.deepEqual(result.json.unsafe_status, [{ type: 'rename_or_copy', source, destination }]);
   assert.equal(git(root, ['diff', '--cached', '--raw', '-z']), before);
 });
 

@@ -131,19 +131,20 @@ function main(argv) {
     const { bundles, stage } = parseArgs(argv);
     const allow = buildAllowlist(bundles);
     const preflight = parseStatus();
-    // Renames/copies can implicitly stage a source-side deletion, so both sides
-    // must be in this batch. Unmerged entries must never be resolved by staging.
+    // A rename/copy can implicitly stage a source-side deletion. Require callers
+    // to normalize every such transition into explicit, allowlisted delete/add.
+    // Unmerged entries must likewise never be resolved by staging.
     const unsafeStatus = [
       ...preflight.unmerged.map((file) => ({ type: 'unmerged', file })),
-      ...preflight.renamesOrCopies
-        .filter(({ source, destination }) => !allow.has(source) || !allow.has(destination))
-        .map(({ source, destination }) => ({ type: 'rename_or_copy', source, destination })),
+      ...preflight.renamesOrCopies.map(({ source, destination }) => ({ type: 'rename_or_copy', source, destination })),
     ];
     if (unsafeStatus.length) return {
       code: 1,
       result: {
         ok: false,
-        error: preflight.unmerged.length ? 'unsafe unmerged git state' : 'unsafe rename or copy status',
+        error: preflight.renamesOrCopies.length
+          ? 'rename/copy changes are unsupported; stage as explicit delete/add'
+          : 'unsafe unmerged git state',
         allowed_changes: [], unrelated_changes: [], unexpected_staged: [], unsafe_status: unsafeStatus,
       },
     };
