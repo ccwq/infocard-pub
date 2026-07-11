@@ -28,7 +28,19 @@ test('rejects remote raw/http/protocol-relative resource references but ignores 
  }
  const safe=fixture({html:'<p>http://example.com/a.png raw.githubusercontent.com/a/b.png</p><a href="http://example.com/a.png">navigation</a><img src="data:image/png;base64,AAAA"><a href="#top">top</a>',manifest:{assets:[]}}); assert.equal(verify(safe).valid,true);
 });
-test('rejects traversal, encoded traversal, outside asset_dir and malformed URL encoding',()=>{
+test('rejects network schemes in every resource-bearing HTML and CSS context',()=>{
+ const cases=[
+  '<img src="https://evil.test/x.png">','<img src="https&colon;//evil.test/x.png">',
+  '<svg><image href="https://evil.test/x.svg"/><use xlink:href="//evil.test/x.svg#x"/></svg>',
+  '<object data="https://evil.test/x"></object>','<embed src="ftp://evil.test/x">','<iframe src="ws://evil.test/x"></iframe>',
+  '<link rel=stylesheet href="https://evil.test/x.css">','<link rel=icon href="//evil.test/x.ico">','<script src="https://evil.test/x.js"></script>',
+  '<audio src="https://evil.test/x.mp3"></audio>','<video poster="https://evil.test/x.jpg"><source srcset="https://evil.test/x.mp4 1x"><track src="https://evil.test/x.vtt"></video>',
+  '<input type=image src="https://evil.test/x.png">','<style>@import "https://evil.test/x.css";x{background:url(https://evil.test/x.png)}</style>',
+  '<div style="background:url(\\68 ttps://evil.test/x.png)"></div>'
+ ];
+ for(const html of cases){const r=verify(fixture({html,manifest:{assets:[]}}));assert.equal(r.valid,false,html);assert.ok(r.errors.some(e=>e.field==='references'),html);}
+});
+test('rejects traversal, encoded traversal, outside asset_dir malformed URL encoding',()=>{
  for(const ref of ['../outside.png','../assets/img/other/x.png','../assets/img/asset-card/%2e%2e/escape.png','../assets/img/asset-card/%E0%A4%A']){ const f=fixture({html:`<img src="${ref}">`,manifest:{assets:[]}}); const r=verify(f); assert.equal(r.valid,false,ref); assert.ok(r.errors.some(e=>e.field==='references')); }
 });
 test('rejects missing directories zero-byte and symlinks escaping repository/asset directory',(t)=>{
@@ -39,7 +51,17 @@ test('requires manifest assets marked required/embed and defaults unflagged asse
  for(const manifest of [{assets:[{local_path:'hero.png',required:true}]},{assets:[{local_path:'hero.png',embed:true}]},{assets:[{local_path:'hero.png'}]}]){ const f=fixture({html:'<p>No image</p>',manifest}); const r=verify(f); assert.equal(r.valid,false); assert.ok(r.errors.some(e=>e.field.startsWith('manifest.assets'))); }
  const optional=fixture({html:'<p>No image</p>',manifest:{assets:[{local_path:'hero.png',required:false,embed:false}]}}); assert.equal(verify(optional).valid,true);
 });
-test('CLI loads and validates bundle/manifest and returns structured JSON exit codes',()=>{
+test('rejects malformed manifest flags, duplicate local_path, and unsafe standalone paths',()=>{
+ const manifests=[
+  {assets:[{local_path:'hero.png',required:'true'}]},
+  {assets:[{local_path:'hero.png',embed:1}]},
+  {assets:[{local_path:'hero.png'},{local_path:'hero.png'}]},
+  {assets:[{local_path:'../hero.png'}]},
+  {assets:[{local_path:'/tmp/hero.png'}]}
+ ];
+ for(const manifest of manifests){const r=verify(fixture({manifest}));assert.equal(r.valid,false,JSON.stringify(manifest));assert.ok(r.errors.some(e=>e.field.startsWith('manifest.assets')));}
+});
+test('CLI loads validates bundle/manifest returns structured JSON exit codes',()=>{
  const f=fixture(); const ok=spawnSync(process.execPath,[MODULE,'--bundle',path.join(f.root,'bundle.json')],{cwd:f.root,encoding:'utf8'}); assert.equal(ok.status,0); assert.equal(JSON.parse(ok.stdout).valid,true);
  for(const args of [[],['--bundle'],['--bundle','/missing']]){const r=spawnSync(process.execPath,[MODULE,...args],{cwd:f.root,encoding:'utf8'});assert.notEqual(r.status,0);assert.equal(JSON.parse(r.stdout).valid,false);}
  const bad=fixture(); fs.writeFileSync(path.join(bad.root,bad.bundle.manifest_path),'{bad'); assert.equal(verify(bad).valid,false); bad.bundle.keywords=[]; assert.equal(verify(bad).valid,false);

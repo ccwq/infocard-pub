@@ -57,7 +57,33 @@ test('uses documented default claim coverage when configured threshold invalid',
   const result = verify(f); assert.equal(result.valid, true); assert.equal(result.claim_coverage.required, 1);
 });
 
-test('CLI emits structured JSON and exit codes', () => {
+test('requires an exact hero token and semantic required-section evidence', () => {
+  const notHero = fixture({ html: '<meta name=viewport content="width=device-width"><style>@media(max-width:2px){}</style><header class=superhero>Widget Kit</header><h2>Installation</h2><h2>Architecture</h2><p>Fast local rendering engine Portable zero dependency CLI</p>' });
+  assert.ok(verify(notHero).errors.some(e => e.field === 'hero'));
+  const paragraphOnly = fixture({ html: '<meta name=viewport content="width=device-width"><style>@media(max-width:2px){}</style><header id=hero>Widget Kit</header><p>Installation Architecture Fast local rendering engine Portable zero dependency CLI</p>' });
+  const result = verify(paragraphOnly);
+  assert.ok(result.errors.some(e => e.field === 'required_sections.0'));
+  assert.ok(result.errors.some(e => e.field === 'required_sections.1'));
+});
+
+test('rejects empty or malformed claims and required_sections independently', () => {
+  for (const facts of [{ claims: [] }, { claims: [''] }, { claims: 'claim' }, { required_sections: [] }, { required_sections: [''] }, { required_sections: 'Installation' }]) {
+    const result = verify(fixture({ facts }));
+    assert.equal(result.valid, false, JSON.stringify(facts));
+    assert.ok(result.errors.some(e => e.field === (Object.hasOwn(facts, 'claims') ? 'claims' : 'required_sections')));
+  }
+});
+
+test('claim threshold must be integer within claims length; invalid values default to one', () => {
+  for (const value of [0, -1, 1.5, 3, '2']) {
+    const f = fixture({ facts: { min_claim_coverage: value }, html: '<meta name=viewport content="width=device-width"><style>@media(max-width:2px){}</style><header id=hero>Widget Kit</header><h2>Installation</h2><h2>Architecture</h2><p>Fast local rendering engine</p>' });
+    const result = verify(f);
+    assert.equal(result.claim_coverage.required, 1, String(value));
+    assert.equal(result.valid, true, String(value));
+  }
+});
+
+test('CLI emits structured JSON exit codes', () => {
   const f = fixture();
   const ok = spawnSync(process.execPath, [MODULE, '--bundle', path.join(f.root, 'bundle.json')], { cwd: f.root, encoding: 'utf8' });
   assert.equal(ok.status, 0); assert.equal(JSON.parse(ok.stdout).valid, true);
