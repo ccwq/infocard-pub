@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme" content="darkblue">
+  <title>Harness 设计：让 Agent 在数小时内构建完整应用</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34)
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);font-size:13px;line-height:1.62;background:radial-gradient(circle at 18% 10%,rgba(88,195,255,.16) 0 10%,transparent 11%),radial-gradient(circle at 86% 8%,rgba(132,89,255,.18) 0 9%,transparent 10%),radial-gradient(circle at 72% 72%,rgba(45,179,106,.10) 0 13%,transparent 14%),radial-gradient(circle at 18% 78%,rgba(244,200,76,.08) 0 11%,transparent 12%),linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%)}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;max-width:100%;overflow:auto}
+    table{max-width:100%;overflow:auto;width:100%}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);white-space:nowrap}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}.pill.green{border-color:rgba(45,179,106,.35);background:rgba(45,179,106,.12);color:#d8ffe8}.pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0b8}.pill.purple{border-color:rgba(132,89,255,.4);background:rgba(132,89,255,.15);color:#e4dbff}
+    .hero-note{border-left:3px solid var(--cyan);padding:10px 13px;background:rgba(88,195,255,.08);color:#dcecff;font-size:13px}
+    .hero-note strong{color:#fff;display:block;margin-bottom:3px}
+
+    .workbench{display:grid;grid-template-columns:1.1fr .9fr;gap:12px;margin-bottom:14px}
+    .panel{min-width:0;background:rgba(23,28,43,.88);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+    .panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 13px;background:rgba(255,255,255,.04);border-bottom:1px solid var(--line)}
+    .panel-title{font:900 12px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:#fff}.panel-sub{font-size:11px;color:var(--muted)}
+    .panel-body{padding:13px}
+    .agent-stack{display:grid;gap:8px}.agent{display:grid;grid-template-columns:42px 1fr auto;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.035)}
+    .agent-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;font-weight:950}.agent-icon.plan{background:rgba(88,195,255,.17);color:var(--cyan)}.agent-icon.gen{background:rgba(132,89,255,.18);color:#c5b6ff}.agent-icon.eval{background:rgba(45,179,106,.18);color:#8ff0b3}
+    .agent h3{margin:0;font-size:14px}.agent p{margin:2px 0 0;color:var(--muted);font-size:11.5px}.status{font-size:10px;font-weight:850;padding:4px 7px;border-radius:999px;background:rgba(45,179,106,.14);color:#8ff0b3;border:1px solid rgba(45,179,106,.3)}
+    .loop{display:flex;align-items:center;gap:0;margin-top:11px}.loop-step{flex:1;text-align:center;padding:8px 5px;background:var(--panel-2);border:1px solid var(--line);font-size:11px;color:#d9e3ff}.loop-step.hot{background:rgba(88,195,255,.12);border-color:rgba(88,195,255,.32);color:#d8f4ff}.loop-arrow{width:20px;text-align:center;color:var(--cyan);font-weight:900}
+    .metric-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.metric{padding:11px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.035)}.metric strong{display:block;font-size:22px;line-height:1;color:#fff}.metric span{display:block;margin-top:5px;color:var(--muted);font-size:11px}.metric em{font-style:normal;color:var(--yellow)}
+
+    .section{margin-bottom:14px}.section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px}.section-head h2{margin:0;font-size:19px;letter-spacing:-.03em}.section-head .num{font:900 11px ui-monospace,monospace;color:var(--cyan);letter-spacing:.14em;text-transform:uppercase}
+    .grid-2,.grid-3{display:grid;gap:10px}.grid-2{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(3,1fr)}
+    .card{min-width:0;background:rgba(23,28,43,.78);border:1px solid var(--line);border-radius:9px;padding:13px}.card .label{font:900 10px ui-monospace,monospace;color:var(--cyan);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}.card h3{margin:0 0 6px;font-size:14px}.card p{margin:0;color:var(--muted);font-size:12px;line-height:1.65}
+    .quote{border-left:3px solid var(--yellow);padding:12px 14px;background:rgba(244,200,76,.08);color:#fff0b8;font-size:14px;line-height:1.65}.quote cite{display:block;margin-top:6px;color:#d1b65b;font-size:11px;font-style:normal}
+    .sprint{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line)}.sprint:last-child{border-bottom:0}.sprint-no{color:var(--cyan);font:900 12px ui-monospace,monospace}.sprint h3{margin:0 0 3px;font-size:13px}.sprint p{margin:0;color:var(--muted);font-size:11.5px}.pass{color:#8ff0b3;font-size:11px;font-weight:800}.fail{color:#ffc76b;font-size:11px;font-weight:800}
+    .compare{border-collapse:collapse;font-size:12px}.compare th,.compare td{border:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}.compare th{background:rgba(88,195,255,.1);color:#d8f4ff;font-size:11px}.compare td{background:rgba(15,20,36,.65);color:#d7e1fb}.compare .bad{color:#ffc76b}.compare .good{color:#8ff0b3}
+    .warning{border:1px solid rgba(244,200,76,.3);background:rgba(244,200,76,.08);border-radius:9px;padding:12px 14px;color:#ffe7a0;font-size:12px}.warning strong{color:#fff0b8}
+    .source-note{font-size:11px;color:#8292bd;margin-top:20px;padding-top:12px;border-top:1px solid var(--line);overflow-wrap:anywhere}
+
+    @media(max-width:720px){.page{width:min(100% - 16px,600px);padding-top:10px}.hero,.workbench{grid-template-columns:1fr}.grid-2,.grid-3{grid-template-columns:1fr}.title{font-size:clamp(38px,15vw,64px)}.source{text-align:left}.metric-grid{grid-template-columns:repeat(2,1fr)}.loop-step{font-size:10px}.loop-arrow{width:14px}.sprint{grid-template-columns:44px 1fr}.sprint .pass,.sprint .fail{grid-column:2}.compare{display:block;overflow-x:auto;white-space:normal}.hero-copy{padding-top:4px}.pill-row{gap:6px}.pill{padding-inline:8px;font-size:11px}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+<section id="hero" aria-label="Harness Design for Long-Running Apps Prithvi Rajasekaran Anthropic">
+  <div class="hero" id="harness-design-long-running-apps">
+    <div class="hero-copy">
+      <div class="kicker-row"><span class="kicker">HARNESS DESIGN FOR LONG-RUNNING APPS</span><span class="source">Prithvi Rajasekaran<br>2026 · long-running apps</span></div>
+      <h1 class="title">Harness Design for<br>Long-Running Apps</h1>
+      <p class="subtitle">让 Agent 在数小时内构建完整应用</p>
+      <p class="subcn">不是抽象原则，而是两套完整实验：三 agent 架构自主构建 2D 游戏 maker 与浏览器端 DAW。</p>
+      <div class="pill-row"><span class="pill cyan">Planner</span><span class="pill purple">Generator</span><span class="pill green">Evaluator</span><span class="pill yellow">Sprint 合约</span><span class="pill">Playwright MCP</span></div>
+      <div class="hero-note"><strong>核心判断</strong>Harness 的价值取决于任务是否越过当前模型能可靠独立完成的边界；模型升级后，要拆掉不再承重的脚手架。</div>
+    </div>
+    <div class="hero-copy" style="padding-top:12px">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">experiment.log</span><span class="panel-sub">two complete builds</span></div>
+        <div class="panel-body"><div class="metric-grid"><div class="metric"><strong>2D</strong><span>游戏 maker</span></div><div class="metric"><strong>DAW</strong><span>浏览器音频工作站</span></div><div class="metric"><strong>6h</strong><span>完整 Harness <em>$200</em></span></div><div class="metric"><strong>20m</strong><span>Solo <em>$9</em></span></div></div><div class="loop"><div class="loop-step hot">计划</div><div class="loop-arrow">→</div><div class="loop-step">生成</div><div class="loop-arrow">→</div><div class="loop-step">评估</div><div class="loop-arrow">↺</div></div></div>
+      </div>
+      <div class="panel"><div class="panel-head"><span class="panel-title">harness.status</span><span class="status">ITERATIVE</span></div><div class="panel-body"><div class="agent-stack"><div class="agent"><span class="agent-icon plan">P</span><div><h3>Planner</h3><p>把 1-4 句话扩展为产品 spec</p></div><span class="status">SPEC</span></div><div class="agent"><span class="agent-icon gen">G</span><div><h3>Generator</h3><p>按 Sprint 实现一个功能模块</p></div><span class="status">BUILD</span></div><div class="agent"><span class="agent-icon eval">E</span><div><h3>Evaluator</h3><p>像用户一样点击、测试、打分</p></div><span class="status">QA</span></div></div></div></div>
+    </div>
+  </div>
+</section>
+
+<section aria-label="三 agent 架构 Planner Generator Evaluator">
+  <div class="section-head"><h2>三 agent 架构：把生成和评估拆开</h2><span class="num">01 / architecture</span></div>
+  <div class="workbench">
+    <div class="panel"><div class="panel-head"><span class="panel-title">agent.pipeline</span><span class="panel-sub">GAN-inspired</span></div><div class="panel-body"><div class="agent-stack"><div class="agent"><span class="agent-icon plan">P</span><div><h3>Planner · 产品上下文</h3><p>范围要有野心，专注产品 spec 和高层技术设计；寻找融入 AI 功能的机会。</p></div><span class="status">01</span></div><div class="agent"><span class="agent-icon gen">G</span><div><h3>Generator · Sprint 实现</h3><p>React + Vite + FastAPI + SQLite，一次完成一个模块，末尾自评并交给 QA。</p></div><span class="status">02</span></div><div class="agent"><span class="agent-icon eval">E</span><div><h3>Evaluator · 外部评估</h3><p>用 Playwright MCP 点击运行中的应用，测试 UI、API 端点和数据库状态，低于阈值就挂起 Sprint。</p></div><span class="status">03</span></div></div></div></div>
+    <div class="panel"><div class="panel-head"><span class="panel-title">context.bridge</span><span class="panel-sub">session reset</span></div><div class="panel-body"><div class="card"><div class="label">问题</div><h3>长时任务会失去连贯性</h3><p>模型接近上下文极限时可能提前结束，或在长任务中逐渐失去状态。</p></div><div class="card"><div class="label">解法</div><h3>上下文重置 + 结构化交接</h3><p>完全清空上下文，启动新 agent，并通过结构化制品传递上一个 session 的状态与下一步。</p></div><div class="card"><div class="label">关键边界</div><h3>不能让做的人评自己</h3><p>裸 Claude 是差的 QA：它会发现问题，然后自己说服自己“也不是什么大问题”。</p></div></div></div>
+  </div>
+</section>
+
+<section aria-label="设计质量 原创性 工艺 功能性 评估器">
+  <div class="section-head"><h2>把主观质量转译成可打分标准</h2><span class="num">02 / evaluation</span></div>
+  <div class="grid-2">
+    <div class="card"><div class="label">01 · Design Quality</div><h3>设计质量</h3><p>颜色、排版、布局、图像和细节是否结合成一个连贯整体，而不是零散部件集合？</p></div>
+    <div class="card"><div class="label">02 · Originality</div><h3>原创性</h3><p>是否有自定义决策的证据，还是模板布局、库默认值和 AI 生成模式？</p></div>
+    <div class="card"><div class="label">03 · Craft</div><h3>工艺</h3><p>排版层级、间距一致性、颜色和谐、对比度。是能力检查，不是创意检查。</p></div>
+    <div class="card"><div class="label">04 · Functionality</div><h3>功能性</h3><p>用户能否理解界面做什么，找到主要操作，并完成任务而不需要猜测？</p></div>
+  </div>
+  <div class="quote" style="margin-top:10px">我强调设计质量和原创性，胜过工艺和功能性。Claude 在工艺和功能性上默认就能做得不错，但在设计和原创性上经常产出充其量“平庸”的结果。<cite>— Prithvi Rajasekaran，关于评估器校准</cite></div>
+</section>
+
+<section aria-label="Sprint 合约 Generator Evaluator Playwright MCP">
+  <div class="section-head"><h2>Sprint 合约：在写代码前约定完成是什么</h2><span class="num">03 / contract</span></div>
+  <div class="panel"><div class="panel-head"><span class="panel-title">sprint.contract</span><span class="panel-sub">Generator ↔ Evaluator</span></div><div class="panel-body"><p style="margin:0 0 8px;color:var(--muted)">每个 Sprint 之前，Generator 提议要构建什么以及如何验证；Evaluator 审查是否在构建正确的东西。两者迭代直到对合同达成一致。</p><div class="sprint"><span class="sprint-no">S03</span><div><h3>关卡编辑器</h3><p>27 条验收标准覆盖工具行为、实体选择、删除和 API 路由。</p></div><span class="fail">3 BUGS FOUND</span></div><div class="sprint"><span class="sprint-no">QA</span><div><h3>矩形填充工具</h3><p>拖拽后只在起点/终点放瓦片，而不是填充整个矩形区域。</p></div><span class="fail">FAIL</span></div><div class="sprint"><span class="sprint-no">QA</span><div><h3>实体删除</h3><p>selection 和 selectedEntityId 的条件应使用 ||，错误使用 && 导致删除失效。</p></div><span class="fail">FAIL</span></div><div class="sprint"><span class="sprint-no">API</span><div><h3>动画帧重排</h3><p>PUT 路由定义在通配符路由之后，FastAPI 将 reorder 当成整数解析。</p></div><span class="fail">FAIL</span></div></div></div>
+</section>
+
+<section aria-label="Solo 完整 Harness 2D 游戏 maker 质量对比">
+  <div class="section-head"><h2>同一个 prompt，两种 Harness，质量差距立竿见影</h2><span class="num">04 / game maker</span></div>
+  <table class="compare"><tr><th>Harness</th><th>时长 / 成本</th><th>结果</th></tr><tr><td><strong>Solo</strong></td><td>20 分钟 · $9</td><td class="bad">看起来符合预期，但布局浪费空间，工作流僵化；游戏实体出现却没有响应，接线断了。</td></tr><tr><td><strong>完整 Harness</strong></td><td>6 小时 · $200</td><td class="good">Planner 扩展为 16 个功能、10 个 Sprint；加入精灵动画、行为模板、音效音乐、AI 精灵/关卡生成和分享导出，测试模式确实可玩。</td></tr></table>
+  <div class="card" style="margin-top:10px"><div class="label">scope expansion</div><h3>Harness 不只是“把同一个任务做久一点”</h3><p>它让 Planner 先扩展产品范围，让 Generator 按模块交付，再让 Evaluator 保持实现与 spec 对齐。最终产物的功能边界因此显著外移。</p></div>
+</section>
+
+<section aria-label="浏览器端 DAW Web Audio API Evaluator 缺失功能">
+  <div class="section-head"><h2>第二个实验：浏览器端 DAW</h2><span class="num">05 / web audio</span></div>
+  <div class="grid-2"><div class="panel"><div class="panel-head"><span class="panel-title">DAW / final state</span><span class="status">WORKING</span></div><div class="panel-body"><div class="card"><div class="label">Web Audio API</div><h3>完整音乐制作程序</h3><p>可用的编曲视图、混音器和传输控制全部在浏览器中运行。Agent 设定速度和调性、放下旋律、构建鼓轨、调整电平并添加混响。</p></div><div class="loop"><div class="loop-step hot">tempo</div><div class="loop-arrow">→</div><div class="loop-step">melody</div><div class="loop-arrow">→</div><div class="loop-step">drums</div><div class="loop-arrow">→</div><div class="loop-step">mix</div></div></div></div><div class="panel"><div class="panel-head"><span class="panel-title">QA / remaining gap</span><span class="fail">2nd REVIEW</span></div><div class="panel-body"><div class="card"><h3>仍未完成的部分</h3><p>音频录制仍是桩代码；片段边缘拖拽缩放和片段分割未实现；效果可视化仍是数值滑块而非图形。</p></div><div class="warning"><strong>结论：</strong>Evaluator 的价值不是证明“一切都好”，而是持续暴露与合同和用户预期的差距。</div></div></div></div>
+</section>
+
+<section aria-label="Opus 4.6 模型升级后拆 Harness 评估器价值">
+  <div class="section-head"><h2>模型升级后，拆掉不再承重的脚手架</h2><span class="num">06 / adaptation</span></div>
+  <div class="grid-2"><div class="card"><div class="label">Opus 4.6</div><h3>移除 Sprint 结构</h3><p>原始能力提升后，模型可以连续运行两个多小时而不需要 Opus 4.5 所需的 Sprint 分解。</p></div><div class="card"><div class="label">边界移动</div><h3>Evaluator 不是固定开销</h3><p>当 Generator 自己就能把一部分构建做好，Evaluator 变成额外成本；但在仍处于能力边界上的部分，它继续提供真实提升。</p></div></div>
+  <div class="quote" style="margin-top:10px">每次新模型发布后，第一件事是拆掉不再承重的脚手架。Harness 的组合空间不会缩小，只是随着模型能力移动。</div>
+</section>
+
+<div class="warning"><strong>带走什么：</strong>在真实问题上读模型 trace 并调优；复杂任务可以拆分并使用专门 agent；模型升级时重新审视 Harness；持续寻找下一个能把能力边界向外推的组合。</div>
+<p class="source-note">来源：Anthropic Engineering，Prithvi Rajasekaran，《Harness Design for Long-Running Apps》。原文：https://anthropic.com/engineering/harness-design-long-running-apps</p>
+</div>
+</body>
+</html>
