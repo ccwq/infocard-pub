@@ -100,19 +100,17 @@
   };
 
   const buildTimeMeta = (card) => {
-    const updatedDate = pickFirstDate(card.updated_at, card.updated);
-    const cardDate = parseLooseDate(card.date);
-    const modified = pickFirstDate(card.updated_at, card.updated, card._effective_at, card._modified_at, card.modified_at, card._modified_date);
-    const submitted = pickFirstDate(card._submitted_at, card._created_at, card.created_at, card.date, card.created);
-    const effective = updatedDate || cardDate || modified || submitted;
+    const primaryTimestamp = window.InfocardTimeMeta.selectDisplayTimestamp(card);
+    const primaryDate = parseLooseDate(primaryTimestamp.value);
+    const modified = pickFirstDate(card._effective_at, card._modified_at, card.modified_at, card._modified_date);
+    const submitted = pickFirstDate(card._submitted_at, card._created_at, card.created);
+    const effective = primaryDate || modified || submitted;
     const sortTs = Number(card._sort_ts);
     const fallbackTs = effective ? effective.getTime() : 0;
     const normalizedSortTs = Number.isFinite(sortTs) && sortTs > 0
       ? (sortTs > 1e15 ? Math.floor(sortTs / 1e6) : sortTs)
       : fallbackTs;
-    const label = updatedDate
-      ? '更新'
-      : (cardDate ? '提交' : (modified ? '修改' : '提交'));
+    const label = primaryDate ? primaryTimestamp.label : (modified ? '修改' : '提交');
     return {
       label,
       date: formatDate(effective),

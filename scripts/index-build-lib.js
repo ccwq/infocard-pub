@@ -183,10 +183,10 @@ function loadMetaYaml(metaPath) {
 }
 
 function resolveBusinessSortTsNs(item, metaPath, cardPath) {
-  const updatedTs = parseSortTsNs(item.updated);
-  if (updatedTs) return updatedTs;
   const dateTs = parseSortTsNs(item.date);
   if (dateTs) return dateTs;
+  const updatedTs = parseSortTsNs(item.updated);
+  if (updatedTs) return updatedTs;
   return latestSourceMtimeNs(metaPath, cardPath);
 }
 
