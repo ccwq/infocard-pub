@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codespaces：让 AI 编程 Agent 先读懂架构再动手</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);
+      gap:14px;color:#fff;margin-bottom:14px;
+    }
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{
+      display:inline-flex;align-items:center;gap:8px;width:fit-content;
+      padding:5px 10px;border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;
+      font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;text-transform:uppercase;border-radius:999px;
+    }
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(34px,7vw,82px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);
+      border-radius:999px;color:#fff;font-size:12px;font-weight:850;
+      letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .pill.blue{border-color:rgba(74,120,255,.35);background:rgba(74,120,255,.12);color:#dde6ff}
+    .hero-note{
+      display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);
+      background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+      padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow);
+    }
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{
+      min-width:0;background:rgba(10,12,22,.5);
+      border:1.5px solid rgba(255,255,255,.12);border-radius:22px;
+      box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start;
+    }
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{
+      width:66px;height:66px;border-radius:22px;
+      background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+        linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+      box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em;
+    }
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{
+      min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1.5px solid rgba(255,255,255,.09);border-radius:16px;
+      padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2);
+    }
+    .mini-card .label{font-size:10.5px;font-weight:800;color:#a8b7df;text-transform:uppercase;letter-spacing:.1em}
+    .mini-card .value{font-size:20px;font-weight:950;color:#fff;letter-spacing:-.03em}
+    .mini-card .sub{font-size:10.5px;color:#8a9bc8;line-height:1.4}
+    .mini-icon{
+      width:36px;height:36px;border-radius:12px;
+      background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.1);display:grid;place-items:center;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .mini-icon.cyan svg{width:19px;height:19px;stroke:#58c3ff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .mini-icon.green svg{width:19px;height:19px;stroke:#2db36a;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .mini-icon.yellow svg{width:19px;height:19px;stroke:#f4c84c;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .mini-icon.purple svg{width:19px;height:19px;stroke:#8459ff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .mini-icon.blue svg{width:19px;height:19px;stroke:#4a78ff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .shell{
+      display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px;
+    }
+    .shell-panel{
+      background:#171c2b;border:1.5px solid rgba(255,255,255,.08);
+      border-radius:18px;overflow:hidden;box-shadow:var(--shadow);
+    }
+    .panel-header{
+      padding:9px 12px;background:#131a2d;border-bottom:1px solid rgba(255,255,255,.08);
+      color:#fff;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+      display:flex;align-items:center;gap:6px;
+    }
+    .panel-body{padding:12px;display:grid;gap:8px}
+    .tree-item{
+      display:flex;align-items:center;gap:6px;font-size:11.5px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#c8d8f0;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);
+    }
+    .tree-item:last-child{border-bottom:none}
+    .tree-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .cmd-item{
+      display:flex;align-items:center;gap:8px;font-size:11.5px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#c8d8f0;padding:4px 8px;background:rgba(0,0,0,.2);
+      border-radius:8px;border:1px solid rgba(255,255,255,.06);
+    }
+    .cmd-prompt{color:#58c3ff;font-weight:800}
+    .cmd-cmd{color:#d8e8ff}
+    .diff{border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;background:#0d1220}
+    .diff-top{
+      padding:9px 12px;background:#13192c;color:#fff;font-size:11px;font-weight:900;
+      letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08);
+    }
+    .diff-body{
+      padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:11.5px;line-height:1.6;color:#dbe5ff;white-space:pre-wrap;
+    }
+    .diff .add{color:#90f0a8}.diff .rem{color:#f09090}.diff .info{color:#a8b7df}
+    .stats{background:#13192c;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .stats-top{
+      padding:9px 12px;background:#171f35;color:#fff;border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+    }
+    .stats-body{padding:12px;display:grid;gap:12px;color:#dce4ff}
+    .stat{display:grid;gap:6px}
+    .stat .label{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+    .bar{height:10px;border-radius:999px;background:#0d1220;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .bar > span{display:block;height:100%;border-radius:999px}
+    .feature-row{
+      margin-bottom:14px;display:grid;
+      grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;
+    }
+    .feature{
+      background:#171c2b;border:1.5px solid rgba(255,255,255,.08);
+      border-radius:16px;padding:11px 9px;color:#e8edf8;text-align:center;
+      display:grid;gap:7px;min-width:0;box-shadow:0 8px 20px rgba(0,0,0,.2);
+    }
+    .feature .icon-wrap{
+      width:40px;height:40px;margin:0 auto;border-radius:12px;
+      background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;
+    }
+    .feature .icon-wrap svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .feature .feat-title{font-size:11px;font-weight:800;line-height:1.35}
+    .feature .feat-sub{font-size:10px;color:#a8b7df;line-height:1.4}
+    .download{margin:0 auto 14px;display:flex;justify-content:center}
+    .download-btn{
+      display:inline-flex;align-items:center;gap:12px;
+      background:linear-gradient(135deg,var(--purple),#6a4cff 54%, var(--blue));
+      color:#fff;border:0;border-radius:18px;padding:16px 28px;
+      box-shadow:0 16px 36px rgba(132,89,255,.34);
+      font-weight:950;letter-spacing:.02em;font-size:18px;
+    }
+    .download-btn small{display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em}
+    .workflow{
+      background:#171c2b;border:1.5px solid rgba(255,255,255,.08);
+      border-radius:18px;padding:14px 16px;display:grid;gap:10px;
+      box-shadow:var(--shadow);margin-bottom:14px;
+    }
+    .workflow-title{font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#a8b7df}
+    .phase-row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+    .phase{
+      flex:1;min-width:140px;background:#0f1424;border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;padding:10px 12px;display:grid;gap:6px;
+    }
+    .phase .n{font-size:22px;font-weight:950;letter-spacing:-.04em}
+    .phase .ph{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#a8b7df}
+    .phase .pd{font-size:11.5px;color:#c8d8f0;line-height:1.5}
+    .phase:nth-child(1) .n{color:#58c3ff}
+    .phase:nth-child(2) .n{color:#4a78ff}
+    .phase:nth-child(3) .n{color:#2db36a}
+    .phase:nth-child(4) .n{color:#8459ff}
+    .footer{
+      background:#0b1020;border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;padding:12px 14px;display:flex;
+      justify-content:space-between;gap:10px;align-items:center;
+      color:#dfe8ff;font-size:12px;flex-wrap:wrap;
+    }
+    .footer .stars{font-weight:900}
+    .footer a:hover{color:#58c3ff}
+    @media(max-width:1080px){
+      .hero,.shell,.feature-row{grid-template-columns:1fr}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .title{font-size:clamp(30px,13vw,54px)}
+      .feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .phase-row{gap:8px}
+      .phase{min-width:120px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker">⬡ diskd-ai / codespaces</span>
+        <span class="source">github.com/diskd-ai/codespaces</span>
+      </div>
+      <h1 class="title">Codespaces</h1>
+      <p class="subtitle">让 AI 编程 Agent 先读懂架构再动手</p>
+      <p class="subcn">tree-sitter 生成可查询的 belief map，把模块边界、依赖、反向依赖、实体、调用链和数据流全变成图。改代码前先 search → analyze → rdeps，只读真正相关的文件。</p>
+      <div class="pill-row">
+        <span class="pill cyan">tree-sitter</span>
+        <span class="pill green">belief map</span>
+        <span class="pill yellow">blast radius</span>
+        <span class="pill purple">Python</span>
+        <span class="pill blue">TypeScript</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">CS</div>
+        <div class="visual-meta">
+          <div class="big">⭐ 35</div>
+          <div class="small">diskd-ai</div>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <div class="mini-card">
+          <div class="label">Language</div>
+          <div class="value">Python</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">Forks</div>
+          <div class="value">3</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">Belief Map</div>
+          <div class="value">.sexp</div>
+          <div class="sub">S-expression graph</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">Install</div>
+          <div class="sub" style="font-size:10px">npx skills add<br>diskd-ai/codespaces</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKFLOW -->
+  <div class="workflow">
+    <div class="workflow-title">Query-Before-Code 工作流</div>
+    <div class="phase-row">
+      <div class="phase">
+        <div class="n">1</div>
+        <div class="ph">search</div>
+        <div class="pd">正则搜索 belief map，定位模块 ID，从不猜测路径</div>
+      </div>
+      <div class="phase">
+        <div class="n">2</div>
+        <div class="ph">analyze</div>
+        <div class="pd">单命令返回边界文件、依赖、反向依赖、层级与违规</div>
+      </div>
+      <div class="phase">
+        <div class="n">3</div>
+        <div class="ph">rdeps</div>
+        <div class="pd">展开 blast radius，知道改了什么会连锁影响谁</div>
+      </div>
+      <div class="phase">
+        <div class="n">4</div>
+        <div class="ph">read &amp; modify</div>
+        <div class="pd">只读 analyze 输出的边界文件，修改后运行 boundaries 验证</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHELL -->
+  <div class="shell">
+    <div class="shell-panel">
+      <div class="panel-header">
+        <div class="mini-icon cyan"><svg viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg></div>
+        Belief Map 事实
+      </div>
+      <div class="panel-body">
+        <div class="tree-item"><div class="tree-dot" style="background:#58c3ff"></div>(boundary &lt;mod&gt; :lang :file)</div>
+        <div class="tree-item"><div class="tree-dot" style="background:#2db36a"></div>(boundary-dep &lt;mod&gt; &lt;dep&gt;)</div>
+        <div class="tree-item"><div class="tree-dot" style="background:#f4c84c"></div>(boundary-rdep &lt;mod&gt; &lt;rdep&gt;)</div>
+        <div class="tree-item"><div class="tree-dot" style="background:#8459ff"></div>(entity-def cls &lt;mod&gt; &lt;Name&gt;)</div>
+        <div class="tree-item"><div class="tree-dot" style="background:#4a78ff"></div>(violation &lt;src&gt; &lt;tgt&gt; :layers)</div>
+      </div>
+    </div>
+    <div class="shell-panel">
+      <div class="panel-header">
+        <div class="mini-icon green"><svg viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg></div>
+        核心命令
+      </div>
+      <div class="panel-body">
+        <div class="cmd-item"><span class="cmd-prompt">$</span><span class="cmd-cmd">search "pattern"</span></div>
+        <div class="cmd-item"><span class="cmd-prompt">$</span><span class="cmd-cmd">analyze &lt;module-id&gt;</span></div>
+        <div class="cmd-item"><span class="cmd-prompt">$</span><span class="cmd-cmd">rdeps &lt;id&gt; [depth]</span></div>
+        <div class="cmd-item"><span class="cmd-prompt">$</span><span class="cmd-cmd">boundaries [id|all]</span></div>
+        <div class="cmd-item"><span class="cmd-prompt">$</span><span class="cmd-cmd">flow &lt;id&gt; &lt;fn&gt;</span></div>
+        <div class="cmd-item"><span class="cmd-prompt">$</span><span class="cmd-cmd">layers</span></div>
+      </div>
+    </div>
+    <div class="shell-panel">
+      <div class="panel-header">
+        <div class="mini-icon purple"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        支持语言
+      </div>
+      <div class="panel-body">
+        <div class="stat">
+          <div class="label"><span>Python</span><span style="color:#58c3ff">.py</span></div>
+          <div class="bar"><span style="width:100%;background:var(--cyan)"></span></div>
+        </div>
+        <div class="stat">
+          <div class="label"><span>TypeScript</span><span style="color:#4a78ff">.ts</span></div>
+          <div class="bar"><span style="width:100%;background:var(--blue)"></span></div>
+        </div>
+        <div class="stat">
+          <div class="label"><span>TSX</span><span style="color:#8459ff">.tsx</span></div>
+          <div class="bar"><span style="width:100%;background:var(--purple)"></span></div>
+        </div>
+        <div class="stat" style="margin-top:4px">
+          <div class="label"><span>infra（Kustomize/Helm/TF）</span></div>
+          <div class="bar"><span style="width:70%;background:linear-gradient(90deg,var(--yellow),var(--green))"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE ROW -->
+  <div class="feature-row">
+    <div class="feature" style="color:#58c3ff">
+      <div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div class="feat-title">Belief Map</div>
+      <div class="feat-sub">tree-sitter 驱动，模块边界/依赖/调用链全图化</div>
+    </div>
+    <div class="feature" style="color:#4a78ff">
+      <div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
+      <div class="feat-title">架构违规检查</div>
+      <div class="feat-sub">boundaries / invariants 检测跨层命名与边界违规</div>
+    </div>
+    <div class="feature" style="color:#2db36a">
+      <div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+      <div class="feat-title">Blast Radius</div>
+      <div class="feat-sub">rdeps 展开影响面，改动前先看清连锁范围</div>
+    </div>
+    <div class="feature" style="color:#f4c84c">
+      <div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg></div>
+      <div class="feat-title">调用链追踪</div>
+      <div class="feat-sub">flow / deps 追踪函数调用与数据流路径</div>
+    </div>
+    <div class="feature" style="color:#8459ff">
+      <div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg></div>
+      <div class="feat-title">Mermaid 图表</div>
+      <div class="feat-sub">从 facts 直接生成 sequence / flowchart / data-flow</div>
+    </div>
+  </div>
+
+  <!-- AGENT PROMPT EXAMPLE -->
+  <div class="diff" style="margin-bottom:14px">
+    <div class="diff-top">Standing Instruction · Claude Code / Codex</div>
+    <div class="diff-body"><span class="info">Before any non-trivial code change, query the belief map first</span>
+<span class="rem">  (search -> analyze -> rdeps)</span><span class="add">,</span> read only boundary files<span class="add">,</span> and run
+  boundaries after the change.
+
+<span class="info"># Pin this in your agent config for zero-friction architecture awareness</span></div>
+  </div>
+
+  <!-- CTA -->
+  <div class="download">
+    <a class="download-btn" href="https://github.com/diskd-ai/codespaces" target="_blank">
+      <svg width="22" height="22" viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg>
+      <span>View on GitHub</span>
+      <small>npx skills add diskd-ai/codespaces</small>
+    </a>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>⬡ diskd-ai / codespaces · <span class="stars">⭐ 35</span></span>
+    <span>Python · tree-sitter · belief-map · Claude Code</span>
+    <a href="https://github.com/diskd-ai/codespaces" target="_blank">github.com/diskd-ai/codespaces ↗</a>
+  </div>
+
+</div>
+<script>
+  // Share card background color to html2canvas
+  window.html2canvas_bg = '#0c1020';
+</script>
+</body>
+</html>
