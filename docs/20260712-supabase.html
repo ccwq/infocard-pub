@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="green">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Supabase — 开源 Firebase 替代</title>
+  <style>
+    :root{
+      --bg:#f0fdf4;--surface:#ffffff;--green:#16a34a;--green-dark:#15803d;
+      --green-light:#dcfce7;--ink:#111827;--gray:#4b5563;
+      --border:#16a34a;--border-light:rgba(22,163,74,.15);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.65;
+    }
+    a{color:var(--green-dark);text-decoration:underline}
+    .page{width:min(1060px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === TOPBAR === */
+    .topbar{
+      display:grid;grid-template-columns:1.2fr .8fr;
+      border-bottom:3px solid var(--green);margin-bottom:14px;overflow:hidden;
+    }
+    .hero{
+      padding:22px 22px 20px;
+      background:linear-gradient(135deg,#16a34a 0%,#15803d 60%,#111827 60%,#111827 100%);
+      color:#fff;position:relative;overflow:hidden;
+    }
+    .hero::after{
+      content:'supabase';position:absolute;bottom:12px;right:16px;
+      font:900 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;color:rgba(255,255,255,.4);
+    }
+    .meta-panel{
+      padding:14px 13px;
+      border-left:3px solid var(--green);
+      background:var(--surface);
+      display:flex;flex-direction:column;gap:8px;
+    }
+    .kicker{
+      display:inline-block;
+      font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;text-transform:uppercase;
+      background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
+      border-radius:999px;padding:4px 10px;margin-bottom:10px;
+    }
+    .hero-title{
+      font-size:clamp(36px,6.5vw,64px);font-weight:950;letter-spacing:-.06em;
+      line-height:.9;margin-bottom:10px;
+    }
+    .hero-sub{font-size:clamp(12px,1.4vw,14px);line-height:1.6;color:rgba(255,255,255,.82);max-width:500px}
+    .hero-note{font-size:clamp(11px,1.2vw,13px);line-height:1.65;color:rgba(255,255,255,.6);max-width:480px;margin-top:8px}
+    .pill-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+    .pill{
+      display:inline-flex;align-items:center;gap:5px;
+      border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);
+      border-radius:999px;padding:4px 10px;font-size:11px;font-weight:750;white-space:nowrap;
+    }
+    .pill.yellow{border-color:#fef08a;background:#fefde8;color:#713f12}
+    .pill.blue{border-color:#93c5fd;background:#eff6ff;color:#1e40af}
+    .pill.dark{border-color:#9ca3af;background:rgba(0,0,0,.15);color:#fff}
+
+    .meta-row-high{display:grid;grid-template-columns:1.4fr 1fr;gap:6px;padding-bottom:7px;border-bottom:2px solid var(--green);margin-bottom:6px}
+    .meta-row-low{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .meta-pill-lg{
+      border:2px solid var(--green);padding:8px 10px 6px;
+      background:#fff;font-weight:900;font-size:14px;line-height:1.1;
+    }
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gray);margin-top:3px}
+    .meta-pill-md{
+      border:2px solid var(--green);border-left:4px solid var(--green);
+      padding:5px 8px 4px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25;
+    }
+    .meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gray);margin-top:1px}
+    .meta-pill-sm{
+      border:2px solid var(--green);border-left:4px solid #86efac;
+      padding:4px 8px 3px;background:#fff;font-weight:700;font-size:11px;color:var(--gray);line-height:1.3;
+    }
+    .meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#bbb;margin-top:1px}
+
+    /* === sections === */
+    .section{margin-bottom:14px}
+    .sec-head{
+      display:flex;align-items:center;gap:9px;
+      border-bottom:2px solid var(--green);padding-bottom:6px;margin-bottom:11px;
+    }
+    .sec-icon{
+      width:26px;height:26px;border-radius:6px;
+      background:var(--green);color:#fff;
+      display:flex;align-items:center;justify-content:center;
+      font-size:13px;font-weight:900;flex-shrink:0;
+    }
+    .sec-icon.yellow{background:#ca8a04}
+    .sec-icon.blue{background:#1d4ed8}
+    .sec-icon.dark{background:#111827}
+    .sec-icon.teal{background:#0d9488}
+    .sec-title{font:900 13px/1 "Inter",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.07em}
+
+    /* === grids === */
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+
+    /* === cards === */
+    .card{
+      background:var(--surface);border:2px solid var(--green);
+      border-radius:10px;padding:11px 13px;
+    }
+    .card-icon{font-size:18px;margin-bottom:6px}
+    .card-title{font:900 12.5px/1.2 "Inter",system-ui,sans-serif;margin-bottom:5px;color:var(--ink)}
+    .card-desc{font-size:11px;line-height:1.65;color:var(--gray)}
+
+    /* === overview === */
+    .overview{
+      background:var(--surface);border:2px solid var(--green);
+      border-radius:10px;padding:13px 16px;margin-bottom:14px;
+    }
+    .overview p{font-size:12.5px;line-height:1.8;color:var(--ink)}
+    .overview strong{color:var(--green-dark)}
+
+    /* === cmd box === */
+    .cmd-box{
+      background:#f8fffe;border:2px solid var(--green);
+      border-radius:10px;overflow:hidden;
+    }
+    .cmd-head{
+      background:var(--green);padding:8px 13px;
+      font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#fff;letter-spacing:.14em;text-transform:uppercase;border-radius:0;
+    }
+    .cmd-body{
+      padding:12px 13px;
+      font:12px/1.7 ui-monospace,monospace;color:#1a1a1a;
+    }
+    .cmd-body .co{color:#888}
+    .cmd-body .str{color:var(--green-dark);font-weight:700}
+    .cmd-body .cm{color:#0369a1}
+
+    /* === pricing table === */
+    .price-table{overflow-x:auto;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;font-size:11.5px}
+    th{
+      background:var(--green);color:#fff;
+      padding:8px 10px;text-align:left;font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-radius:0;
+    }
+    td{padding:8px 10px;border:1px solid rgba(22,163,74,.2);background:var(--surface);vertical-align:top}
+    td:first-child{font-weight:800;color:var(--ink)}
+    tr:nth-child(even) td{background:var(--green-light)}
+    .price-free{color:var(--green-dark);font-weight:800}
+    .price-paid{color:#0369a1;font-weight:800}
+    .price-custom{color:#9333ea;font-weight:800}
+
+    /* === addons === */
+    .addon-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+
+    /* === footer === */
+    .footer{
+      margin-top:14px;
+      background:var(--green);color:#fff;
+      padding:12px 14px;
+      display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+      font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      border-radius:10px;
+    }
+    .footer a{color:#fef08a}
+
+    #save-btn{
+      position:fixed;bottom:20px;right:14px;z-index:999;
+      border:2px solid var(--green);border-radius:10px;
+      padding:12px 20px;
+      background:linear-gradient(135deg,var(--green),var(--green-dark));
+      color:#fff;font-weight:900;font-size:13px;letter-spacing:.04em;
+      cursor:pointer;font-family:Inter,system-ui,sans-serif;
+    }
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .meta-panel{border-left:none;border-top:3px solid var(--green)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .grid{grid-template-columns:1fr 1fr}
+      .grid3{grid-template-columns:1fr 1fr}
+      .grid2{grid-template-columns:1fr}
+      .addon-grid{grid-template-columns:1fr 1fr}
+      .footer{flex-direction:column;align-items:flex-start}
+    }
+    @media(max-width:400px){
+      .grid{grid-template-columns:1fr}
+      .grid3{grid-template-columns:1fr}
+      .addon-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <section aria-label="Supabase 概览">
+  <div class="topbar">
+    <div class="hero">
+      <div class="kicker">🔥 开源 · Firebase 替代 · BaaS</div>
+      <h1 class="hero-title">Supabase</h1>
+      <p class="hero-sub">开源 Firebase 替代。构建产品所需的全部后端功能——数据库、认证、存储、实时、边缘函数。</p>
+      <p class="hero-note">Supabase 是一个开源的 Firebase 替代方案，每个项目提供完整的 Postgres 数据库，支持 Realtime、数据库备份、扩展等。</p>
+      <div class="pill-row">
+        <span class="pill">Postgres</span>
+        <span class="pill yellow">开源</span>
+        <span class="pill blue">Auth</span>
+        <span class="pill blue">Storage</span>
+        <span class="pill blue">Realtime</span>
+        <span class="pill blue">Edge Functions</span>
+        <span class="pill dark">向量搜索</span>
+      </div>
+    </div>
+    <div class="meta-panel">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">
+          免费
+          <span class="sub">2 个项目</span>
+        </div>
+        <div class="meta-pill-md">
+          Pro $25/mo
+          <span class="sub">按组织计费</span>
+        </div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-sm">
+          Postgres
+          <span class="sub">数据库</span>
+        </div>
+        <div class="meta-pill-sm">
+          开源
+          <span class="sub">MIT License</span>
+        </div>
+      </div>
+      <div style="background:#fff;border:2px solid var(--green);border-left:4px solid var(--green);padding:7px 10px 6px">
+        <div style="font:900 11px/1.2 'Inter',sans-serif">AI / 向量</div>
+        <div style="font:700 9px/1.3 ui-monospace,monospace;color:var(--gray);margin-top:2px">pg_vector / 语义搜索</div>
+      </div>
+      <div style="background:#fff;border:2px solid var(--green);border-left:4px solid #86efac;padding:7px 10px 6px">
+        <div style="font:900 11px/1.2 'Inter',sans-serif">支持自托管</div>
+        <div style="font:700 9px/1.3 ui-monospace,monospace;color:var(--gray);margin-top:2px">Docker / 自建部署</div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- OVERVIEW -->
+  <section aria-label="Supabase 是什么">
+  <div class="overview">
+    <p>
+      <strong>Supabase</strong> 是一个开源的 Firebase 替代方案，为开发者提供构建产品所需的全部后端功能。
+      每个项目提供<strong>运行在独立服务器上的专属 Postgres 实例</strong>，无需管理基础设施，只需调用 API。
+      支持自托管或使用托管云服务。
+    </p>
+  </div>
+  </section>
+
+  <!-- CAPABILITIES -->
+  <section aria-label="Supabase 核心能力">
+  <div class="sec-head">
+    <div class="sec-icon">🛠️</div>
+    <span class="sec-title">核心能力 · 8 大模块</span>
+  </div>
+  <div class="grid3" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-icon">🗄️</div>
+      <div class="card-title">数据库 Database</div>
+      <div class="card-desc">完整的 Postgres 数据库，支持 Realtime 实时功能、数据库备份、扩展等。提供专属独立服务器。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔐</div>
+      <div class="card-title">认证 Auth</div>
+      <div class="card-desc">邮箱密码、无密码登录、OAuth 以及移动端登录。支持 20+ 身份提供商。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📦</div>
+      <div class="card-title">存储 Storage</div>
+      <div class="card-desc">存储、组织、处理和分发大型文件。与 Postgres 无缝集成，支持行级安全（RLS）访问策略。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">实时 Realtime</div>
+      <div class="card-desc">监听数据库变更，在客户端之间同步用户状态，将数据广播给订阅频道的客户端。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🌐</div>
+      <div class="card-title">边缘函数</div>
+      <div class="card-desc">全球分布的服务端函数，让代码在距离用户最近的地方执行，实现最低延迟。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🤖</div>
+      <div class="card-title">AI / 向量</div>
+      <div class="card-desc">内置 pg_vector 扩展，支持向量存储与语义搜索，构建 RAG 和 AI 应用。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">⏰</div>
+      <div class="card-title">定时任务 Cron</div>
+      <div class="card-desc">在 Postgres 内设置定时任务，无需外部调度器即可运行周期性作业。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📬</div>
+      <div class="card-title">消息队列 Queues</div>
+      <div class="card-desc">内置消息队列功能，解耦后台任务处理，支持异步工作流。</div>
+    </div>
+  </div>
+  </section>
+
+  <!-- QUICK START -->
+  <section aria-label="Supabase 最短使用方式">
+  <div class="sec-head">
+    <div class="sec-icon yellow">🚀</div>
+    <span class="sec-title">最短使用方式 · 一行代码接入</span>
+  </div>
+  <div class="cmd-box" style="margin-bottom:14px">
+    <div class="cmd-head">bash / javascript — 安装</div>
+    <div class="cmd-body">
+<span class="co"># 安装 Supabase 客户端</span>
+npm install @supabase/supabase-js
+
+<span class="co"># 或使用 Supabase CLI（本地开发）</span>
+npm install -g supabase
+    </div>
+  </div>
+  <div class="cmd-box" style="margin-bottom:14px">
+    <div class="cmd-head">javascript — 初始化连接</div>
+    <div class="cmd-body">
+<span class="co">// 最短接入代码</span>
+<span class="cm">import</span> { createClient } <span class="cm">from</span> <span class="str">'@supabase/supabase-js'</span>
+
+<span class="co">// 填入你的项目 URL 和 anon key（在项目设置中获取）</span>
+<span class="cm">const</span> supabase = createClient(
+  <span class="str">'https://your-project.supabase.co'</span>,
+  <span class="str">'your-anon-key'</span>
+)
+
+<span class="co">// 读取数据</span>
+<span class="cm">const</span> { data, error } = <span class="cm">await</span> supabase
+  .from(<span class="str">'users'</span>)
+  .select(<span class="str">'*'</span>)
+
+<span class="co">// 认证用户</span>
+<span class="cm">const</span> { user, session } = <span class="cm">await</span> supabase.auth.signInWithPassword({
+  email: <span class="str">'user@example.com'</span>,
+  password: <span class="str">'password'</span>
+})
+    </div>
+  </div>
+  </section>
+
+  <!-- CLIENT LIBRARIES -->
+  <section aria-label="Supabase 支持的语言">
+  <div class="sec-head">
+    <div class="sec-icon blue">📚</div>
+    <span class="sec-title">官方客户端库</span>
+  </div>
+  <div class="grid2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-title">Web / Mobile</div>
+      <div class="card-desc">
+        <strong>JavaScript / TypeScript</strong> — 官方主库，完整功能支持<br>
+        <strong>Flutter</strong> — 移动端开发首选<br>
+        <strong>Python</strong> — 数据科学友好<br>
+        <strong>Swift</strong> — iOS/macOS 原生<br>
+        <strong>Kotlin</strong> — Android 原生
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">服务端 / 工具</div>
+      <div class="card-desc">
+        <strong>C# / .NET</strong> — Unity / .NET 生态<br>
+        <strong>Supabase CLI</strong> — 本地开发、部署、管理<br>
+        <strong>管理 API</strong> — 通过 REST API 管理项目和组织的每个方面
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- BILLING -->
+  <section aria-label="Supabase 计费方案">
+  <div class="sec-head">
+    <div class="sec-icon dark">💰</div>
+    <span class="sec-title">计费方案 · 免费 / Pro / Team / Enterprise</span>
+  </div>
+  <div class="price-table" style="margin-bottom:14px">
+  <table>
+    <thead>
+      <tr>
+        <th>使用项目</th>
+        <th style="min-width:120px">免费版 Free</th>
+        <th style="min-width:200px">专业版 Pro / 团队版 Team</th>
+        <th style="min-width:100px">企业版 Enterprise</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>免费项目额度</td>
+        <td class="price-free">2 个项目</td>
+        <td class="price-paid">无限</td>
+        <td class="price-custom">无限</td>
+      </tr>
+      <tr>
+        <td>数据库容量</td>
+        <td class="price-free">500 MB</td>
+        <td class="price-paid">每项目 8 GB，超出 $0.125/GB</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>月活跃用户 MAU</td>
+        <td class="price-free">50,000 MAU</td>
+        <td class="price-paid">100,000 MAU，超出 $0.00325/MAU</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>出口流量</td>
+        <td class="price-free">5 GB</td>
+        <td class="price-paid">250 GB，超出 $0.09/GB</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>存储容量</td>
+        <td class="price-free">1 GB</td>
+        <td class="price-paid">100 GB，超出 $0.021/GB</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>边缘函数调用</td>
+        <td class="price-free">500,000 次/月</td>
+        <td class="price-paid">200 万次，超出 $2/百万次</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>实时消息</td>
+        <td class="price-free">200 万条/月</td>
+        <td class="price-paid">500 万条，超出 $2.5/百万条</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>实时峰值连接</td>
+        <td class="price-free">200 个</td>
+        <td class="price-paid">500 个，超出 $10/千个</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>SSO / MFA</td>
+        <td class="price-free">❌ 不可用</td>
+        <td class="price-paid">50 MAU，超出 $0.015/MAU</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>计算资源</td>
+        <td class="price-free">标准配置</td>
+        <td class="price-paid">可升级至 64 核 256 GB</td>
+        <td class="price-custom">定制</td>
+      </tr>
+      <tr>
+        <td>订阅费用</td>
+        <td class="price-free">$0（免费）</td>
+        <td class="price-paid">Pro $25/月起（按组织）</td>
+        <td class="price-custom">联系销售</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  </section>
+
+  <!-- ADD-ONS -->
+  <section aria-label="Supabase 附加组件">
+  <div class="sec-head">
+    <div class="sec-icon teal">⚙️</div>
+    <span class="sec-title">项目附加组件（按需开通）</span>
+  </div>
+  <div class="addon-grid" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-title">计算资源</div>
+      <div class="card-desc">扩展至最高 64 核 CPU 和 256 GB 内存，适用于高负载数据库。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">只读副本</div>
+      <div class="card-desc">扩展读取操作并提供容错能力，分担主库查询压力。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">自定义域名</div>
+      <div class="card-desc">为项目配置品牌化域名，提升专业形象。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">时间点恢复 PITR</div>
+      <div class="card-desc">可回滚到任意精确到分钟的时间点，数据安全保障。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">高性能磁盘</div>
+      <div class="card-desc">配置额外的 IOPS/吞吐量或使用高性能 SSD，提升 I/O 性能。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">日志导出</div>
+      <div class="card-desc">将 Supabase 日志同步到外部日志系统（SIEM / ELK 等）。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">IPv4 地址</div>
+      <div class="card-desc">获取专用 IPv4 地址，兼容需要 IPv4 的旧系统。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">高级 MFA</div>
+      <div class="card-desc">除 TOTP 外支持更多验证选项，提升认证安全等级。</div>
+    </div>
+  </div>
+  </section>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>supabase.com · 开源 MIT · 支持自托管 · 中文文档: supabase.doczh.com</span>
+    <span><a href="https://supabase.com">supabase.com →</a></span>
+  </div>
+
+</div>
+<button id="save-btn" onclick="window.saveAsPNG&&window.saveAsPNG()">⬇ 保存 PNG</button>
+</body>
+</html>
