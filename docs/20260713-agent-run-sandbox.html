@@ -1,0 +1,436 @@
+---
+slug: agent-run-sandbox
+path: docs/20260713-agent-run-sandbox.html
+title: "agent-run — 用 bwrap 把 Coding Agent 装进沙箱"
+desc: "sin-ack/agent-run 是一个 Rust 小工具，把 Codex、Claude Code、OpenCode、Pi 等 Coding Agent 套进基于 bwrap 的 Linux 沙箱：系统文件默认只读、项目目录可写、TOML 配置网络和挂载、JSON Schema 编辑器补全、单文件二进制 <1MB。核心价值是减少权限弹窗、降低误改本机文件风险；不是 microVM 级绝对隔离。"
+date: "2026-07-13 22:30:00"
+updated: "2026-07-13 22:30:00"
+source_url: "https://github.com/sin-ack/agent-run"
+category: 开发工具
+style: hardblue
+tags:
+  - bwrap
+  - 沙箱
+  - Coding Agent
+  - Claude Code
+  - Codex
+  - OpenCode
+  - Rust
+  - Linux
+  - 安全
+  - 权限控制
+taxonomy:
+  tech_stack:
+    - Rust
+    - Linux
+    - bwrap
+  topics:
+    - Agent 安全
+    - 沙箱隔离
+    - Coding Agent
+  tool_types:
+    - 安全工具
+    - 开发者工具
+  stages:
+    - 开发 / 运行
+  interaction:
+    - 本地工具
+  content_type:
+    - 开源项目
+    - 技术工具
+  source:
+    - GitHub
+  risk:
+    - 低风险
+---
+
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>agent-run — 用 bwrap 把 Coding Agent 装进沙箱</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    table{max-width:100%;overflow:auto}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+    pre{background:#1a1a1a;color:#e8e8e8;padding:14px;border:2px solid var(--line);font-size:12.5px;line-height:1.6;overflow-x:auto}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+      pre{font-size:11px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero" id="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">Linux 沙箱 · Agent 工具</div>
+        <h1 class="demo-title">agent-run：用 bwrap 把 Coding Agent 装进沙箱</h1>
+        <p class="subtitle">把 Codex、Claude Code、OpenCode、Pi 等主流 Coding Agent 套进 Linux 沙箱，系统文件默认只读、项目目录可写、TOML 配置、一键隔离运行。</p>
+        <div class="badge-row">
+          <span class="badge red">Rust</span>
+          <span class="badge blue">bwrap 沙箱</span>
+          <span class="badge dark">GPL-3.0</span>
+          <span class="badge">单文件 &lt;1MB</span>
+          <span class="badge ink">13 GitHub Stars</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge ink">Claude Code</span>
+          <span class="badge ink">Codex</span>
+          <span class="badge ink">OpenCode</span>
+          <span class="badge ink">Pi Agent</span>
+          <span class="badge ink">TOML 配置</span>
+          <span class="badge ink">JSON Schema</span>
+        </div>
+        <div class="alert">
+          <strong>核心价值：减少权限弹窗，降低 Agent 误改本机文件的风险</strong>
+          <p>bwrap 默认将整个文件系统设为只读，仅允许项目目录和显式配置的路径可写。适合"防止 Agent 误操作"而非"防御恶意代码"场景。</p>
+          <div class="mini-row">
+            <span class="mini-tag">权限隔离</span>
+            <span class="mini-tag">bwrap</span>
+            <span class="mini-tag">沙箱</span>
+            <span class="mini-tag">单二进制</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">THREAT MODEL</div>
+          <h3>隔离层级：防止误操作 vs 绝对安全</h3>
+          <p>bwrap 沙箱只保证 Agent 无法随意写入非授权路径，不提供 microVM 级别的恶意代码防护。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>一句话：</b>Agent 想写哪里，就用 TOML 显式授权——其余全只读。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">bwrap 默认全文件系统只读</div></div>
+            <div class="flow-item red"><div class="t">Step 2</div><div class="c">TOML 显式声明可写路径</div></div>
+            <div class="flow-item dark"><div class="t">Step 3</div><div class="c">Agent 在沙箱内运行</div></div>
+            <div class="flow-item blue"><div class="t">Step 4</div><div class="c">超出权限的文件操作被拒绝</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <section class="section" aria-label="核心价值与适用场景">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">核心价值</div>
+          <h2>减少弹窗，防止误改本机文件</h2>
+          <p>Coding Agent 运行时需要写缓存、写临时文件、写配置文件——直接给权限太危险，不给又弹窗。agent-run 用 TOML 声明"哪些路径可写"，其余全只读。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <h3>权限弹窗归零</h3>
+          <p>无需 Agent 向用户申请写权限，配置文件声明即可。</p>
+          <div class="tagrow">
+            <span class="tag">零弹窗</span>
+            <span class="tag blue">声明式</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>误操作防护</h3>
+          <p>系统目录、SSH key、密码文件等默认不可写，Agent 写不进去。</p>
+          <div class="tagrow">
+            <span class="tag red">bwrap</span>
+            <span class="tag blue">只读系统</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>轻量部署</h3>
+          <p>单文件二进制，x86_64 仅 ~666KB，无需安装依赖，放入 <code>PATH</code> 即用。</p>
+          <div class="tagrow">
+            <span class="tag dark">&lt;1MB</span>
+            <span class="tag">零依赖</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="支持的 Coding Agent">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">支持的 Agent</div>
+          <h2>Claude Code / Codex / OpenCode / Pi</h2>
+          <p>命令行直接指定要运行的 Agent 类型，agent-run 自动套上对应沙箱配置。</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <div class="card">
+          <h3>Claude Code</h3>
+          <p>需挂载 <code>~/.claude</code> 和 <code>~/.claude.json</code>（workspace trust 配置）。</p>
+          <div class="tagrow"><span class="tag dark">Anthropic</span></div>
+        </div>
+        <div class="card">
+          <h3>Codex</h3>
+          <p>挂载 <code>~/.codex</code> 缓存目录。</p>
+          <div class="tagrow"><span class="tag dark">OpenAI</span></div>
+        </div>
+        <div class="card">
+          <h3>OpenCode</h3>
+          <p>需 <code>/tmp/opencode</code> 可写（OpenTUI 库解压路径）以及 <code>TMPDIR</code> 环境变量。</p>
+          <div class="tagrow"><span class="tag dark">OpenCode</span></div>
+        </div>
+        <div class="card">
+          <h3>Pi Agent</h3>
+          <p>需挂载 <code>~/.pi</code> 和 <code>/tmp</code>（Pi bash 日志输出路径）。</p>
+          <div class="tagrow"><span class="tag dark">Pi</span></div>
+        </div>
+      </div>
+      <div class="quote-block" style="margin-top:14px">
+        <b>运行方式：</b>在项目目录下运行 <code>agent-run &lt;pi|opencode|codex|claude&gt;</code> 即可，配置从最近的 <code>.agent-run/config.toml</code> 自动读取。
+      </div>
+    </section>
+
+    <section class="section" aria-label="TOML 配置示例">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">配置方式</div>
+          <h2>TOML 声明式配置，网络/环境变量/可写挂载</h2>
+          <p>全局配置 + per-tool 覆盖，支持网络开关、环境变量继承或覆盖、路径只读/可写切换。</p>
+        </div>
+      </div>
+      <pre>[global]
+mount = [
+    "~/.cache",   # 缓存可写
+    "..",          # 项目目录可写（相对于配置所在位置）
+]
+
+[tools.claude]
+mount = [
+    "~/.claude",
+    "~/.claude.json",   # 必须存在，workspace trust
+]</pre>
+      <div class="grid-3" style="margin-top:14px">
+        <div class="card">
+          <h3>mount</h3>
+          <p>显式声明可写路径；未声明的路径默认为只读。支持 <code>~</code> 路径展开。</p>
+          <div class="tagrow"><span class="tag blue">只读默认</span></div>
+        </div>
+        <div class="card">
+          <h3>network</h3>
+          <p>布尔开关，控制沙箱内是否允许网络访问。</p>
+          <div class="tagrow"><span class="tag blue">可关闭</span></div>
+        </div>
+        <div class="card">
+          <h3>env / inherit_env</h3>
+          <p>选择继承宿主环境变量，或仅传递显式声明的变量（如 <code>TMPDIR</code>）。</p>
+          <div class="tagrow"><span class="tag">细粒度控制</span></div>
+        </div>
+      </div>
+      <div class="quote-block" style="margin-top:12px">
+        <b>JSON Schema：</b>仓库内置 <code>schema.json</code>，配合 <a href="https://taplo.tamasfe.dev/" style="color:var(--blue)">Taplo</a> 等支持 Schema 的编辑器可获得配置补全和类型检查。
+      </div>
+    </section>
+
+    <section class="section" aria-label="威胁模型与安全边界">
+      <div class="section-head">
+        <div class="section-no k">04</div>
+        <div class="section-meta">
+          <div class="label k">威胁模型</div>
+          <h2>防止误操作，非绝对安全隔离</h2>
+          <p>README 明确说明：agent-run 主要用于捕获 Agent 的误操作，不保证完全防御恶意代码。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <div class="risk" data-accent="blue">
+          <div class="n">1</div>
+          <h4>✅ 能防护的</h4>
+          <p>Agent 误写系统文件、SSH key、密码文件、其他人目录。</p>
+        </div>
+        <div class="risk" data-accent="red">
+          <div class="n">2</div>
+          <h4>⚠️ 不能防护的（已知限制）</h4>
+          <p>整个文件系统以只读暴露，网络开启时仍可向外发送数据（如读取 <code>/etc/hosts</code> 再外传）。</p>
+        </div>
+        <div class="risk" data-accent="dark">
+          <div class="n">3</div>
+          <h4>🔒 绝对隔离需求</h4>
+          <p>若威胁模型含恶意代码或数据窃取，建议使用 microVM 级隔离方案。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="安装与使用">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">安装使用</div>
+          <h2>Nix / Mise / 手动下载，三种方式</h2>
+          <p>无额外运行时依赖，仅需 Linux + unprivileged user namespaces（bwrap 内嵌在二进制内）。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <h3>Nix（推荐）</h3>
+          <p><code>nix run github:sin-ack/agent-run -- &lt;command&gt;</code></p>
+          <div class="tagrow"><span class="tag dark">Flakes</span></div>
+        </div>
+        <div class="card">
+          <h3>Mise</h3>
+          <p><code>mise use github:sin-ack/agent-run@latest</code></p>
+          <div class="tagrow"><span class="tag">版本管理</span></div>
+        </div>
+        <div class="card">
+          <h3>手动下载</h3>
+          <p>从 <a href="https://github.com/sin-ack/agent-run/releases/latest" style="color:var(--blue)">GitHub Releases</a> 下载二进制，<code>chmod +x</code> 后放入 <code>PATH</code>。</p>
+          <div class="tagrow"><span class="tag">x86_64 / aarch64</span></div>
+        </div>
+      </div>
+      <div class="quote-block" style="margin-top:12px">
+        <b>前提条件：</b>Linux 系统 + unprivileged user namespaces 已启用。<code>bwrap</code> 二进制已内嵌在 agent-run 中，无需单独安装。
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">
+      数据来源：<a href="https://github.com/sin-ack/agent-run" style="color:var(--blue)">GitHub sin-ack/agent-run</a> ·
+      Stars: 13 · Forks: 0 · License: GPL-3.0 · Language: Rust ·
+      最新版本: v0.1.1（2026-07-12） ·
+      主题标签: agent-harness, agent-sandbox
+    </p>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var btn = document.createElement('button');
+      btn.textContent = '保存 PNG';
+      btn.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;background:#d80018;color:#fff;border:2px solid #111;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:system-ui,"PingFang SC",sans-serif;box-shadow:4px 4px 0 rgba(17,17,17,.25)';
+      btn.onclick = function() {
+        html2canvas(document.body, {scale:2,useCORS:true}).then(function(canvas) {
+          var a = document.createElement('a');
+          a.download = 'agent-run-sandbox.png';
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+        });
+      };
+      document.body.appendChild(btn);
+    });
+  </script>
+</body>
+</html>
