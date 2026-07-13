@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Webify MCP · 极低成本上下文压缩MCP工具</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(280px,.94fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:310px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.68;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .pill.blue{border-color:rgba(74,120,255,.35);background:rgba(74,120,255,.12);color:#d8e3ff}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.36) 0 10%,transparent 11%),linear-gradient(135deg,var(--cyan) 0%,var(--blue) 34%,var(--purple) 68%,var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24),inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}.mini-icon.green{color:var(--green)}.mini-icon.yellow{color:var(--yellow)}.mini-icon.purple{color:var(--purple)}.mini-icon.blue{color:var(--blue)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%,#53a3ff 22%,var(--purple) 54%,var(--green) 80%,var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 24px rgba(88,195,255,.16)}
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%,#141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+    .panel-head h3{margin:0;font-size:13px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c8d5ff;white-space:nowrap}
+    .body-text{margin:0;color:#d9e2ff;font-size:12.8px;line-height:1.72}
+    .body-text + .body-text{margin-top:2px}
+    .muted{color:#aebee6}
+    .task{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);border-radius:14px;padding:11px 11px 10px;display:grid;gap:8px}
+    .task-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .task-name{font-size:12px;font-weight:900;color:#fff;letter-spacing:.01em}
+    .status{padding:4px 8px;border-radius:999px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#dce7ff;white-space:nowrap}
+    .status.green{color:#7fe1a2;border-color:rgba(45,179,106,.32)}
+    .status.yellow{color:#ffe28f;border-color:rgba(244,200,76,.32)}
+    .status.purple{color:#d2c0ff;border-color:rgba(132,89,255,.32)}
+    .task p{font-size:12px;line-height:1.55;color:#d9e2ff;margin:0}
+    .progress{height:10px;border-radius:999px;background:#101525;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .progress > span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--green))}
+    .task-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#b6c5f2}
+    .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);padding:4px 8px;border-radius:999px}
+    .status-list{display:grid;gap:8px}
+    .status-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.08);background:#0f1424;padding:9px 10px;border-radius:12px;font-size:12px;color:#d8e2ff}
+    .status-item .left{display:grid;gap:2px}
+    .status-item .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
+    .term{background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#111831;border-bottom:1px solid rgba(255,255,255,.08);color:#dfe8ff;font-size:11px}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8f59f;font-size:12px;line-height:1.7;min-height:180px;white-space:pre-wrap}
+    .term .url{color:#7ad9ff}
+    .compare-wrap{background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .section{display:grid;gap:12px;background:linear-gradient(180deg,var(--panel) 0%,#141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px}
+    .section h2{margin:0;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .section p{margin:0;color:#d9e2ff;font-size:12.8px;line-height:1.72}
+    .table-wrap{overflow-x:auto;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:#0c1120}
+    table{width:100%;border-collapse:collapse;min-width:760px}
+    th,td{padding:12px 12px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top;text-align:left}
+    th{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#cdd8fb;background:#111831}
+    td{font-size:12.5px;line-height:1.65;color:#e1e8ff}
+    td small{display:block;color:#9fb0de;margin-top:4px;line-height:1.55}
+    .flow{display:grid;gap:10px}
+    .flow-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .flow-box{min-width:0;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));padding:12px;position:relative}
+    .flow-box:after{content:"→";position:absolute;right:-16px;top:50%;transform:translateY(-50%);color:#6eb7ff;font-weight:900;font-size:18px}
+    .flow-box:last-child:after{content:""}
+    .flow-k{font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#96a8d8;letter-spacing:.12em;text-transform:uppercase;margin-bottom:7px}
+    .flow-t{font-size:13px;font-weight:900;color:#fff;line-height:1.3;margin-bottom:6px}
+    .flow-d{font-size:12px;line-height:1.55;color:#cdd8fb}
+    .feature-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .feature{display:flex;align-items:center;gap:10px;min-width:0;border-radius:16px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03))}
+    .icon-wrap{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1)}
+    .icon-wrap svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .feature span{font-size:12.6px;font-weight:850;letter-spacing:.01em}
+    .feature.cyan{color:var(--cyan)}.feature.green{color:var(--green)}.feature.yellow{color:var(--yellow)}.feature.purple{color:var(--purple)}
+    .bench-grid{display:grid;grid-template-columns:1.22fr .78fr;gap:10px}
+    .bench-card{border-radius:16px;border:1px solid rgba(255,255,255,.08);background:#0d1220;padding:12px;display:grid;gap:8px}
+    .bench-card .label{font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#94a6d4;letter-spacing:.12em;text-transform:uppercase}
+    .bench-card .value{font-size:22px;font-weight:950;letter-spacing:-.04em}
+    .bench-card .sub{font-size:12.5px;line-height:1.58;color:#c8d5ff}
+    .bench-bars{display:grid;gap:10px}
+    .bar-row{display:grid;gap:6px}
+    .bar-row .meta{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:#c8d5ff}
+    .bar{height:10px;border-radius:999px;background:#101525;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .bar span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--green))}
+    .bar.purple span{background:linear-gradient(90deg,var(--purple),#7ad9ff)}
+    .bar.yellow span{background:linear-gradient(90deg,var(--yellow),var(--purple))}
+    .compat{display:flex;flex-wrap:wrap;gap:8px}
+    .install{display:grid;gap:10px}
+    .code{margin:0;padding:14px 14px;border-radius:16px;background:#0b1020;border:1px solid rgba(255,255,255,.08);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.6px;line-height:1.7;color:#dff0ff;overflow:auto}
+    .foot{margin-top:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#9fb0de;font-size:11.5px}
+    .foot strong{color:#eff4ff}
+    @media (max-width:980px){
+      .hero,.shell,.bench-grid{grid-template-columns:1fr}
+      .flow-row{grid-template-columns:1fr 1fr}
+      .feature-row{grid-template-columns:1fr}
+      .flow-box:after{right:10px;top:auto;bottom:-16px;transform:none}
+    }
+    @media (max-width:720px){
+      .page{width:min(1180px,calc(100% - 14px));padding:10px 0 70px}
+      .hero-copy{padding-top:4px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .flow-row{grid-template-columns:1fr}
+      .flow-box:after{content:"↓";right:50%;bottom:-16px;transform:translateX(50%)}
+      .visual-grid{grid-template-columns:1fr}
+      .bench-card .value{font-size:18px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <div class="kicker">AI Agent · MCP · DarkBlue</div>
+          <div class="source">source_url: https://github.com/kunal12203/webify-mcp</div>
+        </div>
+        <h1 class="title">Webify MCP</h1>
+        <p class="subtitle">Adaptive web research for AI coding agents.</p>
+        <p class="subcn">极低成本上下文压缩MCP工具。它不是把整页网页硬塞进上下文，而是先搜索、再抽取结构、最后只把真正相关的子树交给模型。</p>
+        <div class="pill-row">
+          <span class="pill cyan">61 Stars</span>
+          <span class="pill green">Python</span>
+          <span class="pill yellow">MIT</span>
+          <span class="pill purple">GrapeRoot</span>
+          <span class="pill blue">Webify MCP</span>
+        </div>
+        <div class="hero-note">
+          <strong>AI 网页研究贵在上下文，而非搜索。</strong>
+          <p>真正昂贵的部分不是“找到网页”，而是“把网页压缩到模型能用的上下文密度”。Webify 把成本花在结构化检索和摘要上，让 AI coding agents 以更低 token 代价获得更准的信息。</p>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">W</div>
+          <div class="visual-meta">
+            <div class="big">91% 质量 / 5% 成本</div>
+            <div class="small">Deep Research Benchmark</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <div class="mini-card">
+            <div class="mini-icon cyan"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></div>
+            <div class="label">Search</div>
+            <div class="value">web_find</div>
+            <div class="desc">多来源研究，适合问题探索与交叉验证。</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon purple"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h13"></path></svg></div>
+            <div class="label">Lookup</div>
+            <div class="value">web_lookup</div>
+            <div class="desc">已知 URL 的精准定位与片段抽取。</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon green"><svg viewBox="0 0 24 24"><path d="M6 5h12v14H6z"></path><path d="M9 9h6M9 13h6"></path></svg></div>
+            <div class="label">Graph</div>
+            <div class="value">DOM Graph</div>
+            <div class="desc">把网页变成结构图，而不是长文本。</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon yellow"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"></path></svg></div>
+            <div class="label">Scope</div>
+            <div class="value">80–300 tok</div>
+            <div class="desc">只返回相关子树，极限压缩上下文。</div>
+          </div>
+        </div>
+        <div class="visual-strip"></div>
+      </div>
+    </section>
+
+    <section class="shell">
+      <div class="panel">
+        <div class="panel-head"><h3>Pain Point</h3><span class="badge">why it matters</span></div>
+        <p class="body-text">网页研究的主要成本，不在“搜索结果列表”，而在“把网页读进上下文”。当模型看到的是整页 HTML / 纯文本，大量 token 会浪费在无关导航、页脚、广告与重复结构上。</p>
+        <p class="body-text muted">Webify 把网页先拆成结构图，再用 BM25 + BFS 找到相关节点，最后用 Haiku Synthesis 产出紧凑结论。目标不是“读更多”，而是“读得更省”。</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Workflow</h3><span class="badge">text flowchart</span></div>
+        <div class="flow">
+          <div class="flow-row">
+            <div class="flow-box">
+              <div class="flow-k">Step 01</div>
+              <div class="flow-t">Search</div>
+              <div class="flow-d">Brave Search / DuckDuckGo Lite 负责找到候选页面。</div>
+            </div>
+            <div class="flow-box">
+              <div class="flow-k">Step 02</div>
+              <div class="flow-t">DOM Graph Builder</div>
+              <div class="flow-d">把页面转成结构化节点图，保留可检索层级。</div>
+            </div>
+            <div class="flow-box">
+              <div class="flow-k">Step 03</div>
+              <div class="flow-t">BM25 + BFS</div>
+              <div class="flow-d">先打分，再沿结构展开，抓到最相关子树。</div>
+            </div>
+            <div class="flow-box">
+              <div class="flow-k">Step 04</div>
+              <div class="flow-t">Haiku Synthesis</div>
+              <div class="flow-d">把检索片段压成可直接用于推理的短答案。</div>
+            </div>
+          </div>
+          <div class="term">
+            <div class="term-top"><span>TEXT PIPELINE</span><span class="url">Search → DOM Graph Builder → BM25 + BFS → Haiku Synthesis</span></div>
+            <div class="term-body">Input query
+  ↓
+Search candidates
+  ↓
+DOM structural graph
+  ↓
+BM25 ranking + BFS traversal
+  ↓
+Relevant subtree (80–300 tokens)
+  ↓
+Haiku synthesis for the agent</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Support</h3><span class="badge">IDE list</span></div>
+        <div class="status-list">
+          <div class="status-item"><div class="left"><span>Claude Code</span><span class="small">MCP client</span></div><strong>✓</strong></div>
+          <div class="status-item"><div class="left"><span>Cursor</span><span class="small">MCP client</span></div><strong>✓</strong></div>
+          <div class="status-item"><div class="left"><span>VS Code</span><span class="small">MCP client</span></div><strong>✓</strong></div>
+          <div class="status-item"><div class="left"><span>Windsurf</span><span class="small">MCP client</span></div><strong>✓</strong></div>
+          <div class="status-item"><div class="left"><span>Zed</span><span class="small">MCP client</span></div><strong>✓</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="compare-wrap">
+      <div class="section">
+        <h2>Two Tools Comparison</h2>
+        <p>一个负责“找问题”，一个负责“找页面里的关键片段”。二者都围绕上下文压缩工作，但入口不同。</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>When to use</th>
+                <th>What it does</th>
+                <th>Approx cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>web_find</strong><small>multi-source research</small></td>
+                <td>你只有问题，没有具体网页。</td>
+                <td>搜索多个候选来源，做结构化检索与合成。</td>
+                <td>~$0.003 / query</td>
+              </tr>
+              <tr>
+                <td><strong>web_lookup</strong><small>single-url precision lookup</small></td>
+                <td>你已经知道 URL，只想抓相关片段。</td>
+                <td>从单页中提取相关子树，避免整页灌入上下文。</td>
+                <td>~$0.0005 / query</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-bottom:14px">
+      <h2>Benchmark</h2>
+      <div class="bench-grid">
+        <div class="bench-card">
+          <div class="label">Deep Research Comparison</div>
+          <div class="value">91% 质量 / 5% 成本</div>
+          <div class="sub">在盲测中，Webify 的表现接近 Deep Research，但成本只有约 5%。对大多数研究型问题，这意味着更高的可用性与更低的 token 消耗。</div>
+        </div>
+        <div class="bench-bars">
+          <div class="bar-row">
+            <div class="meta"><span>Quality</span><span>91%</span></div>
+            <div class="bar"><span style="width:91%"></span></div>
+          </div>
+          <div class="bar-row">
+            <div class="meta"><span>Cost</span><span>5%</span></div>
+            <div class="bar purple"><span style="width:5%"></span></div>
+          </div>
+          <div class="bar-row">
+            <div class="meta"><span>Context efficiency</span><span>High</span></div>
+            <div class="bar yellow"><span style="width:96%"></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell" style="margin-bottom:14px">
+      <div class="panel">
+        <div class="panel-head"><h3>Install</h3><span class="badge">pip</span></div>
+        <div class="install">
+          <p class="body-text">最小安装命令如下；装完后即可在支持 MCP 的 IDE 中添加 webify 服务。</p>
+          <pre class="code">pip install webify-mcp
+claude mcp add webify -- webify-mcp</pre>
+          <div class="compat">
+            <span class="pill cyan">Claude Code</span>
+            <span class="pill green">Cursor</span>
+            <span class="pill yellow">VS Code</span>
+            <span class="pill purple">Windsurf</span>
+            <span class="pill blue">Zed</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Core Stats</h3><span class="badge">repo signal</span></div>
+        <div class="status-list">
+          <div class="status-item"><div class="left"><span>Source</span><span class="small">github.com/kunal12203/webify-mcp</span></div><strong>link</strong></div>
+          <div class="status-item"><div class="left"><span>Stars</span><span class="small">current signal</span></div><strong>61</strong></div>
+          <div class="status-item"><div class="left"><span>Language</span><span class="small">runtime</span></div><strong>Python</strong></div>
+          <div class="status-item"><div class="left"><span>License</span><span class="small">open source</span></div><strong>MIT</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>What to remember</h2>
+      <p>Webify MCP 的核心卖点不是“又一个网页抓取器”，而是“把网页研究压缩成 AI 能承受的上下文块”。</p>
+      <div class="feature-row">
+        <div class="feature cyan"><div class="icon-wrap"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></div><span>search-first but context-light</span></div>
+        <div class="feature green"><div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"></path></svg></div><span>relevant subtree only</span></div>
+        <div class="feature yellow"><div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M6 5h12v14H6z"></path><path d="M9 9h6M9 13h6"></path></svg></div><span>BM25 + BFS retrieval</span></div>
+        <div class="feature purple"><div class="icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h13"></path></svg></div><span>Haiku synthesis for agents</span></div>
+      </div>
+      <div class="foot">
+        <span><strong>GrapeRoot</strong> · AI Agent category · darkblue theme</span>
+        <span>极低成本上下文压缩MCP工具</span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>睡眠计算：Agent 的离线记忆巩固架构</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{
+      width:min(1180px,calc(100% - 20px));
+      margin:0 auto;
+      padding:18px 0 82px;
+    }
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);
+      gap:14px;
+      color:#fff;
+      margin-bottom:14px;
+    }
+    .hero-copy{
+      min-width:0;
+      display:grid;
+      gap:10px;
+      align-content:start;
+      padding:12px 0 0;
+    }
+    .kicker-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:fit-content;
+      padding:5px 10px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);
+      backdrop-filter:blur(10px);
+      color:#fff;
+      font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      border-radius:999px;
+    }
+    .source{
+      max-width:280px;
+      text-align:right;
+      font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#b8c8f5;
+      overflow-wrap:anywhere;
+    }
+    .source a{color:#58c3ff;text-decoration:underline;text-decoration-color:rgba(88,195,255,.4)}
+    .title{
+      margin:0;
+      font-size:clamp(40px,7vw,88px);
+      line-height:.92;
+      letter-spacing:-.07em;
+      font-weight:950;
+    }
+    .subtitle{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(15px,2vw,20px);
+      line-height:1.55;
+      color:#e8eefc;
+    }
+    .subcn{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(13px,1.6vw,16px);
+      line-height:1.65;
+      color:#c5d2f7;
+    }
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.05);
+      border-radius:999px;
+      color:#fff;
+      font-size:12px;
+      font-weight:850;
+      letter-spacing:.01em;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{
+      display:grid;
+      gap:8px;
+      border:1.5px solid rgba(255,255,255,.16);
+      background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+      padding:14px 16px 12px;
+      border-radius:18px;
+      box-shadow:var(--shadow);
+    }
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{
+      min-width:0;
+      background:rgba(10,12,22,.5);
+      border:1.5px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:14px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+    .visual-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .orb{
+      width:66px;
+      height:66px;
+      border-radius:22px;
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+        linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+      box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      display:grid;
+      place-items:center;
+      color:#fff;
+      font-size:26px;
+      font-weight:950;
+      letter-spacing:-.08em;
+    }
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .mini-card{
+      min-width:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1.5px solid rgba(255,255,255,.09);
+      border-radius:16px;
+      padding:10px 10px 9px;
+      display:grid;
+      gap:8px;
+      box-shadow:0 12px 26px rgba(0,0,0,.18);
+    }
+    .mini-icon{
+      width:34px;height:34px;border-radius:12px;
+      display:grid;place-items:center;
+      color:#fff;font-size:16px;
+    }
+    .mini-icon.cyan{background:linear-gradient(135deg,rgba(88,195,255,.45),rgba(74,120,255,.38))}
+    .mini-icon.purple{background:linear-gradient(135deg,rgba(132,89,255,.45),rgba(74,120,255,.38))}
+    .mini-icon.green{background:linear-gradient(135deg,rgba(45,179,106,.45),rgba(88,195,255,.38))}
+    .mini-icon.yellow{background:linear-gradient(135deg,rgba(244,200,76,.45),rgba(132,89,255,.38))}
+    .mini-card .label{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9db0de}
+    .mini-card .value{font-size:14px;font-weight:900;letter-spacing:-.02em;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.55;color:#c5d2f7;margin:0}
+    .visual-strip{
+      background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple),var(--green));
+      height:3px;border-radius:999px;
+      opacity:.6;
+    }
+    .shell{
+      display:grid;
+      grid-template-columns:240px minmax(0,1fr) 220px;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    .panel{
+      background:var(--panel);
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:20px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .panel-head{
+      padding:10px 13px;
+      background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));
+      border-bottom:1px solid rgba(255,255,255,.07);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+    }
+    .panel-head h3{margin:0;font-size:12.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#e8edf8}
+    .badge{
+      font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+      padding:4px 8px;border-radius:999px;
+      background:rgba(88,195,255,.2);border:1px solid rgba(88,195,255,.3);color:#d8f4ff;
+    }
+    .panel-body{padding:10px;display:grid;gap:8px}
+    .search{
+      padding:9px 11px;
+      background:#0f1424;
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:10px;
+      font-size:12px;color:#6b7db0;
+    }
+    .pipeline-step{
+      display:grid;
+      grid-template-columns:32px minmax(0,1fr);
+      gap:10px;
+      align-items:start;
+      padding:10px;
+      background:linear-gradient(135deg,rgba(255,255,255,.04),rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:14px;
+    }
+    .step-num{
+      width:32px;height:32px;border-radius:50%;
+      display:grid;place-items:center;
+      font-size:13px;font-weight:950;color:#fff;
+    }
+    .step-num.g{background:linear-gradient(135deg,var(--cyan),var(--blue))}
+    .step-num.r{background:linear-gradient(135deg,var(--yellow),#e07030)}
+    .step-num.c{background:linear-gradient(135deg,var(--green),var(--cyan))}
+    .step-content{display:grid;gap:3px}
+    .step-content .name{font-size:13px;font-weight:900;color:#fff}
+    .step-content .fn{font-size:11px;color:#c5d2f7;line-height:1.5}
+    .pathway-card{
+      background:linear-gradient(135deg,rgba(74,120,255,.12),rgba(88,195,255,.08));
+      border:1px solid rgba(88,195,255,.2);
+      border-radius:12px;
+      padding:10px 12px;
+      display:grid;
+      gap:6px;
+    }
+    .pathway-card.cold{
+      background:linear-gradient(135deg,rgba(45,179,106,.12),rgba(88,195,255,.08));
+      border-color:rgba(45,179,106,.2);
+    }
+    .pathway-card .header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .pathway-card .tag{font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:999px}
+    .pathway-card .tag.hot{background:rgba(88,195,255,.2);color:#d8f4ff}
+    .pathway-card .tag.cold{background:rgba(45,179,106,.2);color:#ddffe8}
+    .pathway-card .title{font-size:13px;font-weight:900;color:#fff}
+    .pathway-card .desc{font-size:11px;line-height:1.55;color:#c5d2f7;margin:0}
+    .pathway-card .timing{font-size:10.5px;color:#9db0de}
+    .trigger-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .trigger-item{
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;
+      padding:10px;
+      display:grid;
+      gap:6px;
+    }
+    .trigger-item .icon{font-size:18px}
+    .trigger-item .label{font-size:12px;font-weight:900;color:#fff}
+    .trigger-item .desc{font-size:11px;color:#c5d2f7;line-height:1.5;margin:0}
+    .scenario-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .scenario-card{
+      background:linear-gradient(180deg,rgba(132,89,255,.1),rgba(74,120,255,.06));
+      border:1px solid rgba(132,89,255,.2);
+      border-radius:14px;
+      padding:12px;
+      display:grid;
+      gap:6px;
+    }
+    .scenario-card .icon{font-size:20px}
+    .scenario-card .title{font-size:13px;font-weight:900;color:#fff}
+    .scenario-card .desc{font-size:11.5px;color:#c5d2f7;line-height:1.55;margin:0}
+    .feature-row{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:repeat(6,minmax(0,1fr));
+      gap:10px;
+    }
+    .feature{
+      background:#171c2b;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      padding:11px 9px;
+      color:#e8edf8;
+      text-align:center;
+      display:grid;
+      gap:7px;
+      min-width:0;
+    }
+    .icon{
+      width:28px;height:28px;margin:0 auto;border-radius:50%;
+      background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.09);
+      display:grid;place-items:center;
+      font-size:14px;
+      color:#fff;
+    }
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+    .footer{
+      margin-top:14px;
+      background:#0b1020;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      color:#dfe8ff;
+      font-size:12px;
+      flex-wrap:wrap;
+    }
+    .footer .tag{
+      background:rgba(88,195,255,.15);
+      border:1px solid rgba(88,195,255,.25);
+      padding:4px 10px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:800;
+      color:#58c3ff;
+    }
+    .footer .url{font-size:11px;color:#6b7db0;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    @media (max-width:1080px){
+      .hero,.shell{grid-template-columns:1fr}
+      .feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .shell{padding:10px;gap:10px}
+      .feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .footer{font-size:11.5px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+      .trigger-grid,.scenario-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <div class="kicker">AGENT ENGINEERING · CONTEXTUAL AI</div>
+          <div class="source"><a href="https://www.context.ai/blog/sleep-time-compute" target="_blank" rel="noopener">context.ai/blog/sleep-time-compute</a></div>
+        </div>
+        <h1 class="title">睡眠计算</h1>
+        <p class="subtitle">Agent 的离线记忆巩固架构</p>
+        <p class="subcn">把学习从用户等待的热路径中剥离，让明天的 Agent 比今天更好——今天没有任何任务变慢。</p>
+        <div class="pill-row">
+          <span class="pill cyan">Agent工程</span>
+          <span class="pill green">上下文工程</span>
+          <span class="pill yellow">架构模式</span>
+          <span class="pill purple">睡眠计算</span>
+        </div>
+        <div class="hero-note">
+          <strong>Context.ai 提出的 Agent 系统架构模式</strong>
+          <p>类比生物记忆巩固：白天行动，晚上学习。Agent 执行任务时产生大量"尾气"（检索了什么、尝试了什么、哪里出错了），这些是学习的原材料，但不应该在用户等待时处理。</p>
+        </div>
+      </div>
+
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">💤</div>
+          <div class="visual-meta">
+            <div class="big">Sleep-time Compute</div>
+            <div class="small">Generator / Reflector / Curator</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <article class="mini-card">
+            <div class="mini-icon cyan" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="label">Generator</div>
+            <div class="value">提出更新建议</div>
+            <div class="desc">从执行痕迹中提炼教训，生成候选更新。</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon yellow" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <div class="label">Reflector</div>
+            <div class="value">批评验证</div>
+            <div class="desc">提议的教训是真的？和已知相容？值得保留？</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon green" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <div class="label">Curator</div>
+            <div class="value">决定最终写入</div>
+            <div class="desc">增量写入存储，持久积累知识。</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon purple" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+            </div>
+            <div class="label">三层并行</div>
+            <div class="value">组织/团队/个人</div>
+            <div class="desc">按各自节奏运行，互不干扰。</div>
+          </article>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <section class="shell">
+      <aside class="panel">
+        <div class="panel-head"><h3>问题定义</h3></div>
+        <div class="panel-body">
+          <div class="search">为什么热路径不能学习？</div>
+          <article class="pathway-card">
+            <div class="header">
+              <span class="tag hot">热路径</span>
+            </div>
+            <div class="title">用户等待中</div>
+            <div class="desc">Agent 执行任务时，用户正在等待响应。任何额外计算都会直接增加延迟。</div>
+            <div class="timing">→ 必须极简：廉价抓取原始痕迹，然后继续</div>
+          </article>
+          <article class="pathway-card cold">
+            <div class="header">
+              <span class="tag cold">冷路径</span>
+            </div>
+            <div class="title">空闲时学习</div>
+            <div class="desc">昂贵的提炼过程完全在热路径之外运行，让明天的 Agent 比今天更好。</div>
+            <div class="timing">→ 定时节奏 + 容量阈值触发</div>
+          </article>
+        </div>
+      </aside>
+
+      <section class="panel" style="background:transparent;border:none;box-shadow:none;display:grid;grid-template-rows:auto auto;gap:12px;padding:0">
+        <div class="panel">
+          <div class="panel-head"><h3>核心机制：G → R → C 管道</h3></div>
+          <div class="panel-body" style="display:grid;gap:10px">
+            <div class="pipeline-step">
+              <div class="step-num g">G</div>
+              <div class="step-content">
+                <div class="name">Generator 生成器</div>
+                <div class="fn">从执行痕迹中提炼经验教训，提出更新建议候选</div>
+              </div>
+            </div>
+            <div class="pipeline-step">
+              <div class="step-num r">R</div>
+              <div class="step-content">
+                <div class="name">Reflector 反思器</div>
+                <div class="fn">批评验证——提议的教训是真的？和已知知识相容？值得保留？</div>
+              </div>
+            </div>
+            <div class="pipeline-step">
+              <div class="step-num c">C</div>
+              <div class="step-content">
+                <div class="name">Curator 管理器</div>
+                <div class="fn">决定最终写入存储，增量写入，持久积累，不重复覆盖</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>触发机制</h3></div>
+          <div class="panel-body">
+            <div class="trigger-grid">
+              <div class="trigger-item">
+                <div class="icon">⏰</div>
+                <div class="label">定时节奏</div>
+                <div class="desc">每几小时自动触发一次，按组织/团队/个人三层各自节奏运行</div>
+              </div>
+              <div class="trigger-item">
+                <div class="icon">📊</div>
+                <div class="label">容量阈值</div>
+                <div class="desc">当未处理的执行痕迹积压超过阈值时立即触发，避免知识流失</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <div class="panel-head"><h3>设计原则</h3></div>
+        <div class="panel-body">
+          <div class="search">积累与呈现分离</div>
+          <article class="pathway-card cold" style="margin-top:4px">
+            <div class="header">
+              <span class="tag cold">存储层</span>
+            </div>
+            <div class="title">持久积累</div>
+            <div class="desc">执行痕迹、学习成果、经验教训持久积累，不断丰富知识库。</div>
+          </article>
+          <article class="pathway-card" style="margin-top:8px">
+            <div class="header">
+              <span class="tag hot">呈现层</span>
+            </div>
+            <div class="title">可替换</div>
+            <div class="desc">Prompt 优化方法、检索策略、知识组织方式均可独立演进，不影响底层存储。</div>
+          </article>
+          <div class="search" style="margin-top:8px">生物类比</div>
+          <article class="pathway-card cold" style="margin-top:4px">
+            <div class="title">白天行动 · 晚上学习</div>
+            <div class="desc">生物记忆巩固机制：白天积累经验，夜间睡眠时整合强化，两者互不干扰。</div>
+          </article>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel" style="margin-bottom:14px">
+      <div class="panel-head"><h3>热路径 vs 冷路径对比</h3></div>
+      <div class="panel-body">
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <div class="icon">🔥</div>
+            <div class="title">热路径（Hot Path）</div>
+            <div class="desc">
+              <strong>时机：</strong>用户等待中<br>
+              <strong>目标：</strong>极低延迟响应<br>
+              <strong>操作：</strong>廉价抓取原始痕迹（检索了什么、尝试了什么、哪里出错了）<br>
+              <strong>原则：</strong>不做任何学习/提炼/优化操作
+            </div>
+          </div>
+          <div class="scenario-card">
+            <div class="icon">❄️</div>
+            <div class="title">冷路径（Cold Path）</div>
+            <div class="desc">
+              <strong>时机：</strong>空闲计算时<br>
+              <strong>目标：</strong>让 Agent 持续进化<br>
+              <strong>操作：</strong>G→R→C 三阶段管道处理痕迹<br>
+              <strong>原则：</strong>今天没有任何任务变慢，明天变得更好
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3>适用场景</h3></div>
+      <div class="panel-body">
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <div class="icon">🤖</div>
+            <div class="title">Agent 产品</div>
+            <div class="desc">需要持续学习和优化的 AI Agent，在每次交互中积累经验，不断提升回答质量和任务成功率。</div>
+          </div>
+          <div class="scenario-card">
+            <div class="icon">📋</div>
+            <div class="title">长任务场景</div>
+            <div class="desc">复杂多步骤任务执行，过程中产生大量中间状态和尝试路径，需要在任务间隙进行知识沉淀。</div>
+          </div>
+          <div class="scenario-card">
+            <div class="icon">🔄</div>
+            <div class="title">多 Agent 协作</div>
+            <div class="desc">组织/团队/个人三层并行运行，各自在空闲时进行知识巩固，集体智慧持续增长。</div>
+          </div>
+          <div class="scenario-card">
+            <div class="icon">⏱️</div>
+            <div class="title">延迟敏感系统</div>
+            <div class="desc">对响应时间有严格要求的系统，必须将学习过程完全剥离热路径，保证用户体验不受影响。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-row">
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <span>离线学习</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <span>零延迟影响</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <span>G→R→C 管道</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </div>
+        <span>三层并行</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16v11H4z"/><path d="M4 10h16"/><path d="M7 14h4"/></svg>
+        </div>
+        <span>积累与呈现分离</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12"/><path d="M6 12h12"/><path d="M6 16h12"/><path d="M6 8l-2-2"/><path d="M18 8l2-2"/></svg>
+        </div>
+        <span>Agent 进化</span>
+      </div>
+    </section>
+
+    <section class="footer">
+      <div>🟦 Sleep-time Compute</div>
+      <div class="tag">来源：Context.ai</div>
+      <div class="url" title="https://www.context.ai/blog/sleep-time-compute">context.ai/blog/sleep-time-compute</div>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      function send(){
+        var h=document.body.scrollHeight;
+        window.parent.postMessage({type:'theme-height',slug:'sleep-time-compute',height:h},'*');
+      }
+      if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+      setTimeout(send,500);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>多 Agent 系统：何时拆、何时合的设计指南</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;margin-bottom:14px}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(22px,3.8vw,40px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+
+    /* SECTIONS */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* GRIDS */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card{border:2px solid var(--line);background:#fff;padding:14px;box-shadow:var(--shadow)}
+    .card .n{font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+    .card h3{margin:0 0 6px;font-size:15px;line-height:1.25;font-weight:900;letter-spacing:-.02em}
+    .card p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.65}
+
+    /* FLOW */
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* COMPARE TABLE */
+    .compare{border:2px solid var(--line);border-collapse:collapse;width:100%;font-size:12.5px}
+    .compare th{background:#111;color:#fff;padding:9px 12px;font-weight:900;text-align:left;font-size:11px;letter-spacing:.08em}
+    .compare td{padding:9px 12px;border:1.5px solid var(--line);vertical-align:top}
+    .compare tr:nth-child(even) td{background:#f7f6f2}
+    .compare .red{color:var(--red);font-weight:900}
+    .compare .blue{color:var(--blue);font-weight:900}
+
+    /* WARN */
+    .warn{border:2px solid var(--red);background:var(--soft-red);padding:12px 14px;font-size:13px;font-weight:750;margin-top:14px}
+
+    /* SOURCE */
+    .source-note{font-size:11px;color:var(--muted);margin-top:28px;padding-top:14px;border-top:2px solid var(--line)}
+
+    @media(max-width:720px){
+      .hero,.section-head{grid-template-columns:1fr}
+      .section-no{width:60px;height:60px;font-size:22px}
+      .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<section aria-label="多 Agent 系统 并行 上下文工程">
+<div class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <span class="kicker">LangChain · Anthropic · Multi-Agent</span>
+    <h1 class="demo-title">多 Agent 系统：何时拆、何时合的设计指南</h1>
+    <p class="subtitle">读可并行，写会把隐性决策变成冲突。上下文工程是拆与合的核心约束。</p>
+    <div class="badge-row">
+      <span class="badge red">Anthropic Claude Research</span>
+      <span class="badge blue">上下文工程</span>
+      <span class="badge dark">主 Agent 统一调用</span>
+    </div>
+    <div class="alert">
+      <strong>核心原则：并行的单位不是 Agent，是任务。</strong>
+      <p>拆任务不等于拆上下文。长生命周期 agent 需要压缩、外部记忆、谨慎交接。</p>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="panel-top">
+      <span class="eyebrow">ARCHITECTURE</span>
+      <h3>多 Agent 协作模型</h3>
+      <p>主 agent 在一次统一调用中完成 · 高价值且可大量并行</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote">压缩、外部记忆、谨慎交接 — 长生命周期 agent 的三大支柱。</div>
+      <div class="flow" style="margin-top:8px">
+        <div class="flow-item blue"><div class="t">STEP 1</div><div class="c">任务分解</div></div>
+        <div class="flow-item blue"><div class="t">STEP 2</div><div class="c">并行执行</div></div>
+        <div class="flow-item red"><div class="t">STEP 3</div><div class="c">冲突仲裁</div></div>
+        <div class="flow-item dark"><div class="t">STEP 4</div><div class="c">结果聚合</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- OVERVIEW -->
+<section aria-label="多 Agent 系统">
+<div class="overview">
+  <div class="overview-sentence">多 Agent 不是越多越好：何时拆、何时合，是架构设计的核心判断。</div>
+  <div class="overview-body">
+    <p>多 Agent 系统的价值在于高价值且可大量并行的任务。拆分前必须问：这些子任务是否真的需要独立 agent，还是只需独立的函数调用？</p>
+  </div>
+</div>
+</section>
+
+<!-- SECTION 1: WHEN TO SPLIT -->
+<section aria-label="并行的单位不是 什么时候多 Agent 值得 什么时候先别拆">
+<div class="section-head">
+  <div class="section-no">01</div>
+  <div class="section-meta">
+    <div class="label">并行的单位不是</div>
+    <h2>什么时候多 Agent 值得拆？</h2>
+    <p>高价值且可大量并行的任务才值得多 Agent。判断标准：任务是否足够独立、是否需要不同工具或知识域、是否可接受异步执行。</p>
+  </div>
+</div>
+<div class="grid-3">
+  <div class="card">
+    <div class="n">值得拆</div>
+    <h3>多域并行任务</h3>
+    <p>需要不同专业知识域的子任务，如搜索、分析、生成各自调用不同工具链。</p>
+  </div>
+  <div class="card">
+    <div class="n">值得拆</div>
+    <h3>长生命周期任务</h3>
+    <p>需要压缩、外部记忆、人类介入检查点的任务，agent 需要状态持久化。</p>
+  </div>
+  <div class="card">
+    <div class="n">先别拆</div>
+    <h3>简单顺序任务</h3>
+    <p>如果一个 LLM 调用就能解决，不要拆成多个 agent，增加延迟和协调成本。</p>
+  </div>
+</div>
+</section>
+
+<!-- SECTION 2: ANTHROPIC RESEARCH -->
+<section aria-label="Anthropic Claude Research">
+<div class="section-head">
+  <div class="section-no b">02</div>
+  <div class="section-meta">
+    <div class="label b">Anthropic Claude Research</div>
+    <h2>主 Agent 在一次统一调用中完成</h2>
+    <p>Anthropic 的研究发现：主 agent 在一次统一调用中完成，往往比多次调用更稳定。多 Agent 的价值只在高并行度场景。</p>
+  </div>
+</div>
+<div class="grid-2">
+  <div class="card">
+    <div class="n">核心结论</div>
+    <h3>压缩 · 外部记忆 · 谨慎交接</h3>
+    <p>长生命周期 agent 必须有上下文压缩机制、外部记忆存储、任务交接时的状态同步。</p>
+  </div>
+  <div class="card">
+    <div class="n">关键陷阱</div>
+    <h3>写会把隐性决策变成冲突</h3>
+    <p>多 Agent 的写操作比读操作危险得多。并发写入同一上下文会引入隐性决策冲突。</p>
+  </div>
+</div>
+</section>
+
+<!-- SECTION 3: CONTEXT ENGINEERING -->
+<section aria-label="拆任务不等于拆上下文">
+<div class="section-head">
+  <div class="section-no k">03</div>
+  <div class="section-meta">
+    <div class="label k">上下文工程</div>
+    <h2>拆任务不等于拆上下文</h2>
+    <p>多 Agent 系统最常见的错误是把"拆任务"等同于"拆上下文"。实际上，任务可以并行，上下文必须集中管理。</p>
+  </div>
+</div>
+<table class="compare">
+  <tr><th>场景</th><th>推荐方式</th><th>原因</th></tr>
+  <tr>
+    <td>高并行 + 无状态</td>
+    <td class="blue">多 Agent 并行</td>
+    <td>任务独立，无冲突风险</td>
+  </tr>
+  <tr>
+    <td>需要共享状态</td>
+    <td class="blue">主 Agent + 函数调用</td>
+    <td>统一上下文管理，减少冲突</td>
+  </tr>
+  <tr>
+    <td>长生命周期 + 写操作</td>
+    <td class="red">谨慎交接机制</td>
+    <td>防止写操作冲突，引入仲裁层</td>
+  </tr>
+  <tr>
+    <td>上下文超长</td>
+    <td class="red">压缩 + 外部记忆</td>
+    <td>避免超出上下文窗口</td>
+  </tr>
+</table>
+</section>
+
+<!-- SECTION 4: LONG LIFECYCLE -->
+<section aria-label="长生命周期 agent">
+<div class="section-head">
+  <div class="section-no">04</div>
+  <div class="section-meta">
+    <div class="label">长生命周期 agent</div>
+    <h2>设计多 Agent 前的检查清单</h2>
+    <p>在引入多 Agent 架构前，确认以下几点都已评估。</p>
+  </div>
+</div>
+<div class="grid-2">
+  <div class="card">
+    <div class="n">检查项</div>
+    <h3>任务是否真的需要并行？</h3>
+    <p>如果是串行依赖关系，多 Agent 不会带来收益，只增加系统复杂度。</p>
+  </div>
+  <div class="card">
+    <div class="n">检查项</div>
+    <h3>冲突处理机制是否就绪？</h3>
+    <p>写操作前是否有仲裁层？状态同步机制是否完善？人类介入点在哪里？</p>
+  </div>
+  <div class="card">
+    <div class="n">检查项</div>
+    <h3>上下文窗口是否足够？</h3>
+    <p>如果任务需要跨长对话，压缩机制和外部记忆存储是否已设计？</p>
+  </div>
+  <div class="card">
+    <div class="n">检查项</div>
+    <h3>任务可量化的价值？</h3>
+    <p>多 Agent 带来的并行收益是否超过协调开销？只在高价值大量并行任务上有意义。</p>
+  </div>
+</div>
+<div class="warn">
+  ⚠ 读可并行，写会把隐性决策变成冲突。设计时优先考虑写操作的并发安全。
+</div>
+</section>
+
+<p class="source-note">来源：LangChain Blog · How and When to Build Multi-Agent Systems（Anthropic Claude Research）。原文：https://www.langchain.com/blog/how-and-when-to-build-multi-agent-systems</p>
+</div>
+</body>
+</html>

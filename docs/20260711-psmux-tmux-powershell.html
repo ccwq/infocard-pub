@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>psmux — 原生 Windows tmux，PowerShell/Rust 实现</title>
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === topbar: diagonal red-black hero + meta pills === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .kicker{display:inline-block;border:2px solid #fff;padding:3px 8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:10.5px;}
+    h1.demo-title{
+      margin:10px 0 6px;
+      font-size:clamp(20px,3.2vw,38px);font-weight:800;
+      letter-spacing:-.03em;line-height:1.05;
+    }
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+
+    .topbar-meta{
+      padding:14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);
+      padding:7px 9px 5px;
+      background:#fff;
+      font-weight:900;
+      font-size:14px;
+      line-height:1.1;
+    }
+    .meta-pill-lg .sub{
+      display:block;
+      font-size:9px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:2px;
+    }
+    .meta-pill-md{
+      border:2px solid var(--line);
+      border-left:4px solid var(--red);
+      padding:4px 7px 3px;
+      background:#fff;
+      font-weight:800;
+      font-size:11.5px;
+      line-height:1.25;
+    }
+    .meta-pill-md .sub{
+      display:block;
+      font-size:8.5px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:1px;
+    }
+    .meta-pill-sm{
+      border:2px solid var(--line);
+      border-left:4px solid #666;
+      padding:3px 7px 3px;
+      background:#fff;
+      font-weight:700;
+      font-size:11px;
+      color:#555;
+      line-height:1.3;
+    }
+    .meta-pill-sm .sub{
+      display:block;
+      font-size:8px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#aaa;
+      margin-top:1px;
+    }
+
+    /* === overview: one-sentence + body === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* === stats: red-black grid === */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* === pills === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+
+    /* === section === */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{
+      background:var(--ink);color:#fff;padding:7px 12px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:10px 12px}
+
+    h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+    p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+
+    /* === tags === */
+    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
+
+    /* === grid-2/3 === */
+    .grid-2,.grid-3{display:grid;gap:10px;margin-bottom:10px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+    .card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+
+    /* === table === */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+    th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    tr:nth-child(even) td{background:#faf8f4}
+    .check{color:var(--red);font-weight:900;font-size:13px}
+    .cross{color:var(--ink);font-weight:900;font-size:13px;opacity:.35}
+
+    /* === flow === */
+    .flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
+    .flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+
+    /* === quick-cmd === */
+    .quick-cmd{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:10px 14px;margin-bottom:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;font-weight:800;letter-spacing:.02em}
+
+    /* === cmd-list: 83 tmux commands === */
+    .cmd-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+    .cmd-item{background:#fff;border:1.5px solid var(--line);padding:5px 8px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;font-weight:700;line-height:1.3;color:var(--ink)}
+    .cmd-item.alt{background:#faf8f4}
+
+    /* === comparison-table === */
+    .comparison-table .highlight td{background:#fff5f6;font-weight:800}
+    .badge{padding:2px 6px;border:1.5px solid var(--line);font-size:10px;font-weight:800;background:#fff}
+    .badge.red{background:var(--red);color:#fff;border-color:var(--red)}
+
+    /* === arch-diagram === */
+    .arch-diagram{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:4px}
+    .arch-cell{border:2px solid var(--line);padding:10px 12px;background:#fff;text-align:center}
+    .arch-cell .arch-icon{font-size:20px;margin-bottom:5px}
+    .arch-cell .arch-name{font-weight:900;font-size:12px;margin-bottom:3px}
+    .arch-cell .arch-desc{font-size:11px;color:#555;line-height:1.4}
+
+    /* === install-grid === */
+    .install-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .install-card{border:2px solid var(--line);background:#fff;padding:10px 12px}
+    .install-card .install-method{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--red);margin-bottom:4px}
+    .install-card .install-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;color:var(--ink);word-break:break-all}
+
+    /* === feature-list === */
+    .feature-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .feature-item{display:grid;grid-template-columns:32px 1fr;border:2px solid var(--line);background:#fff;overflow:hidden}
+    .feature-icon{background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;padding:8px 4px}
+    .feature-body{padding:8px 10px}
+    .feature-name{font-weight:800;font-size:12px;margin-bottom:2px}
+    .feature-desc{font-size:11px;color:#444;line-height:1.4}
+
+    /* === btn === */
+    .btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+    .btn.red{background:var(--red);border-color:var(--red)}
+
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .overview{padding:10px 0}
+      .cmd-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .install-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .feature-list{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== TOPBAR ===== -->
+  <div class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">开源 · 终端多路复用</div>
+      <h1 class="demo-title">psmux</h1>
+      <div class="sub-line">原生 Windows tmux，非端口非封装。<br/>Born in PowerShell，Made in Rust。</div>
+      <div class="tagline">Windows ConPTY 直连 · 无需 WSL</div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">2,904<span class="sub">GitHub Stars</span></div>
+        <div class="meta-pill-lg">MIT<span class="sub">License</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">PowerShell<span class="sub">Shell</span></div>
+        <div class="meta-pill-md">Rust<span class="sub">语言</span></div>
+        <div class="meta-pill-sm">psmux/pmux/tmux<span class="sub">三命令同义</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== OVERVIEW ===== -->
+  <div class="overview">
+    <div class="overview-sentence">真正的原生 Windows tmux — 不依赖 WSL，不使用 Cygwin/MSYS2，直接调用 Windows ConPTY，用 Rust 重写完整 tmux 语义。</div>
+    <div class="overview-body">
+      <p>psmux 从零构建，读取你的 <code>.tmux.conf</code>、支持 tmux themes、83 条命令、140+ 格式变量、53 个 vim copy-mode 键位。PowerShell 7+ / cmd.exe 即开即用。可与 Claude Code agent teams 无缝集成，teammate 自动分配到独立 tmux pane。</p>
+    </div>
+  </div>
+
+  <!-- ===== STATS ===== -->
+  <div class="stats">
+    <div class="stat"><strong>83</strong><span>tmux 命令</span></div>
+    <div class="stat"><strong>140+</strong><span>格式变量</span></div>
+    <div class="stat"><strong>53</strong><span>vim 复制键</span></div>
+    <div class="stat"><strong>4</strong><span>安装方式</span></div>
+    <div class="stat"><strong>ConPTY</strong><span>原生支持</span></div>
+  </div>
+
+  <!-- ===== CORE FEATURES ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <span class="label">核心卖点 · ConPTY 直连 vs 传统方案</span>
+    </div>
+    <div class="sec-body">
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-body">
+            <div class="feature-name">ConPTY 直连</div>
+            <div class="feature-desc">直接调用 Windows Pseudo Console API，不走任何中间层，无延迟</div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🚫</div>
+          <div class="feature-body">
+            <div class="feature-name">无需 WSL</div>
+            <div class="feature-desc">纯 Windows 原生运行，不依赖 Linux 子系统，PowerShell 7+ 开箱即用</div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🦀</div>
+          <div class="feature-body">
+            <div class="feature-name">Rust 实现</div>
+            <div class="feature-desc">内存安全、零 GC 停顿、极低 CPU 占用，启动速度毫秒级</div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🐭</div>
+          <div class="feature-body">
+            <div class="feature-name">完整鼠标支持</div>
+            <div class="feature-desc">点击 pane 切换、选中复制、滚轮滚动、拖拽调整大小，SSH 下同样可用</div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🎨</div>
+          <div class="feature-body">
+            <div class="feature-name">tmux Themes</div>
+            <div class="feature-desc">Catppuccin、Dracula、Nord 等主流 tmux 主题开箱即用</div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">📄</div>
+          <div class="feature-body">
+            <div class="feature-name">tmux.conf 兼容</div>
+            <div class="feature-desc">直接读取 <code>.tmux.conf</code>，现有配置无缝迁移</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 83 TMUX COMMANDS ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">02</span>
+      <span class="label">83 条 tmux 命令清单（psmux 全部支持）</span>
+    </div>
+    <div class="sec-body">
+      <div class="cmd-grid">
+        <div class="cmd-item">new-session</div>
+        <div class="cmd-item alt">new-window</div>
+        <div class="cmd-item">new-pane</div>
+        <div class="cmd-item alt">split-window</div>
+        <div class="cmd-item">attach-session</div>
+        <div class="cmd-item alt">detach-client</div>
+        <div class="cmd-item">kill-session</div>
+        <div class="cmd-item alt">kill-window</div>
+        <div class="cmd-item">kill-pane</div>
+        <div class="cmd-item alt">list-sessions</div>
+        <div class="cmd-item">list-windows</div>
+        <div class="cmd-item alt">list-panes</div>
+        <div class="cmd-item">list-clients</div>
+        <div class="cmd-item alt">list-commands</div>
+        <div class="cmd-item">list-keys</div>
+        <div class="cmd-item alt">list-buffers</div>
+        <div class="cmd-item">list-message</div>
+        <div class="cmd-item alt">list-global-options</div>
+        <div class="cmd-item">list-options</div>
+        <div class="cmd-item alt">list-styles</div>
+        <div class="cmd-item">select-layout</div>
+        <div class="cmd-item alt">select-pane</div>
+        <div class="cmd-item">select-window</div>
+        <div class="cmd-item alt">select-client</div>
+        <div class="cmd-item">select-target</div>
+        <div class="cmd-item alt">rename-session</div>
+        <div class="cmd-item">rename-window</div>
+        <div class="cmd-item alt">move-window</div>
+        <div class="cmd-item">swap-pane</div>
+        <div class="cmd-item alt">swap-window</div>
+        <div class="cmd-item">respawn-pane</div>
+        <div class="cmd-item alt">respawn-window</div>
+        <div class="cmd-item">run-shell</div>
+        <div class="cmd-item alt">send-keys</div>
+        <div class="cmd-item">send-prefix</div>
+        <div class="cmd-item alt">copy-mode</div>
+        <div class="cmd-item">copy-selection</div>
+        <div class="cmd-item alt">paste-buffer</div>
+        <div class="cmd-item">save-buffer</div>
+        <div class="cmd-item alt">delete-buffer</div>
+        <div class="cmd-item">set-buffer</div>
+        <div class="cmd-item alt">show-messages</div>
+        <div class="cmd-item">show-environment</div>
+        <div class="cmd-item alt">set-environment</div>
+        <div class="cmd-item">set-option</div>
+        <div class="cmd-item alt">set-window-option</div>
+        <div class="cmd-item">set-hook</div>
+        <div class="cmd-item alt">show-hooks</div>
+        <div class="cmd-item">set走廊-hook</div>
+        <div class="cmd-item alt">refresh-client</div>
+        <div class="cmd-item">resize-pane</div>
+        <div class="cmd-item alt">resize-window</div>
+        <div class="cmd-item">break-pane</div>
+        <div class="cmd-item alt">join-pane</div>
+        <div class="cmd-item">move-pane</div>
+        <div class="cmd-item alt">move-join-pane</div>
+        <div class="cmd-item">pipe-pane</div>
+        <div class="cmd-item alt">display-message</div>
+        <div class="cmd-item">display-popup</div>
+        <div class="cmd-item alt">popup</div>
+        <div class="cmd-item">confirm-before</div>
+        <div class="cmd-item alt">if-shell</div>
+        <div class="cmd-item">source-file</div>
+        <div class="cmd-item alt">clock-mode</div>
+        <div class="cmd-item">last-pane</div>
+        <div class="cmd-item alt">last-window</div>
+        <div class="cmd-item">next-window</div>
+        <div class="cmd-item alt">previous-window</div>
+        <div class="cmd-item">next-layout</div>
+        <div class="cmd-item alt">previous-layout</div>
+        <div class="cmd-item">link-window</div>
+        <div class="cmd-item alt">unlink-window</div>
+        <div class="cmd-item">unbind-key</div>
+        <div class="cmd-item alt">bind-key</div>
+        <div class="cmd-item">copy-mode-vi</div>
+        <div class="cmd-item alt">paste</div>
+        <div class="cmd-item">show-prefix</div>
+        <div class="cmd-item alt">lock-server</div>
+        <div class="cmd-item">lock-client</div>
+        <div class="cmd-item alt">lock-session</div>
+        <div class="cmd-item">wait-for</div>
+        <div class="cmd-item alt">server-info</div>
+        <div class="cmd-item">info</div>
+        <div class="cmd-item alt">has-session</div>
+        <div class="cmd-item">wait</div>
+        <div class="cmd-item alt">display-menu</div>
+        <div class="cmd-item">menu</div>
+        <div class="cmd-item alt">command-prompt</div>
+        <div class="cmd-item">load-buffer</div>
+        <div class="cmd-item alt">show-options</div>
+        <div class="cmd-item">kill-server</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== THREE FEATURES ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">03</span>
+      <span class="label">三大特性 · tmux.conf / Themes / 鼠标支持</span>
+    </div>
+    <div class="sec-body">
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">①</div>
+          <h4>.tmux.conf 兼容</h4>
+          <p>直接读取现有 Linux/macOS tmux 配置，bind-key、set-option、source-file 全支持，无需修改一行</p>
+          <div class="quick-cmd">set -g status-interval 5</div>
+        </div>
+        <div class="card">
+          <div class="lead">②</div>
+          <h4>tmux Themes</h4>
+          <p>Catppuccin、Dracula、Nord、Tokyo Night 等主流主题原生支持，配合 Oh My Posh 效果更佳</p>
+          <div class="quick-cmd">cargo install omp-manager</div>
+        </div>
+        <div class="card">
+          <div class="lead">③</div>
+          <h4>完整鼠标支持</h4>
+          <p>点击 pane 切换、选中复制、滚轮滚动、拖拽调整大小，Windows SSH (OpenSSH) 下同样可用</p>
+          <div class="quick-cmd">set -g mouse on</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== INSTALLATION ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="label">安装方式 · 四选一</span>
+    </div>
+    <div class="sec-body">
+      <div class="install-grid">
+        <div class="install-card">
+          <div class="install-method">WinGet</div>
+          <div class="install-cmd">winget install psmux</div>
+        </div>
+        <div class="install-card">
+          <div class="install-method">Cargo</div>
+          <div class="install-cmd">cargo install psmux</div>
+        </div>
+        <div class="install-card">
+          <div class="install-method">Scoop</div>
+          <div class="install-cmd">scoop bucket add psmux<br/>scoop install psmux</div>
+        </div>
+        <div class="install-card">
+          <div class="install-method">Chocolatey</div>
+          <div class="install-cmd">choco install psmux</div>
+        </div>
+      </div>
+      <div class="pills" style="margin-top:10px">
+        <span class="pill">要求：Windows 10+ / PowerShell 7+</span>
+        <span class="pill">三命令同义：psmux / pmux / tmux</span>
+        <span class="pill">二进制：psmux.exe / pmux.exe / tmux.exe</span>
+        <span class="pill">源码：git clone → cargo build --release</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ARCHITECTURE ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">05</span>
+      <span class="label">Rust 高性能架构</span>
+    </div>
+    <div class="sec-body">
+      <div class="arch-diagram">
+        <div class="arch-cell">
+          <div class="arch-icon">🖥️</div>
+          <div class="arch-name">PowerShell / cmd.exe</div>
+          <div class="arch-desc">用户 Shell，支持 SSH</div>
+        </div>
+        <div class="arch-cell">
+          <div class="arch-icon">🔗</div>
+          <div class="arch-name">psmux / pmux / tmux</div>
+          <div class="arch-desc">Rust 核心，内存安全，零 GC</div>
+        </div>
+        <div class="arch-cell">
+          <div class="arch-icon">⚙️</div>
+          <div class="arch-name">Windows ConPTY</div>
+          <div class="arch-desc">Pseudo Console API 原生调用</div>
+        </div>
+      </div>
+      <div class="pills" style="margin-top:10px">
+        <span class="pill dark">Rust 所有制系统：内存安全，无 runtime 开销</span>
+        <span class="pill dark">异步 I/O：tokio 驱动高并发 session</span>
+        <span class="pill dark">无 GC 停顿：保证终端响应实时性</span>
+        <span class="pill dark">wasm-bindgen-free：原生 Windows PE，二进制单文件</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== COMPARISON TABLE ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">06</span>
+      <span class="label">vs 传统 tmux · Windows 原生 vs WSL/WSL2</span>
+    </div>
+    <div class="sec-body">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th class="highlight">★ psmux<br/><span style="font-weight:400;font-size:9px;text-transform:none;letter-spacing:0">Windows 原生</span></th>
+            <th>WSL 下的 tmux</th>
+            <th>WSL2 下的 tmux</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>终端层</td>
+            <td class="highlight">Windows ConPTY <span class="badge red">原生</span></td>
+            <td>WSL ptty（转发层）</td>
+            <td>WSL2 Hyper-V VM</td>
+          </tr>
+          <tr>
+            <td>依赖要求</td>
+            <td class="highlight">无需 WSL <span class="badge red">✓</span></td>
+            <td>需安装 WSL</td>
+            <td>需安装 WSL2 + Hyper-V</td>
+          </tr>
+          <tr>
+            <td>PowerShell 集成</td>
+            <td class="highlight">原生集成 <span class="badge red">✓</span></td>
+            <td>跨系统调用，性能损耗</td>
+            <td>VM 网络转发，延迟更高</td>
+          </tr>
+          <tr>
+            <td>鼠标支持</td>
+            <td class="highlight">ConPTY 直连，完整支持</td>
+            <td>SSH 转发，鼠标受限</td>
+            <td>部分支持，延迟明显</td>
+          </tr>
+          <tr>
+            <td>启动速度</td>
+            <td class="highlight">毫秒级 <span class="badge red">✓</span></td>
+            <td>WSL 冷启动 1–3 秒</td>
+            <td>WSL2 冷启动 2–5 秒</td>
+          </tr>
+          <tr>
+            <td>内存占用</td>
+            <td class="highlight">Rust ~10 MB</td>
+            <td>WSL 底层 ~50 MB+</td>
+            <td>WSL2 VM ~200 MB+</td>
+          </tr>
+          <tr>
+            <td>tmux.conf</td>
+            <td class="highlight">直接读取 <span class="badge red">✓</span></td>
+            <td>需 WSL 路径</td>
+            <td>需 WSL 路径</td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td class="highlight">agent teams 无缝集成 <span class="badge red">✓</span></td>
+            <td>agent teams 需额外配置</td>
+            <td>agent teams 需额外配置</td>
+          </tr>
+          <tr>
+            <td>系统资源</td>
+            <td class="highlight">轻量 <span class="badge red">✓</span></td>
+            <td>中等（WSL 本身占用）</td>
+            <td>较重（完整 Linux VM）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== CLAUDE CODE ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">07</span>
+      <span class="label">Claude Code Agent Teams 集成</span>
+    </div>
+    <div class="sec-body">
+      <p>psmux 为 Claude Code agent teams 提供一等支持。当 Claude Code 在 psmux session 内运行时，teammate agent 自动分配到独立 tmux pane，无需额外配置。</p>
+      <div class="flow">
+        <div class="flow-item">psmux new -s work</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">claude</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item red">agent teams just work</div>
+      </div>
+      <div class="pills">
+        <span class="pill">teammate 自动分配独立 pane</span>
+        <span class="pill">进程隔离，互不干扰</span>
+        <span class="pill">无需额外配置文件</span>
+        <span class="pill">实时观察 agent 工作状态</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== QUICK START ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">08</span>
+      <span class="label">快速上手</span>
+    </div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div>
+          <h3>基本命令</h3>
+          <div class="quick-cmd">psmux                        # 启动新 session</div>
+          <div class="quick-cmd">psmux new -s work           # 命名 session</div>
+          <div class="quick-cmd">psmux ls                     # 列出 session</div>
+          <div class="quick-cmd">psmux attach -t work         # 附加 session</div>
+          <div class="quick-cmd">psmux --help                 # 显示帮助</div>
+        </div>
+        <div>
+          <h3>常用快捷键（C-b）</h3>
+          <div class="quick-cmd">C-b c     # 新建窗口</div>
+          <div class="quick-cmd">C-b "     # 水平分 pane</div>
+          <div class="quick-cmd">C-b %     # 垂直分 pane</div>
+          <div class="quick-cmd">C-b z     # pane 全屏</div>
+          <div class="quick-cmd">C-b d     # 脱离 session</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RELATED ===== -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">09</span>
+      <span class="label">相关项目 · psmux 生态</span>
+    </div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">TUI 工具</div>
+          <h4>pstop · htop for Windows</h4>
+          <p>实时系统监控，per-core CPU 柱状图、进程树视图、7 套配色</p>
+          <div class="quick-cmd">cargo install pstop</div>
+        </div>
+        <div class="card">
+          <div class="lead">TUI 工具</div>
+          <h4>psnet · 网络实时监控</h4>
+          <p>实时网速图表、连接追踪、流量日志、包嗅探器</p>
+          <div class="quick-cmd">cargo install psnet</div>
+        </div>
+        <div class="card">
+          <div class="lead">插件管理</div>
+          <h4>Tmux Plugin Panel</h4>
+          <p>tmux/psmux 插件与主题管理 TUI，浏览/安装/更新主题</p>
+          <div class="quick-cmd">cargo install tmuxpanel</div>
+        </div>
+        <div class="card">
+          <div class="lead">Shell 美化</div>
+          <h4>OMP Manager</h4>
+          <p>Oh My Posh 安装向导，100+ 主题浏览、一键安装字体与配置</p>
+          <div class="quick-cmd">cargo install omp-manager</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FOOTER ===== -->
+  <div class="section">
+    <div class="sec-body" style="text-align:center;padding:14px">
+      <div class="tags" style="justify-content:center;margin-bottom:10px">
+        <a href="https://github.com/psmux/psmux" class="tag" target="_blank">GitHub →</a>
+        <span class="tag">MIT License</span>
+        <span class="tag">Rust 🦀</span>
+        <span class="tag">Windows 原生</span>
+        <span class="tag">ConPTY</span>
+      </div>
+      <p style="font-size:11px;color:#888;margin:0">Made with ❤️ for PowerShell · 用 Rust 构建</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

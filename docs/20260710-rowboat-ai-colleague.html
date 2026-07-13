@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rowboat — 无限记忆的本地 AI 同事</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{overflow-x:hidden}
+    body{
+      font-family:"Inter",system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);background:
+        radial-gradient(circle at 18% 10%,rgba(88,195,255,.16) 0 10%,transparent 11%),
+        radial-gradient(circle at 86% 8%,rgba(132,89,255,.18) 0 9%,transparent 10%),
+        radial-gradient(circle at 72% 72%,rgba(45,179,106,.10) 0 13%,transparent 14%),
+        radial-gradient(circle at 18% 78%,rgba(244,200,76,.08) 0 11%,transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+
+    /* ── HERO ── */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:0;grid-template-rows:auto 1fr auto}
+    .hero-title{font-size:clamp(22px,3.5vw,34px);font-weight:800;line-height:1.18;letter-spacing:-.025em;margin-bottom:10px}
+    .hero-title em{font-style:normal;color:var(--cyan)}
+    .hero-sub{font-size:13.5px;line-height:1.65;color:var(--muted);margin-bottom:16px}
+    .hero-sub strong{color:var(--ink);font-weight:600}
+    .hero-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .18s}
+    .btn-primary{background:var(--cyan);color:#000}
+    .btn-primary:hover{background:#7dd3ff;transform:translateY(-1px)}
+    .btn-ghost{border:1px solid var(--line);color:var(--ink)}
+    .btn-ghost:hover{background:rgba(255,255,255,.07)}
+    .hero-meta{display:flex;flex-wrap:wrap;gap:6px 14px;padding:12px 0;border-top:1px solid var(--line)}
+    .meta-item{font-size:12.5px;color:var(--muted)}
+    .meta-item strong{color:var(--ink)}
+    .hero-visual{position:relative;border-radius:14px;overflow:hidden;background:var(--panel);border:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:10px;min-height:200px}
+    .kv-row{display:flex;align-items:center;gap:8px;font-size:13px}
+    .kv-key{color:var(--muted);width:80px;flex-shrink:0}
+    .kv-val{color:var(--cyan);font-weight:600}
+    .kv-val.green{color:var(--green)}
+    .kv-val.purple{color:var(--purple)}
+    .kv-val.yellow{color:var(--yellow)}
+    .kv-sep{flex:1;border-bottom:1px dashed var(--line)}
+
+    /* ── SECTION ── */
+    .section{margin-bottom:14px}
+    .section-title{
+      display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px 10px 0 0;
+      background:var(--panel);border-bottom:1px solid var(--line);
+      font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    }
+    .section-title .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .section-title .num{background:var(--cyan);color:#000;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:800}
+    .section-body{badding:14px;border-radius:0 0 10px 10px;background:var(--panel);border:1px solid var(--line);border-top:none;padding:16px}
+
+    /* ── GRID ── */
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .card{border-radius:10px;border:1px solid var(--line);padding:14px;background:var(--panel-2);transition:border-color .2s,transform .2s}
+    .card:hover{border-color:rgba(88,195,255,.35);transform:translateY(-1px)}
+    .card-icon{font-size:22px;margin-bottom:6px}
+    .card-title{font-size:13.5px;font-weight:700;margin-bottom:4px}
+    .card-desc{font-size:12px;color:var(--muted);line-height:1.6}
+
+    /* ── FLOW ── */
+    .flow{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+    .flow-node{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);font-size:12.5px;font-weight:600;min-width:120px}
+    .flow-node .icon{font-size:15px}
+    .flow-arrow{color:var(--cyan);font-size:16px;font-weight:700;flex-shrink:0}
+
+    /* ── TABLE ── */
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}
+    th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
+    tr:last-child td{border-bottom:none}
+    td code{background:var(--panel-2);padding:2px 7px;border-radius:4px;font-size:11.5px;color:var(--cyan)}
+
+    /* ── BADGE ── */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600}
+    .badge-green{background:rgba(45,179,106,.15);color:var(--green);border:1px solid rgba(45,179,106,.3)}
+    .badge-blue{background:rgba(88,195,255,.12);color:var(--cyan);border:1px solid rgba(88,195,255,.25)}
+    .badge-purple{background:rgba(132,89,255,.15);color:var(--purple);border:1px solid rgba(132,89,255,.3)}
+    .badge-yellow{background:rgba(244,200,76,.12);color:var(--yellow);border:1px solid rgba(244,200,76,.25)}
+
+    /* ── CODE ── */
+    pre{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-size:12px;line-height:1.7;overflow-x:auto;color:#c8d6f8}
+    pre .kw{color:var(--purple)}.pre .cm{color:#6b7a9e}.pre .str{color:var(--green)}
+
+    /* ── ALERT ── */
+    .alert{border-radius:8px;padding:11px 14px;font-size:12.5px;line-height:1.6;border-left:3px solid}
+    .alert-info{background:rgba(88,195,255,.07);border-color:var(--cyan);color:var(--muted)}
+    .alert-warn{background:rgba(244,200,76,.07);border-color:var(--yellow);color:var(--muted)}
+
+    /* ── VS ── */
+    .vs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .vs-card{border-radius:10px;padding:14px;background:var(--panel-2);border:1px solid var(--line)}
+    .vs-card.good{border-color:rgba(45,179,106,.35)}
+    .vs-card.bad{border-color:rgba(244,200,76,.25)}
+    .vs-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding:3px 10px;display:inline-block;border-radius:4px}
+    .vs-card.good .vs-label{background:rgba(45,179,106,.15);color:var(--green)}
+    .vs-card.bad .vs-label{background:rgba(244,200,76,.1);color:var(--yellow)}
+
+    /* ── FOOTER ── */
+    .footer{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:space-between}
+    .footer-tags{display:flex;flex-wrap:wrap;gap:5px}
+    .tag{padding:3px 10px;border-radius:20px;font-size:11.5px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted)}
+    .footer-note{font-size:11.5px;color:#5a6a8a}
+
+    @media(max-width:720px){
+      .hero{grid-template-columns:1fr}
+      .grid-3,.grid-4{grid-template-columns:repeat(2,1fr)}
+      .vs-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:480px){
+      .grid-3,.grid-4{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══ HERO ══ -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div>
+        <div class="hero-title">Rowboat<br><em>无限记忆的本地 AI 同事</em></div>
+        <p class="hero-sub">
+          把 Gmail、会议、Slack 等工作流索引进<strong>永久本地知识图谱</strong>，Ollama 免费跑，本地 Markdown 存储，数据永远不离开你的硬盘。
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://github.com/rowboatlabs/rowboat" target="_blank">
+            ★ 16,003</a>
+          <a class="btn btn-ghost" href="https://github.com/rowboatlabs/rowboat" target="_blank">
+            github.com/rowboatlabs/rowboat</a>
+          <span class="badge badge-green">Apache-2.0</span>
+          <span class="badge badge-blue">TypeScript</span>
+        </div>
+      </div>
+      <div class="hero-meta">
+        <div class="meta-item"><strong>⭐ 16,003</strong> Stars</div>
+        <div class="meta-item"><strong>协议</strong> Apache-2.0</div>
+        <div class="meta-item"><strong>语言</strong> TypeScript</div>
+        <div class="meta-item"><strong>模型</strong> Ollama / LM Studio / Hosted</div>
+        <div class="meta-item"><strong>MCP</strong> 支持</div>
+        <div class="meta-item"><strong>存储</strong> 本地 Markdown</div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div style="font-size:11.5px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">核心能力矩阵</div>
+      <div class="kv-row"><span class="kv-key">📧 邮件</span><span class="kv-sep"></span><span class="kv-val">Gmail 接入</span></div>
+      <div class="kv-row"><span class="kv-key">📅 会议</span><span class="kv-sep"></span><span class="kv-val">实时转录</span></div>
+      <div class="kv-row"><span class="kv-key">💬 Slack</span><span class="kv-sep"></span><span class="kv-val">对话索引</span></div>
+      <div class="kv-row"><span class="kv-key">🧠 图谱</span><span class="kv-sep"></span><span class="kv-val green">Obsidian 风格</span></div>
+      <div class="kv-row"><span class="kv-key">🖥️ 本地</span><span class="kv-sep"></span><span class="kv-val purple">Ollama 免费跑</span></div>
+      <div class="kv-row"><span class="kv-key">🔌 MCP</span><span class="kv-sep"></span><span class="kv-val yellow">外部工具</span></div>
+      <div class="kv-row"><span class="kv-key">📝 存储</span><span class="kv-sep"></span><span class="kv-val green">Markdown 本地</span></div>
+    </div>
+  </div>
+
+  <!-- ══ 01 问题定义 ══ -->
+  <div class="section">
+    <div class="section-title" style="background:linear-gradient(90deg,#1a1040,#1a1040 60%,rgba(88,195,255,.08))">
+      <span class="num">01</span>
+      <span class="dot" style="background:var(--purple)"></span>
+      问题定义：AI 同事为什么记不住
+    </div>
+    <div class="section-body">
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-icon">😤</div>
+          <div class="card-title">每次开局重新喂料</div>
+          <div class="card-desc">AutoGPT、BabyAGI 等每次任务都从零开始，昨天的上下文全部丢失，无法跨任务积累。</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🔒</div>
+          <div class="card-title">数据必须上云</div>
+          <div class="card-desc">大多数 AI 助手要求数据上传到第三方服务器处理，隐私敏感场景（公司内网、客户数据）完全无法使用。</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🧩</div>
+          <div class="card-title">工具之间互相割裂</div>
+          <div class="card-desc">邮件、会议、Slack、文档分散在各个平台，AI 无法跨平台建立关联，知识永远是碎片化的。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 02 核心架构 ══ -->
+  <div class="section">
+    <div class="section-title" style="background:linear-gradient(90deg,#0a1a2a,#0a1a2a 60%,rgba(88,195,255,.08))">
+      <span class="num">02</span>
+      <span class="dot" style="background:var(--cyan)"></span>
+      核心架构：本地知识图谱 + 模块化 Agent
+    </div>
+    <div class="section-body">
+      <div class="flow" style="margin-bottom:16px">
+        <div class="flow-node"><span class="icon">📧📅💬</span>Gmail/会议/Slack</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node"><span class="icon">🔍</span>本地索引</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node"><span class="icon">🧠</span>Obsidian 风格<br>双向链接图谱</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node"><span class="icon">🤖</span>Agent 推理<br>基于图谱上下文</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node"><span class="icon">📄</span>本地 Markdown<br>永久存储</div>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-icon">🔑</div>
+          <div class="card-title">永久记忆层</div>
+          <div class="card-desc">所有工作记录自动转为本地 Markdown 文件，双向链接构建可追溯知识网络，下次对话自动携带历史上下文。</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🏠</div>
+          <div class="card-title">本地优先存储</div>
+          <div class="card-desc">所有信息以 Markdown 格式存在本地，可直接查看、编辑、备份、删除，数据永远不会离开你的硬盘。</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🔌</div>
+          <div class="card-title">MCP 协议扩展</div>
+          <div class="card-desc">通过 MCP 连接任意外部工具（Exa 搜索、Twitter、GitHub 等），也可接入 Composio 工具集，一个配置全搞定。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 03 功能矩阵 ══ -->
+  <div class="section">
+    <div class="section-title" style="background:linear-gradient(90deg,#0d1f1a,#0d1f1a 60%,rgba(45,179,106,.08))">
+      <span class="num">03</span>
+      <span class="dot" style="background:var(--green)"></span>
+      功能矩阵：覆盖工作全流程
+    </div>
+    <div class="section-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>功能模块</th><th>具体能力</th><th>数据去向</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>📧 邮件工作台</strong></td><td>接入 Gmail，自动区分重要邮件，基于上下文起草回复建议</td><td><span class="badge badge-green">本地 Markdown</span></td></tr>
+            <tr><td><strong>📅 会议记录</strong></td><td>麦克风/扬声器接入，实时转录 + Markdown 总结，自动更新知识图谱</td><td><span class="badge badge-green">本地 Markdown</span></td></tr>
+            <tr><td><strong>💬 Slack 对话</strong></td><td>对话历史索引，关键决策和讨论纳入知识图谱</td><td><span class="badge badge-green">本地 Markdown</span></td></tr>
+            <tr><td><strong>🖥️ 浏览器隔离</strong></td><td>内置独立浏览器处理网页任务，与主浏览器完全隔离</td><td><span class="badge badge-green">本地存储</span></td></tr>
+            <tr><td><strong>⏰ 后台自动化</strong></td><td>事件触发（新邮件）或定时任务（每天早 8 点简报），静默执行</td><td><span class="badge badge-green">本地 Markdown</span></td></tr>
+            <tr><td><strong>🗣️ 语音简报</strong></td><td>每天早上汇总昨日工作动态，语音播报，无需打开任何应用</td><td><span class="badge badge-green">本地 Markdown</span></td></tr>
+            <tr><td><strong>⌨️ 代码模式</strong></td><td>并行启动 Claude Code / Codex 编码代理，处理复杂开发任务</td><td><span class="badge badge-green">本地</span></td></tr>
+            <tr><td><strong>🧩 MCP 集成</strong></td><td>Exa 搜索、Twitter、GitHub、Composio 工具，任意 MCP server 即插即用</td><td><span class="badge badge-green">本地</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 04 模型选择 ══ -->
+  <div class="section">
+    <div class="section-title" style="background:linear-gradient(90deg,#1a0f2a,#1a0f2a 60%,rgba(132,89,255,.08))">
+      <span class="num">04</span>
+      <span class="dot" style="background:var(--purple)"></span>
+      模型选择：免费白嫖 or 强力云端
+    </div>
+    <div class="section-body">
+      <div class="grid-3">
+        <div class="card" style="border-color:rgba(45,179,106,.35)">
+          <div class="card-icon">🖥️</div>
+          <div class="card-title">本地 Ollama</div>
+          <div class="card-desc">完全免费，数据全在本地，支持各类开源模型（Llama 3、Qwen、Mistral 等），零 API 费用。</div>
+          <div style="margin-top:8px"><span class="badge badge-green">零成本 · 完全隐私</span></div>
+        </div>
+        <div class="card">
+          <div class="card-icon">💾</div>
+          <div class="card-title">LM Studio</div>
+          <div class="card-desc">桌面端本地模型运行器，支持 GGUF 格式模型，图形化调参，本地推理完全离线。</div>
+          <div style="margin-top:8px"><span class="badge badge-green">离线推理</span></div>
+        </div>
+        <div class="card">
+          <div class="card-icon">☁️</div>
+          <div class="card-title">Hosted 模型</div>
+          <div class="card-desc">接入 OpenAI、Anthropic、Google 等云端 API，适合需要更强推理能力的复杂任务。</div>
+          <div style="margin-top:8px"><span class="badge badge-blue">高性能</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 05 vs 竞品 ══ -->
+  <div class="section">
+    <div class="section-title" style="background:linear-gradient(90deg,#1f1a0a,#1f1a0a 60%,rgba(244,200,76,.08))">
+      <span class="num">05</span>
+      <span class="dot" style="background:var(--yellow)"></span>
+      vs 竞品：为什么 Rowboat 不一样
+    </div>
+    <div class="section-body">
+      <div class="vs-grid">
+        <div class="vs-card good">
+          <div class="vs-label">✅ Rowboat</div>
+          <table style="margin-top:6px">
+            <tbody>
+              <tr><td style="width:45%">记忆</td><td>永久本地知识图谱，跨任务积累</td></tr>
+              <tr><td>数据</td><td>Markdown 本地存储，100% 隐私</td></tr>
+              <tr><td>模型</td><td>Ollama 完全免费，或自选 API</td></tr>
+              <tr><td>集成</td><td>MCP + Composio + 邮件 + 会议 + Slack</td></tr>
+              <tr><td>自动化</td><td>后台静默运行，定时 + 事件触发</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="vs-card bad">
+          <div class="vs-label">❌ AutoGPT / BabyAGI</div>
+          <table style="margin-top:6px">
+            <tbody>
+              <tr><td style="width:45%">记忆</td><td>每次任务从零，无跨任务积累</td></tr>
+              <tr><td>数据</td><td>通常需要 API key，数据上传云端</td></tr>
+              <tr><td>模型</td><td>仅支持 OpenAI 等云端 API</td></tr>
+              <tr><td>集成</td><td>工具少，邮件/会议无原生支持</td></tr>
+              <tr><td>自动化</td><td>无后台静默模式，纯手动触发</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 06 快速启动 ══ -->
+  <div class="section">
+    <div class="section-title" style="background:linear-gradient(90deg,#0a1020,#0a1020 60%,rgba(88,195,255,.08))">
+      <span class="num">06</span>
+      <span class="dot" style="background:var(--blue)"></span>
+      快速启动
+    </div>
+    <div class="section-body">
+      <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <pre>git clone https://github.com/rowboatlabs/rowboat
+cd rowboat
+npm install
+
+<span class="cm"># 首次启动（自动打开浏览器配置）</span>
+npm start
+
+<span class="cm"># 连接 Ollama 本地模型</span>
+<span class="cm"># 在设置中填写 Ollama 地址（默认 localhost:11434）</span></pre>
+        </div>
+        <div>
+          <div class="alert alert-info" style="margin-bottom:10px">
+            <strong>Google 服务配置：</strong><br>
+            执行 <code>Google setup</code> 文档指引，接入 Gmail + Calendar + Drive。Rowboat 不会存储你的 Google 凭据。
+          </div>
+          <div class="alert alert-warn">
+            <strong>本地模型推荐：</strong><br>
+            Ollama 默认端口 <code>11434</code>，首次使用需先运行 <code>ollama serve</code>。
+          </div>
+          <div style="margin-top:10px">
+            <div class="kv-row" style="margin-bottom:6px"><span class="kv-key">MCP 配置</span><span class="kv-sep"></span><code>~/.rowboat/config/composio.json</code></div>
+            <div class="kv-row"><span class="kv-key">数据存储</span><span class="kv-sep"></span><code>~/.rowboat/</code>（Markdown 文件）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div class="footer">
+    <div class="footer-tags">
+      <span class="tag">AI同事</span><span class="tag">知识图谱</span><span class="tag">MCP</span>
+      <span class="tag">Ollama</span><span class="tag">本地模型</span><span class="tag">Obsidian</span>
+      <span class="tag">邮件自动化</span><span class="tag">会议记录</span><span class="tag">TypeScript</span>
+    </div>
+    <div class="footer-note">⭐ 16,003 · Apache-2.0 · rowboatlabs/rowboat</div>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>md2wechat-skill · AI Agent 微信公众号 CLI</title>
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    pre,code,table{overflow-x:auto;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === 顶栏：diagonal red-black hero + 右侧 meta pill === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .topbar-meta{
+      padding:14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 0.8fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);
+      padding:7px 9px 5px;
+      background:#fff;
+      font-weight:900;
+      font-size:14px;
+      line-height:1.1;
+    }
+    .meta-pill-lg .sub{
+      display:block;
+      font-size:9px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:2px;
+    }
+    .meta-pill-md{
+      border:2px solid var(--line);
+      border-left:4px solid var(--red);
+      padding:4px 7px 3px;
+      background:#fff;
+      font-weight:800;
+      font-size:11.5px;
+      line-height:1.25;
+    }
+    .meta-pill-md .sub{
+      display:block;
+      font-size:8.5px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:1px;
+    }
+    .meta-pill-sm{
+      border:2px solid var(--line);
+      border-left:4px solid #666;
+      padding:3px 7px 3px;
+      background:#fff;
+      font-weight:700;
+      font-size:11px;
+      color:#555;
+      line-height:1.3;
+    }
+    .meta-pill-sm .sub{
+      display:block;
+      font-size:8px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#aaa;
+      margin-top:1px;
+    }
+    .kicker{
+      display:inline-block;border:2px solid #fff;padding:4px 8px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;
+    }
+    h1.demo-title{
+      margin:10px 0 6px;
+      font-size:clamp(20px,3.2vw,38px);font-weight:800;
+      letter-spacing:-.03em;line-height:1.05;
+    }
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+
+    /* === overview：一句话概述 === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* === stats：红黑网格 === */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* === pills：红/黑为主 === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === section：红头黑框 dense grid === */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{
+      background:var(--ink);color:#fff;padding:7px 12px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:10px 12px}
+
+    h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+    p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+
+    /* === tags：红色为主 === */
+    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
+
+    /* === grid-2/3：纯红黑 grid === */
+    .grid-2,.grid-3{display:grid;gap:10px;margin-bottom:10px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+    .card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+
+    /* === table：红黑高密度 === */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+    th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    tr:nth-child(even) td{background:#faf8f4}
+    .check{color:var(--red);font-weight:900;font-size:13px}
+    .cross{color:var(--ink);font-weight:900;font-size:13px}
+
+    /* === flow：红箭头 === */
+    .flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
+    .flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+
+    /* === btn：红/黑 === */
+    .btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+    .btn.red{background:var(--red);border-color:var(--red)}
+    .btn.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === rule === */
+    .rule{height:3px;background:var(--ink);margin:10px 0}
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+
+    /* === demo-gif === */
+    .demo-gif{border:2px solid var(--line);box-shadow:var(--shadow);margin-bottom:14px;background:#fff}
+    .demo-gif img{width:100%;height:auto}
+
+    /* === cli-grid === */
+    .cli-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .cli-card{border:2px solid var(--line);background:#fff;padding:10px 12px;box-shadow:4px 4px 0 rgba(10,10,10,.08)}
+    .cli-card .cmd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;font-weight:800;color:var(--ink);display:block;margin-bottom:4px}
+    .cli-card .desc{font-size:11px;color:#555;line-height:1.4}
+
+    /* === responsive === */
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .grid-3,.grid-2{grid-template-columns:1fr}
+      .cli-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .stats{flex-direction:column}
+      .stat{border-right:0;border-bottom:2px solid var(--line)}
+      .stat:last-child{border-bottom:0}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- TOPBAR: diagonal hero + meta pills -->
+    <header class="topbar">
+      <div class="topbar-hero">
+        <div class="kicker">CLI · AGENT READY · GOLANG</div>
+        <h1 class="demo-title">md2wechat-skill</h1>
+        <p class="sub-line">面向 AI Agent 的微信公众号创作与发布 CLI</p>
+        <div class="tagline">Markdown → 公众号排版 · AI 配图 · 多账号发布</div>
+      </div>
+      <div class="topbar-meta">
+        <div class="meta-row-high">
+          <div class="meta-pill-lg">3,198<span class="sub">Stars</span></div>
+          <div class="meta-pill-lg">Source<span class="sub">Available</span></div>
+        </div>
+        <div class="meta-row-low">
+          <div class="meta-pill-md">48<span class="sub">主题</span></div>
+          <div class="meta-pill-md">43<span class="sub">模块</span></div>
+          <div class="meta-pill-sm">Go<span class="sub">1.26.1+</span></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- OVERVIEW：一句话 -->
+    <div class="overview">
+      <div class="overview-sentence">写 Markdown，生成公众号排版，制作封面和文章配图，预览校验后推送草稿箱。</div>
+      <div class="overview-body">
+        <p>md2wechat 把公众号发布流程拆成一组可验证的 CLI 命令。支持 Claude Code、Codex、WorkBuddy、Kimi Work、Hermes Agent、OpenClaw 等 Agent 通过 JSON discovery 稳定调用。</p>
+      </div>
+    </div>
+
+    <!-- DEMO GIF -->
+    <div class="demo-gif">
+      <img src="../assets/img/md2wechat-skill/readme-header.gif" alt="md2wechat CLI demo" />
+    </div>
+
+    <!-- STATS -->
+    <div class="stats" aria-label="key metrics">
+      <div class="stat"><strong>3,198</strong><span>GitHub Stars</span></div>
+      <div class="stat"><strong>48</strong><span>专业主题</span></div>
+      <div class="stat"><strong>43</strong><span>排版模块</span></div>
+      <div class="stat"><strong>6+</strong><span>Agent 支持</span></div>
+    </div>
+
+    <!-- CORE FEATURES -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">01</span>
+        <span class="label">核心功能</span>
+      </div>
+      <div class="sec-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="lead">Markdown → 公众号</div>
+            <h4>convert 命令</h4>
+            <p>Markdown 转微信公众号兼容 HTML，支持预览、上传图片、创建草稿</p>
+          </div>
+          <div class="card">
+            <div class="lead">40+ 样式</div>
+            <h4>专业主题系统</h4>
+            <p>免费模式 3 个基础主题，专业 API 模式 48 个精调主题 + 43 个高级排版模块</p>
+          </div>
+          <div class="card">
+            <div class="lead">AI 配图</div>
+            <h4>封面图 / 信息图生成</h4>
+            <p>支持 Volcengine、ModelScope、OpenRouter、OpenAI、Gemini 等 provider</p>
+          </div>
+          <div class="card">
+            <div class="lead">批量发布</div>
+            <h4>多账号管理</h4>
+            <p>命名公众号账号，本地只读发现，不输出 Secret，支持矩阵号运营</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API 对比 -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">02</span>
+        <span class="label">专业 API</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr>
+            <th>能力</th>
+            <th>免费 AI 模式</th>
+            <th>专业 API 模式</th>
+          </tr>
+          <tr>
+            <td>输出方式</td>
+            <td>生成 prompt，外部 LLM 处理</td>
+            <td><strong style="color:var(--red)">直接返回微信 HTML</strong></td>
+          </tr>
+          <tr>
+            <td>主题数</td>
+            <td>3 个基础主题</td>
+            <td><strong style="color:var(--red)">48 个专业主题</strong></td>
+          </tr>
+          <tr>
+            <td>排版模块</td>
+            <td>不支持</td>
+            <td><strong style="color:var(--red)">43 个 :::module 模块</strong></td>
+          </tr>
+          <tr>
+            <td>输出一致性</td>
+            <td>取决于外部 LLM</td>
+            <td><strong style="color:var(--red)">确定性输出</strong></td>
+          </tr>
+          <tr>
+            <td>响应速度</td>
+            <td>取决于外部 LLM</td>
+            <td><strong style="color:var(--red)">秒级</strong></td>
+          </tr>
+          <tr>
+            <td>适用场景</td>
+            <td>实验</td>
+            <td>团队、客户号、矩阵号</td>
+          </tr>
+        </table>
+        <div class="pills">
+          <span class="pill red">48 精调主题</span>
+          <span class="pill red">43 排版模块</span>
+          <span class="pill dark">确定性 HTML</span>
+          <span class="pill">微信接口固定出口</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGENT 工作流 -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">03</span>
+        <span class="label">Agent 工作流</span>
+      </div>
+      <div class="sec-body">
+        <p style="margin-bottom:10px">支持 Claude Code、Codex、WorkBuddy、Kimi Work、Hermes Agent、OpenClaw 通过 JSON discovery 稳定调用。</p>
+        <div class="flow">
+          <div class="flow-item red">Capabilities</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">Doctor</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">Inspect</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">Convert</div>
+        </div>
+        <div class="cli-grid">
+          <div class="cli-card">
+            <span class="cmd">capabilities --json</span>
+            <span class="desc">列出 CLI 支持的所有命令</span>
+          </div>
+          <div class="cli-card">
+            <span class="cmd">doctor --json</span>
+            <span class="desc">检查 API/草稿/上传就绪</span>
+          </div>
+          <div class="cli-card">
+            <span class="cmd">inspect --json</span>
+            <span class="desc">文章元数据和发布就绪性</span>
+          </div>
+          <div class="cli-card">
+            <span class="cmd">themes list --json</span>
+            <span class="desc">可用主题列表</span>
+          </div>
+          <div class="cli-card">
+            <span class="cmd">layout list --json</span>
+            <span class="desc">可用排版模块列表</span>
+          </div>
+          <div class="cli-card">
+            <span class="cmd">title suggest --json</span>
+            <span class="desc">生成标题建议</span>
+          </div>
+          <div class="cli-card">
+            <span class="cmd">skills list --json</span>
+            <span class="desc">内置 Agent SOP 列表</span>
+          </div>
+          <div class="cli-card">
+            <span class="cmd">skills read md2wechat</span>
+            <span class="desc">读取特定 SOP</span>
+          </div>
+        </div>
+        <div class="pills">
+          <span class="pill red">Claude Code</span>
+          <span class="pill dark">Hermes Agent</span>
+          <span class="pill">OpenClaw</span>
+          <span class="pill">Codex</span>
+          <span class="pill">WorkBuddy</span>
+          <span class="pill">Kimi Work</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 常用命令 -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">04</span>
+        <span class="label">常用命令</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr>
+            <th>命令</th>
+            <th>用途</th>
+          </tr>
+          <tr>
+            <td><code>inspect</code></td>
+            <td>检查文章元数据和发布 readiness</td>
+          </tr>
+          <tr>
+            <td><code>advise</code></td>
+            <td>为已有文章推荐可选的最小增强动作</td>
+          </tr>
+          <tr>
+            <td><code>preview</code></td>
+            <td>本地预览，不上传、不创建草稿</td>
+          </tr>
+          <tr>
+            <td><code>convert</code></td>
+            <td>Markdown 转微信 HTML，可选创建草稿</td>
+          </tr>
+          <tr>
+            <td><code>write</code></td>
+            <td>从想法生成文章</td>
+          </tr>
+          <tr>
+            <td><code>humanize</code></td>
+            <td>重写 AI 文章，支持 authentic 强度</td>
+          </tr>
+          <tr>
+            <td><code>generate_cover</code></td>
+            <td>生成封面图或图片计划</td>
+          </tr>
+          <tr>
+            <td><code>generate_infographic</code></td>
+            <td>生成信息图或图片计划</td>
+          </tr>
+          <tr>
+            <td><code>upload_image</code></td>
+            <td>上传图片到微信素材库</td>
+          </tr>
+          <tr>
+            <td><code>doctor</code></td>
+            <td>本地配置体检</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 安装 -->
+    <div class="section">
+      <div class="sec-head" style="background:var(--red)">
+        <span class="num" style="color:#fff">→</span>
+        <span class="label" style="color:#fff">快速开始</span>
+      </div>
+      <div class="sec-body">
+        <div style="background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:12px 14px;margin-bottom:12px;overflow-x:auto">
+          <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72">npm install -g @geekjourneyx/md2wechat
+md2wechat config init
+md2wechat inspect article.md --json
+md2wechat convert article.md --draft --cover cover.jpg</pre>
+        </div>
+        <div class="pills">
+          <a class="btn red" href="https://github.com/geekjourneyx/md2wechat-skill" target="_blank">GitHub</a>
+          <a class="btn" href="https://md2wechat.app/theme-gallery" target="_blank">主题展示</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+    <p class="source-note">md2wechat-skill · 面向 AI Agent 的微信公众号创作与发布 CLI · Source Available License</p>
+  </main>
+</body>
+</html>

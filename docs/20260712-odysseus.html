@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Odysseus — 自托管 AI 工作站</title>
+  <style>
+    :root{
+      --bg:#070b14;--surface:#0d1525;--glass:#0f1e38;
+      --border:rgba(80,140,255,.18);--border-bright:rgba(80,140,255,.4);
+      --blue:#4d8ef0;--blue-bright:#7eb5ff;--blue-dim:#2a5baa;
+      --green:#10b981;--yellow:#fbbf24;--red:#f87171;--purple:#a78bfa;--pink:#f472b6;
+      --text:#e2eaf8;--text-dim:#7a90b8;--text-bright:#f0f6ff;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--text);font-size:12.5px;line-height:1.65;
+    }
+    a{color:var(--blue);text-decoration:none}
+    .page{width:min(1060px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === TOPBAR: diagonal blue hero + right panel === */
+    .topbar{
+      display:grid;grid-template-columns:1.25fr .75fr;
+      border:1px solid var(--border-bright);
+      border-radius:14px;overflow:hidden;
+      margin-bottom:14px;
+      box-shadow:0 0 40px rgba(77,142,240,.12),0 0 80px rgba(77,142,240,.06);
+    }
+    .hero{
+      padding:26px 24px 22px;
+      background:linear-gradient(135deg,#0d1e3a 0%,#11254a 45%,#0a1835 100%);
+      position:relative;overflow:hidden;
+    }
+    .hero::before{
+      content:'';position:absolute;top:-60px;right:-60px;
+      width:260px;height:260px;
+      background:radial-gradient(circle,rgba(77,142,240,.25),transparent 65%);
+      border-radius:50%;
+    }
+    .hero::after{
+      content:'';position:absolute;bottom:-40px;left:30%;
+      width:180px;height:180px;
+      background:radial-gradient(circle,rgba(167,139,250,.15),transparent 65%);
+      border-radius:50%;
+    }
+    .hero-content{position:relative;z-index:1}
+    .badge-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+    .badge{
+      display:inline-flex;align-items:center;gap:5px;
+      border:1px solid var(--border-bright);border-radius:999px;
+      padding:4px 11px;font-size:10.5px;font-weight:750;
+      background:rgba(77,142,240,.08);color:var(--blue-bright);
+    }
+    .badge.red{background:rgba(248,113,113,.08);color:var(--red);border-color:rgba(248,113,113,.3)}
+    .badge.green{background:rgba(16,185,129,.08);color:var(--green);border-color:rgba(16,185,129,.3)}
+    .badge.yellow{background:rgba(251,191,36,.08);color:var(--yellow);border-color:rgba(251,191,36,.3)}
+    .badge.purple{background:rgba(167,139,250,.08);color:var(--purple);border-color:rgba(167,139,250,.3)}
+    .hero-title{
+      font-size:clamp(38px,7.5vw,72px);font-weight:950;letter-spacing:-.06em;
+      line-height:.9;margin-bottom:10px;
+      background:linear-gradient(135deg,#7eb5ff 0%,#4d8ef0 50%,#a78bfa 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .hero-sub{
+      font-size:clamp(13px,1.6vw,16px);line-height:1.55;color:rgba(180,210,255,.8);
+      max-width:520px;margin-bottom:10px;
+    }
+    .hero-desc{
+      font-size:clamp(12px,1.3vw,14px);line-height:1.7;color:rgba(140,170,220,.72);
+      max-width:500px;
+    }
+    .hero-footer{margin-top:14px;font:750 11px/1.4 ui-monospace,monospace;color:var(--blue-dim)}
+    .hero-footer span{color:var(--blue-bright)}
+
+    /* === right panel === */
+    .meta-panel{
+      padding:18px 16px;
+      background:linear-gradient(180deg,#0a1428,#081020);
+      border-left:1px solid var(--border-bright);
+      display:flex;flex-direction:column;gap:10px;
+    }
+    .meta-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .stat-box{
+      background:var(--glass);border:1px solid var(--border);
+      border-radius:9px;padding:10px 12px;text-align:center;
+    }
+    .stat-num{font-size:22px;font-weight:950;letter-spacing:-.03em;line-height:1;color:var(--blue-bright)}
+    .stat-lbl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-top:4px}
+    .stat-box.green .stat-num{color:var(--green)}
+    .stat-box.yellow .stat-num{color:var(--yellow)}
+    .stat-box.red .stat-num{color:var(--red)}
+    .meta-info{
+      background:var(--glass);border:1px solid var(--border);border-radius:9px;
+      padding:9px 11px;
+    }
+    .meta-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px}
+    .meta-row:not(:last-child){border-bottom:1px solid var(--border)}
+    .meta-key{color:var(--text-dim);font-weight:700}
+    .meta-val{color:var(--text-bright);font-weight:750;font-family:ui-monospace,monospace}
+    .meta-val.blue{color:var(--blue-bright)}
+    .meta-val.green{color:var(--green)}
+
+    /* === sections === */
+    .section{margin-bottom:14px}
+    .sec-head{
+      display:flex;align-items:center;gap:9px;
+      border-bottom:1px solid var(--border-bright);
+      padding-bottom:8px;margin-bottom:11px;
+    }
+    .sec-icon{
+      width:26px;height:26px;border-radius:7px;
+      background:linear-gradient(135deg,#4d8ef0,#2a5baa);
+      display:flex;align-items:center;justify-content:center;
+      font-size:13px;flex-shrink:0;
+    }
+    .sec-icon.green{background:linear-gradient(135deg,#10b981,#047857)}
+    .sec-icon.purple{background:linear-gradient(135deg,#a78bfa,#6d28d9)}
+    .sec-icon.yellow{background:linear-gradient(135deg,#fbbf24,#b45309)}
+    .sec-title{font:900 12.5px/1 "Inter",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.09em;color:var(--text-bright)}
+
+    /* === card grid === */
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    .feat-card{
+      background:var(--glass);border:1px solid var(--border);
+      border-radius:10px;padding:11px 13px;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .feat-card:hover{border-color:var(--border-bright);box-shadow:0 0 16px rgba(77,142,240,.1)}
+    .feat-icon{font-size:18px;margin-bottom:6px}
+    .feat-title{font:850 12px/1.2 "Inter",system-ui,sans-serif;color:var(--text-bright);margin-bottom:5px}
+    .feat-desc{font-size:11px;line-height:1.6;color:var(--text-dim)}
+
+    /* === highlight card === */
+    .hl-card{
+      background:linear-gradient(135deg,#0d1e3a,#11284a);
+      border:1px solid var(--border-bright);border-radius:10px;
+      padding:14px 16px;
+    }
+    .hl-title{font:900 12px/1.2 "Inter",system-ui,sans-serif;color:var(--blue-bright);margin-bottom:7px}
+    .hl-desc{font-size:11.5px;line-height:1.7;color:var(--text-dim)}
+
+    /* === cmd box === */
+    .cmd-box{
+      background:#060d1a;border:1px solid var(--border-bright);
+      border-radius:10px;overflow:hidden;
+    }
+    .cmd-head{
+      background:linear-gradient(90deg,#0d1e3a,#0a1835);
+      padding:8px 13px;border-bottom:1px solid var(--border);
+      font:800 10px/1 ui-monospace,monospace;
+      color:var(--blue-bright);letter-spacing:.14em;text-transform:uppercase;
+    }
+    .cmd-body{
+      padding:12px 13px;
+      font:12px/1.7 ui-monospace,monospace;color:#c8d8f0;
+    }
+    .cmd-body .co{color:#4a6280}
+    .cmd-body .str{color:#7ec8a4}
+    .cmd-body .cmd{color:#7eb5ff}
+    .cmd-body .fn{color:#fbbf24}
+    .cmd-body .ok{color:#10b981}
+
+    /* === overview === */
+    .overview{
+      background:var(--glass);border:1px solid var(--border);
+      border-radius:10px;padding:13px 16px;margin-bottom:14px;
+    }
+    .overview-sentence{font-size:12.5px;line-height:1.8;color:var(--text-dim)}
+    .overview-sentence strong{color:var(--text-bright)}
+
+    /* === footer === */
+    .footer{
+      margin-top:14px;
+      background:rgba(10,24,53,.8);border:1px solid var(--border);
+      border-radius:10px;padding:12px 15px;
+      display:flex;justify-content:space-between;align-items:center;gap:12px;
+      flex-wrap:wrap;font:750 11px/1.4 ui-monospace,monospace;
+    }
+    .footer a{color:var(--blue-bright)}
+
+    #save-btn{
+      position:fixed;bottom:20px;right:14px;z-index:999;
+      border:1px solid var(--border-bright);border-radius:10px;
+      padding:11px 20px;
+      background:linear-gradient(135deg,rgba(77,142,240,.2),rgba(167,139,250,.15));
+      backdrop-filter:blur(10px);
+      color:var(--blue-bright);font-weight:900;font-size:12.5px;letter-spacing:.04em;
+      box-shadow:0 0 20px rgba(77,142,240,.15);
+      cursor:pointer;font-family:Inter,system-ui,sans-serif;
+    }
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .hero{padding:20px 16px}
+      .meta-panel{border-left:none;border-top:1px solid var(--border-bright)}
+      .grid{grid-template-columns:1fr 1fr}
+      .grid3{grid-template-columns:1fr 1fr}
+      .grid2{grid-template-columns:1fr}
+      .footer{flex-direction:column;align-items:flex-start}
+    }
+    @media(max-width:400px){
+      .grid{grid-template-columns:1fr}
+      .grid3{grid-template-columns:1fr}
+      .meta-stats{grid-template-columns:1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <section aria-label="Odysseus 概览">
+  <div class="topbar">
+    <div class="hero">
+      <div class="hero-content">
+        <div class="badge-row">
+          <span class="badge red">⭐ PewDiePie 参与</span>
+          <span class="badge green">自托管</span>
+          <span class="badge">本地优先</span>
+          <span class="badge purple">Docker</span>
+          <span class="badge yellow">AGPL-3.0</span>
+          <span class="badge">Python</span>
+        </div>
+        <h1 class="hero-title">Odysseus</h1>
+        <p class="hero-sub">Self-hosted AI workspace for chat, agents, research, documents, email, notes, calendar, and local model workflows.</p>
+        <p class="hero-desc">Docker 一键部署，数据全在本地，断网也能跑。聊天、深度研究、文档编辑器、邮件、笔记、日历、任务管理全在一套工作站里。支持本地模型和 API 模型。</p>
+        <p class="hero-footer">github.com/<span>pewdiepie-archdaemon</span>/odysseus · dev 分支最新</p>
+      </div>
+    </div>
+    <div class="meta-panel">
+      <div class="meta-stats">
+        <div class="stat-box">
+          <div class="stat-num">82.4k</div>
+          <div class="stat-lbl">GitHub Stars</div>
+        </div>
+        <div class="stat-box green">
+          <div class="stat-num">10.8k</div>
+          <div class="stat-lbl">Forks</div>
+        </div>
+        <div class="stat-box yellow">
+          <div class="stat-num">466</div>
+          <div class="stat-lbl">Watchers</div>
+        </div>
+        <div class="stat-box red">
+          <div class="stat-num">1,697</div>
+          <div class="stat-lbl">Open Issues</div>
+        </div>
+      </div>
+      <div class="meta-info">
+        <div class="meta-row"><span class="meta-key">语言</span><span class="meta-val">Python</span></div>
+        <div class="meta-row"><span class="meta-key">协议</span><span class="meta-val green">AGPL-3.0</span></div>
+        <div class="meta-row"><span class="meta-key">端口</span><span class="meta-val blue">localhost:7000</span></div>
+        <div class="meta-row"><span class="meta-key">默认分支</span><span class="meta-val">dev</span></div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- OVERVIEW -->
+  <section aria-label="Odysseus 是什么">
+  <div class="overview">
+    <p class="overview-sentence">
+      <strong>Odysseus</strong> 是一套<strong>自托管 AI 工作站</strong>，GitHub 超 82k Star，PewDiePie 参与开发。<br>
+      Docker 一行命令跑起来，数据全在本地，支持<strong>本地模型（Ollama / llama.cpp）</strong>和 <strong>API 模型</strong>（Claude / GPT / Gemini）。<br>
+      聊天、深度研究、文档编辑器、邮件、笔记、日历、任务管理——所有这些不再散落在不同工具里，全部统一在一个本地工作站中。
+    </p>
+  </div>
+  </section>
+
+  <!-- CORE FEATURES -->
+  <section aria-label="Odysseus 核心功能">
+  <div class="sec-head">
+    <div class="sec-icon">⚡</div>
+    <span class="sec-title">核心功能 · 一个工作站搞定所有</span>
+  </div>
+  <div class="grid" style="margin-bottom:14px">
+    <div class="feat-card">
+      <div class="feat-icon">💬</div>
+      <div class="feat-title">Chat + Agents</div>
+      <div class="feat-desc">本地/API 模型、工具调用、MCP、文件操作、Shell、Skill、记忆。Agent 模式支持多步任务执行。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔬</div>
+      <div class="feat-title">Deep Research</div>
+      <div class="feat-desc">多步网页调研，读来源网页，生成完整研究报告。支持多轮搜索和结果综合。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📄</div>
+      <div class="feat-title">Documents</div>
+      <div class="feat-desc">写作优先编辑器，AI 编辑和建议。支持 Markdown、HTML、CSV 语法高亮，无需切换工具。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📧</div>
+      <div class="feat-title">Email</div>
+      <div class="feat-desc">IMAP/SMTP 收件箱，摘要、标签、提醒、回复草稿。邮件工作流直接在工作站里完成。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📝</div>
+      <div class="feat-title">Notes + Tasks</div>
+      <div class="feat-desc">笔记管理、提醒、待办列表、定时 Agent 任务。信息不再碎片化，统一索引。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📅</div>
+      <div class="feat-title">Calendar + CalDAV</div>
+      <div class="feat-desc">日历视图、CalDAV 同步。任务和日历与笔记联动，工作流更顺畅。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🍳</div>
+      <div class="feat-title">Cookbook</div>
+      <div class="feat-desc">硬件感知模型推荐、下载、部署。告诉你用什么硬件配置跑哪个模型最合适。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">⚖️</div>
+      <div class="feat-title">Compare</div>
+      <div class="feat-desc">盲测多模型并排对比与综合评估。用同一问题测试不同模型，直观看效果差异。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔍</div>
+      <div class="feat-title">Web Search</div>
+      <div class="feat-desc">内置网页搜索能力，深度研究模式调用。可配置搜索提供商。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔐</div>
+      <div class="feat-title">Auth + 2FA</div>
+      <div class="feat-desc">内置认证系统，支持两因素验证。数据本地存储，适合自托管场景。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🎨</div>
+      <div class="feat-title">Themes</div>
+      <div class="feat-desc">多套主题切换，UI 定制化。支持暗色/亮色，满足不同视觉偏好。</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🖼️</div>
+      <div class="feat-title">Extras</div>
+      <div class="feat-desc">图库/图像编辑器、文件上传、预设模板、会话管理。</div>
+    </div>
+  </div>
+  </section>
+
+  <!-- MODEL SUPPORT -->
+  <section aria-label="Odysseus 模型支持">
+  <div class="sec-head">
+    <div class="sec-icon green">🧠</div>
+    <span class="sec-title">模型支持 · 本地 + API 混用</span>
+  </div>
+  <div class="grid3" style="margin-bottom:14px">
+    <div class="hl-card">
+      <div class="hl-title">🍴 本地模型（Ollama）</div>
+      <div class="hl-desc">支持 Ollama 托管的所有模型。Llama / Mistral / Gemma / Phi 等，Cookbook 里有硬件推荐。完全离线运行，数据不出机器。</div>
+    </div>
+    <div class="hl-card">
+      <div class="hl-title">☁️ API 模型（OpenAI 兼容）</div>
+      <div class="hl-desc">OpenAI / Claude / Gemini / Groq / Mistral / Cohere 等 OpenAI-compatible API 直连。支持多 Key 轮换和自定义端点。</div>
+    </div>
+    <div class="hl-card">
+      <div class="hl-title">🦙 llama.cpp / GGUF</div>
+      <div class="hl-desc">Cookbook 提供 llama.cpp 本地部署指南。适合有 GPU 的用户自己跑大模型，无需云端 API。</div>
+    </div>
+  </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section aria-label="Odysseus 快速安装">
+  <div class="sec-head">
+    <div class="sec-icon purple">🚀</div>
+    <span class="sec-title">快速安装 · Docker 一行跑起来</span>
+  </div>
+  <div class="cmd-box" style="margin-bottom:14px">
+    <div class="cmd-head">bash — Docker 快速部署</div>
+    <div class="cmd-body">
+<span class="co"># 1. 克隆仓库（dev 分支最新功能）</span>
+<span class="cmd">git</span> clone -b dev https://github.com/pewdiepie-archdaemon/odysseus.git
+<span class="co"># 2. 进入目录，复制环境变量配置</span>
+<span class="cmd">cd</span> odysseus && <span class="cmd">cp</span> .env.example .env
+<span class="co"># 3. Docker Compose 启动（自动构建 + 启动）</span>
+<span class="cmd">docker compose</span> up -d --build
+<span class="co"># 4. 打开浏览器访问</span>
+<span class="ok">open</span> http://localhost:7000
+<span class="co"># 5. 首次管理员密码（容器启动后）</span>
+<span class="cmd">docker compose</span> logs odysseus | <span class="fn">grep</span> password
+    </div>
+  </div>
+  </section>
+
+  <!-- SECURITY + EXTRAS -->
+  <section aria-label="Odysseus 安全与额外功能">
+  <div class="sec-head">
+    <div class="sec-icon yellow">🛡️</div>
+    <span class="sec-title">安全 · 自托管注意事项</span>
+  </div>
+  <div class="grid2" style="margin-bottom:14px">
+    <div class="hl-card">
+      <div class="hl-title">🔒 自托管安全建议</div>
+      <div class="hl-desc">
+        <ul style="padding-left:14px;font-size:11.5px;line-height:2;color:var(--text-dim)">
+          <li>保持认证功能开启，不要跳过初始密码设置</li>
+          <li>敏感数据不要提交到 Git（.env 已包含在 .gitignore）</li>
+          <li>不要把模型/服务端口直接暴露到公网</li>
+          <li>详细配置见 <a href="https://github.com/pewdiepie-archdaemon/odysseus/blob/main/docs/setup.md">docs/setup.md</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="hl-card">
+      <div class="hl-title">📦 本地安装（可选）</div>
+      <div class="hl-desc">
+        <ul style="padding-left:14px;font-size:11.5px;line-height:2;color:var(--text-dim)">
+          <li>支持 GPU 配置（CUDA）加速本地推理</li>
+          <li>Windows / macOS 原生安装见 docs/setup.md</li>
+          <li>HTTPS 配置有完整指南</li>
+          <li>高级配置：模型供应商、多 Key 轮换</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>github.com/pewdiepie-archdaemon/odysseus · <span style="color:var(--green)">⭐ 82.4k</span> · 🔀 10.8k · AGPL-3.0 · Python</span>
+    <span><a href="https://github.com/pewdiepie-archdaemon/odysseus">View on GitHub →</a></span>
+  </div>
+
+</div>
+<button id="save-btn" onclick="window.saveAsPNG&&window.saveAsPNG()">⬇ 保存 PNG</button>
+</body>
+</html>
