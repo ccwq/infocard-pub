@@ -79,7 +79,8 @@ function normalizeFacetArray(value) {
 // ---------------------------------------------------------------------------
 
 const PRIMARY_DIMENSIONS = [
-  { key: 'domains' },
+  { key: 'topics' },
+  { key: 'tech_stack' },
   { key: 'tool_types' },
   { key: 'stages' },
   { key: 'interaction' },
@@ -97,7 +98,8 @@ function normalizeCard(card) {
   return {
     ...card,
     __facets: {
-      domains: normalizeFacetArray(taxonomy.domains),
+      topics: normalizeFacetArray(taxonomy.topics),
+      tech_stack: normalizeFacetArray(taxonomy.tech_stack),
       tool_types: normalizeFacetArray(taxonomy.tool_types),
       stages: normalizeFacetArray(taxonomy.stages),
       interaction: normalizeFacetArray(taxonomy.interaction),
@@ -128,7 +130,7 @@ function cardMatchesFacets(card, selectedFacets) {
 
 function testCardFilterability(card) {
   const results = [];
-  const allPassed = { domains: true, tool_types: true, stages: true, interaction: true,
+  const allPassed = { topics: true, tech_stack: true, tool_types: true, stages: true, interaction: true,
     content_type: true, source: true, style: true, risk: true };
 
   for (const dim of ALL_DIMENSIONS) {
@@ -171,7 +173,7 @@ function verifyCard(cards, slug) {
   }
 
   // check all dims
-  const dims = ['domains', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
+  const dims = ['topics', 'tech_stack', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
   const dimIssues = [];
   const requiredIssues = [];
   for (const d of dims) {
@@ -280,7 +282,7 @@ function main() {
 
   console.log(`[PASS] ${res.slug}`);
   console.log('  taxonomy dims:');
-  const dims = ['domains', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
+  const dims = ['topics', 'tech_stack', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
   for (const d of dims) {
     const vals = res.taxonomy[d] || [];
     const status = vals.length > 0 ? '✓' : '○';

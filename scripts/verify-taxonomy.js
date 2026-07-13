@@ -58,8 +58,8 @@ function verifyMeta(file) {
     };
   }
 
-  // all 8 dims must exist as arrays
-  const dims = ['domains', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
+  // all filter dimensions must exist as arrays; primary_content_type is a scalar label.
+  const dims = ['topics', 'tech_stack', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
   const missingDims = dims.filter(d => !Array.isArray(data.taxonomy[d]));
   if (missingDims.length > 0) {
     return {

@@ -11,7 +11,8 @@
  *   - inferStyle()         style from taxonomy.style / top-level style
  *   - inferRisk()          risk from title / tags / category
  *   - inferContentType()    content_type from category / source_url / text
- *   - inferDomains()        domains from text / tags
+ *   - inferTechStack()      tech_stack from text / tags
+ *   - inferTopics()         topics from text / tags
  *   - inferToolTypes()      tool_types from text / tags
  *   - inferStages()         stages from text / tags
  *   - inferInteraction()     interaction from text / tags
@@ -28,6 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TAXONOMY_PATH = path.join(ROOT, '_taxonomy.yaml');
 const DOCS = path.join(ROOT, 'docs');
+const TAXONOMY_DIMENSIONS = ['tech_stack', 'topics', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
 
 // ---------------------------------------------------------------------------
 // YAML utilities
@@ -190,7 +192,7 @@ function inferSource(data) {
   if (src === 'user-provided') out.push('User-provided');
   if (src === 'screenshot') out.push('Screenshot');
 
-  return uniq(out);
+  return uniq(out).length ? uniq(out) : ['Unknown / legacy'];
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +203,7 @@ function inferStyle(data) {
   // priority: taxonomy.style > top-level style
   const top = canonicalizeStyle(data.style);
   if (top) return [top];
-  return [];
+  return ['legacy / 未分类'];
 }
 
 // ---------------------------------------------------------------------------
@@ -283,10 +285,10 @@ function inferContentType(data) {
 }
 
 // ---------------------------------------------------------------------------
-// Infer: domains
+// Infer: tech_stack and topics
 // ---------------------------------------------------------------------------
 
-function inferDomains(data) {
+function inferTechStack(data) {
   const text = makeText(data.title || '', data.desc || '', data.note || '', data.tags || []);
   const out = [];
 
@@ -298,6 +300,17 @@ function inferDomains(data) {
   if (/\bgo\b|golang/.test(text)) out.push('Go');
   if (/kotlin/.test(text)) out.push('Kotlin');
   if (/android/.test(text)) out.push('Android');
+  if (/windows/.test(text)) out.push('Windows');
+  if (/macos|mac os/.test(text)) out.push('macOS');
+  if (/linux/.test(text)) out.push('Linux');
+
+  const allowed = getSpecValues('tech_stack');
+  return uniq(out).filter(v => allowed.has(v));
+}
+
+function inferTopics(data) {
+  const text = makeText(data.title || '', data.desc || '', data.note || '', data.tags || []);
+  const out = [];
   if (/obsidian/.test(text)) out.push('Obsidian');
   if (/knowledge|wiki|vault|笔记|知识/.test(text)) out.push('知识管理');
   if (/agent|claude|codex|llm|gpt|anthropic|openai|rag|mcp/.test(text)) out.push('AI / LLM');
@@ -309,8 +322,10 @@ function inferDomains(data) {
   if (/animation|video|image|3d|canvas|svg|design|motion/.test(text)) out.push('设计 / 动效');
   if (/video|image|audio|tts|multimodal/.test(text)) out.push('多媒体 / 视频');
   if (/research|benchmark|舆情|调查/.test(text)) out.push('舆情 / 调查');
-
-  const allowed = getSpecValues('domains');
+  if (/network|proxy|gateway|vpn|tailscale/.test(text)) out.push('网络 / 基础设施');
+  if (/database|redis|mysql|postgres/.test(text)) out.push('数据库');
+  if (/gis|map|地图/.test(text)) out.push('GIS / 地图');
+  const allowed = getSpecValues('topics');
   return uniq(out).filter(v => allowed.has(v));
 }
 
@@ -410,7 +425,7 @@ function inferInteraction(data) {
 // ---------------------------------------------------------------------------
 
 const REQUIRED_NON_EMPTY = ['source', 'style', 'risk', 'content_type'];
-const OPTIONAL = ['domains', 'tool_types', 'stages', 'interaction'];
+const OPTIONAL = ['tech_stack', 'topics', 'tool_types', 'stages', 'interaction'];
 
 function buildTaxonomy(data) {
   const tags = Array.isArray(data.tags) ? data.tags : [];
@@ -418,7 +433,17 @@ function buildTaxonomy(data) {
   const desc = String(data.desc || data.note || '');
   const note = String(data.note || '');
 
-  const domains = inferDomains({ title, desc, note, tags });
+  const legacyDomains = Array.isArray(data.taxonomy && data.taxonomy.domains)
+    ? data.taxonomy.domains.map(String)
+    : [];
+  const techStack = uniq([
+    ...inferTechStack({ title, desc, note, tags }),
+    ...legacyDomains.filter(value => getSpecValues('tech_stack').has(value)),
+  ]);
+  const topics = uniq([
+    ...inferTopics({ title, desc, note, tags }),
+    ...legacyDomains.filter(value => getSpecValues('topics').has(value)),
+  ]);
   const toolTypes = inferToolTypes({ title, desc, note, tags });
   const stages = inferStages({ title, desc, note, tags });
   const interaction = inferInteraction({ title, desc, note, tags });
@@ -427,12 +452,15 @@ function buildTaxonomy(data) {
   const risk = inferRisk({ title, desc, note, tags, category: data.category });
   const contentType = inferContentType({ ...data, title, desc, note, tags });
 
+  const stableContentType = contentType.length ? contentType : ['技术手册'];
   return {
-    domains: domains.length ? domains : [],
+    tech_stack: techStack.length ? techStack : [],
+    topics: topics.length ? topics : [],
     tool_types: toolTypes.length ? toolTypes : [],
     stages: stages.length ? stages : [],
     interaction: interaction.length ? interaction : [],
-    content_type: contentType.length ? contentType : [],
+    content_type: stableContentType,
+    primary_content_type: stableContentType[0],
     source: source.length ? source : [],
     style: style.length ? style : [],
     risk: risk.length ? risk : [],
@@ -450,7 +478,7 @@ function validateTaxonomy(taxonomy) {
   const allowed = getAllAllowedValues();
   const issues = [];
 
-  const dims = ['domains', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
+  const dims = TAXONOMY_DIMENSIONS;
 
   for (const dim of dims) {
     const val = taxonomy[dim];
@@ -466,6 +494,12 @@ function validateTaxonomy(taxonomy) {
         issues.push({ type: 'error', field: dim, value: item, canonical: canon, message: `invalid value "${item}" for ${dim}; did you mean "${canon}"?` });
       }
     }
+  }
+
+  if (typeof taxonomy.primary_content_type !== 'string' || !taxonomy.primary_content_type.trim()) {
+    issues.push({ type: 'error', field: 'primary_content_type', message: 'primary_content_type must be a non-empty string' });
+  } else if (allowed.content_type && !allowed.content_type.has(taxonomy.primary_content_type)) {
+    issues.push({ type: 'error', field: 'primary_content_type', value: taxonomy.primary_content_type, message: 'primary_content_type must be an allowed content_type value' });
   }
 
   // required non-empty
@@ -485,20 +519,21 @@ function validateTaxonomy(taxonomy) {
 
 function mergeTaxonomy(existing, inferred) {
   const result = {};
-  const dims = ['domains', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
+  const allowed = getAllAllowedValues();
 
-  for (const dim of dims) {
+  for (const dim of TAXONOMY_DIMENSIONS) {
     const have = Array.isArray(existing[dim]) ? existing[dim].filter(Boolean) : [];
     const fill = Array.isArray(inferred[dim]) ? inferred[dim] : [];
-    if (have.length > 0) {
-      // canonicalize existing values
-      result[dim] = have.map(v => dim === 'style' ? canonicalizeStyle(v) : String(v)).filter(Boolean);
-    } else if (fill.length > 0) {
-      result[dim] = fill;
-    } else {
-      result[dim] = [];
-    }
+    const usable = values => values
+      .map(v => dim === 'style' ? canonicalizeStyle(v) : String(v).trim())
+      .filter(v => v && allowed[dim] && allowed[dim].has(v));
+    const existingValues = usable(have);
+    const inferredValues = usable(fill);
+    result[dim] = existingValues.length ? existingValues : inferredValues;
   }
+  result.primary_content_type = result.content_type.includes(inferred.primary_content_type)
+    ? inferred.primary_content_type
+    : (result.content_type[0] || '技术手册');
   return result;
 }
 
@@ -561,7 +596,8 @@ module.exports = {
   inferStyle,
   inferRisk,
   inferContentType,
-  inferDomains,
+  inferTechStack,
+  inferTopics,
   inferToolTypes,
   inferStages,
   inferInteraction,
@@ -576,4 +612,5 @@ module.exports = {
   writeMeta,
   REQUIRED_NON_EMPTY,
   OPTIONAL,
+  TAXONOMY_DIMENSIONS,
 };

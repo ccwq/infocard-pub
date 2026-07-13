@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const yaml = require('../assets/home/vendor/js-yaml.min.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const TS_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
@@ -58,6 +59,25 @@ function upsert(raw, field, re, value) {
   return raw.replace(PATH_RE, `${pathMatch[1]}\n${line}`);
 }
 
+function comparableMeta(raw) {
+  const data = yaml.load(raw, { schema: yaml.FAILSAFE_SCHEMA });
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const comparable = { ...data };
+  // Taxonomy-only migrations should not make a card look newly updated.
+  delete comparable.taxonomy;
+  delete comparable.updated;
+  return JSON.stringify(comparable);
+}
+
+function isTaxonomyOnlyChange(rel, raw) {
+  try {
+    const headRaw = execFileSync('git', ['show', `HEAD:${rel}`], { cwd: ROOT_DIR, encoding: 'utf8' });
+    return comparableMeta(headRaw) === comparableMeta(raw);
+  } catch {
+    return false;
+  }
+}
+
 function main() {
   const timestampIndex = process.argv.indexOf('--timestamp');
   const timestamp = timestampIndex >= 0 ? process.argv[timestampIndex + 1] : null;
@@ -80,6 +100,9 @@ function main() {
       next = upsert(next, 'updated', UPDATED_RE, timestamp);
       summary.newCards += 1;
       console.log(`[sync-build-timestamps] NEW ${rel} | date=updated=${timestamp}`);
+    } else if (isTaxonomyOnlyChange(rel, raw)) {
+      summary.unchanged += 1;
+      console.log(`[sync-build-timestamps] KEEP ${rel} | taxonomy-only change`);
     } else {
       if (!currentDate || !TS_RE.test(currentDate)) {
         next = upsert(next, 'date', DATE_RE, timestamp);

@@ -1,6 +1,6 @@
 # TAXONOMY.md — infocard-pub 数据维度规范
 
-> **版本：1.0 | 2026-06-26 固化**
+> **版本：2.0 | 2026-07-13 重构**
 
 ## 背景
 
@@ -10,15 +10,17 @@
 
 ## 1. taxonomy schema
 
-每张卡必须有完整的 8 维结构：
+每张卡必须有完整的 9 个筛选维度，并提供一个主内容类型：
 
 ```yaml
 taxonomy:
-  domains: []
+  tech_stack: []
+  topics: []
   tool_types: []
   stages: []
   interaction: []
   content_type: []
+  primary_content_type: 技术手册
   source: []
   style: []
   risk: []
@@ -30,15 +32,17 @@ taxonomy:
 
 以 `_taxonomy.yaml` 为准；允许值在该文件中定义。
 
-### 主维度（5个）
+### 主维度（6个）
 
 | 字段 | 首页标签 | 是否必须非空 |
 |---|---|---|
-| `domains` | 平台 / 领域 | 可空 |
+| `topics` | 主题领域 | 可空 |
+| `tech_stack` | 技术栈 / 平台 | 可空 |
 | `tool_types` | 工具类型 | 可空 |
 | `stages` | 使用阶段 | 可空 |
 | `interaction` | 交互形态 | 可空 |
 | `content_type` | 内容类型 | **必须** |
+| `primary_content_type` | 主内容类型 | **必须**，必须属于 `content_type` |
 
 ### 高级维度（3个）
 
@@ -83,7 +87,7 @@ taxonomy:
 | `wikipedia.org` | `Wikipedia` |
 | 学术 / arxiv / doi | `Paper` |
 | 普通 `https://` | `Website` |
-| 无 URL，用户上传 | `User-provided` / `Screenshot` |
+| 无 URL 或历史内容无法判断 | `Unknown / legacy` |
 
 **注意**：`source` 只能从 `source_url` / 顶层 `source` 字段自动推断，不能从 tags 或 category 污染。
 
@@ -119,16 +123,21 @@ taxonomy:
 
 ## 4. 推断规则
 
-### domains — 可空，允许多选（最多 2–5 个）
+### tech_stack 与 topics — 可空，允许多选
 
-| 信号 | domains |
+`tech_stack` 只存放语言、运行时和目标平台；`topics` 只存放内容主题。两者不得混写。
+
+| 信号 | tech_stack |
 |---|---|
 | Python | `Python` |
 | TypeScript / JavaScript | `TypeScript` / `JavaScript` |
 | Node/npm | `Node.js` |
 | Rust | `Rust` |
 | Go | `Go` |
-| Android | `Android` |
+| Android / Windows / macOS / Linux | 对应平台值 |
+
+| 信号 | topics |
+|---|---|
 | Agent / Claude / LLM / RAG / MCP | `AI / LLM` |
 | CLI / terminal / shell | `CLI / Terminal` |
 | React / Vue / DOM | `Web 前端` |
@@ -281,13 +290,13 @@ npm run build && npm run verify
 ## 9. 常见问题
 
 **Q: `source` 推断失败？**  
-检查 `source_url` 是否存在；若 URL 不可达或无法推断，手动写入 `source: User-provided`。
+检查 `source_url` 是否存在；历史内容无法可靠判断时使用 `Unknown / legacy`，不要臆测来源。
 
 **Q: `style` 有别名？**  
 运行 `fix-taxonomy --dry-run` 查看 canonicalize 变更，再用 `--write` 写入。
 
-**Q: `domains` 混了语言和领域？**  
-本轮保持混合，暂不拆分维度。先确保所有卡有值，再考虑未来规范化。
+**Q: 语言、平台和主题写在哪里？**
+语言与平台写入 `tech_stack`；技术和内容主题写入 `topics`。旧的 `domains` 已废弃。
 
 **Q: CI `verify-taxonomy` 失败但本地通过？**  
 检查是否是 CI 浅克隆（无 `origin/main`）；已修复 skip 逻辑。如仍失败，本地跑 `npm run verify-taxonomy --all` 确认问题范围。

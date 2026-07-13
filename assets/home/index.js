@@ -126,6 +126,12 @@
   };
 
   const buildKindLabel = (card) => {
+    const primaryContentType = card.taxonomy?.primary_content_type;
+    if (typeof primaryContentType === 'string' && primaryContentType.trim()) {
+      return primaryContentType.trim();
+    }
+
+    // 兼容尚未迁移 taxonomy 的历史索引数据。
     const category = String(card.category || '').toLowerCase();
     if (category === 'docs') return 'BRIEF';
     if (category === 'report') return 'REPORT';
@@ -141,7 +147,8 @@
   };
 
   const PRIMARY_DIMENSIONS = [
-    { key: 'domains', label: '平台 / 领域', limit: 8 },
+    { key: 'topics', label: '主题领域', limit: 8 },
+    { key: 'tech_stack', label: '技术栈 / 平台', limit: 8 },
     { key: 'tool_types', label: '工具类型', limit: 8 },
     { key: 'stages', label: '使用阶段', limit: 8 },
     { key: 'interaction', label: '交互形态', limit: 8 },
@@ -170,7 +177,8 @@
       __kind: buildKindLabel(card),
       __glyph: buildLeadGlyph(card),
       __facets: {
-        domains: normalizeFacetArray(taxonomy.domains),
+        topics: normalizeFacetArray(taxonomy.topics),
+        tech_stack: normalizeFacetArray(taxonomy.tech_stack),
         tool_types: normalizeFacetArray(taxonomy.tool_types),
         stages: normalizeFacetArray(taxonomy.stages),
         interaction: normalizeFacetArray(taxonomy.interaction),
@@ -193,7 +201,7 @@
       const allCards = ref([]);
       const searchQuery = ref('');
       const selectedFacets = ref({
-        domains: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: []
+        topics: [], tech_stack: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: []
       });
       const filterDrawerOpen = ref(false);
       const isMobileViewport = ref(false);
@@ -337,7 +345,7 @@
       };
 
       const clearAllFacets = () => {
-        selectedFacets.value = { domains: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: [] };
+        selectedFacets.value = { topics: [], tech_stack: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: [] };
         resetVisibleCount();
         nextTick(() => {
           ensureAutoFill();
@@ -595,73 +603,32 @@
             </label>
           </section>
 
-          <section v-if="isMobileViewport" class="mobile-filter-summary">
-            <div class="mobile-filter-copy">
-              <span class="mobile-filter-label">FILTERS</span>
+          <section class="filter-summary">
+            <div class="filter-summary-copy">
+              <span class="filter-summary-label">FILTERS</span>
               <strong>{{ filterSummaryText }}</strong>
               <span>{{ shownCount }} / {{ totalCount }} 命中</span>
             </div>
-            <div v-if="Object.values(selectedFacets).some(v => v.length)" class="mobile-selected-list" aria-label="已选择筛选条件">
+            <div v-if="Object.values(selectedFacets).some(v => v.length)" class="filter-selected-list" aria-label="已选择筛选条件">
               <template v-for="dim in [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS]" :key="'mobile-selected-' + dim.key">
                 <button
                   v-for="value in selectedFacets[dim.key]"
                   :key="'mobile-summary-' + dim.key + value"
                   type="button"
-                  class="mobile-selected-pill"
+                  class="filter-selected-pill"
                   @click="removeFacetValue(dim.key, value)"
                 >
                   {{ dim.label }} · {{ value }}
                 </button>
               </template>
             </div>
-            <button type="button" class="mobile-filter-trigger" @click="openFilterDrawer">
+            <button type="button" class="filter-trigger" @click="openFilterDrawer">
               筛选
               <span v-if="activeFilterCount">{{ activeFilterCount }}</span>
             </button>
           </section>
 
-          <section v-if="!isMobileViewport" class="filter-stack compact-taxonomy-stack compact-filter-strip desktop-filter-panel">
-            <div class="filter-stack-top compact-filter-top">
-              <div class="filter-stack-title-wrap compact-filter-head">
-                <div class="filter-stack-kicker compact-filter-kicker">taxonomy</div>
-                <div class="filter-stack-title compact-filter-title">紧凑筛选</div>
-              </div>
-            </div>
-
-            <div v-if="Object.values(selectedFacets).some(v => v.length)" class="current-filter banded">
-              <span class="stack-label">当前条件</span>
-              <span class="selected-pills">
-                <template v-for="dim in [...PRIMARY_DIMENSIONS, ...ADVANCED_DIMENSIONS]" :key="dim.key">
-                  <span v-for="value in selectedFacets[dim.key]" :key="dim.key + value" class="pill pill-stack taxonomy-pill">
-                    {{ dim.label }} · {{ value }}
-                    <button type="button" aria-label="移除筛选" @click="removeFacetValue(dim.key, value)">×</button>
-                  </span>
-                </template>
-              </span>
-              <button type="button" class="clear-all" @click="clearAllFacets">清空 taxonomy</button>
-            </div>
-
-            <div class="facet-compact-list">
-              <div v-for="row in compactFacetRows" :key="row.key" class="facet-compact-row">
-                <div class="facet-compact-label">{{ row.label }}</div>
-                <div class="facet-compact-items">
-                  <button
-                    v-for="item in row.full"
-                    :key="row.key + item.value"
-                    :class="{ active: activeFacetClass(row.key, item.value) }"
-                    type="button"
-                    @click="toggleFacetValue(row.key, item.value)"
-                  >
-                    {{ renderFacetLabel(item) }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-          </section>
-
           <div
-            v-if="isMobileViewport"
             class="filter-drawer-shell"
             :class="{ open: filterDrawerOpen }"
             :aria-hidden="filterDrawerOpen ? 'false' : 'true'"
@@ -736,7 +703,7 @@
               <div class="card-rail">
                 <a class="rail-number-block" :href="card.__href" :aria-label="card.__title">
                   <span class="rail-serial">{{ serialOf(card) }}</span>
-                  <span class="rail-category">{{ card.__category }}</span>
+                  <span class="rail-category">{{ card.__kind }}</span>
                   <span class="rail-time">{{ card.__time.minuteFull }}</span>
                   <span class="rail-time-stack">
                     <span class="rail-date">{{ card.__time.date }}</span>

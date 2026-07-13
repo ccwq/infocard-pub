@@ -10,6 +10,7 @@ const DOCS_DIR = path.join(ROOT_DIR, "docs");
 const DIST_DIR = path.join(ROOT_DIR, "dist");
 const INDEX_PATH = path.join(DIST_DIR, "_index.yaml");
 const INDEX_HTML_PATH = path.join(DIST_DIR, "index.html");
+const SOURCE_INDEX_YAML_PATH = path.join(ROOT_DIR, "_index.yaml");
 const SOURCE_INDEX_HTML_PATH = path.join(ROOT_DIR, "index.html");
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATETIME_RE =
@@ -318,16 +319,20 @@ function copyStaticTreeToDist() {
 }
 
 function writeGeneratedArtifacts(indexData) {
+  // Source preview, filter checks, and deployment must consume the same index.
+  writeText(SOURCE_INDEX_YAML_PATH, serializeIndexYaml(indexData));
+  const sourceHtml = readText(SOURCE_INDEX_HTML_PATH);
+  writeText(SOURCE_INDEX_HTML_PATH, injectIndexDataIntoHtml(sourceHtml, indexData));
+
   copyStaticTreeToDist();
   writeText(INDEX_PATH, serializeIndexYaml(indexData));
-  const htmlText = readText(SOURCE_INDEX_HTML_PATH);
-  writeText(INDEX_HTML_PATH, injectIndexDataIntoHtml(htmlText, indexData));
 }
 
 module.exports = {
   DIST_DIR,
   INDEX_HTML_PATH,
   INDEX_PATH,
+  SOURCE_INDEX_YAML_PATH,
   ROOT_DIR,
   buildIndexData,
   extractInjectedIndexData,

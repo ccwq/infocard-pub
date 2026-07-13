@@ -18,6 +18,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const yaml = require("../assets/home/vendor/js-yaml.min.js");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const TS_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
@@ -63,6 +64,23 @@ function isQuoted(value) {
   return /^".*"$/.test(value) || /^'.*'$/.test(value);
 }
 
+function isTaxonomyOnlyChange(rel, raw) {
+  try {
+    const headRaw = execFileSync("git", ["show", `HEAD:${rel}`], { cwd: ROOT_DIR, encoding: "utf8" });
+    const comparable = (content) => {
+      const data = yaml.load(content, { schema: yaml.FAILSAFE_SCHEMA });
+      if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+      const result = { ...data };
+      delete result.taxonomy;
+      delete result.updated;
+      return JSON.stringify(result);
+    };
+    return comparable(headRaw) === comparable(raw);
+  } catch {
+    return false;
+  }
+}
+
 function main() {
   const files = collectChangedMetaFiles();
   if (!files.length) {
@@ -71,10 +89,15 @@ function main() {
   }
 
   const errors = [];
+  let taxonomyOnly = 0;
   for (const rel of files) {
     const abs = path.join(ROOT_DIR, rel);
     if (!fs.existsSync(abs)) continue; // deleted sidecar: deletion workflow handles index rebuild.
     const raw = fs.readFileSync(abs, "utf8");
+    if (isTaxonomyOnlyChange(rel, raw)) {
+      taxonomyOnly += 1;
+      continue;
+    }
     for (const key of ["date", "updated"]) {
       const scalar = getTopLevelScalar(raw, key);
       if (scalar == null || scalar === "") {
@@ -98,7 +121,7 @@ function main() {
     throw new Error(["Timestamp metadata gate failed:", ...errors.map((line) => `- ${line}`), "", "Use:", "  publish_ts=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')", "  date: \"$publish_ts\"", "  updated: \"$publish_ts\""].join("\n"));
   }
 
-  console.log(`[verify-meta-timestamps] OK: ${files.length} changed meta sidecar(s)`);
+  console.log(`[verify-meta-timestamps] OK: ${files.length} changed meta sidecar(s), ${taxonomyOnly} taxonomy-only skipped`);
 }
 
 main();

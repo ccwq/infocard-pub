@@ -48,7 +48,7 @@ function arrayEq(a, b) {
 }
 
 function diffTaxonomy(existing, next) {
-  const dims = ['domains', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
+  const dims = ['tech_stack', 'topics', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
   const changes = [];
   for (const dim of dims) {
     if (!arrayEq(existing[dim], next[dim])) {
@@ -58,6 +58,20 @@ function diffTaxonomy(existing, next) {
         to: next[dim] || [],
       });
     }
+  }
+  const existingPrimary = typeof existing.primary_content_type === 'string'
+    ? existing.primary_content_type.trim()
+    : '';
+  const nextPrimary = typeof next.primary_content_type === 'string'
+    ? next.primary_content_type.trim()
+    : '';
+  if (existingPrimary !== nextPrimary) {
+    changes.push({
+      dim: 'primary_content_type',
+      // 与数组维度保持相同的数据形状，复用后续的增删日志输出。
+      from: existingPrimary ? [existingPrimary] : [],
+      to: nextPrimary ? [nextPrimary] : [],
+    });
   }
   return changes;
 }
