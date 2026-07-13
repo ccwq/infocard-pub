@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="paper-warm">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clone 是 Agent 新瓶颈 — Corigin 优化 Git Clone</title>
+  <style>
+    :root{
+      --bg:#f7f4ef;--paper:#fffdf9;--ink:#0a0a0a;
+      --red:#c8102e;--blue:#0036a3;--green:#15803d;--orange:#c2410c;
+      --gray:#555;--light:#e8e4dc;--border:#1a1a1a;
+      --shadow:5px 5px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Georgia,"Times New Roman","PingFang SC","Microsoft YaHei","SimSun",serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.75;
+    }
+    a{color:var(--blue);text-decoration:underline}
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === TOPBAR === */
+    .topbar{
+      display:grid;grid-template-columns:1.2fr .8fr;
+      border-bottom:3px solid var(--border);margin-bottom:14px;overflow:hidden;
+    }
+    .hero{
+      padding:22px 22px 20px;
+      background:linear-gradient(135deg,var(--red) 0%,#c8102e 55%,var(--border) 55%,var(--border) 100%);
+      color:#fff;position:relative;overflow:hidden;
+    }
+    .hero::after{
+      content:'MATT RICKARD';position:absolute;bottom:12px;right:16px;
+      font:900 9px/1 ui-monospace,monospace;letter-spacing:.18em;color:rgba(255,255,255,.4);
+    }
+    .meta-panel{
+      padding:14px 13px;
+      border-left:3px solid var(--border);
+      background:var(--paper);
+      display:flex;flex-direction:column;gap:8px;
+    }
+    .kicker{
+      display:inline-block;
+      font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;text-transform:uppercase;
+      background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
+      border-radius:999px;padding:4px 10px;margin-bottom:10px;
+    }
+    .hero-title{
+      font-size:clamp(32px,6vw,62px);font-weight:950;letter-spacing:-.05em;
+      line-height:.9;margin-bottom:10px;
+    }
+    .hero-sub{font-size:clamp(12px,1.4vw,14px);line-height:1.6;color:rgba(255,255,255,.82);max-width:500px}
+    .hero-note{font-size:clamp(11px,1.2vw,13px);line-height:1.65;color:rgba(255,255,255,.6);max-width:480px;margin-top:8px}
+    .pill-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+    .pill{
+      display:inline-flex;align-items:center;gap:5px;
+      border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);
+      border-radius:999px;padding:4px 10px;font-size:11px;font-weight:750;white-space:nowrap;
+    }
+    .pill.yellow{border-color:#e8c200;background:#fffde7;color:#7a6000}
+    .pill.green{border-color:#15803d;background:#dcfce7;color:#15803d}
+    .pill.blue{border-color:var(--blue);background:#eef4ff;color:var(--blue)}
+
+    .meta-row-high{display:grid;grid-template-columns:1.4fr 1fr;gap:6px;padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:6px}
+    .meta-row-low{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .meta-pill-lg{
+      border:2px solid var(--border);padding:8px 10px 6px;
+      background:#fff;font-weight:900;font-size:14px;line-height:1.1;
+    }
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gray);margin-top:3px}
+    .meta-pill-md{
+      border:2px solid var(--border);border-left:4px solid var(--red);
+      padding:5px 8px 4px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25;
+    }
+    .meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gray);margin-top:1px}
+    .meta-pill-sm{
+      border:2px solid var(--border);border-left:4px solid #888;
+      padding:4px 8px 3px;background:#fff;font-weight:700;font-size:11px;color:var(--gray);line-height:1.3;
+    }
+    .meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#bbb;margin-top:1px}
+
+    /* === sections === */
+    .section{margin-bottom:14px}
+    .sec-head{
+      display:flex;align-items:center;gap:9px;
+      border-bottom:2px solid var(--border);padding-bottom:6px;margin-bottom:11px;
+    }
+    .sec-icon{
+      width:26px;height:26px;border-radius:3px;
+      background:var(--red);color:#fff;
+      display:flex;align-items:center;justify-content:center;
+      font-size:13px;font-weight:900;flex-shrink:0;
+    }
+    .sec-icon.blue{background:var(--blue)}
+    .sec-icon.orange{background:var(--orange)}
+    .sec-icon.green{background:var(--green)}
+    .sec-title{font:900 13px/1 "Georgia",serif;text-transform:uppercase;letter-spacing:.07em}
+
+    /* === grids === */
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+
+    /* === cards === */
+    .card{
+      background:var(--paper);border:2px solid var(--border);
+      box-shadow:var(--shadow);padding:11px 13px;
+    }
+    .card-title{font:900 12.5px/1.3 "Georgia",serif;margin-bottom:6px}
+    .card-desc{font-size:11.5px;line-height:1.7;color:var(--gray)}
+
+    /* === callout === */
+    .callout{
+      background:var(--paper);border:2px solid var(--border);
+      border-left:5px solid var(--red);
+      box-shadow:var(--shadow);padding:13px 16px;margin-bottom:14px;
+    }
+    .callout-title{font:900 12px/1.2 "Georgia",serif;color:var(--red);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+    .callout-body{font-size:12px;line-height:1.8;color:var(--ink)}
+
+    /* === insight card === */
+    .insight{
+      background:#fffde7;border:2px solid var(--border);
+      border-left:5px solid #e8c200;
+      box-shadow:var(--shadow);padding:12px 14px;margin-bottom:14px;
+    }
+    .insight-title{font:900 12px/1.2 "Georgia",serif;color:#7a6000;margin-bottom:6px}
+    .insight-body{font-size:12px;line-height:1.75;color:#333}
+
+    /* === quote === */
+    .quote{
+      background:var(--paper);border:2px solid var(--border);
+      box-shadow:var(--shadow);padding:12px 16px;margin-bottom:14px;
+    }
+    .quote-mark{font-size:48px;line-height:.5;color:var(--red);font-family:Georgia,serif;font-weight:900}
+    .quote-text{font-size:13px;line-height:1.8;color:var(--ink);font-style:italic;margin-top:6px}
+
+    /* === metric card === */
+    .metric-card{
+      background:var(--paper);border:2px solid var(--border);
+      box-shadow:var(--shadow);padding:12px 14px;text-align:center;
+    }
+    .metric-num{font-size:28px;font-weight:950;letter-spacing:-.04em;color:var(--red);line-height:1}
+    .metric-unit{font-size:11px;color:var(--gray);margin-top:4px}
+    .metric-label{font-size:11px;font-weight:700;color:var(--ink);margin-top:6px;text-transform:uppercase;letter-spacing:.06em}
+
+    /* === timeline === */
+    .timeline{position:relative;padding-left:20px;margin-bottom:14px}
+    .timeline::before{
+      content:'';position:absolute;left:7px;top:6px;bottom:6px;
+      width:2px;background:var(--border);
+    }
+    .tl-item{position:relative;margin-bottom:10px}
+    .tl-item::before{
+      content:'';position:absolute;left:-17px;top:7px;
+      width:10px;height:10px;border-radius:50%;border:2px solid var(--border);background:var(--paper);
+    }
+    .tl-time{font:800 10px/1 ui-monospace,monospace;color:var(--gray);text-transform:uppercase;letter-spacing:.08em}
+    .tl-text{font-size:12px;line-height:1.65;color:var(--ink);margin-top:2px}
+    .tl-num{font:950 13px/1 ui-monospace,monospace;color:var(--red)}
+
+    /* === tradeoff === */
+    .trade-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+
+    /* === footer === */
+    .footer{
+      margin-top:14px;
+      background:var(--ink);color:#fff;
+      border:2px solid var(--border);
+      padding:12px 14px;
+      display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+      font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    }
+    .footer a{color:#f4c84c}
+
+    #save-btn{
+      position:fixed;bottom:20px;right:14px;z-index:999;
+      border:2px solid var(--border);border-radius:0;
+      padding:12px 20px;
+      background:linear-gradient(135deg,var(--red),#a90f27);
+      color:#fff;font-weight:900;font-size:13px;letter-spacing:.04em;
+      box-shadow:4px 4px 0 rgba(10,10,10,.2);
+      cursor:pointer;font-family:Georgia,serif;
+    }
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .meta-panel{border-left:none;border-top:3px solid var(--border)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .grid{grid-template-columns:1fr 1fr}
+      .grid2{grid-template-columns:1fr}
+      .trade-grid{grid-template-columns:1fr 1fr}
+      .footer{flex-direction:column;align-items:flex-start}
+    }
+    @media(max-width:400px){
+      .grid{grid-template-columns:1fr}
+      .trade-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <section aria-label="文章概览">
+  <div class="topbar">
+    <div class="hero">
+      <div class="kicker">📝 Blog Post · Matt Rickard</div>
+      <h1 class="hero-title">Clone 是 Agent<br>的新瓶颈</h1>
+      <p class="hero-sub">Agent 越来越多跑在临时 sandbox 里，所有提供商都在优化"启动到能执行命令"的时间。但真正被忽视的瓶颈不是启动——是把代码 clone 进去。</p>
+      <p class="hero-note">git clone 一个普通仓库需要好几秒，等于好几次 sandbox 启动。Matt Rickard 正在做一个叫 <strong>Corigin</strong> 的解决方案，从头重建 git 读路径，把 clone 降到 184–646ms。</p>
+      <div class="pill-row">
+        <span class="pill">AI Agent</span>
+        <span class="pill yellow">Git 优化</span>
+        <span class="pill green">Sandbox</span>
+        <span class="pill blue">Corigin</span>
+      </div>
+    </div>
+    <div class="meta-panel">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">
+          690ms
+          <span class="sub">Sandbox TTI 中位数</span>
+        </div>
+        <div class="meta-pill-md">
+          184–646ms
+          <span class="sub">Corigin Clone</span>
+        </div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-sm">
+          2026
+          <span class="sub">Workload</span>
+        </div>
+        <div class="meta-pill-sm">
+          Agent
+          <span class="sub">Sandbox</span>
+        </div>
+      </div>
+      <div style="background:#fff;border:2px solid var(--border);border-left:4px solid var(--blue);padding:7px 10px 6px">
+        <div style="font:900 11px/1.2 'Georgia',serif">原文</div>
+        <div style="font:700 9px/1.3 ui-monospace,monospace;color:var(--gray);margin-top:2px">blog.matt-rickard.com</div>
+      </div>
+      <div style="background:#fff;border:2px solid var(--border);border-left:4px solid var(--green);padding:7px 10px 6px">
+        <div style="font:900 11px/1.2 'Georgia',serif">Corigin</div>
+        <div style="font:700 9px/1.3 ui-monospace,monospace;color:var(--blue);margin-top:2px">corigin.dev</div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- THE PROBLEM -->
+  <section aria-label="问题背景">
+  <div class="callout">
+    <div class="callout-title">🔍 核心问题</div>
+    <div class="callout-body">
+      <strong>TTI（Time To Interactive）只衡量 sandbox 能执行命令的时间。</strong>它不算把代码弄进去的时间。<br><br>
+      对大多数仓库，从头 <code>git clone</code> 需要好几秒——相当于好几次 sandbox 启动。<br>
+      如果 agent 工作流的标准是"每任务一个临时 sandbox"，clone 延迟就是<strong>每个 agent session 的固定入场费</strong>。
+    </div>
+  </div>
+  </section>
+
+  <!-- METRICS -->
+  <section aria-label="关键数据对比">
+  <div class="sec-head">
+    <div class="sec-icon">📊</div>
+    <span class="sec-title">关键数据</span>
+  </div>
+  <div class="grid" style="margin-bottom:14px">
+    <div class="metric-card">
+      <div class="metric-num">690</div>
+      <div class="metric-unit">ms 中位数</div>
+      <div class="metric-label">Sandbox TTI（可执行命令）</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-num">184–646</div>
+      <div class="metric-unit">ms 中位数</div>
+      <div class="metric-label">Corigin 完整 Clone</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-num">~1s+</div>
+      <div class="metric-unit">传统方式</div>
+      <div class="metric-label">标准 git clone 仓库</div>
+    </div>
+  </div>
+  </section>
+
+  <!-- INSIGHT -->
+  <section aria-label="核心洞察">
+  <div class="insight">
+    <div class="insight-title">💡 洞察：Sandbox 启动优化已逼近极限，clone 还有数量级优化空间</div>
+    <div class="insight-body">
+      690ms 的 TTI 已经很难再压，但 clone 有一个数量级的优化空间。<strong>Sandbox 提供商卷的是启动时间，而真正的瓶颈在数据搬运。</strong>这不是一个大市场，但对任何认真对待 agent 基础设施的人来说，这是一个该解决的问题。
+    </div>
+  </div>
+  </section>
+
+  <!-- WHY NOT JUST MOUNT -->
+  <section aria-label="方案对比">
+  <div class="sec-head">
+    <div class="sec-icon orange">⚖️</div>
+    <span class="sec-title">方案对比 · 为什么不直接挂载</span>
+  </div>
+  <div class="grid2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-title">❌ 挂载磁盘 / NFS</div>
+      <div class="card-desc">
+        挂载时间几乎为零，文件操作很快。但问题是：<br><br>
+        • 磁盘是<strong>共享的、可变的状态</strong><br>
+        • 每个 sandbox 都在同一个文件系统上工作<br>
+        • 并行 agent 需要隔离<br>
+        • 一旦用快照或"分支"磁盘，就是在<strong>重新发明版本控制</strong>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">✅ 快速 Clone（Corigin）</div>
+      <div class="card-desc">
+        每个 sandbox 在本地磁盘上物化自己的隔离副本：<br><br>
+        • 仓库仍然是真正的 Git remote<br>
+        • 每个 agent 有独立隔离的工作目录<br>
+        • 完成后用正常的 <code>git push</code> 推回去<br>
+        • 享受 Git 全部能力（分支、合并、历史、跨提供商）
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- HOW CORIGIN WORKS -->
+  <section aria-label="Corigin 工作原理">
+  <div class="sec-head">
+    <div class="sec-icon blue">🔧</div>
+    <span class="sec-title">Corigin 工作原理</span>
+  </div>
+  <div class="timeline" style="margin-bottom:14px">
+    <div class="tl-item">
+      <div class="tl-time">优化 1 · 预计算</div>
+      <div class="tl-text">在 sandbox 外部预计算出 clone 计划，节省一次往返和约 <span class="tl-num">155–370ms</span></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">优化 2 · 自定义协议</div>
+      <div class="tl-text">用自定义 clone 协议代替标准 git，但最终产物是<strong>完全相同的 git 仓库</strong>（语义等价）</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">优化 3 · 读路径重建</div>
+      <div class="tl-text">为 2026 年 agent sandbox 工作负载从头重建了 git 读路径程序化 git 服务器</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">结果</div>
+      <div class="tl-text">中位数 <span class="tl-num">184–646ms</span> 完成完整 clone —— 比 sandbox 启动还快</div>
+    </div>
+  </div>
+  </section>
+
+  <!-- TRADE-OFFS -->
+  <section aria-label="Corigin 代价">
+  <div class="sec-head">
+    <div class="sec-icon">⚠️</div>
+    <span class="sec-title">Corigin 放弃了什么</span>
+  </div>
+  <div class="trade-grid" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-title">往返节省的代价</div>
+      <div class="card-desc">预计算 clone 计划节省了约 155–370ms 的往返时间，但需要 sandbox 外额外的预计算步骤。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">非标准协议</div>
+      <div class="card-desc">用自定义 clone 协议代替标准 git，最终产物相同，但 push 端稍慢（预计算加速的时间来自 push 端）。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">push 变慢</div>
+      <div class="card-desc">预计算 clone 加速制品的时刻，就是 push 稍微变慢的时刻——读写性能需要权衡。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">暂不支持优化</div>
+      <div class="card-desc">基准只测试了全量 clone，暂不支持 shallow、blobless、treeless 等 clone 优化策略。</div>
+    </div>
+  </div>
+  </section>
+
+  <!-- WHY IT MATTERS -->
+  <section aria-label="为什么重要">
+  <div class="sec-head">
+    <div class="sec-icon green">🌐</div>
+    <span class="sec-title">为什么这事重要</span>
+  </div>
+  <div class="quote" style="margin-bottom:14px">
+    <div class="quote-mark">"</div>
+    <div class="quote-text">
+      如果 agent 工作流的标准是"每任务一个临时 sandbox"，那么 clone 延迟就成了每个 agent session 的固定入场费。<br><br>
+      Sandbox 启动优化已经快逼近极限了——690ms 的 TTI 很难再压。但 clone 有一个数量级的优化空间。<br><br>
+      这不是一个大市场，但对任何认真对待 agent 基础设施的人来说，<strong>这是一个该解决的问题。</strong>
+    </div>
+  </div>
+  </section>
+
+  <!-- LINKS -->
+  <section aria-label="相关链接">
+  <div class="sec-head">
+    <div class="sec-icon blue">🔗</div>
+    <span class="sec-title">相关链接</span>
+  </div>
+  <div class="grid2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-title">📄 原文 Blog Post</div>
+      <div class="card-desc">
+        Matt Rickard 原文《Clone Is the New Bottleneck for Agents》，含完整分析、基准数据和 Corigin 方案说明。<br><br>
+        <a href="https://blog.matt-rickard.com/p/clone-is-the-new-bottleneck-for-agents">blog.matt-rickard.com/p/clone-is-the-new-bottleneck-for-agents</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">🚀 Corigin</div>
+      <div class="card-desc">
+        为 agent sandbox 场景重建了 git 读路径的程序化 git 服务器，中位数 184–646ms 完成完整 clone。<br><br>
+        <a href="https://corigin.dev">corigin.dev</a>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>Matt Rickard · Clone Is the New Bottleneck for Agents · corigin.dev</span>
+    <span><a href="https://blog.matt-rickard.com/p/clone-is-the-new-bottleneck-for-agents">原文 →</a></span>
+  </div>
+
+</div>
+<button id="save-btn" onclick="window.saveAsPNG&&window.saveAsPNG()">⬇ 保存 PNG</button>
+</body>
+</html>
