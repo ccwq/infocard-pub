@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SingGuard-NSFA — Agent 动作安全护栏</title>
+  <style>
+    :root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{overflow-x:hidden}
+    body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:12px}
+    img{max-width:100%;display:block}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;margin-bottom:14px}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(20px,3.8vw,36px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.green{background:#1a7a3a;color:#fff}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px}
+    .alert strong{display:block;font-size:13px;line-height:1.35}
+    .alert p{margin:4px 0 0;font-size:12px;line-height:1.5;color:#f0ebe0}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f172a 0%,#1e2a4a 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid rgba(255,255,255,.5);padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:17px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#c8d4e8;font-size:12px;line-height:1.5}
+    .panel-body{padding:14px;display:grid;gap:8px;background:#f7f6f2}
+    .flow{display:grid;gap:6px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:8px 10px;display:grid;gap:2px;position:relative}
+    .flow-item::before{content:attr(data-n);position:absolute;right:8px;top:6px;font-size:11px;font-weight:900;color:var(--muted)}
+    .flow-item .fi-title{font-size:12px;font-weight:850;line-height:1.3}
+    .flow-item .fi-sub{font-size:10.5px;color:var(--muted);line-height:1.4}
+    .flow-item.blue-card{border-color:var(--blue);background:var(--soft-blue)}
+    .flow-item.red-card{border-color:var(--red);background:var(--soft-red)}
+    .flow-item.green-card{border-color:#1a7a3a;background:#e8f5ee}
+    .section{margin-bottom:14px}
+    .section-header{display:flex;align-items:center;gap:10px;padding:7px 12px;border:2px solid var(--line);background:var(--paper);margin-bottom:8px}
+    .section-num{font-size:13px;font-weight:900;background:var(--red);color:#fff;padding:2px 7px}
+    .section-title{font-size:12.5px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .card{border:2px solid var(--line);background:var(--paper);padding:11px;box-shadow:var(--shadow)}
+    .card h3{font-size:12px;font-weight:900;margin-bottom:5px;line-height:1.3}
+    .card p{font-size:11px;color:var(--muted);line-height:1.5}
+    .tag{display:inline-block;border:1.5px solid var(--line);background:#fff;padding:2px 7px;font-size:10.5px;font-weight:700;margin-top:5px}
+    .tag.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .tag.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .tag.green{background:#1a7a3a;color:#fff;border-color:#1a7a3a}
+    /* Taxonomy table */
+    .tax-table{width:100%;border-collapse:collapse;font-size:10.5px;border:2px solid var(--line);background:var(--paper)}
+    .tax-table th{background:var(--ink);color:#fff;padding:6px 10px;text-align:left;font-weight:850;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+    .tax-table td{padding:6px 10px;border-bottom:1px solid #e0dcd4;vertical-align:top;font-size:10.5px;line-height:1.4}
+    .tax-table tr:last-child td{border-bottom:none}
+    .tax-table tr:nth-child(even) td{background:#faf8f3}
+    .tax-table .q{font-weight:800;color:var(--red)}
+    .tax-table .r{font-weight:800;color:var(--blue)}
+    /* Model cards */
+    .model-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+    .model-card{border:2px solid var(--line);background:var(--paper);padding:10px;text-align:center}
+    .model-card .m-size{font-size:20px;font-weight:900;color:var(--blue)}
+    .model-card .m-name{font-size:10px;font-weight:750;color:var(--muted);margin-top:2px}
+    .model-card .m-f1{font-size:11px;font-weight:800;color:#1a7a3a;margin-top:4px}
+    /* Dual mode */
+    .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+    .mode-card{border:2px solid var(--line);background:var(--paper);padding:11px}
+    .mode-card h3{font-size:12px;font-weight:900;margin-bottom:5px}
+    .mode-card p{font-size:10.5px;color:var(--muted);line-height:1.5}
+    .mode-card.green-mode{border-color:#1a7a3a;background:#e8f5ee}
+    .mode-card.blue-mode{border-color:var(--blue);background:var(--soft-blue)}
+    /* Quote */
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-size:11.5px;font-weight:750;line-height:1.55;margin-bottom:8px}
+    .footer{margin-top:0;padding-top:12px;border-top:3px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .footer a{color:var(--blue);font-size:11.5px;font-weight:700;text-decoration:none;border-bottom:1px solid #c0d0ff;padding-bottom:1px}
+    .footer a:hover{border-bottom-color:var(--blue)}
+    .dl-btn{display:inline-flex;align-items:center;gap:6px;background:var(--blue);color:#fff;padding:7px 14px;font-size:11.5px;font-weight:850;border:2px solid var(--line);text-decoration:none}
+    .dl-btn:hover{background:var(--ink)}
+    @media(max-width:600px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:none;border-bottom:3px solid var(--line)}
+      .grid-3,.grid-2,.model-grid,.mode-grid{grid-template-columns:1fr}
+      .tax-table{font-size:9.5px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<section aria-label="SingGuard-NSFA Agent 动作安全护栏">
+<div class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <span class="kicker">蚂蚁安全实验室</span>
+    <h1 class="demo-title">SingGuard-NSFA</h1>
+    <p class="subtitle">专治 Agent 异常动作风险的安全护栏。工具调用、恶意代码、敏感信息窃取等 7 大类、185 个细分变体，超 133 种语言检测，0.8B-9B 四种尺寸，>94% F1。</p>
+    <div class="badge-row">
+      <span class="badge dark">Ant Group</span>
+      <span class="badge red">7 类 185 变体</span>
+      <span class="badge blue">0.8B–9B</span>
+      <span class="badge green">>94% F1</span>
+      <span class="badge">133 语言</span>
+      <span class="badge">Apache-2.0</span>
+    </div>
+    <div class="alert">
+      <strong>安全威胁从"模型说了什么"变为"Agent 做了什么"。</strong>
+      <p>传统内容安全护栏无法检测操作类威胁。NSFA 把工具调用、恶意代码执行等风险拆成 185 个细分变体，堵死攻击者换语种绕过的漏洞。</p>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="panel-top">
+      <span class="eyebrow">Agentic AI Guardrails</span>
+      <h3>NSFA 风险分类体系</h3>
+      <p>基于 CIA 三元模型（机密性/完整性/可用性）构建，交叉验证 OWASP 三大指南</p>
+    </div>
+    <div class="panel-body">
+      <div class="flow">
+        <div class="flow-item red-card" data-n="Q1">
+          <div class="fi-title">提示注入 & 越狱</div>
+          <div class="fi-sub">对抗输入劫持 Agent 行为，上下文操纵，编码混淆绕过</div>
+        </div>
+        <div class="flow-item red-card" data-n="Q2">
+          <div class="fi-title">恶意代码 & 网络攻击</div>
+          <div class="fi-sub">恶意软件生成、漏洞利用开发、权限提升和横向移动</div>
+        </div>
+        <div class="flow-item" data-n="Q3">
+          <div class="fi-title">敏感信息窃取</div>
+          <div class="fi-sub">提取系统提示、模型内部参数、个人和专有数据</div>
+        </div>
+        <div class="flow-item red-card" data-n="Q4">
+          <div class="fi-title">危险操作 & 工具滥用</div>
+          <div class="fi-sub">通过工具误用或参数篡改诱导权限提升或破坏性操作</div>
+        </div>
+        <div class="flow-item" data-n="Q5">
+          <div class="fi-title">资源滥用</div>
+          <div class="fi-sub">触发失控执行或不成比例的计算，导致服务可用性下降</div>
+        </div>
+        <div class="flow-item green-card" data-n="R1">
+          <div class="fi-title">危险动作生成（响应侧）</div>
+          <div class="fi-sub">输出可执行的危险命令、恶意代码或攻击程序</div>
+        </div>
+        <div class="flow-item green-card" data-n="R2">
+          <div class="fi-title">敏感信息泄漏（响应侧）</div>
+          <div class="fi-sub">在生成文本中暴露凭证、API Key 或密钥</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 模型规格 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">🤖</span>
+    <span class="section-title">四种模型规格 · 全部 >94% F1</span>
+  </div>
+  <div class="model-grid">
+    <div class="model-card">
+      <div class="m-size">0.8B</div>
+      <div class="m-name">SingGuard-NSFA-0.8B</div>
+      <div class="m-f1">>94% F1</div>
+    </div>
+    <div class="model-card">
+      <div class="m-size">2B</div>
+      <div class="m-name">SingGuard-NSFA-2B</div>
+      <div class="m-f1">>94% F1</div>
+    </div>
+    <div class="model-card">
+      <div class="m-size">4B</div>
+      <div class="m-name">SingGuard-NSFA-4B</div>
+      <div class="m-f1">>94% F1</div>
+    </div>
+    <div class="model-card">
+      <div class="m-size">9B</div>
+      <div class="m-name">SingGuard-NSFA-9B</div>
+      <div class="m-f1">>94% F1</div>
+    </div>
+  </div>
+</div>
+
+<!-- NSFA 风险分类表 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">📋</span>
+    <span class="section-title">NSFA 风险分类体系（185 个变体）</span>
+  </div>
+  <table class="tax-table" aria-label="NSFA风险分类">
+    <thead>
+      <tr>
+        <th style="width:40px">侧</th>
+        <th>一级域</th>
+        <th>CIA</th>
+        <th>二级风险数</th>
+        <th>三级变体数</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="q">Query</td>
+        <td>提示注入 & 越狱</td>
+        <td>C, I, A</td>
+        <td>多</td>
+        <td>大量变体</td>
+      </tr>
+      <tr>
+        <td class="q">Query</td>
+        <td>恶意代码 & 网络攻击</td>
+        <td>I</td>
+        <td>多</td>
+        <td>大量变体</td>
+      </tr>
+      <tr>
+        <td class="q">Query</td>
+        <td>敏感信息窃取</td>
+        <td>C</td>
+        <td>多</td>
+        <td>大量变体</td>
+      </tr>
+      <tr>
+        <td class="q">Query</td>
+        <td>危险操作 & 工具滥用</td>
+        <td>I</td>
+        <td>多</td>
+        <td>大量变体</td>
+      </tr>
+      <tr>
+        <td class="q">Query</td>
+        <td>资源滥用</td>
+        <td>A</td>
+        <td>多</td>
+        <td>大量变体</td>
+      </tr>
+      <tr>
+        <td class="r">Response</td>
+        <td>危险动作生成</td>
+        <td>C, I, A</td>
+        <td>4</td>
+        <td>25</td>
+      </tr>
+      <tr>
+        <td class="r">Response</td>
+        <td>敏感信息泄漏</td>
+        <td>C</td>
+        <td>多</td>
+        <td>大量变体</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 双模式推理 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">⚡</span>
+    <span class="section-title">双模式推理架构</span>
+  </div>
+  <div class="mode-grid">
+    <div class="mode-card blue-mode">
+      <h3>🧠 生成推理模式</h3>
+      <p>用于离线审计和可解释分析。基于规则生成详细的推理路径，输出完整风险报告，适合安全合规审查。</p>
+      <span class="tag blue">离线审计</span>
+    </div>
+    <div class="mode-card green-mode">
+      <h3>⚡ 判别分类模式</h3>
+      <p>用于实时在线拦截。专用分类头，约 50ms 级别延迟，在线检测 Agent 动作并实时阻断高风险操作。</p>
+      <span class="tag green">实时拦截</span>
+    </div>
+  </div>
+</div>
+
+<!-- 核心特性 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">✦</span>
+    <span class="section-title">核心特性</span>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <h3>🛡️ 7 大类 185 变体</h3>
+      <p>基于 CIA 三元模型和 OWASP 三大指南（AgentDojo、InjecAgent、AgentHarm）交叉验证的风险分类体系。</p>
+      <span class="tag red">全面覆盖</span>
+    </div>
+    <div class="card">
+      <h3>🌍 133 种语言检测</h3>
+      <p>超 93K 条多语言样本训练，彻底堵死攻击者通过冷门语种绕过安全护栏的漏洞。</p>
+      <span class="tag blue">多语言</span>
+    </div>
+    <div class="card">
+      <h3>🔌 插件式扩展</h3>
+      <p>新增风险类型只需在冻结 backbone 上训练一个轻量分类头，无需重训。也可作为其他护栏的插件增强（+17.6 F1）。</p>
+      <span class="tag green">可扩展</span>
+    </div>
+    <div class="card">
+      <h3>📊 超强基准</h3>
+      <p>在 NSFA-Query-Multilingual（63K）、NSFA-Response-Multilingual（30K）、NSFA-CrossSource-Query（3.4K）三大基准上，比最强竞品高 6-12 F1 点。</p>
+      <span class="tag blue">SOTA</span>
+    </div>
+    <div class="card">
+      <h3>⚡ ~50ms 实时拦截</h3>
+      <p>判别分类模式延迟约 50ms，可直接嵌入 Agent 工具调用链路，实时阻断高风险操作。</p>
+      <span class="tag">低延迟</span>
+    </div>
+    <div class="card">
+      <h3>🧩 即插即用</h3>
+      <p>可作为 Llama Guard 3 等其他护栏的插件增强，无需替换现有系统即可提升安全能力。</p>
+      <span class="tag green">无缝集成</span>
+    </div>
+  </div>
+</div>
+
+<!-- 与 SingGuard 关系 -->
+<div class="quote">
+  <strong>与 SingGuard 的关系：</strong>SingGuard 是输入端/输出端的内容防御（文本+图像+多模态），SingGuard-NSFA 是 Agent 操作层面的动作防御。两者互补，组合使用覆盖"说什么"和"做什么"的全链路安全。
+</div>
+
+<div class="footer">
+  <a href="https://github.com/inclusionAI/SingGuard-NSFA" target="_blank">inclusionAI/SingGuard-NSFA · 26 Stars · Apache-2.0</a>
+  <a href="https://huggingface.co/collections/inclusionAI/singguard-nsfa" target="_blank" class="dl-btn">Hugging Face →</a>
+</div>
+
+</div>
+</body>
+</html>
