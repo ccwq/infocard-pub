@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiniCPM 5 1B 本地部署与评测</title>
+  <style>
+    :root{--bg:#f9f6f0;--paper:#fffdf8;--ink:#1a1a1a;--muted:#6b6560;--line:#1a1a1a;--red:#d42b2b;--blue:#1a56db;--green:#16a34a;--yellow:#ca8a04;--orange:#c2410c;--soft-red:#fdf0f0;--soft-blue:#eff6ff;--soft-green:#f0fdf4;--soft-yellow:#fefce8;--radius:10px;--shadow:5px 5px 0 rgba(26,26,26,.15)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{overflow-x:hidden}
+    body{color:var(--ink);line-height:1.6;background:var(--bg);font-family:ui-sans-serif,system-ui,"PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:12px}
+    img{max-width:100%;display:block}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.85fr);gap:14px;border:3px solid var(--line);background:var(--paper);border-radius:0;overflow:hidden;margin-bottom:14px}
+    .hero-bar{grid-column:1/-1;height:12px;background:var(--line)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);background:#fff;padding:4px 9px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+    h1.demo-title{margin:0;font-size:clamp(20px,3.5vw,34px);line-height:1;letter-spacing:-.04em;font-weight:900}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.5}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border:2px solid var(--line);background:#fff;font-size:11.5px;font-weight:800}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.green{background:var(--green);color:#fff}
+    .badge.yellow{background:var(--yellow);color:#fff}
+    .badge.orange{background:var(--orange);color:#fff}
+    .badge.dark{background:var(--ink);color:#fff}
+    .alert{border:2px solid var(--line);background:var(--ink);color:#fff;padding:10px 12px;border-radius:0}
+    .alert strong{display:block;font-size:13px;font-weight:900}
+    .alert p{margin:3px 0 0;font-size:11.5px;line-height:1.5;color:#e0e0e0}
+    .hero-visual{background:#f7f5ef;display:grid;grid-template-rows:auto 1fr}
+    .panel-top{padding:14px;border-bottom:2px solid var(--line);background:var(--ink);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;border:1px solid rgba(255,255,255,.4);padding:2px 8px;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.8)}
+    .panel-top h3{margin:8px 0 4px;font-size:16px;font-weight:900;letter-spacing:-.03em}
+    .panel-top p{margin:0;font-size:11.5px;color:rgba(255,255,255,.7);line-height:1.5}
+    .panel-body{padding:12px;display:grid;gap:7px}
+    .spec-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .spec-item{border:2px solid var(--line);background:#fff;padding:8px 10px}
+    .spec-item .s-label{font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px}
+    .spec-item .s-val{font-size:13px;font-weight:900}
+    .spec-item .s-val.red{color:var(--red)}
+    .spec-item .s-val.green{color:var(--green)}
+    .spec-item .s-val.blue{color:var(--blue)}
+    /* SECTIONS */
+    .section{margin-bottom:14px}
+    .section-header{display:flex;align-items:center;gap:10px;padding:7px 12px;border:2px solid var(--line);background:var(--paper);margin-bottom:8px;border-radius:0}
+    .section-num{font-size:11px;font-weight:900;background:var(--red);color:#fff;padding:2px 7px;min-width:26px;text-align:center}
+    .section-title{font-size:12px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .card{border:2px solid var(--line);background:var(--paper);padding:11px;box-shadow:var(--shadow);border-radius:0}
+    .card h3{font-size:12px;font-weight:900;margin-bottom:5px;line-height:1.3}
+    .card p{font-size:11px;color:var(--muted);line-height:1.5}
+    .tag{display:inline-block;border:1.5px solid var(--line);background:#fff;padding:2px 7px;font-size:10.5px;font-weight:700;margin-top:4px}
+    .tag.blue{background:var(--blue);color:#fff}
+    .tag.green{background:var(--green);color:#fff}
+    .tag.red{background:var(--red);color:#fff}
+    .tag.yellow{background:var(--yellow);color:#fff}
+    /* Version table */
+    .ver-table{width:100%;border-collapse:collapse;border:2px solid var(--line);background:var(--paper);font-size:11px}
+    .ver-table th{background:var(--ink);color:#fff;padding:7px 11px;text-align:left;font-weight:850;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
+    .ver-table td{padding:7px 11px;border-bottom:1px solid #e8e4dc;font-size:11px;line-height:1.4;vertical-align:middle}
+    .ver-table tr:last-child td{border-bottom:none}
+    .ver-table tr:nth-child(even) td{background:#faf8f3}
+    .ver-table .vname{font-weight:900;color:var(--blue);white-space:nowrap}
+    .ver-table .vsize{font-weight:800}
+    .ver-table .vgood{border-left:3px solid var(--green)}
+    .ver-table .vrec{border-left:3px solid var(--yellow);background:#fffbea}
+    /* Feature pills */
+    .pill-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}
+    .pill{border:2px solid var(--line);background:#fff;padding:6px 10px;font-size:11px;font-weight:800;display:flex;align-items:center;gap:5px}
+    .pill.on{border-color:var(--green);background:var(--soft-green)}
+    .pill.on::before{content:"✓";color:var(--green);font-weight:900}
+    /* Scene grid */
+    .scene-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+    .scene-item{border:2px solid var(--line);background:var(--paper);padding:10px;text-align:center}
+    .scene-item .s-icon{font-size:20px;margin-bottom:4px}
+    .scene-item .s-name{font-size:11px;font-weight:850;margin-bottom:3px}
+    .scene-item .s-desc{font-size:10px;color:var(--muted);line-height:1.4}
+    /* Config code */
+    .code-block{border:2px solid var(--line);background:#1e293b;color:#e2e8f0;padding:11px 13px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.65;overflow-x:auto;border-radius:0}
+    .code-block .c-comment{color:#64748b}
+    .code-block .c-cmd{color:#7dd3fc}
+    .code-block .c-val{color:#86efac}
+    /* Warning */
+    .warn-box{border:2px solid var(--yellow);background:var(--soft-yellow);padding:10px 12px}
+    .warn-box .w-title{font-size:11.5px;font-weight:900;color:var(--yellow);margin-bottom:3px}
+    .warn-box p{font-size:11px;color:var(--muted);line-height:1.5}
+    /* Quote */
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-size:11.5px;font-weight:750;line-height:1.55;margin-bottom:8px}
+    /* Footer */
+    .footer{margin-top:0;padding-top:12px;border-top:3px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .footer a{color:var(--blue);font-size:11.5px;font-weight:700;text-decoration:none;border-bottom:1px solid #bfdbfe;padding-bottom:1px}
+    .footer a:hover{border-bottom-color:var(--blue)}
+    .dl-btn{display:inline-flex;align-items:center;gap:6px;background:var(--blue);color:#fff;padding:7px 14px;font-size:11.5px;font-weight:850;border:2px solid var(--line);text-decoration:none;border-radius:0}
+    .dl-btn:hover{background:var(--ink)}
+    @media(max-width:600px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:none;border-bottom:3px solid var(--line)}
+      .grid-3,.grid-2,.spec-grid,.scene-grid{grid-template-columns:1fr}
+      .ver-table{font-size:9.5px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<section aria-label="MiniCPM 5 1B 本地部署与评测">
+<div class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <span class="kicker">本地 LLM · OpenBMB</span>
+    <h1 class="demo-title">MiniCPM 5 1B</h1>
+    <p class="subtitle">本地轻量化大模型，688MB 起步，200+ tokens/s 吞吐，128K 上下文，深度思考模式，OpenAI 兼容接口，一键本地部署。</p>
+    <div class="badge-row">
+      <span class="badge dark">OpenBMB</span>
+      <span class="badge blue">128K 上下文</span>
+      <span class="badge red">深度思考</span>
+      <span class="badge green">200+ tokens/s</span>
+      <span class="badge yellow">OpenAI 接口</span>
+    </div>
+    <div class="alert">
+      <strong>688MB 即可跑，1GB 显存够用</strong>
+      <p>Q4 量化版仅 688MB，完全支持低配 CPU 运行；Q8 量化版 1.15GB，显存 >= 1GB；F16 全量版 2.17GB，显存 >= 2GB。刷新 AI 分析指数榜 17.9 分。</p>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="panel-top">
+      <span class="eyebrow">Performance Specs</span>
+      <h3>性能指标</h3>
+      <p>本地运行吞吐量 · 量化规格对比</p>
+    </div>
+    <div class="panel-body">
+      <div class="spec-grid">
+        <div class="spec-item">
+          <div class="s-label">吞吐量</div>
+          <div class="s-val green">200-256 tok/s</div>
+        </div>
+        <div class="spec-item">
+          <div class="s-label">AI 分析指数</div>
+          <div class="s-val red">17.9 分</div>
+        </div>
+        <div class="spec-item">
+          <div class="s-label">上下文</div>
+          <div class="s-val blue">128K</div>
+        </div>
+        <div class="spec-item">
+          <div class="s-label">最小体积</div>
+          <div class="s-val">688MB（Q4）</div>
+        </div>
+        <div class="spec-item">
+          <div class="s-label">模型参数</div>
+          <div class="s-val blue">1B</div>
+        </div>
+        <div class="spec-item">
+          <div class="s-label">接口协议</div>
+          <div class="s-val">OpenAI 兼容</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 功能特性 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">✦</span>
+    <span class="section-title">核心功能特性</span>
+  </div>
+  <div class="pill-row">
+    <div class="pill on">128K 长上下文</div>
+    <div class="pill on">深度思考模式</div>
+    <div class="pill on">急速响应模式</div>
+    <div class="pill on">Agent 工具调用</div>
+    <div class="pill on">代码生成</div>
+    <div class="pill on">本地闭环运行</div>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <h3>🧠 深度思考模式</h3>
+      <p>针对复杂多任务强制开启，通过额外的思考 token 提升推理正确率，适合代数、逻辑、多步骤推理场景。</p>
+      <span class="tag red">高复杂度必备</span>
+    </div>
+    <div class="card">
+      <h3>⚡ 急速响应模式</h3>
+      <p>关闭思考 token，直出结果，吞吐量可达 200-256 tokens/s，适合简单问答、代码补全、快速生成场景。</p>
+      <span class="tag green">低延迟</span>
+    </div>
+    <div class="card">
+      <h3>🔌 Agent 工具调用</h3>
+      <p>支持工具调用（Function Calling），可接入搜索、计算器、数据库等外部工具，构建本地 Agent。</p>
+      <span class="tag blue">Function Calling</span>
+    </div>
+  </div>
+</div>
+
+<!-- 版本规格 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">📦</span>
+    <span class="section-title">版本规格对比</span>
+  </div>
+  <table class="ver-table" aria-label="版本规格">
+    <thead>
+      <tr>
+        <th>版本</th>
+        <th>文件大小</th>
+        <th>显存要求</th>
+        <th>推荐场景</th>
+        <th>推荐度</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="vgood">
+        <td class="vname">Q4 量化版</td>
+        <td class="vsize">688MB</td>
+        <td>无（CPU 运行）</td>
+        <td>低配设备 / CPU 推理 / 入门体验</td>
+        <td>⭐⭐⭐⭐⭐ 入门首选</td>
+      </tr>
+      <tr class="vrec">
+        <td class="vname">Q8 量化版</td>
+        <td class="vsize">1.15GB</td>
+        <td>VRAM ≥ 1GB</td>
+        <td>笔记本 / 低显存 GPU / 日常开发</td>
+        <td>⭐⭐⭐⭐ 推荐日常</td>
+      </tr>
+      <tr>
+        <td class="vname">F16 全量版</td>
+        <td class="vsize">2.17GB</td>
+        <td>VRAM ≥ 2GB</td>
+        <td>高精度任务 / 专业评测</td>
+        <td>⭐⭐⭐ 精度优先</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 典型用例 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">🎯</span>
+    <span class="section-title">典型用例</span>
+  </div>
+  <div class="scene-grid">
+    <div class="scene-item">
+      <div class="s-icon">🎮</div>
+      <div class="s-name">跑酷游戏代码</div>
+      <div class="s-desc">代码生成与纠错，物理引擎逻辑实现</div>
+    </div>
+    <div class="scene-item">
+      <div class="s-icon">📐</div>
+      <div class="s-name">代数方程推理</div>
+      <div class="s-desc">逻辑推理与方程求解，深度思考模式</div>
+    </div>
+    <div class="scene-item">
+      <div class="s-icon">🗺️</div>
+      <div class="s-name">出行方案规划</div>
+      <div class="s-desc">结构化行程规划，多约束条件求解</div>
+    </div>
+    <div class="scene-item">
+      <div class="s-icon">📖</div>
+      <div class="s-name">长篇科幻创作</div>
+      <div class="s-desc">128K 上下文支持长篇小说续写</div>
+    </div>
+  </div>
+</div>
+
+<!-- 部署配置 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">⚙️</span>
+    <span class="section-title">部署配置规范</span>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>工具选择</h3>
+      <p>采用最新编译版 <code>llama.cpp</code> 进行高性能本地加载，支持 llama-cli、llama-server 等工具。</p>
+      <span class="tag blue">llama.cpp</span>
+    </div>
+    <div class="card">
+      <h3>硬件加速</h3>
+      <p>依据显卡（N 卡 / A 卡 / I 卡）及 CUDA 版本匹配专属驱动文件，放置于主程序根目录。</p>
+      <span class="tag">NVIDIA / AMD / Intel</span>
+    </div>
+    <div class="card">
+      <h3>文件组织</h3>
+      <p>驱动 DLL 放置于主程序根目录；独立创建 <code>models/</code> 文件夹管理权重文件。</p>
+      <span class="tag green">目录规范</span>
+    </div>
+    <div class="card">
+      <h3>一键启动脚本</h3>
+      <p>根据算力与时延要求灵活开关深度思考，一键脚本启动，零配置运行。</p>
+      <span class="tag yellow">零配置</span>
+    </div>
+  </div>
+</div>
+
+<!-- 接口配置 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">🔌</span>
+    <span class="section-title">接口配置</span>
+  </div>
+  <div class="code-block"><span class="c-comment"># 启动 llama-server（OpenAI 兼容接口）</span>
+<span class="c-cmd">./llama-server -m models/minicpm5-1b-q4.gguf</span>
+<span class="c-cmd">         -c 131072 -fa --host 127.0.0.1 --port 8080</span>
+
+<span class="c-comment"># 本地访问端点</span>
+<span class="c-val">http://127.0.0.1:8080/v1/chat/completions</span>
+
+<span class="c-comment"># API Key（本地闭环，可填任意占位符）</span>
+<span class="c-val">sk-local</span>
+
+<span class="c-comment"># 深度思考模式（开启 extra thinking）</span>
+<span class="c-cmd">-y 2</span>  <span class="c-comment"># 控制 thinking token 长度</span></div>
+</div>
+
+<!-- 已知约束 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">⚠️</span>
+    <span class="section-title">已知约束</span>
+  </div>
+  <div class="warn-box">
+    <div class="w-title">1B 小模型高复杂度任务限制</div>
+    <p>1B 参数规模在处理高度复杂多任务时，需强制开启<strong>深度思考模式</strong>以保障正确率。简单任务可关闭以获得最高吞吐量（200+ tokens/s）。</p>
+  </div>
+</div>
+
+<!-- 扩展 -->
+<div class="quote">
+  <strong>高级扩展：</strong>配合第三方可视化客户端（如 Open WebUI）接入网络搜索，可实现多步骤全自动 Agent 深度研究。本地闭环 + 联网搜索 = 完全可控的本地 AI 助手。
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <a href="https://github.com/OpenBMB/MiniCPM" target="_blank">OpenBMB/MiniCPM · 1B 参数 · llama.cpp 部署</a>
+  <a href="https://github.com/OpenBMB/MiniCPM" target="_blank" class="dl-btn">GitHub →</a>
+</div>
+
+</div>
+</body>
+</html>
