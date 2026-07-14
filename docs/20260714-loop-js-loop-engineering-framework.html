@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>loop.js：让 Verify Agent 判断“做完了”的循环工程框架</title>
+<style>
+:root{--bg:#0b1020;--panel:#151d32;--panel2:#10182b;--ink:#eef4ff;--muted:#aab9dc;--cyan:#58c3ff;--blue:#4a78ff;--green:#48d597;--yellow:#f4c84c;--red:#ff7187;--line:rgba(255,255,255,.14)}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);overflow-x:hidden}body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}.page{width:min(1120px,calc(100% - 28px));margin:auto;padding:24px 0 86px}.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:18px;align-items:stretch}.hero-copy{padding:18px 0}.eyebrow{color:var(--cyan);font:800 12px/1.2 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase}.title{font-size:clamp(42px,7vw,86px);line-height:.94;letter-spacing:-.04em;margin:14px 0 18px}.lede{font-size:clamp(16px,2vw,21px);line-height:1.55;color:#dbe7ff;max-width:760px}.source{color:var(--muted);font:700 12px/1.5 ui-monospace,monospace;overflow-wrap:anywhere}.source a{color:var(--cyan)}.diagram{background:linear-gradient(145deg,#18264a,#11182d);border:1px solid var(--line);padding:20px;display:grid;align-content:center;gap:10px}.node{border:1px solid var(--cyan);padding:13px 14px;font-weight:900;background:rgba(88,195,255,.08)}.node.verify{border-color:var(--green);background:rgba(72,213,151,.1)}.arrow{text-align:center;color:var(--muted);font-weight:900}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}.panel{background:var(--panel);border:1px solid var(--line);padding:18px;min-width:0}.panel h2{font-size:17px;margin:0 0 11px;color:#fff}.panel p,.panel li{font-size:14px;line-height:1.7;color:#c9d5ee}.panel ul{margin:0;padding-left:19px}.wide{grid-column:span 2}.tag{display:inline-block;padding:5px 9px;margin:3px 5px 3px 0;border:1px solid rgba(88,195,255,.35);color:#d9f5ff;background:rgba(88,195,255,.1);font-size:12px;font-weight:800}.code{background:#0a0f1d;border-left:3px solid var(--yellow);padding:14px;white-space:pre-wrap;font:13px/1.65 ui-monospace,SFMono-Regular,monospace;color:#e9efff}.warn{border-left-color:var(--red)}.footer{margin-top:18px;color:var(--muted);font-size:12px;line-height:1.6}.save{position:fixed;right:18px;bottom:18px;border:1px solid var(--cyan);background:#122b50;color:#fff;padding:11px 14px;font-weight:900;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+@media(max-width:720px){.page{width:min(100% - 20px,560px);padding-top:15px}.hero{grid-template-columns:1fr}.hero-copy{padding:5px 0}.title{font-size:clamp(40px,13vw,64px)}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.panel{padding:15px}.diagram{min-height:260px}.save{right:12px;bottom:12px}}
+</style>
+</head>
+<body>
+<main class="page">
+<header class="hero" aria-label="loop.js 概览">
+<section class="hero-copy"><div class="eyebrow">LOOP ENGINEERING / APACHE-2.0</div><h1 class="title">loop.js</h1><p class="lede">给 Agent 一个目标和完成标准，让它一轮轮执行；每轮清空上下文、把笔记落盘，直到独立且只读的 Verify Agent 判定达标。</p><p class="source">来源：<a href="https://github.com/loop-js/loop.js">github.com/loop-js/loop.js</a></p></section>
+<section class="diagram" aria-label="目标执行验证循环"><div class="node">GOAL<br><small>要达成什么</small></div><div class="arrow">↓ fresh session</div><div class="node">EXECUTE WORKER<br><small>可读写，完成任务并交接笔记</small></div><div class="arrow">↓ independent read-only check</div><div class="node verify">VERIFY AGENT<br><small>只读判定：ok / impossible / continue</small></div></section>
+</header>
+<section class="grid" aria-label="核心机制">
+<article class="panel wide"><h2>三种 prompt，同一种形状</h2><p>goal、execute、verify 都接受同一种 Prompt：字符串、文件引用或函数。目标、干活和验收因此可以复用同一套表达方式，但职责仍然分离。</p><span class="tag">goal</span><span class="tag">execute</span><span class="tag">verify</span></article>
+<article class="panel"><h2>Worker 无自判权</h2><p>Execute Worker 默认是 <b>auto</b>，可以改工作区；Verify Agent 默认是 <b>read</b>，禁用写操作。循环是否收尾只看 Verify 的 Verdict。</p></article>
+<article class="panel"><h2>每轮从零开始</h2><p>Execute 每轮使用 fresh session，不 resume 上一轮上下文。跨轮连续性来自磁盘，而不是越来越长的聊天记录。</p></article>
+<article class="panel"><h2>把记忆写进文件</h2><p>Handoff 将笔记写入 <code>rounds/XXXXK-&lt;slug&gt;.md</code>，并投影到 <code>.loop/index.md</code>；下一轮再读回来继续。</p></article>
+<article class="panel wide"><h2>最小运行路径</h2><div class="code">npm create @loop.js@latest
+# 或 npm install @loop.js/core
+
+export ANTHROPIC_API_KEY=...
+loop run</div><p>要求 Node.js &gt;= 22.18.0。默认执行模型为 Claude Opus，Verify 使用更便宜的 Claude Haiku。</p></article>
+<article class="panel"><h2>Guard 不是完成标准</h2><p>rounds、usd、timeout 只是防跑飞护卫。即使达到轮数，只要最后的 Verify 返回 ok，Loop 仍然可以 settled。</p></article>
+<article class="panel wide"><h2>不要混淆</h2><div class="code warn">loop.js ≠ Claude Code /loop
+loop.js ≠ while(true)
+Verify Agent ≠ Execute Worker
+Agent.run() ≠ Loop.run()
+package 0.2.0-beta ≠ Release v0.1.0-beta</div></article>
+</section>
+<footer class="footer" aria-label="项目元数据">loop.js · TypeScript · Apache-2.0 · GitHub 约 88 Stars · Release v0.1.0-beta（包内版本 v0.2.0-beta，存在版本差异）</footer>
+</main>
+<button class="save" id="save" aria-label="保存 loop.js 信息卡为 PNG">保存 PNG</button>
+<script>document.getElementById('save').addEventListener('click',async()=>{if(typeof html2canvas==='undefined'){const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';document.head.appendChild(s);await new Promise(r=>s.onload=r)}const c=await html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,backgroundColor:'#0b1020'});const a=document.createElement('a');a.download='loop-js-loop-engineering-framework.png';a.href=c.toDataURL('image/png');a.click()})</script>
+</body></html>
