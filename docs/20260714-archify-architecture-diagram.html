@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Archify — 用大白话生成架构图</title>
+  <style>
+    :root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{overflow-x:hidden}
+    body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:12px}
+    img{max-width:100%;display:block}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;margin-bottom:14px}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(20px,3.8vw,36px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.green{background:#1a7a3a;color:#fff}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px}
+    .alert strong{display:block;font-size:13px;line-height:1.35}
+    .alert p{margin:4px 0 0;font-size:12px;line-height:1.5;color:#f0ebe0}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f172a 0%,#1e2a4a 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid rgba(255,255,255,.5);padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:17px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#c8d4e8;font-size:12px;line-height:1.5}
+    .panel-body{padding:14px;display:grid;gap:8px;background:#f7f6f2}
+    .flow{display:grid;gap:6px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:8px 10px;display:grid;gap:2px;position:relative}
+    .flow-item::before{content:attr(data-n);position:absolute;right:8px;top:6px;font-size:11px;font-weight:900;color:var(--muted)}
+    .flow-item .fi-title{font-size:12px;font-weight:850;line-height:1.3}
+    .flow-item .fi-sub{font-size:10.5px;color:var(--muted);line-height:1.4}
+    .flow-item.blue-card{border-color:var(--blue);background:var(--soft-blue)}
+    .flow-item.red-card{border-color:var(--red);background:var(--soft-red)}
+    .flow-item.green-card{border-color:#1a7a3a;background:#e8f5ee}
+    .section{margin-bottom:14px}
+    .section-header{display:flex;align-items:center;gap:10px;padding:7px 12px;border:2px solid var(--line);background:var(--paper);margin-bottom:8px}
+    .section-num{font-size:13px;font-weight:900;background:var(--red);color:#fff;padding:2px 7px}
+    .section-title{font-size:12.5px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+    .card{border:2px solid var(--line);background:var(--paper);padding:11px;box-shadow:var(--shadow)}
+    .card h3{font-size:12px;font-weight:900;margin-bottom:5px;line-height:1.3}
+    .card p{font-size:11px;color:var(--muted);line-height:1.5}
+    .tag{display:inline-block;border:1.5px solid var(--line);background:#fff;padding:2px 7px;font-size:10.5px;font-weight:700;margin-top:5px}
+    .tag.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .tag.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .tag.green{background:#1a7a3a;color:#fff;border-color:#1a7a3a}
+    /* Diagram type cards */
+    .diagram-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px}
+    .diag-card{border:2px solid var(--line);background:var(--paper);padding:10px;text-align:center}
+    .diag-card .d-icon{font-size:22px;margin-bottom:4px}
+    .diag-card .d-name{font-size:11.5px;font-weight:850;margin-bottom:3px}
+    .diag-card .d-use{font-size:10px;color:var(--muted);line-height:1.4}
+    /* Code sample */
+    .code-block{border:2px solid var(--line);background:#1a1a2e;color:#a8d8ea;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre}
+    /* Quote */
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-size:11.5px;font-weight:750;line-height:1.55;margin-bottom:8px}
+    .footer{margin-top:0;padding-top:12px;border-top:3px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .footer a{color:var(--blue);font-size:11.5px;font-weight:700;text-decoration:none;border-bottom:1px solid #c0d0ff;padding-bottom:1px}
+    .footer a:hover{border-bottom-color:var(--blue)}
+    .dl-btn{display:inline-flex;align-items:center;gap:6px;background:var(--blue);color:#fff;padding:7px 14px;font-size:11.5px;font-weight:850;border:2px solid var(--line);text-decoration:none}
+    .dl-btn:hover{background:var(--ink)}
+    @media(max-width:600px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:none;border-bottom:3px solid var(--line)}
+      .grid-3,.grid-2,.grid-5,.diagram-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<section aria-label="Archify 用大白话生成架构图">
+<div class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <span class="kicker">Claude / Codex / OpenCode Skill</span>
+    <h1 class="demo-title">Archify</h1>
+    <p class="subtitle">把需求用大白话说清楚，架构图就给你生成了。省去 Visio/Drawio 的拖拽烦恼，自动生成深浅主题切换、4× 清晰度导出的专业架构图。</p>
+    <div class="badge-row">
+      <span class="badge dark">MIT</span>
+      <span class="badge blue">4372 Stars</span>
+      <span class="badge red">5 种图类型</span>
+      <span class="badge">4× 导出</span>
+      <span class="badge green">深浅主题</span>
+    </div>
+    <div class="alert">
+      <strong>不用拖组件，不用配样式。</strong>
+      <p>`archify` 是个 Agent Skill，接入 Claude Code / Codex CLI / opencode，大白话描述你的系统，架构图立刻生成，支持 PNG / JPEG / WebP / SVG 导出。</p>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="panel-top">
+      <span class="eyebrow">Zero Design Skills</span>
+      <h3>大白话 → 专业架构图</h3>
+      <p>JSON IR → 多渲染器 → 自包含 HTML · 支持 JSON Schema 验证</p>
+    </div>
+    <div class="panel-body">
+      <div class="flow">
+        <div class="flow-item blue-card" data-n="1">
+          <div class="fi-title">💬 大白话描述需求</div>
+          <div class="fi-sub">用自然语言告诉 Archify 你的系统结构，如"React 前端调用 Node.js API，后端 PostgreSQL + Redis"</div>
+        </div>
+        <div class="flow-item" data-n="2">
+          <div class="fi-title">🧠 生成 JSON IR</div>
+          <div class="fi-sub">Archify 解析需求，生成结构化的 JSON 中间表示，包含组件、连接、边界等语义信息</div>
+        </div>
+        <div class="flow-item red-card" data-n="3">
+          <div class="fi-title">🎨 多渲染器输出</div>
+          <div class="fi-sub">渲染器生成自包含 HTML 图，支持深浅主题切换、JSON Schema 验证和迭代修正</div>
+        </div>
+        <div class="flow-item green-card" data-n="4">
+          <div class="fi-title">📤 一键导出</div>
+          <div class="fi-sub">PNG / JPEG / WebP 最高 4× 分辨率（无插值模糊），SVG 真矢量，剪贴板一键复制</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 5 种图类型 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">📊</span>
+    <span class="section-title">5 种图类型</span>
+  </div>
+  <div class="diagram-grid">
+    <div class="diag-card">
+      <div class="d-icon">🏗️</div>
+      <div class="d-name">架构图</div>
+      <div class="d-use">系统组件、云资源、数据库、缓存、服务、边界、安全组</div>
+    </div>
+    <div class="diag-card">
+      <div class="d-icon">🔀</div>
+      <div class="d-name">工作流</div>
+      <div class="d-use">请求生命周期、审批流、工具调用、CI/CD、故障响应</div>
+    </div>
+    <div class="diag-card">
+      <div class="d-icon">📝</div>
+      <div class="d-name">时序图</div>
+      <div class="d-use">API 调用链、缓存回源、认证检查、异步追踪、服务交互</div>
+    </div>
+    <div class="diag-card">
+      <div class="d-icon">🔄</div>
+      <div class="d-name">数据流</div>
+      <div class="d-use">ETL/ELT、数据管道、PII 隔离、仓库同步、数据溯源</div>
+    </div>
+    <div class="diag-card">
+      <div class="d-icon">🔁</div>
+      <div class="d-name">生命周期</div>
+      <div class="d-use">状态机、订单/任务/部署/Agent 运行生命周期、重试与取消</div>
+    </div>
+  </div>
+</div>
+
+<!-- 核心亮点 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">✦</span>
+    <span class="section-title">核心亮点</span>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <h3>🖼️ 4× 超清导出</h3>
+      <p>PNG / JPEG / WebP 原生渲染到最高 4× 源分辨率，无插值模糊。SVG 真矢量，GitHub README 里自动跟随系统深浅主题。</p>
+      <span class="tag blue">4× Export</span>
+    </div>
+    <div class="card">
+      <h3>🌙 深浅主题切换</h3>
+      <p>一键在暗色和亮色主题之间切换，跨 session 持久化。导出的 SVG 内置两套变量 + 媒体查询，读者的主题自动适配。</p>
+      <span class="tag">主题切换</span>
+    </div>
+    <div class="card">
+      <h3>📋 语义化技术标签</h3>
+      <p>描述组件时使用 `aws.lambda`、`postgres`、`redis`、`github-actions`、`openai` 等语义标签，Archify 自动映射到正确的视觉类别。</p>
+      <span class="tag blue">语义识别</span>
+    </div>
+    <div class="card">
+      <h3>🔍 验证循环</h3>
+      <p>渲染器支持 JSON Schema 验证、布局检查、HTML/SVG 工件检查和定向迭代修正，确保输出正确。</p>
+      <span class="tag green">Schema 验证</span>
+    </div>
+    <div class="card">
+      <h3>📋 剪贴板直出</h3>
+      <p>点击一下，PNG 直接复制到剪贴板，粘贴进 Slack / Notion / GitHub，无需文件传输。</p>
+      <span class="tag">即用</span>
+    </div>
+    <div class="card">
+      <h3>🔌 通用 Agent Skill</h3>
+      <p>不是专属工具——Claude Code、Codex CLI、opencode 通用，一次安装处处使用，架构图画完自动嵌入文档。</p>
+      <span class="tag blue">通用</span>
+    </div>
+  </div>
+</div>
+
+<!-- 使用方式 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">⚡</span>
+    <span class="section-title">使用方式</span>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>安装 Archify Skill</h3>
+      <p>在 Claude Code / Codex CLI / opencode 中加载 archify skill（JSON 文件），具体方式见 GitHub 仓库。</p>
+      <span class="tag blue">安装 Skill</span>
+    </div>
+    <div class="card">
+      <h3>示例 Prompt</h3>
+      <div class="code-block">Use archify to draw an architecture diagram:
+React frontend calls a Node.js API backed by
+PostgreSQL and Redis, deployed on AWS behind
+CloudFront.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Quote -->
+<div class="quote">
+  <strong>适用场景：</strong>技术文档编写、系统设计讨论、Code Review 附图、GitHub README 架构说明、团队内部知识沉淀——不再需要打开 Visio，一句话搞定。
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <a href="https://github.com/tt-a1i/archify" target="_blank">tt-a1i/archify · 4372 Stars · MIT</a>
+  <a href="https://github.com/tt-a1i/archify" target="_blank" class="dl-btn">GitHub →</a>
+</div>
+
+</div>
+</body>
+</html>
