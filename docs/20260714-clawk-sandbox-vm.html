@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clawk — AI Coding Agent 的沙箱 VM</title>
+  <style>
+    :root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{overflow-x:hidden}
+    body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:12px}
+    img{max-width:100%;display:block}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;margin-bottom:14px}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(22px,3.8vw,38px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.green{background:#1a7a3a;color:#fff}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px}
+    .alert strong{display:block;font-size:13px;line-height:1.35}
+    .alert p{margin:4px 0 0;font-size:12px;line-height:1.5;color:#f0ebe0}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f172a 0%,#1e2a4a 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid rgba(255,255,255,.5);padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:18px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#c8d4e8;font-size:12.5px;line-height:1.55}
+    .panel-body{padding:14px;display:grid;gap:8px;background:#f7f6f2}
+    .flow{display:grid;gap:6px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:8px 10px;display:grid;gap:2px;position:relative}
+    .flow-item::before{content:attr(data-n);position:absolute;right:8px;top:6px;font-size:11px;font-weight:900;color:var(--muted)}
+    .flow-item .fi-title{font-size:12px;font-weight:850;line-height:1.3}
+    .flow-item .fi-sub{font-size:10.5px;color:var(--muted);line-height:1.4}
+    .flow-item.blue-card{border-color:var(--blue);background:var(--soft-blue)}
+    .flow-item.red-card{border-color:var(--red);background:var(--soft-red)}
+    .flow-item.green-card{border-color:#1a7a3a;background:#e8f5ee}
+    /* SECTIONS */
+    .section{margin-bottom:14px}
+    .section-header{display:flex;align-items:center;gap:10px;padding:7px 12px;border:2px solid var(--line);background:var(--paper);margin-bottom:8px}
+    .section-num{font-size:13px;font-weight:900;background:var(--red);color:#fff;padding:2px 7px}
+    .section-title{font-size:12.5px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .card{border:2px solid var(--line);background:var(--paper);padding:11px;box-shadow:var(--shadow)}
+    .card h3{font-size:12px;font-weight:900;margin-bottom:5px;line-height:1.3}
+    .card p{font-size:11px;color:var(--muted);line-height:1.5}
+    .tag{display:inline-block;border:1.5px solid var(--line);background:#fff;padding:2px 7px;font-size:10.5px;font-weight:700;margin-top:5px}
+    .tag.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .tag.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .tag.green{background:#1a7a3a;color:#fff;border-color:#1a7a3a}
+    /* Comparison */
+    .compare{width:100%;border-collapse:collapse;font-size:10.5px;border:2px solid var(--line);background:var(--paper)}
+    .compare th{background:var(--ink);color:#fff;padding:7px 12px;text-align:center;font-weight:850;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+    .compare th:first-child{text-align:left}
+    .compare td{padding:7px 12px;border-bottom:1px solid #e0dcd4;vertical-align:middle;font-size:11px;line-height:1.4}
+    .compare td:first-child{font-weight:700;white-space:nowrap}
+    .compare td:nth-child(2){text-align:center;background:#fde9eb;color:var(--red);font-weight:750}
+    .compare td:nth-child(3){text-align:center;background:#e8f5ee;color:#1a7a3a;font-weight:750}
+    .compare tr:last-child td{border-bottom:none}
+    .compare tr:nth-child(even) td{background:#faf8f3}
+    /* Quote */
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-size:11.5px;font-weight:750;line-height:1.55;margin-bottom:8px}
+    .quote strong{color:var(--blue)}
+    /* Footer */
+    .footer{margin-top:0;padding-top:12px;border-top:3px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .footer a{color:var(--blue);font-size:11.5px;font-weight:700;text-decoration:none;border-bottom:1px solid #c0d0ff;padding-bottom:1px}
+    .footer a:hover{border-bottom-color:var(--blue)}
+    .dl-btn{display:inline-flex;align-items:center;gap:6px;background:var(--blue);color:#fff;padding:7px 14px;font-size:11.5px;font-weight:850;border:2px solid var(--line);text-decoration:none}
+    .dl-btn:hover{background:var(--ink)}
+    @media(max-width:600px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:none;border-bottom:3px solid var(--line)}
+      .grid-3,.grid-2{grid-template-columns:1fr}
+      .compare{font-size:9.5px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<section aria-label="Clawk 沙箱 VM">
+<div class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <span class="kicker">沙箱安全</span>
+    <h1 class="demo-title">Clawk</h1>
+    <p class="subtitle">为 AI Coding Agent 提供独立、可销毁的 Linux VM，Agent 在虚拟机中拥有较高权限，同时宿主机的文件、密钥和系统环境完全隔离。</p>
+    <div class="badge-row">
+      <span class="badge dark">Go</span>
+      <span class="badge blue">Apache-2.0</span>
+      <span class="badge red">Deny-All 网络</span>
+      <span class="badge">364 Stars</span>
+      <span class="badge green">Disposable VM</span>
+    </div>
+    <div class="alert">
+      <strong>别再 `--dangerously-skip-permissions` 了。</strong>
+      <p>`clawk` 让 Claude Code / Codex 在独立的沙箱 VM 里工作，宿主机文件、Keychain、API Token 全在 VM 外面。任务结束 VM 销毁，不留痕迹。</p>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="panel-top">
+      <span class="eyebrow">How it Works</span>
+      <h3>clawk run = 沙箱会话</h3>
+      <p>每次运行全新 VM · 代码目录挂载进 VM · VM 内 root 权限 · 宿主机完全隔离</p>
+    </div>
+    <div class="panel-body">
+      <div class="flow">
+        <div class="flow-item" data-n="1">
+          <div class="fi-title">🖥️ 启动 VM</div>
+          <div class="fi-sub">clawk 初始化Disposable Linux，macOS 用 Apple Virtualization，Linux 用 Firecracker</div>
+        </div>
+        <div class="flow-item blue-card" data-n="2">
+          <div class="fi-title">📁 挂载代码目录</div>
+          <div class="fi-sub">当前 repo 目录以只读/读写模式挂载进 VM，代码对 Agent 可见可改</div>
+        </div>
+        <div class="flow-item red-card" data-n="3">
+          <div class="fi-title">🚫 Deny-All 网络</div>
+          <div class="fi-sub">默认拒绝所有出站连接，Agent 尝试泄漏数据到未知服务器时 clawk 直接拦截</div>
+        </div>
+        <div class="flow-item green-card" data-n="4">
+          <div class="fi-title">✅ 完成任务</div>
+          <div class="fi-sub">Agent 完成后 VM 可销毁或挂起，代码从 VM 写回宿主机，密钥仍在 VM 外</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 核心亮点 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">✦</span>
+    <span class="section-title">核心亮点</span>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <h3>🗑️ Disposable VM</h3>
+      <p>每次任务运行在全新的隔离 Linux 环境，任务结束可销毁 VM，不留进程、不留痕迹、不污染宿主机。</p>
+      <span class="tag red">一次性环境</span>
+    </div>
+    <div class="card">
+      <h3>🚫 Deny-All 网络策略</h3>
+      <p>默认拒绝所有出站网络连接。Agent 崩溃或被恶意注入手动，也无法把密钥、Token 或代码发送给未知服务器。</p>
+      <span class="tag red">网络安全</span>
+    </div>
+    <div class="card">
+      <h3>🍎 macOS + 🐧 Linux</h3>
+      <p>macOS 使用 Apple Virtualization Framework（无需 Virtualization.app），Linux 使用 Firecracker 微虚拟机，单二进制部署。</p>
+      <span class="tag blue">双平台</span>
+    </div>
+    <div class="card">
+      <h3>🔐 宿主机隔离</h3>
+      <p>Keychain、SSH Key、.env、API Token 全部在 VM 外部。Agent 即使执行 `rm -rf /` 也影响不到宿主机。</p>
+      <span class="tag green">完全隔离</span>
+    </div>
+    <div class="card">
+      <h3>📦 单二进制运行</h3>
+      <p>Go 编写，静态编译，`brew install` 或 `curl` 一条命令安装，无运行时依赖。</p>
+      <span class="tag blue">零依赖</span>
+    </div>
+    <div class="card">
+      <h3>🔌 兼容主流 Agent</h3>
+      <p>Claude Code、Codex、OpenCode、任意 shell 会话。clawk 是平台无关的 VM 容器，Agent 无需感知沙箱存在。</p>
+      <span class="tag">通用</span>
+    </div>
+  </div>
+</div>
+
+<!-- 和现有方案对比 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">⚡</span>
+    <span class="section-title">与其他方案对比</span>
+  </div>
+  <table class="compare" aria-label="方案对比">
+    <thead>
+      <tr>
+        <th>维度</th>
+        <th>直接运行</th>
+        <th>clawk</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Agent 权限</td><td>宿主机权限（危险）</td><td>VM 内 root（安全）</td></tr>
+      <tr><td>网络策略</td><td>完全放行（危险）</td><td>Deny-All（安全）</td></tr>
+      <tr><td>密钥保护</td><td>Agent 可访问（危险）</td><td>VM 外不可达</td></tr>
+      <tr><td>环境清理</td><td>手动清理</td><td>VM 销毁即清零</td></tr>
+      <tr><td>安装复杂度</td><td>无需安装</td><td>单二进制</td></tr>
+      <tr><td>平台支持</td><td>所有平台</td><td>macOS + Linux</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 使用场景 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">🎯</span>
+    <span class="section-title">适用场景</span>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>🧪 高风险代码执行</h3>
+      <p>运行来源不明的代码、`npm install` 未知包、`pip install` 不熟悉库。VM 隔离防止恶意代码访问宿主机文件或外泄数据。</p>
+    </div>
+    <div class="card">
+      <h3>🔑 API Token 安全</h3>
+      <p>在 .env 中配置了 GitHub Token、OpenAI Key 或数据库凭证。clawk 确保 Agent 在 VM 里操作，Token 永不进 VM。</p>
+    </div>
+    <div class="card">
+      <h3>🐛 破坏性测试</h3>
+      <p>跑 `dd`、`mkfs`、`iptables -F` 等破坏性命令测试工具行为，不怕误删系统文件。</p>
+    </div>
+    <div class="card">
+      <h3>☁️ 多租户沙箱</h3>
+      <p>同一个宿主机上运行多个互不干扰的 Agent 会话，每个会话有独立 VM、独立网络策略。</p>
+    </div>
+  </div>
+</div>
+
+<!-- 设计理念 -->
+<div class="quote">
+  <strong>核心理念：Agent 应该拥有自己的机器，而不是你的。</strong> Clawk 解决的不是"是否给 Agent 权限"的问题，而是"如何安全地给 Agent 完整权限"的问题。
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <a href="https://github.com/clawkwork/clawk" target="_blank">clawkwork/clawk · 364 Stars · Apache-2.0</a>
+  <a href="https://github.com/clawkwork/clawk" target="_blank" class="dl-btn">GitHub →</a>
+</div>
+
+</div>
+</body>
+</html>
