@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mindwalk — Agent 会话在代码库 3D 地图上的可视化回放</title>
+  <style>
+:root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-body{display:flex;flex-direction:column;gap:12px;padding:20px 18px 18px}
+.hero-eyebrow{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.hero-title{font-size:clamp(20px,4vw,30px);font-weight:900;line-height:1.15;letter-spacing:-.02em;color:var(--ink)}
+.hero-title span{display:block;font-size:.65em;font-weight:500;letter-spacing:0;color:var(--muted);margin-top:4px}
+.hero-desc{font-size:13.5px;line-height:1.55;color:var(--muted)}
+.hero-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.pill{font-size:10.5px;font-weight:600;padding:3px 9px;border:1.5px solid var(--ink);letter-spacing:.03em}
+.pill-red{background:var(--soft-red)}
+.pill-blue{background:var(--soft-blue)}
+.hero-stats{display:flex;flex-direction:column;gap:10px;padding:18px 18px 18px 0;border-left:3px solid var(--line)}
+.stats-inner{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px;background:var(--soft-ink);margin:0 16px}
+.stat{text-align:center}
+.stat-n{font-size:20px;font-weight:900;letter-spacing:-.03em;line-height:1}
+.stat-l{font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.stat-big{grid-column:1/-1;padding:10px 0 4px;border-bottom:2px solid var(--ink);margin-bottom:4px}
+.stat-big .stat-n{font-size:28px}
+.hero-image{padding:0 16px 16px 0}
+.hero-image img{width:100%;height:160px;object-fit:cover;border:3px solid var(--line);box-shadow:var(--shadow)}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+section{margin-top:14px}
+section > h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:6px 10px;background:var(--ink);color:var(--paper);margin-bottom:0}
+.card{border:2px solid var(--ink);background:var(--paper);padding:14px;box-shadow:5px 5px 0 rgba(17,17,17,.12)}
+.card h3{font-size:13.5px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+.card p,.card li{font-size:12.5px;line-height:1.55;color:var(--muted)}
+.card ul{padding-left:16px;margin-top:4px}
+.card li{margin-bottom:3px}
+.prose{border:2px solid var(--ink);background:var(--paper);padding:14px;box-shadow:5px 5px 0 rgba(17,17,17,.12);margin-top:14px}
+.prose p{font-size:12.5px;line-height:1.6;color:var(--ink);margin-bottom:8px}
+.prose p:last-child{margin-bottom:0}
+.key-line{border-left:4px solid var(--red);padding-left:10px;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+th,td{border:1.5px solid var(--ink);padding:6px 10px;text-align:left}
+th{background:var(--ink);color:var(--paper);font-weight:700;letter-spacing:.04em}
+tr:nth-child(even) td{background:var(--soft-ink)}
+pre{background:#1a1a1a;color:#e8e8e8;padding:12px 14px;border:2px solid var(--ink);font-size:11.5px;line-height:1.5;overflow-x:auto;margin-top:8px}
+code{background:var(--soft-ink);padding:1px 5px;border:1px solid rgba(17,17,17,.2);font-size:.9em}
+.footer{border-top:3px solid var(--ink);margin-top:20px;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted)}
+pre,code,table{overflow-x:auto;max-width:100%}
+@media(max-width:640px){
+  .hero{grid-template-columns:1fr}
+  .hero-stats{border-left:none;border-top:3px solid var(--line)}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .hero-image img{height:130px}
+}
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<section aria-label="Mindwalk Claude Code Codex 会话可视化">
+<header class="hero" id="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-body">
+    <div class="hero-eyebrow">开发工具 · 可视化 · 2025</div>
+    <h1>Mindwalk</h1>
+    <p class="hero-desc">把 Claude Code / Codex 会话日志投射到代码库的 3D 地图上回放——Agent 搜索、读取、编辑过的文件发光，其余保持黑暗，让「工作范围」变成肉眼可见的形状。</p>
+    <div class="hero-pills">
+      <span class="pill pill-red">Go</span>
+      <span class="pill pill-blue">MIT</span>
+      <span class="pill">本地处理</span>
+      <span class="pill">单二进制</span>
+      <span class="pill">Claude Code</span>
+      <span class="pill">Codex</span>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="stats-inner">
+      <div class="stat stat-big">
+        <div class="stat-n">704</div>
+        <div class="stat-l">GitHub Stars</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">41</div>
+        <div class="stat-l">Forks</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">Go</div>
+        <div class="stat-l">Language</div>
+      </div>
+    </div>
+    <div class="hero-image">
+      <img src="https://github.com/user-attachments/assets/20ecdc3b-9bc2-469b-ba99-607f3c1d5e0c" alt="Mindwalk 3D 可视化界面截图" loading="lazy" />
+    </div>
+  </div>
+</header>
+</section>
+
+<!-- PROBLEM -->
+<section aria-label="问题痛点">
+<div class="card">
+  <h3>解决了什么问题</h3>
+  <p>会话日志记录了 Agent 做了什么，但不记录它如何理解任务：它认为仓库的哪些部分相关？在哪里先探索再行动？它的足迹是否匹配你预设的范围？逐行读原始 JSONL 什么都回答不了。</p>
+  <div class="key-line">
+    <p><strong>Mindwalk 的核心直觉：</strong>Agent 的工作范围和你以为的往往不一样。当它跑了 30 分钟，你以为它读遍了整个仓库——但地图可能告诉你它根本没碰到关键目录。</p>
+  </div>
+</div>
+</section>
+
+<!-- CORE FEATURES -->
+<section aria-label="核心功能">
+<div class="card">
+  <h3>核心功能</h3>
+  <ul>
+    <li><strong>Tree / Terrain 视图</strong> — 仓库的径向树或矩阵地图；发光强度 ∝ 文件被触达的深度和频率</li>
+    <li><strong>四级文件触达状态</strong> — 未访问（暗）、已查看（苔绿）、已读取（月白）、已编辑（暖琥珀）</li>
+    <li><strong>播放控制条</strong> — 冷色（搜索/读取/执行）到暖色（编辑/验证）的光谱，直观看出编辑阶段</li>
+    <li><strong>时间轴标记</strong> — ◇ 上下文压缩、○ 子 Agent 启动、› 用户输入；均可点击跳转</li>
+    <li><strong>Inspector</strong> — 点击文件固定访问历史，点击访问行跳转到播放头的对应时刻</li>
+    <li><strong>Session Evaluation</strong> — 调用本地 Claude / Codex CLI，让 Agent 评判会话轨迹，给出锚定到时间轴事件的评估报告</li>
+  </ul>
+</div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section aria-label="底层架构">
+<div class="card">
+  <h3>底层架构（三个分离的构件）</h3>
+  <table>
+    <thead>
+      <tr><th>构件</th><th>作用</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Trace</strong></td><td>将会话日志归一化为有序的文件触达事件流（internal/adapter，每种 Agent 格式一个 adapter）</td></tr>
+      <tr><td><strong>Citymap</strong></td><td>仓库的确定性布局（internal/citymap）；同一棵树始终生成同一张地图，保证不同会话可对比</td></tr>
+      <tr><td><strong>Report</strong></td><td>LLM Judge 的证据锚定发现（internal/judge）；Judge 只贡献发现，裁决始终由机械逻辑汇总，保证报告可比性</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:10px;font-size:12px;color:var(--muted)">本地 Go 服务（internal/server）串联三者并提供 React/Three.js 前端（web）。schema/ 镜像导出的 JSON 合约。</p>
+</div>
+</section>
+
+<!-- PRIVACY -->
+<section aria-label="隐私保护">
+<div class="card">
+  <h3>隐私保护 — 数据不离机器</h3>
+  <p>单个 Go 二进制，所有数据完全本地处理。查看会话时不发送任何内容到任何地方。</p>
+  <p><strong>唯一的例外（需用户主动触发）：</strong>Session Evaluation 时，会将当前会话摘要（用户消息措辞、文件路径、事件摘要）发送到你的 claude 或 codex CLI 背后的模型。Judge 子进程以密封模式运行：无工具调用、无 MCP 服务器、无用户/项目设置、无会话持久化。</p>
+  <p>报告缓存在 <code>~/.mindwalk/reports</code>，会话内容变化后自动失效（不会自动重跑）。</p>
+</div>
+</section>
+
+<!-- INSTALL -->
+<section aria-label="安装方式">
+<div class="card">
+  <h3>快速安装</h3>
+  <pre>curl -fsSL https://raw.githubusercontent.com/cosmtrek/mindwalk/master/scripts/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+mindwalk</pre>
+  <p style="margin-top:8px;font-size:12px;color:var(--muted)">安装程序校验二进制签名并安装到 <code>~/.local/bin</code>（可用 <code>INSTALL_DIR</code> 覆盖，<code>VERSION</code> 固定版本）。Windows 在 GitHub Releases。源码构建：<code>make setup && make build</code>。</p>
+  <p style="margin-top:6px;font-size:12px;color:var(--muted)">无参数启动：自动扫描 <code>~/.claude/projects</code> 和 <code>~/.codex/sessions</code>，在随机本地端口提供 UI 并打开浏览器。</p>
+</div>
+</section>
+
+<!-- CTA -->
+<section aria-label="适用场景">
+<div class="card">
+  <h3>什么时候用</h3>
+  <ul>
+    <li>用 Claude Code / Codex 跑复杂任务，想检查它是否真的理解了任务范围</li>
+    <li>任务跑了很久但结果不对，想诊断 Agent 在哪里「跑偏」</li>
+    <li>想直观对比不同 prompt 或参数下的 Agent 行为差异</li>
+    <li>团队 Code Review 时，用可视化会话轨迹代替逐行读 JSONL</li>
+  </ul>
+</div>
+</section>
+
+<div class="footer">
+  <span>cosmtrek/mindwalk · MIT · Go</span>
+  <span><a href="https://github.com/cosmtrek/mindwalk">github.com/cosmtrek/mindwalk</a></span>
+</div>
+
+</div>
+</body>
+</html>
