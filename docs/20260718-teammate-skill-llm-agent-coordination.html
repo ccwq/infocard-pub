@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>teammate.skill：把队友的上下文做成可调用的 Agent Skill</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        var(--bg);
+      font-family:"Courier New",Courier,monospace;
+    }
+    img{display:block;max-width:100%}
+    a{color:var(--blue);word-break:break-all}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .page{width:min(100% - 24px,860px);margin:0 auto;padding:14px 0 40px}
+    .frame{border:2px solid var(--ink);background:var(--paper);padding:16px;box-shadow:var(--shadow)}
+
+    .topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:2px solid var(--ink);background:var(--ink);color:#fff;font-size:13px}
+    .topbar-brand{font-weight:900;letter-spacing:.04em}
+    .topbar-nav{display:flex;gap:16px}
+    .topbar a{color:#fff;opacity:.75}
+    .topbar a:hover{opacity:1}
+
+    .section{margin-top:20px}
+    .section-head{display:grid;grid-template-columns:56px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .section-no{width:56px;height:56px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;background:var(--ink);color:#fff;border:2px solid var(--ink);flex-shrink:0}
+    .section-cn{font-size:20px;letter-spacing:-.02em;margin-bottom:3px}
+    .section-en{font-size:13px;color:var(--muted)}
+
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;align-items:start}
+    .hero-left{display:grid;gap:10px}
+    .hero-sub{font-size:17px;font-weight:700;color:var(--ink);margin-top:6px}
+    .hero-note{font-size:14px;color:var(--muted);line-height:1.55}
+    .hero-stat-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px}
+    .hero-stat{font-size:15px}
+    .hero-right{display:grid;gap:10px}
+
+    .hardbox{border:2px solid var(--ink);overflow:hidden;background:var(--paper)}
+    .hardbox-head{padding:8px 12px;font-size:13px;font-weight:900;letter-spacing:.03em}
+    .hardbox-body{padding:10px 12px;font-size:14px;line-height:1.62}
+    .red-bg{background:var(--red);color:#fff} .blue-bg{background:var(--blue);color:#fff}
+    .dark-bg{background:var(--ink);color:#fff}
+
+    .meta-row{margin-bottom:4px;font-size:13.5px} .link-row{margin-bottom:4px;font-size:13.5px}
+
+    .grid-2,.grid-3,.grid-4,.grid-5{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .grid-5{grid-template-columns:repeat(5,1fr)}
+
+    @media (max-width:720px){
+      .grid-3,.grid-4,.grid-5{grid-template-columns:1fr}
+      .grid-2,.hero,.hero-stat-row{grid-template-columns:1fr;flex-direction:column}
+      .section-head{grid-template-columns:40px 1fr}
+    }
+
+    .mini{border:2px solid var(--ink);overflow:hidden;background:var(--paper)}
+    .mini-head{padding:6px 10px;font-size:12px;font-weight:900}
+    .mini-body{padding:7px 10px;font-size:12.5px;line-height:1.5}
+
+    .plain-list{padding-left:18px;display:grid;gap:4px}
+    .plain-list li{line-height:1.55}
+    .mono-list{font-size:13px}
+
+    .code-block{background:#1a1a1a;color:#e8e8e8;padding:10px 12px;font-size:12.5px;line-height:1.6;border:1.5px solid #444;margin-top:4px;overflow-x:auto;white-space:pre-wrap}
+    .mono-label{font-size:12.5px;font-weight:700;margin-bottom:4px;color:var(--ink)}
+    code{background:#f0ede8;padding:1px 5px;font-size:12px;border:1px solid #ccc}
+
+    .cmd-row{display:grid;grid-template-columns:1.5fr 1fr;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px solid #eee;align-items:center}
+    .cmd-cmd{font-weight:700;font-family:"Courier New",monospace}
+    .cmd-desc{color:var(--muted)}
+
+    .pipeline-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px}
+    .pipe-step{background:var(--soft-blue);border:1.5px solid var(--blue);padding:6px 8px;text-align:center;min-width:90px;color:var(--ink)}
+    .pipe-arrow{color:var(--blue);font-weight:900;font-size:16px}
+
+    .platform-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+    .tag{display:inline-block;padding:4px 10px;font-size:12px;font-weight:700;border:1.5px solid var(--ink)}
+    .tag.blue{background:var(--soft-blue);color:var(--blue)}
+    .tag.red{background:var(--soft-red);color:var(--red)}
+    .tag.dark{background:var(--soft-ink)}
+
+    .call-sequence{display:grid;gap:4px;margin-top:8px}
+    .seq-step{display:flex;align-items:center;gap:8px;font-size:13px}
+    .seq-num{width:24px;height:24px;background:var(--ink);color:#fff;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .seq-arrow{color:var(--blue);font-weight:900;font-size:18px;padding-left:12px}
+
+    .big-quote{font-size:15px;font-weight:700;line-height:1.7}
+    .note-text{font-size:12px;color:var(--muted);line-height:1.5}
+
+    .footer{margin-top:20px;padding:12px 14px;background:var(--ink);color:#fff;border-top:3px solid var(--blue);display:grid;grid-template-columns:1.2fr .8fr;gap:10px;font-size:13px}
+    .footer a{color:#8ab4f8}
+    .footer-meta{display:grid;gap:4px}
+    .footer-meta div{opacity:.75}
+    .footer-license{opacity:.65;font-size:12px}
+
+    @media (max-width:540px){
+      .hero,.footer{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="frame">
+
+      <div class="topbar">
+        <div class="topbar-brand">AI 开源工具 · 技术分析卡</div>
+        <div class="topbar-nav">
+          <a href="https://github.com/LeoYeAI/teammate-skill" target="_blank">GitHub</a>
+          <a href="https://github.com/LeoYeAI/teammate-skill/blob/main/README.md" target="_blank">README</a>
+          <a href="https://github.com/LeoYeAI/teammate-skill/blob/main/SKILL.md" target="_blank">SKILL.md</a>
+        </div>
+      </div>
+
+    <!-- ======= 01 teammate.skill / Turn Teammate Context into a Callable Skill ======= -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">01</div>
+        <div class="section-meta">
+          <div class="section-cn"><span class="b red">teammate.skill：把队友的上下文做成可调用的 Agent Skill</span></div>
+          <div class="section-en"><span class="muted">teammate.skill / Turn Teammate Context into a Callable Skill</span></div>
+        </div>
+      </div>
+      <div class="hero">
+        <div class="hero-left">
+          <h1 class="demo-title">teammate.skill</h1>
+          <p class="hero-sub">将队友的工作上下文蒸馏成可调用的 Agent Skill</p>
+          <p class="hero-note">通过斜杠命令 /{slug} 随时调用，保留其技术标准、沟通风格与决策逻辑</p>
+          <div class="hero-stat-row">
+            <div class="hero-stat"><span class="b red">238</span><span class="muted"> ★ GitHub Stars</span></div>
+            <div class="hero-stat"><span class="b blue">7</span><span class="muted"> Forks</span></div>
+            <div class="hero-stat"><span class="b">Python</span><span class="muted"> · MIT</span></div>
+          </div>
+        </div>
+        <div class="hero-right">
+          <div class="hardbox">
+            <div class="hardbox-head red-bg">仓库信息</div>
+            <div class="hardbox-body">
+              <div class="meta-row"><span class="b">作者：</span>LeoYeAI / teammate-skill</div>
+              <div class="meta-row"><span class="b">语言：</span>Python</div>
+              <div class="meta-row"><span class="b">许可证：</span>MIT</div>
+              <div class="meta-row"><span class="b">最后提交：</span>2026-03-31（4个月前）</div>
+              <div class="meta-row"><span class="b">Star/Fork：</span>238 ★ / 7</div>
+              <div class="meta-row"><span class="b">Issues：</span>0 open</div>
+              <div class="meta-row"><span class="b">README：</span>8语言（EN/ZH/FR/DE/RU/JA/IT/ES）</div>
+            </div>
+          </div>
+          <div class="hardbox">
+            <div class="hardbox-head blue-bg">来源与链接</div>
+            <div class="hardbox-body">
+              <div class="link-row">GH <a href="https://github.com/LeoYeAI/teammate-skill" target="_blank">github.com/LeoYeAI/teammate-skill</a></div>
+              <div class="link-row">README.md / SKILL.md（同一仓库）</div>
+              <div class="link-row">INSTALL.md（安装与 token 配置）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= 02 Problem / Tribal Knowledge Walks Out ======= -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="section-cn"><span class="b red">问题：隐性知识随人员离开而流失</span></div>
+          <div class="section-en"><span class="muted">Problem: Tribal Knowledge Walks Out</span></div>
+        </div>
+      </div>
+      <div class="grid-2" style="gap:12px">
+        <div class="hardbox">
+          <div class="hardbox-head red-bg">痛点场景</div>
+          <div class="hardbox-body">
+            <ul class="plain-list">
+              <li>资深工程师离职 — 没有交接文档、没有运行手册，只剩沉默</li>
+              <li>远程同事跨时区协作 — 想询问意见但不想打断其工作流</li>
+              <li>共创者转向新方向 — 带走了每一个未写下来的决策逻辑</li>
+              <li>新成员 onboarding — 面对代码库但不理解背后的设计原则</li>
+            </ul>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg">teammate.skill 的解题思路</div>
+          <div class="hardbox-body">
+            <ul class="plain-list">
+              <li>将历史 Slack / GitHub / 邮件 / 文档作为输入材料</li>
+              <li>AI 分析工作风格与技术标准（双轨分析）</li>
+              <li>生成可版本化、可纠正、可导出的 Agent Skill</li>
+              <li>用 /{slug} 随时调用 — 不打扰同事，不丢失上下文</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= 03 Dual-Track Model / Work Skill + Persona ======= -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">03</div>
+        <div class="section-meta">
+          <div class="section-cn"><span class="b blue">双轨建模：工作能力 + 五层人格</span></div>
+          <div class="section-en"><span class="muted">Dual-Track Model / Work Skill + 5-Layer Persona</span></div>
+        </div>
+      </div>
+      <div class="grid-3" style="gap:12px">
+        <div class="hardbox">
+          <div class="hardbox-head" style="background:var(--soft-ink);border-bottom:2px solid var(--ink)"><span class="b">Track A — Work Skill</span></div>
+          <div class="hardbox-body">
+            <p>覆盖队友负责的<strong>系统与技术栈</strong>、代码审查标准、工作流与隐性知识。</p>
+            <ul class="plain-list" style="margin-top:8px">
+              <li>系统与架构熟悉度</li>
+              <li>代码风格与评审重点</li>
+              <li>工作流与决策习惯</li>
+              <li>Tribal knowledge</li>
+            </ul>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head" style="background:var(--soft-ink);border-bottom:2px solid var(--ink)"><span class="b">Track B — 5层 Persona</span></div>
+          <div class="hardbox-body">
+            <p>将人格特质逐层建模：</p>
+            <ul class="plain-list" style="margin-top:8px">
+              <li>L1 硬规则 / 底线要求</li>
+              <li>L2 身份认同 / 角色感</li>
+              <li>L3 表达方式 / 语气偏好</li>
+              <li>L4 决策模式 / 判断框架</li>
+              <li>L5 人际风格 / 协作方式</li>
+            </ul>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg"><span class="b">调用时组合</span></div>
+          <div class="hardbox-body">
+            <p>README 描述的调用顺序：</p>
+            <div class="call-sequence">
+              <div class="seq-step"><span class="seq-num">1</span><span>Persona 决定语气与态度</span></div>
+              <div class="seq-arrow">-&gt;</div>
+              <div class="seq-step"><span class="seq-num">2</span><span>Work Skill 执行任务</span></div>
+              <div class="seq-arrow">-&gt;</div>
+              <div class="seq-step"><span class="seq-num">3</span><span>以该队友声音输出</span></div>
+            </div>
+            <p class="note-text" style="margin-top:8px;font-size:12px;color:var(--muted)">注：「像本人」为项目方描述，非独立验证结论</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= 04 Data In / Continuous Evolution ======= -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="section-cn"><span class="b red">多源输入与持续演化</span></div>
+          <div class="section-en"><span class="muted">Data In / Continuous Evolution</span></div>
+        </div>
+      </div>
+      <div class="grid-5" style="gap:8px;margin-bottom:12px;grid-template-columns:repeat(5,1fr)">
+        <div class="mini"><div class="mini-head red-bg">Slack</div><div class="mini-body">消息/线程/反应（API自动或JSON导入）</div></div>
+        <div class="mini"><div class="mini-head red-bg">GitHub</div><div class="mini-body">PR/Review/Commit/Issues（API自动）</div></div>
+        <div class="mini"><div class="mini-head red-bg">Gmail</div><div class="mini-body">.mbox / .eml 格式</div></div>
+        <div class="mini"><div class="mini-head red-bg">Teams</div><div class="mini-body">Teams / Outlook JSON</div></div>
+        <div class="mini"><div class="mini-head blue-bg">Notion</div><div class="mini-body">Markdown / HTML</div></div>
+      </div>
+      <div class="grid-5" style="gap:8px;margin-bottom:14px;grid-template-columns:repeat(5,1fr)">
+        <div class="mini"><div class="mini-head blue-bg">Confluence</div><div class="mini-body">HTML / zip 导出</div></div>
+        <div class="mini"><div class="mini-head blue-bg">JIRA</div><div class="mini-body">CSV / JSON</div></div>
+        <div class="mini"><div class="mini-head blue-bg">Linear</div><div class="mini-body">CSV / JSON</div></div>
+        <div class="mini"><div class="mini-head" style="background:var(--soft-ink);border-bottom:2px solid var(--ink)">PDF/图片</div><div class="mini-body">文字提取</div></div>
+        <div class="mini"><div class="mini-head" style="background:var(--soft-ink);border-bottom:2px solid var(--ink)">文本</div><div class="mini-body">Markdown / 纯文本</div></div>
+      </div>
+      <div class="grid-2" style="gap:12px">
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg"><span class="b">Token 配置（可选）</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list">
+              <li><code>SLACK_BOT_TOKEN</code> — Slack 自动采集（最小权限）</li>
+              <li><code>GITHUB_TOKEN</code> — GitHub PR/Review/Commit 采集</li>
+              <li>无需 Token 亦可使用 JSON/文件导入</li>
+            </ul>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head red-bg"><span class="b">持续演化 / 版本管理</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list">
+              <li><code>/update-teammate {slug}</code> — 追加新材料、纠正错误</li>
+              <li><code>/teammate-rollback {slug} {version}</code> — 回滚到指定版本</li>
+              <li>自动版本化，支持随时恢复</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= 05 Usage / Install, Create, Invoke ======= -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="section-cn"><span class="b blue">安装与调用：从零依赖开始</span></div>
+          <div class="section-en"><span class="muted">Usage / Install, Create, Invoke</span></div>
+        </div>
+      </div>
+      <div class="grid-2" style="gap:12px;margin-bottom:14px">
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg"><span class="b">安装方式</span></div>
+          <div class="hardbox-body">
+            <p class="mono-label">OpenClaw / MyClaw.ai：</p>
+            <pre class="code-block">openclaw skills install create-teammate</pre>
+            <p class="mono-label" style="margin-top:10px">Claude Code：</p>
+            <pre class="code-block"># clone 到项目 .claude/skills/
+git clone &lt;repo&gt; .claude/skills/create-teammate
+# 或全局：~/.claude/skills/create-teammate</pre>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head red-bg"><span class="b">依赖（可选）</span></div>
+          <div class="hardbox-body">
+            <pre class="code-block"># 自动采集器可选依赖
+pip3 install -r requirements.txt
+# 当前 requirements.txt 仅声明：slack_sdk&gt;=3.0
+# 基础 Skill 本身无需任何依赖</pre>
+          </div>
+        </div>
+      </div>
+      <div class="hardbox">
+        <div class="hardbox-head" style="background:var(--soft-ink);border-bottom:2px solid var(--ink)"><span class="b">斜杠命令速查</span></div>
+        <div class="hardbox-body">
+          <div class="grid-2" style="gap:8px">
+            <div>
+              <div class="cmd-row"><span class="cmd-cmd">/create-teammate [name]</span><span class="cmd-desc">创建新队友 Skill</span></div>
+              <div class="cmd-row"><span class="cmd-cmd">/list-teammates</span><span class="cmd-desc">列出所有已创建队友</span></div>
+              <div class="cmd-row"><span class="cmd-cmd">/{slug}</span><span class="cmd-desc">以完整 Persona + Work 调用</span></div>
+              <div class="cmd-row"><span class="cmd-cmd">/{slug}-work</span><span class="cmd-desc">仅 Work Skill 能力</span></div>
+              <div class="cmd-row"><span class="cmd-cmd">/{slug}-persona</span><span class="cmd-desc">仅 Persona 人格</span></div>
+            </div>
+            <div>
+              <div class="cmd-row"><span class="cmd-cmd">/compare {a} vs {b}</span><span class="cmd-desc">10维度对比 + 场景模拟</span></div>
+              <div class="cmd-row"><span class="cmd-cmd">/export-teammate {slug}</span><span class="cmd-desc">导出为 .tar.gz 便携包</span></div>
+              <div class="cmd-row"><span class="cmd-cmd">/update-teammate {slug}</span><span class="cmd-desc">追加新材料</span></div>
+              <div class="cmd-row"><span class="cmd-cmd">/teammate-rollback {slug} vN</span><span class="cmd-desc">回滚到指定版本</span></div>
+              <div class="cmd-row"><span class="cmd-cmd">/delete-teammate {slug}</span><span class="cmd-desc">删除队友 Skill</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= 06 Repository Map / Prompts, Tools, Outputs ======= -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">06</div>
+        <div class="section-meta">
+          <div class="section-cn"><span class="b red">仓库结构：Prompt、工具与产物目录</span></div>
+          <div class="section-en"><span class="muted">Repository Map / Prompts, Tools, Outputs</span></div>
+        </div>
+      </div>
+      <div class="grid-3" style="gap:12px">
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg"><span class="b">prompts/ 提示词模板</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list mono-list">
+              <li>intake — 信息采集引导</li>
+              <li>work_analyzer — Work Skill 分析</li>
+              <li>persona_analyzer — Persona 建模</li>
+              <li>work_builder / persona_builder — 产物构建</li>
+              <li>merger — 双轨合并</li>
+              <li>correction_handler — 纠正处理</li>
+              <li>compare — 队友对比</li>
+              <li>smoke_test — 自动化测试</li>
+            </ul>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head red-bg"><span class="b">tools/ Python 脚本</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list mono-list">
+              <li>slack_collector.py — Slack API 采集</li>
+              <li>github_collector.py — GitHub API 采集</li>
+              <li>gmail_parser.py / teams_parser.py</li>
+              <li>notion_parser.py / confluence_parser.py</li>
+              <li>jira_parser.py / linear_parser.py</li>
+              <li>privacy_guard.py — PII 检测 + 脱敏</li>
+              <li>skill_writer.py / version_manager.py</li>
+              <li>export.py — 导出为 .tar.gz</li>
+            </ul>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg"><span class="b">teammates/ 输出目录</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list mono-list">
+              <li>SKILL.md — 双平台入口（OpenClaw/Claude）</li>
+              <li>work.md — Work Skill 内容</li>
+              <li>persona.md — Persona 内容</li>
+              <li>meta.json — 元数据</li>
+              <li>version/ — 版本历史（可回滚）</li>
+              <li>knowledge/ — 原始知识（默认不导出）</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="gap:12px;margin-top:12px">
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg"><span class="b">支持平台</span></div>
+          <div class="hardbox-body">
+            <div class="platform-tags">
+              <span class="tag blue">OpenClaw</span>
+              <span class="tag blue">MyClaw.ai</span>
+              <span class="tag red">Claude Code</span>
+              <span class="tag dark">AgentSkills Agent</span>
+            </div>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head red-bg"><span class="b">质量保障管线</span></div>
+          <div class="hardbox-body">
+            <div class="pipeline-row">
+              <span class="pipe-step">1. Quality Gate<br><span style="font-size:11px">7项自检，失败自动修复</span></span>
+              <span class="pipe-arrow">-&gt;</span>
+              <span class="pipe-step">2. Smoke Test<br><span style="font-size:11px">3个自动化测试提示</span></span>
+              <span class="pipe-arrow">-&gt;</span>
+              <span class="pipe-step">3. Privacy Scan<br><span style="font-size:11px">PII检测+自动脱敏</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= 07 Boundary / Workflow Evidence vs. Marketing Promise ======= -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">07</div>
+        <div class="section-meta">
+          <div class="section-cn"><span class="b red">边界：可验证的生成流程，不等于真实人格复制</span></div>
+          <div class="section-en"><span class="muted">Boundary / Workflow vs. Marketing Promise</span></div>
+        </div>
+      </div>
+      <div class="grid-2" style="gap:12px;margin-bottom:14px">
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg"><span class="b">可核实的事实</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list">
+              <li>仓库确实提供 SKILL.md 入口、双轨提示词、数据源采集/解析脚本</li>
+              <li>10种数据源接入（Slack/GitHub/Gmail/Teams等）</li>
+              <li>提供版本管理、回滚、导出与隐私扫描工具</li>
+              <li>README 明确写出命令与用法</li>
+              <li>knowledge/ 目录默认不随 git 和导出包包含</li>
+            </ul>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head red-bg"><span class="b">需归因于项目方的表述</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list">
+              <li>「AI Skill that actually works like them」— 项目方能力主张，无独立验证</li>
+              <li>「Writes code in their style / Reviews PRs with their standards」— 项目方描述</li>
+              <li>「3/3 passed」质量示例 — 流程设计示例，非实证通过率</li>
+              <li>「自动检测并修复 PII」— 项目方描述，privacy_guard.py 仅有限正则规则</li>
+              <li>MyClaw.ai「one-click deploy / always-on」— 第三方托管描述</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="hardbox">
+        <div class="hardbox-head red-bg"><span class="b">使用边界（research-b 识别）</span></div>
+        <div class="hardbox-body">
+          <div class="grid-2" style="gap:10px">
+            <div>
+              <p class="b" style="margin-bottom:6px">隐私与授权</p>
+              <ul class="plain-list">
+                <li>采集 Slack/GitHub/邮件需<strong>资料主体与组织授权</strong></li>
+                <li>Token 应遵循<strong>最小权限原则</strong></li>
+                <li>真实数据不得出现在公开信息卡中</li>
+              </ul>
+            </div>
+            <div>
+              <p class="b" style="margin-bottom:6px">导出与分享</p>
+              <ul class="plain-list">
+                <li>使用 <code>--include-knowledge</code> 可能包含 PII</li>
+                <li>导出前应先用 <code>privacy_guard.py</code> 扫描</li>
+                <li>建议人工复核后再分享</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= 08 Conclusion / A Versioned Working Model ======= -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">08</div>
+        <div class="section-meta">
+          <div class="section-cn"><span class="b blue">结论：把交接材料转成可演化的工作模型</span></div>
+          <div class="section-en"><span class="muted">Conclusion / A Versioned Working Model</span></div>
+        </div>
+      </div>
+      <div class="grid-2" style="gap:12px;margin-bottom:14px">
+        <div class="hardbox">
+          <div class="hardbox-head blue-bg"><span class="b">teammate.skill 的可核实价值</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list">
+              <li>用标准 Agent Skill 格式和提示词模板整理多源工作材料</li>
+              <li>生成 Work Skill + Persona 两类可调用产物</li>
+              <li>提供调用、对比、更新、版本回滚、隐私扫描和导出的完整工具链</li>
+              <li>无需 Token 即可用 JSON/文件方式使用基础功能</li>
+              <li>跨 OpenClaw / Claude Code / AgentSkills 平台</li>
+            </ul>
+          </div>
+        </div>
+        <div class="hardbox">
+          <div class="hardbox-head red-bg"><span class="b">适用范围与局限性</span></div>
+          <div class="hardbox-body">
+            <ul class="plain-list">
+              <li>适合：知识提炼、决策模拟、代码风格学习、远程协作辅助</li>
+              <li>不适合：对离职同事意识、记忆或判断力的等价替代</li>
+              <li>质量取决于材料覆盖度、解析结果与后续人工纠正</li>
+              <li>生成的 Skill 是工作流工具，不是人格复制品</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="hardbox">
+        <div class="hardbox-head" style="background:var(--soft-ink);border-bottom:2px solid var(--ink)"><span class="b">一句话定位</span></div>
+        <div class="hardbox-body">
+          <p class="big-quote">把交接材料转成可演化的工作模型 — 用 Agent Skill 格式保存技术标准、沟通风格与决策逻辑，随时通过斜杠命令调用。</p>
+        </div>
+      </div>
+    </section>
+
+      <div class="footer">
+        <div class="footer-meta">
+          <div><strong>teammate.skill</strong> — <a href="https://github.com/LeoYeAI/teammate-skill" target="_blank">LeoYeAI/teammate-skill</a></div>
+          <div>238 Stars | 7 Forks | Python | MIT | 最后提交 2026-03-31</div>
+          <div>数据检索：2026-07-18 | README commit 41811c0</div>
+        </div>
+        <div class="footer-license">
+          <div>本卡基于公开 GitHub 源码整理</div>
+          <div>效果性描述为项目方原文，未作独立验证</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
