@@ -15,6 +15,7 @@ A publish bundle is a JSON object used to validate and scope one infocard publis
 | `keywords` | Non-empty array of non-empty strings. |
 | `wiki.raw_path` | Required relative path without `..` traversal. |
 | `wiki.knowledge_path` | Required relative path without `..` traversal. |
+| `repository.root` | Runtime-only absolute path of the one dedicated publish worktree. Required by `verify:publish-local-gate`; never a publication artifact. |
 
 Supported style identifiers are: `darkblue`, `redswiss`, `hardblue`, `main-style`, `darkgreen`, `graph-paper`, `handline`, `wood`, `black-head`, `pixelstack`, `q-style`, `paper-warm`, `white-purple`, and `color-material`.
 

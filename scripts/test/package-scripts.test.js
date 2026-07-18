@@ -15,4 +15,8 @@ test('exposes card verification gates as package scripts', () => {
     packageJson.scripts['verify-local-assets'],
     'node scripts/verify-local-assets.js'
   );
+  assert.equal(
+    packageJson.scripts['verify:publish-local-gate'],
+    'node scripts/verify-publish-local-gate.js'
+  );
 });
