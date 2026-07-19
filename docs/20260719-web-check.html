@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web-Check：一体化网站 OSINT 分析工具</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+    .card{border:3px solid var(--line);background:var(--paper);padding:16px;display:grid;gap:8px}
+    .card-hd{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .card-icon{width:36px;height:36px;border:2px solid var(--line);background:var(--soft-ink);display:grid;place-items:center;font-size:18px;flex:0 0 auto}
+    .card-icon.red{background:var(--soft-red);color:var(--red)}
+    .card-icon.blue{background:var(--soft-blue);color:var(--blue)}
+    .card-icon.dark{background:#111;color:#fff}
+    .card-num{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .card h3{margin:0;font-size:18px;line-height:1.2;letter-spacing:-.02em}
+    .card p,.card li{margin:0;font-size:13px;line-height:1.65;color:var(--muted)}
+    .card ul{padding-left:16px}
+    .card li{margin-bottom:4px}
+    .tag{display:inline-flex;align-items:center;border:1.5px solid var(--line);padding:4px 8px;font-size:11.6px;font-weight:850;background:#fff;white-space:nowrap}
+    .tag.blue{border-color:var(--blue);color:var(--blue);background:var(--soft-blue)}
+    .tag.red{border-color:var(--red);color:var(--red);background:var(--soft-red)}
+
+    .stat-row{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}
+    .stat{border:3px solid var(--line);background:var(--paper);padding:18px 22px;flex:1 1 180px;text-align:center}
+    .stat .v{display:block;font-size:clamp(30px,5vw,52px);font-weight:950;line-height:1;color:var(--red);letter-spacing:-.04em}
+    .stat .v.blue{color:var(--blue)}
+    .stat .l{display:block;font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-top:5px;font-weight:900}
+
+    .callout{border:2px solid var(--line);border-left:6px solid var(--blue);padding:12px 16px;background:#fff;margin:16px 0;display:grid;gap:6px}
+    .callout strong{font-size:14px;line-height:1.35}
+    .callout p{margin:0;font-size:12.5px;line-height:1.65;color:var(--muted)}
+    .callout.red{border-left-color:var(--red)}
+
+    .code-block{border:2px solid var(--line);background:#111;padding:14px 16px;margin:12px 0;overflow-x:auto}
+    .code-block .lang{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:#666;margin-bottom:8px;font-weight:900}
+    .code-block pre{margin:0;font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.72;color:#e8e4d8;white-space:pre-wrap}
+    .code-block .c-m{color:#e8c200}
+    .code-block .c-k{color:#ff79c6}
+    .code-block .c-s{color:#50fa7b}
+    .code-block .c-c{color:#8be9fd}
+    .code-block .c-r{color:#ff5555}
+    .code-block .c-g{color:#6272a4}
+
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px;margin-top:20px}
+    .footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+    .footer-block ul{padding-left:16px;margin:0;font-size:13.5px;color:#333;line-height:1.72}
+
+    .rule{border-top:2px solid var(--line);margin:30px 0 12px}
+    .source-note{font-size:11.5px;color:var(--muted);letter-spacing:.08em}
+    .source-note a{color:var(--blue);text-decoration:underline}
+
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+    .half{border:3px solid var(--line);background:var(--paper);padding:16px}
+    .half h3{margin:0 0 10px;font-size:18px;letter-spacing:-.02em}
+    .half p,.half li{font-size:13px;line-height:1.65;color:var(--muted)}
+    .half ul{padding-left:16px;margin:0}
+    .half li{margin-bottom:4px}
+
+    .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .chip{display:inline-flex;align-items:center;border:1.5px solid var(--line);padding:3px 8px;font-size:11.5px;font-weight:750;background:#fff}
+    .chip.blue{border-color:var(--blue);color:var(--blue);background:var(--soft-blue)}
+    .chip.red{border-color:var(--red);color:var(--red);background:var(--soft-red)}
+
+    .pro-con{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .pro{border:3px solid var(--line);border-top:6px solid var(--blue);background:var(--paper);padding:14px 16px}
+    .con{border:3px solid var(--line);border-top:6px solid var(--red);background:var(--paper);padding:14px 16px}
+    .pro h3,.con h3{margin:0 0 10px;font-size:15px;letter-spacing:-.01em}
+    .pro li,.con li{font-size:12.5px;line-height:1.65;margin-bottom:5px}
+    .pro li{list-style:square;color:var(--blue)}
+    .con li{list-style:square;color:var(--red)}
+    .pro ul,.con ul{padding-left:16px;margin:0}
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-copy">
+      <div class="kicker">🕵️ OSINT · Website Analysis</div>
+      <h1 class="demo-title">Web-Check</h1>
+      <p class="subtitle">一键洞察任意网站的内部运行机制：攻击向量发现、服务器架构分析、安全配置审查</p>
+      <div class="badge-row">
+        <span class="badge dark">MIT License</span>
+        <span class="badge blue">开源免费</span>
+        <span class="badge">Docker 部署</span>
+        <span class="badge red">自托管</span>
+      </div>
+      <div class="alert">
+        <strong>一句话定位</strong>
+        <p>输入网址 → 输出 20+ 维度网站画像，无需注册，打开即用</p>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="panel-top">
+        <div class="eyebrow">// live demo</div>
+        <h3>web-check.xyz</h3>
+        <p>输入任意 URL，立即获取完整的安全与配置报告</p>
+      </div>
+      <div class="panel-body">
+        <div class="quote">"帮助用户理解、优化和保护自己的网站"</div>
+        <div class="flow">
+          <div class="flow-item blue">
+            <div class="t">输入</div>
+            <div class="c">任意网站 URL</div>
+          </div>
+          <div class="flow-item red">
+            <div class="t">分析</div>
+            <div class="c">20+ 检测维度</div>
+          </div>
+          <div class="flow-item dark">
+            <div class="t">输出</div>
+            <div class="c">结构化分析报告</div>
+          </div>
+        </div>
+        <div class="mini-row">
+          <span class="mini-tag">无需 API Key</span>
+          <span class="mini-tag">无数据上传</span>
+          <span class="mini-tag">本地优先</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 概述 ============ -->
+  <div class="overview">
+    <div class="overview-sentence">Web-Check = 一键网站体检，20+ 检测维度，开源免费，支持 Docker 自托管</div>
+    <div class="overview-body">
+      <p>Web-Check 是由 Lissy93 开发的开源网站 OSINT 分析工具，通过整合多个检测 API，一键输出域名、IP、SSL、DNS、Headers、Cookie、端口、路由等 20+ 维度的分析报告。完全免费、支持 Docker 部署，数据留在本地，适合安全研究员、站长和开发者自检网站健康度。</p>
+    </div>
+  </div>
+
+  <!-- ============ 核心数据 ============ -->
+  <div class="stat-row">
+    <div class="stat">
+      <span class="v">20+</span>
+      <span class="l">检测维度</span>
+    </div>
+    <div class="stat">
+      <span class="v blue">540+</span>
+      <span class="l">GitHub Commits</span>
+    </div>
+    <div class="stat">
+      <span class="v">MIT</span>
+      <span class="l">开源协议</span>
+    </div>
+    <div class="stat">
+      <span class="v blue">Docker</span>
+      <span class="l">一键部署</span>
+    </div>
+  </div>
+
+  <!-- ============ 功能模块 ============ -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">Capabilities</div>
+        <h2>检测能力矩阵</h2>
+        <p>覆盖从基础设施到安全配置的全链路分析</p>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <article class="card">
+        <div class="card-hd">
+          <div class="card-icon red">🌐</div>
+          <div class="card-num">01 / Network</div>
+        </div>
+        <h3>网络层分析</h3>
+        <ul>
+          <li>IP 地址与归属地（GeoIP）</li>
+          <li>DNS 记录（A/AAAA/CNAME/MX/TXT）</li>
+          <li>Whois 注册信息</li>
+          <li>Traceroute 路由追踪</li>
+          <li>开放端口扫描</li>
+        </ul>
+        <div class="chip-row">
+          <span class="chip blue">nslookup</span>
+          <span class="chip">dig</span>
+          <span class="chip">whois</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-hd">
+          <div class="card-icon blue">🔒</div>
+          <div class="card-num">02 / Security</div>
+        </div>
+        <h3>安全配置检测</h3>
+        <ul>
+          <li>SSL/TLS 证书有效期与配置</li>
+          <li>Security Headers 检测</li>
+          <li>CSP（内容安全策略）分析</li>
+          <li>CORS 跨域策略审查</li>
+          <li>Cookie 安全属性检查</li>
+        </ul>
+        <div class="chip-row">
+          <span class="chip blue">HTTPS</span>
+          <span class="chip red">漏洞信号</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-hd">
+          <div class="card-icon dark">⚙️</div>
+          <div class="card-num">03 / Config</div>
+        </div>
+        <h3>站点配置审计</h3>
+        <ul>
+          <li>HTTP Headers 完整解析</li>
+          <li>robots.txt 内容审查</li>
+          <li>sitemap.xml 发现与解析</li>
+          <li>重定向链追踪</li>
+          <li>服务器类型识别</li>
+        </ul>
+        <div class="chip-row">
+          <span class="chip blue">SEO</span>
+          <span class="chip">重定向</span>
+          <span class="chip">Headers</span>
+        </div>
+      </article>
+    </div>
+
+    <div style="margin-top:14px" class="grid-3">
+      <article class="card">
+        <div class="card-hd">
+          <div class="card-icon blue">📊</div>
+          <div class="card-num">04 / Performance</div>
+        </div>
+        <h3>性能与可用性</h3>
+        <ul>
+          <li>服务器响应时间测量</li>
+          <li>DNS 解析速度</li>
+          <li>TRR / TTFB 分析</li>
+          <li>UP/Down 状态检测</li>
+          <li>CDN 覆盖检测</li>
+        </ul>
+        <div class="chip-row">
+          <span class="chip blue">Speed</span>
+          <span class="chip">可用性</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-hd">
+          <div class="card-icon red">🕸️</div>
+          <div class="card-num">05 / Crawl</div>
+        </div>
+        <h3>爬取与索引分析</h3>
+        <ul>
+          <li>robots.txt 规则解析</li>
+          <li>sitemap.xml 结构分析</li>
+          <li>SEO 元数据检查</li>
+          <li>内/外链统计</li>
+          <li>历史截图（WIP）</li>
+        </ul>
+        <div class="chip-row">
+          <span class="chip blue">robots</span>
+          <span class="chip">sitemap</span>
+          <span class="chip">SEO</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-hd">
+          <div class="card-icon dark">🏗️</div>
+          <div class="card-num">06 / Tech</div>
+        </div>
+        <h3>技术栈指纹</h3>
+        <ul>
+          <li>Server 类型识别</li>
+          <li>CMS/框架指纹（Wappalyzer 风格）</li>
+          <li>前端 JS 库检测</li>
+          <li>WAF / CDN 识别</li>
+          <li>IP 段与 ASN 分析</li>
+        </ul>
+        <div class="chip-row">
+          <span class="chip blue">CMS</span>
+          <span class="chip red">WAF</span>
+          <span class="chip">CDN</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 快速部署 ============ -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">02</div>
+      <div class="section-meta">
+        <div class="label b">Deploy</div>
+        <h2>快速部署</h2>
+        <p>两种方式：Docker 一行命令，或 Yarn 源码构建</p>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="half">
+        <h3>🐳 Docker（推荐）</h3>
+        <p>无需 Node 环境，一行命令启动：</p>
+        <div class="code-block">
+          <div class="lang">bash</div>
+          <pre><span class="c-g"># 拉取并运行</span>
+docker run -d \
+  --name web-check \
+  -p <span class="c-m">3000</span>:3000 \
+  --restart always \
+  <span class="c-k">lissy93</span>/<span class="c-s">web-check</span>
+
+<span class="c-g"># 或使用 docker-compose</span>
+<span class="c-c">version</span>: <span class="c-m">'3.9'</span>
+<span class="c-c">services</span>:
+  web-check:
+    <span class="c-c">image</span>: lissy93/web-check
+    <span class="c-c">restart</span>: always
+    <span class="c-c">ports</span>:
+      - <span class="c-m">"3000:3000"</span></pre>
+        </div>
+        <div class="callout">
+          <strong>访问地址</strong>
+          <p>启动后浏览器打开 http://localhost:3000 即可使用</p>
+        </div>
+      </div>
+
+      <div class="half">
+        <h3>📦 Yarn 源码构建</h3>
+        <p>克隆后本地构建（需要 Node.js）：</p>
+        <div class="code-block">
+          <div class="lang">bash</div>
+          <pre><span class="c-g"># 克隆仓库</span>
+git clone \
+  <span class="c-m">https://github.com/Lissy93/web-check.git</span>
+<span class="c-c">cd</span> web-check
+
+<span class="c-g"># 安装依赖</span>
+<span class="c-c">yarn</span> install
+
+<span class="c-g"># 构建并启动</span>
+<span class="c-c">yarn</span> build
+<span class="c-c">yarn</span> serve</pre>
+        </div>
+        <div class="callout red">
+          <strong>环境要求</strong>
+          <p>Node.js ≥ 18，推荐使用 Yarn 而非 npm</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 使用场景 ============ -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">03</div>
+      <div class="section-meta">
+        <div class="label k">Use Cases</div>
+        <h2>典型使用场景</h2>
+        <p>覆盖安全审计、运维优化、渗透测试准备三大方向</p>
+      </div>
+    </div>
+
+    <div class="grid-4">
+      <div class="card" style="padding:14px">
+        <div style="font-size:24px;margin-bottom:8px">🛡️</div>
+        <h3 style="font-size:15px">安全自检</h3>
+        <p style="font-size:12.5px;margin:0">快速发现 SSL 配置缺陷、缺失安全头、Cookie 属性不足等常见风险</p>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="font-size:24px;margin-bottom:8px">⚡</div>
+        <h3 style="font-size:15px">性能诊断</h3>
+        <p style="font-size:12.5px;margin:0">检测响应时间、DNS 解析速度、CDN 覆盖度，优化 TTFB</p>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="font-size:24px;margin-bottom:8px">🔍</div>
+        <h3 style="font-size:15px">OSINT 侦查</h3>
+        <p style="font-size:12.5px;margin:0">收集目标网站的服务器、IP、路由、技术栈等公开情报信息</p>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="font-size:24px;margin-bottom:8px">🧭</div>
+        <h3 style="font-size:15px">爬虫配置审计</h3>
+        <p style="font-size:12.5px;margin:0">检查 robots.txt、sitemap.xml，确认爬虫策略是否符合 SEO 预期</p>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:16px">
+      <strong>典型分析报告内容</strong>
+      <p>一次完整的 Web-Check 会输出：IP 归属地 / DNS 记录 / Whois 信息 / SSL 证书 / Security Headers / Cookie 分析 / 端口扫描 / Traceroute / 服务器指纹 / 技术栈检测 / robots.txt / sitemap.xml / 重定向链 / 响应时间 / ASN / WAF 检测 / 内/外链统计等 20+ 模块</p>
+    </div>
+  </section>
+
+  <!-- ============ 优劣势 ============ -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">04</div>
+      <div class="section-meta">
+        <div class="label">Pros & Cons</div>
+        <h2>优势与局限</h2>
+        <p>客观看待工具能力边界</p>
+      </div>
+    </div>
+
+    <div class="pro-con">
+      <div class="pro">
+        <h3>✅ 优势</h3>
+        <ul>
+          <li>完全免费，开源透明，数据不上传</li>
+          <li>自托管，数据主权在自己手里</li>
+          <li>20+ 检测维度覆盖完整</li>
+          <li>Docker 一键部署，无依赖</li>
+          <li>无需注册、无 API Key</li>
+          <li>持续活跃维护（500+ commits）</li>
+        </ul>
+      </div>
+      <div class="con">
+        <h3>⚠️ 局限</h3>
+        <ul>
+          <li>部分 API 依赖外部服务（需网络可达）</li>
+          <li>未登录，无法做登录态下的检测</li>
+          <li>大规模批量扫描受速率限制</li>
+          <li>不支持 JavaScript 渲染后的内容</li>
+          <li>端口扫描仅覆盖常见端口范围</li>
+          <li>不提供漏洞利用或 POC 生成</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 关键来源 ============ -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">05</div>
+      <div class="section-meta">
+        <div class="label b">Sources</div>
+        <h2>关键来源</h2>
+        <p>引用来源与参考链接</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hd">
+        <div class="card-icon blue">📂</div>
+        <div class="card-num">PRIMARY</div>
+      </div>
+      <h3>GitHub 官方仓库</h3>
+      <ul>
+        <li><strong>仓库：</strong><a href="https://github.com/Lissy93/web-check" style="color:var(--blue);text-decoration:underline">github.com/Lissy93/web-check</a></li>
+        <li><strong>体验地址：</strong><a href="https://web-check.xyz" style="color:var(--blue);text-decoration:underline">web-check.xyz</a>（官方托管演示站）</li>
+        <li><strong>协议：</strong>MIT License</li>
+        <li><strong>语言：</strong>TypeScript + Node.js + React</li>
+        <li><strong>Commits：</strong>540+（活跃维护）</li>
+      </ul>
+    </div>
+
+    <div class="grid-2">
+      <div class="half">
+        <h3>中文参考资料</h3>
+        <ul>
+          <li><a href="https://blog.csdn.net/qq_58286439/article/details/146409190" style="color:var(--blue);text-decoration:underline" target="_blank">CSDN：Web-Check 构建网站健康检测系统</a></li>
+          <li><a href="https://post.smzdm.com/p/avpq7nen/" style="color:var(--blue);text-decoration:underline" target="_blank">什么值得买：Web-Check 一体化网站测试工具</a></li>
+          <li><a href="https://post.smzdm.com/p/azoq9gq0/" style="color:var(--blue);text-decoration:underline" target="_blank">什么值得买：NAS 部署站点分析利器</a></li>
+        </ul>
+      </div>
+      <div class="half">
+        <h3>相关技术对照</h3>
+        <ul>
+          <li>类似工具：<strong>BuiltWith</strong>、<strong>Wappalyzer</strong>、<strong>Netcraft</strong></li>
+          <li>对比：Web-Check 优势在于完全自托管、免费、无需注册</li>
+          <li>适合：自建私有化检测平台需求</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 收口 ============ -->
+  <div class="footer-block">
+    <h3>一句话总结</h3>
+    <p>Web-Check 是目前最值得推荐的开源网站 OSINT 工具，一键 20+ 维度分析，Docker 5 秒部署，完全免费无限制，适合安全审计、运维优化与渗透测试情报收集。</p>
+    <ul>
+      <li><strong>核心价值：</strong>零门槛、无需注册、数据本地化的网站健康度检测</li>
+      <li><strong>最佳入口：</strong>访问 <a href="https://web-check.xyz" style="color:var(--blue)" target="_blank">web-check.xyz</a> 直接试用，或 <code>docker run -p 3000:3000 lissy93/web-check</code> 自建</li>
+      <li><strong>局限边界：</strong>不提供漏洞利用能力，输出为待核验信号，不等于漏洞成立</li>
+    </ul>
+    <div style="font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px">
+      信息卡生成时间：2026-07-19 · 数据来源：GitHub / Web-Check.xyz / 什么值得买 / CSDN · 主题：hardblue-style
+    </div>
+  </div>
+
+  <div class="rule"></div>
+  <p class="source-note">20260719-web-check · Web-Check OSINT 工具信息卡 · <a href="https://github.com/Lissy93/web-check" target="_blank">github.com/Lissy93/web-check</a> · hardblue-style</p>
+</main>
+</body>
+</html>
