@@ -40,6 +40,8 @@ const HIGH_RISK_PATTERNS = [
     name: "手机号（中国大陆）",
     regex: /(\+?86)?[1][3-9]\d{9}/g,
     exclude: /(\+?86)?[1][3-9]\d{4}xxxx\d{4}|13800000000|13900000000/,
+    // Exclude numbers inside URL query params or path segments (e.g. X post IDs like 2078318406424793326)
+    urlContextExclude: /[?&][^=]*=|status\/\d{16,}|id\/\d{16,}/,
     severity: "HIGH",
   },
   {
@@ -89,6 +91,8 @@ function scanFile(filePath) {
     while ((match = pattern.regex.exec(content)) !== null) {
       const value = match[0];
       if (pattern.exclude && pattern.exclude.test(value)) continue;
+      // Exclude matches inside URL path segments (e.g. /status/2078318406424793326)
+      if (pattern.urlContextExclude && pattern.urlContextExclude.test(value)) continue;
       // Deduplicate
       if (issues.some(i => i.value === value)) continue;
       issues.push({
