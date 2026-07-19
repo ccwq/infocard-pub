@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AgentKey：AI Agent 的 API 密钥与 MCP 上下文管理框架</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card{border:2px solid var(--line);background:var(--paper);padding:14px;display:grid;gap:8px}
+    .card .card-tag{display:inline-flex;align-items:center;width:fit-content;border:1.5px solid var(--line);background:#fff;padding:3px 8px;font-size:10.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .card .card-tag.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .card .card-tag.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .card h3{margin:0;font-size:15px;font-weight:950;line-height:1.28;letter-spacing:-.02em}
+    .card p{font-size:12.5px;color:#333;line-height:1.65;margin:0}
+    .card .card-link{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:var(--blue);margin-top:4px}
+    .card .card-link::before{content:"→";font-size:13px}
+
+    /* ============ BIG STAT BLOCKS ============ */
+    .stat-row{display:flex;gap:12px;flex-wrap:wrap}
+    .stat-block{flex:1;min-width:160px;border:3px solid var(--line);background:var(--paper);padding:16px;display:grid;gap:4px}
+    .stat-block .s-value{font-size:clamp(28px,4.5vw,48px);font-weight:950;line-height:1;letter-spacing:-.05em;color:var(--ink)}
+    .stat-block .s-label{font-size:11.5px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+    .stat-block.red{border-color:var(--red);background:var(--soft-red)}
+    .stat-block.red .s-value{color:var(--red)}
+    .stat-block.blue{border-color:var(--blue);background:var(--soft-blue)}
+    .stat-block.blue .s-value{color:var(--blue)}
+
+    /* ============ CALLOUT ============ */
+    .callout{border:2px solid var(--line);border-left:6px solid var(--blue);background:#fff;padding:14px;display:grid;gap:8px}
+    .callout.red{border-left-color:var(--red)}
+    .callout.dark{border-left-color:#111;background:#111;color:#fff}
+    .callout h4{font-size:13.5px;font-weight:950;margin:0;line-height:1.3}
+    .callout p{font-size:12.5px;line-height:1.65;margin:0;color:#333}
+    .callout.dark p{color:#e0dbcf}
+
+    /* ============ TABLE ============ */
+    .table-wrap{overflow-x:auto;border:2px solid var(--line);background:var(--paper)}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    thead tr{background:#111;color:#fff}
+    thead th{padding:10px 12px;text-align:left;font-weight:900;letter-spacing:.1em;font-size:11.5px}
+    tbody tr{border-bottom:1.5px solid var(--line)}
+    tbody tr:nth-child(even){background:var(--soft-ink)}
+    tbody td{padding:10px 12px;vertical-align:top;line-height:1.6;color:#222}
+    tbody td:first-child{font-weight:800;white-space:nowrap;color:var(--ink)}
+
+    /* ============ CODE ============ */
+    .code-block{background:#111;border:2px solid var(--line);padding:14px;overflow-x:auto}
+    .code-block .code-label{font-size:10.5px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px;display:block}
+    pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.75;color:#e8e8e8;white-space:pre-wrap;margin:0}
+
+    /* ============ PROS / CONS ============ */
+    .pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .pro-box,.con-box{border:2px solid var(--line);padding:14px}
+    .pro-box{background:var(--soft-ink)}
+    .con-box{background:var(--soft-red)}
+    .pro-box h4,.con-box h4{font-size:13px;font-weight:950;margin:0 0 8px;display:flex;align-items:center;gap:6px}
+    .pro-box h4{color:#1a8a1a}
+    .con-box h4{color:var(--red)}
+    .pro-box ul,.con-box ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.8;color:#222}
+    .pro-box li::marker{content:"✓ "}
+    .con-box li::marker{content:"✗ "}
+
+    /* ============ TIMELINE ============ */
+    .timeline{display:grid;gap:0}
+    .timeline-item{display:grid;grid-template-columns:100px 1fr;gap:12px;border-bottom:2px solid var(--line);padding:12px 0;align-items:start}
+    .timeline-item:last-child{border-bottom:none}
+    .tl-date{font-size:11.5px;font-weight:900;letter-spacing:.1em;color:var(--muted);padding-top:2px}
+    .tl-content{font-size:12.5px;line-height:1.65;color:#222;display:grid;gap:4px}
+    .tl-content strong{font-size:13px;color:var(--ink)}
+
+    /* ============ FOOTER / SOURCE ============ */
+    .rule{border-top:3px solid var(--line);margin:30px 0 14px}
+    .source-note{font-size:11.5px;color:var(--muted);letter-spacing:.08em}
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+    .footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+    .footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+
+    /* ============ COMPARE TABLE ============ */
+    .compare-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border:2px solid var(--line);background:var(--paper)}
+    .compare-header{display:contents}
+    .compare-header > div{background:#111;color:#fff;padding:12px;font-weight:900;font-size:12px;letter-spacing:.1em;text-align:center;border-right:1.5px solid #fff}
+    .compare-header > div:last-child{border-right:none}
+    .compare-row{display:contents}
+    .compare-row > div{padding:10px 12px;border-bottom:1.5px solid var(--line);border-right:1.5px solid var(--line);font-size:12.5px;line-height:1.6;vertical-align:top}
+    .compare-row > div:last-child{border-right:none}
+    .compare-row > div:first-child{font-weight:900;background:var(--soft-ink)}
+    .compare-row:last-child > div{border-bottom:none}
+
+    /* ============ BADGE ROWS ============ */
+    .tag-cloud{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;border:1.5px solid var(--line);background:#fff;padding:4px 9px;font-size:11.5px;font-weight:750;color:#222}
+    .tag.blue{border-color:var(--blue);color:var(--blue)}
+    .tag.red{border-color:var(--red);color:var(--red)}
+    .tag.dark{background:#111;color:#fff;border-color:#111}
+
+    @media(max-width:640px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:none;border-bottom:3px solid var(--line)}
+      .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+      .pros-cons{grid-template-columns:1fr}
+      .compare-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:64px 1fr}
+      .section-no{width:64px;height:64px;font-size:24px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- ===== HERO ===== -->
+    <div class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <span class="kicker">AI Agent · 安全基础设施</span>
+        <h1 class="demo-title">AgentKey</h1>
+        <p class="subtitle">AI Agent 的 API 密钥管理与 MCP 上下文协议标准——让智能体安全、可信、可控地连接外部世界</p>
+        <div class="badge-row" style="margin-top:4px">
+          <span class="badge dark">MCP 标准</span>
+          <span class="badge blue">密钥管理</span>
+          <span class="badge">零信任架构</span>
+          <span class="badge">Open Source</span>
+        </div>
+        <div class="alert" style="margin-top:2px">
+          <strong>⚠ 安全红线</strong>
+          <p>API Key 是 Agent 的"钱包钥匙"——泄露即意味着账户资产可被任意调用。AgentKey 体系从协议层解决这一风险。</p>
+        </div>
+        <div class="mini-row" style="margin-top:4px">
+          <span class="mini-tag"># 上下文感知</span>
+          <span class="mini-tag"># 最小权限</span>
+          <span class="mini-tag"># 审计追溯</span>
+        </div>
+      </div>
+      <div class="hero-visual" style="grid-column:1/-1">
+        <div class="panel-top">
+          <span class="eyebrow">架构示意</span>
+          <h3>AgentKey · MCP 三层架构</h3>
+          <p>Model Context Protocol 将 AI Agent 与外部工具解耦，实现一次实现、任意 Agent 调用的标准化连接</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote">
+            MCP = AI 领域的 USB-C 接口——统一、安全、可扩展
+          </div>
+          <div class="flow">
+            <div class="flow-item dark">
+              <span class="t">Layer 01 · 凭证层</span>
+              <span class="c">API Key / OAuth / 硬件密钥</span>
+            </div>
+            <div class="flow-item blue">
+              <span class="t">Layer 02 · 协议层</span>
+              <span class="c">MCP · JSON-RPC · TLS</span>
+            </div>
+            <div class="flow-item red">
+              <span class="t">Layer 03 · 工具层</span>
+              <span class="c">MCP Server → Resources · Tools · Prompts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== OVERVIEW ===== -->
+    <div class="overview">
+      <div class="overview-sentence">一句话：AgentKey 是 AI Agent 访问外部工具和数据源的标准化安全框架，核心是 MCP（Model Context Protocol）协议与密钥生命周期管理。</div>
+      <div class="overview-body">
+        <p>AI Agent 若要"真正办事"，必须突破 LLM 的训练数据边界，连接数据库、API、文件系统等外部系统。AgentKey 通过 MCP 协议将这种连接标准化，并通过严格的密钥管理与权限控制确保安全可控。目前主流 Agent 框架（LangChain、AutoGen、Microsoft Agent Framework）均在积极集成 MCP，MCP 也已成为 AI Agent 领域的"事实标准"。</p>
+      </div>
+    </div>
+
+    <!-- ===== SECTION 01 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <span class="label">MCP 协议核心</span>
+          <h2>Model Context Protocol</h2>
+          <p>Anthropic 主导的开放协议，解决 AI 模型与外部数据源/工具之间的标准化连接问题</p>
+        </div>
+      </div>
+
+      <div class="stat-row" style="margin-bottom:16px">
+        <div class="stat-block">
+          <div class="s-value">2024.11</div>
+          <div class="s-label">协议发布</div>
+        </div>
+        <div class="stat-block blue">
+          <div class="s-value">3</div>
+          <div class="s-label">核心原语</div>
+        </div>
+        <div class="stat-block red">
+          <div class="s-value">5+</div>
+          <div class="s-label">官方 SDK</div>
+        </div>
+        <div class="stat-block">
+          <div class="s-value">1000+</div>
+          <div class="s-label">开源 Server</div>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:14px">
+        <div class="card">
+          <span class="card-tag">Resources</span>
+          <h3>资源原语</h3>
+          <p>只读数据源：文件、数据库记录、API 响应。模型可读取上下文信息，但不能修改外部状态。</p>
+        </div>
+        <div class="card">
+          <span class="card-tag blue">Tools</span>
+          <h3>工具原语</h3>
+          <p>可执行操作：搜索、计算、写入数据库、发送消息。Agent 可调用工具并获取结构化结果。</p>
+        </div>
+        <div class="card">
+          <span class="card-tag red">Prompts</span>
+          <h3>提示原语</h3>
+          <p>预定义交互模板：代码审查、周报生成、数据分析，引导模型在特定场景下输出高质量结果。</p>
+        </div>
+      </div>
+
+      <div class="callout dark" style="margin-bottom:14px">
+        <h4>💡 协议价值</h4>
+        <p>MCP 解决了传统 Function Calling 的平台锁定问题——同一 MCP Server 可被 Claude Desktop、Cursor IDE、LangChain Agent、Dify 等任意客户端复用，无需为每个 Agent 重写适配代码。</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="compare-grid" style="grid-column:1/-1">
+          <div class="compare-header">
+            <div>对比维度</div>
+            <div>Function Calling</div>
+            <div>MCP 协议</div>
+          </div>
+          <div class="compare-row">
+            <div>标准化程度</div>
+            <div>各平台私有格式，需要重复实现</div>
+            <div>统一协议，一次实现，任意调用</div>
+          </div>
+          <div class="compare-row">
+            <div>上下文保持</div>
+            <div>弱，多轮对话需要手动管理</div>
+            <div>协议内置上下文同步机制</div>
+          </div>
+          <div class="compare-row">
+            <div>工具发现</div>
+            <div>手动描述，手工 JSON Schema</div>
+            <div>自动发现，协议层规范</div>
+          </div>
+          <div class="compare-row">
+            <div>安全隔离</div>
+            <div>凭证暴露给 LLM，风险高</div>
+            <div>凭证存于 MCP Server，LLM 无法直接访问</div>
+          </div>
+          <div class="compare-row">
+            <div>生态丰富度</div>
+            <div>依赖各平台自己建设</div>
+            <div>1000+ 开源 Server，涵盖数据库/搜索/文件系统等</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION 02 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <span class="label b">密钥安全管理</span>
+          <h2>AgentKey 凭证体系</h2>
+          <p>覆盖 API Key 全生命周期的安全实践——从生成、存储、使用到轮换的全链路防护</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <span class="card-tag red">密钥生命周期</span>
+          <h3>创建 → 存储 → 使用 → 轮换 → 销毁</h3>
+          <p>每个阶段都有对应的安全要求：密钥不应硬编码在代码中，应使用环境变量或密钥管理服务（如 AWS Secrets Manager、HashiCorp Vault）；定期轮换；敏感操作需要多因素认证。</p>
+          <div class="code-block" style="margin-top:8px">
+            <span class="code-label">// 安全配置示例</span>
+            <pre style="color:#e8e8e8"># ❌ 危险：Key 直接写在代码中
+api_key = "sk-abc123..."
+
+# ✅ 推荐：环境变量
+api_key = os.environ.get("AGENT_API_KEY")
+
+# ✅ 推荐：密钥管理服务
+api_key = vault.get("secret/agent/api-key")</pre>
+          </div>
+        </div>
+        <div class="card">
+          <span class="card-tag blue">零信任原则</span>
+          <h3>永不信任，始终验证</h3>
+          <p>AgentKey 遵循零信任架构：每个 MCP 请求都经过身份验证与授权校验；密钥仅授予最小必要权限（Principle of Least Privilege）；所有操作留有审计日志。</p>
+          <ul style="margin:8px 0 0;padding-left:16px;font-size:12.5px;color:#333;line-height:1.8">
+            <li>传输层加密（TLS 1.3）</li>
+            <li>请求签名与时间戳验证</li>
+            <li>细粒度权限控制（RBAC）</li>
+            <li>操作审计与异常告警</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="timeline" style="margin-bottom:14px">
+        <div class="timeline-item">
+          <div class="tl-date">Phase 01<br/>生成</div>
+          <div class="tl-content">
+            <strong>密钥生成</strong>
+            <span>使用加密安全的随机数生成器（CSPRNG）；支持多种规格（AES-256、RSA-4096、Ed25519）；平台级密钥托管服务生成，不在客户端暴露明文。</span>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="tl-date">Phase 02<br/>存储</div>
+          <div class="tl-content">
+            <strong>安全存储</strong>
+            <span>加密存储（静态加密）；隔离环境变量或专用 KMS；不写入日志、代码仓库或错误信息；MCP Server 端集中管理凭证，LLM 侧不存储。</span>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="tl-date">Phase 03<br/>使用</div>
+          <div class="tl-content">
+            <strong>受控使用</strong>
+            <span>最小权限原则（仅授予任务所需的最低权限）；操作速率限制（Rate Limiting）；请求签名防篡改；敏感操作需要人工审批（Human-in-the-Loop）。</span>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="tl-date">Phase 04<br/>轮换</div>
+          <div class="tl-content">
+            <strong>定期轮换</strong>
+            <span>自动密钥轮换机制；支持密钥版本管理；旧密钥优雅失效窗口（Grace Period）；轮换过程对 Agent 运行零感知。</span>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="tl-date">Phase 05<br/>销毁</div>
+          <div class="tl-content">
+            <strong>安全销毁</strong>
+            <span>密钥撤销后立即失效；历史日志脱敏处理；符合 GDPR 等合规要求的数据清除；销毁证明（Audit Certificate）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION 03 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <span class="label k">技术实现</span>
+          <h2>快速接入指南</h2>
+          <p>通过官方 SDK（TypeScript / Python / Go / Rust）在 5 分钟内启动第一个 MCP Server</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <span class="card-tag blue">TypeScript</span>
+          <h3>MCP Server 快速创建</h3>
+          <p>使用官方 @modelcontextprotocol/sdk，定义工具、资源和提示词，支持 stdio / SSE / HTTP 等多种传输方式。</p>
+          <div class="code-block" style="margin-top:8px">
+            <span class="code-label">// 安装 &amp; 初始化</span>
+            <pre style="color:#e8e8e8">npm install @modelcontextprotocol/sdk zod
+
+<span style="color:#888"># server.ts</span>
+<span style="color:#1f63ff">import</span> { McpServer } <span style="color:#1f63ff">from</span> <span style="color:#e8c200">"@modelcontextprotocol/sdk"</span>;
+<span style="color:#1f63ff">import</span> { z } <span style="color:#1f63ff">from</span> <span style="color:#e8c200">"zod"</span>;
+
+<span style="color:#1f63ff">const</span> server = <span style="color:#1f63ff">new</span> McpServer({
+  name: <span style="color:#e8c200">"my-agent-server"</span>,
+  version: <span style="color:#e8c200">"1.0.0"</span>
+});
+
+server.tool(<span style="color:#e8c200">"search"</span>, <span style="color:#e8c200">"搜索网络"</span>,
+  { query: z.string() },
+  async ({ query }) => {
+    <span style="color:#888">// 实现搜索逻辑</span>
+    <span style="color:#1f63ff">return</span> { content: [{ type: <span style="color:#e8c200">"text"</span>, text: result }] };
+  }
+);
+
+server.run();</pre>
+          </div>
+        </div>
+        <div class="card">
+          <span class="card-tag">Python</span>
+          <h3>Python MCP Server 示例</h3>
+          <p>Python 生态首选，mcp 包提供与 TypeScript SDK 对齐的接口，支持异步操作。</p>
+          <div class="code-block" style="margin-top:8px">
+            <span class="code-label">// Python MCP Server</span>
+            <pre style="color:#e8e8e8">uv add mcp
+
+<span style="color:#888"># server.py</span>
+<span style="color:#1f63ff">from</span> mcp.server <span style="color:#1f63ff">import</span> McpServer
+<span style="color:#1f63ff">import</span> asyncio
+
+server = McpServer(<span style="color:#e8c200">"my-agent-server"</span>, <span style="color:#e8c200">"1.0.0"</span>)
+
+<span style="color:#1f63ff">@server.list_tools</span>()
+<span style="color:#1f63ff">def</span> <span style="color:#d19a66">get_tools</span>():
+    <span style="color:#1f63ff">return</span> [
+        {
+            <span style="color:#e8c200">"name"</span>: <span style="color:#e8c200">"db_query"</span>,
+            <span style="color:#e8c200">"description"</span>: <span style="color:#e8c200">"执行数据库查询"</span>,
+            <span style="color:#e8c200">"inputSchema"</span>: {
+                <span style="color:#e8c200">"type"</span>: <span style="color:#e8c200">"object"</span>,
+                <span style="color:#e8c200">"properties"</span>: {
+                    <span style="color:#e8c200">"sql"</span>: { <span style="color:#e8c200">"type"</span>: <span style="color:#e8c200">"string"</span> }
+                }
+            }
+        }
+    ]
+
+asyncio.run(server.run())</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-bottom:14px">
+        <h4>📡 传输层选择</h4>
+        <p>stdio：本地进程间通信，延迟最低，适合 CLI 工具和本地开发。<br/>SSE（Server-Sent Events）：HTTP 长连接，支持远程 MCP Server，适合云端部署。<br/>HTTP POST：简单轮询场景，兼容性最好。<br/>SDK（进程内）：零网络开销，适合深度集成的高性能场景。</p>
+      </div>
+
+      <div class="table-wrap" style="margin-bottom:14px">
+        <table>
+          <thead>
+            <tr>
+              <th>场景</th>
+              <th>推荐 SDK</th>
+              <th>传输方式</th>
+              <th>难度</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>快速原型 / CLI 工具</td>
+              <td>TypeScript (@modelcontextprotocol/sdk)</td>
+              <td>stdio</td>
+              <td>⭐ 低</td>
+            </tr>
+            <tr>
+              <td>AI 应用集成（LangChain / LlamaIndex）</td>
+              <td>Python (mcp)</td>
+              <td>stdio / SSE</td>
+              <td>⭐ 低</td>
+            </tr>
+            <tr>
+              <td>企业级高可用部署</td>
+              <td>Go / Rust</td>
+              <td>SSE / HTTP</td>
+              <td>⭐⭐⭐ 高</td>
+            </tr>
+            <tr>
+              <td>.NET 平台（Microsoft Agent Framework）</td>
+              <td>C# (Microsoft.Agents.*)</td>
+              <td>stdio / SSE</td>
+              <td>⭐⭐ 中</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== SECTION 04 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <span class="label">主流框架集成</span>
+          <h2>AgentKey + Agent 框架生态</h2>
+          <p>AgentKey / MCP 已与主流 Agent 框架深度集成，实现开箱即用的安全连接</p>
+        </div>
+      </div>
+
+      <div class="grid-4" style="margin-bottom:14px">
+        <div class="card">
+          <span class="card-tag blue">LangChain</span>
+          <h3>LangChain + MCP</h3>
+          <p>通过 langchain-mcp 集成 MCP Server 作为 Tool，自动工具发现与调用。</p>
+          <div class="code-block" style="margin-top:6px">
+            <pre style="font-size:11px;color:#e8e8e8"><span style="color:#1f63ff">from</span> langchain_mcp <span style="color:#1f63ff">import</span> MCPToolset
+
+tools = MCPToolset(
+    server=<span style="color:#e8c200">"my-mcp-server"</span>
+)
+agent = initialize_agent(
+    tools, llm, agent=<span style="color:#e8c200">"conversational-react-description"</span>
+)</pre>
+          </div>
+        </div>
+        <div class="card">
+          <span class="card-tag dark">AutoGen</span>
+          <h3>AutoGen · 微软</h3>
+          <p>多 Agent 协作框架，支持 MCP Server 作为共享工具库，Agent 间通过 MCP 协议通信。</p>
+          <div class="code-block" style="margin-top:6px">
+            <pre style="font-size:11px;color:#e8e8e8"><span style="color:#1f63ff">from</span> autogen.agentchat.contrib <span style="color:#1f63ff">import</span> MCPTool
+
+mcp_tool = MCPTool(
+    server_name=<span style="color:#e8c200">"filesystem"</span>,
+    tool_names=[<span style="color:#e8c200">"read_file"</span>, <span style="color:#e8c200">"write_file"</span>]
+)</pre>
+          </div>
+        </div>
+        <div class="card">
+          <span class="card-tag">MAF</span>
+          <h3>Microsoft Agent Framework</h3>
+          <p>统一 Agent 开发框架，内置 MCP 客户端支持，支持 Sequential / Concurrent / GroupChat 等工作流。</p>
+          <div class="code-block" style="margin-top:6px">
+            <pre style="font-size:11px;color:#e8e8e8"><span style="color:#1f63ff">var</span> agent = <span style="color:#1f63ff">new</span> Agent(<span style="color:#e8c200">"assistant"</span>);
+agent.AddMcpServer(config);
+agent.OnMessage += HandleMessage;</pre>
+          </div>
+        </div>
+        <div class="card">
+          <span class="card-tag red">Cursor IDE</span>
+          <h3>Cursor · IDE 集成</h3>
+          <p>2025 年 2 月 Cursor 率先宣布支持 MCP，成为开发者最常用的 MCP 客户端之一，可一键连接海量工具。</p>
+          <div class="code-block" style="margin-top:6px">
+            <pre style="font-size:11px;color:#e8e8e8"><span style="color:#888"># ~/.cursor/mcp.json</span>
+{
+  <span style="color:#e8c200">"mcpServers"</span>: {
+    <span style="color:#e8c200">"filesystem"</span>: {
+      <span style="color:#e8c200">"command"</span>: <span style="color:#e8c200">"npx"</span>,
+      <span style="color:#e8c200">"args"</span>: [<span style="color:#e8c200">"-y"</span>, <span style="color:#e8c200">"@modelcontextprotocol/server-filesystem"</span>]
+    }
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION 05 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <span class="label b">优缺点分析</span>
+          <h2>AgentKey 的适用边界</h2>
+          <p>没有银弹——明确 AgentKey / MCP 的适用场景与局限，避免过度设计</p>
+        </div>
+      </div>
+
+      <div class="pros-cons" style="margin-bottom:14px">
+        <div class="pro-box">
+          <h4>✓ 适用场景</h4>
+          <ul>
+            <li>需要连接多个外部工具（数据库、API、文件系统）的复杂 Agent</li>
+            <li>多框架复用同一工具集，避免重复造轮子</li>
+            <li>对安全性要求高的企业环境（凭证隔离、审计追溯）</li>
+            <li>需要跨平台（Claude Desktop / Cursor / Dify）切换 Agent 客户端</li>
+            <li>构建工具/服务的开放生态，供第三方 Agent 接入</li>
+            <li>长期维护的 Agent 项目，需要标准化扩展机制</li>
+          </ul>
+        </div>
+        <div class="con-box">
+          <h4>✗ 局限性</h4>
+          <ul>
+            <li>简单单轮问答场景，MCP 引入额外复杂度，不值得</li>
+            <li>实时性要求极高的场景，协议开销可能不满足延迟要求</li>
+            <li>MCP Server 生态虽在增长，但某些垂直领域覆盖仍不足</li>
+            <li>多 Agent 间的状态共享和协调，MCP 目前不是最优方案</li>
+            <li>学习曲线：需要理解协议、SDK、部署方式，对新手有门槛</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-bottom:14px">
+        <h4>🔑 选型决策树</h4>
+        <p>需要跨多个外部系统？ → 是 → MCP 适合你<br/>仅需要简单 API 调用？ → Function Calling 可能更直接<br/>需要高并发低延迟？ → 评估协议开销，考虑进程内 SDK<br/>需要构建开放工具生态？ → MCP 是最佳选择</p>
+      </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <div class="footer-block">
+      <h3>收口总结</h3>
+      <p>AgentKey 体系（MCP + 密钥管理）是 AI Agent 连接外部世界的标准化安全路径。核心价值：</p>
+      <ul>
+        <li><strong>协议标准化</strong>：一次实现，任意 Agent 复用，生态丰富（1000+ Server）</li>
+        <li><strong>安全隔离</strong>：凭证存于 MCP Server，LLM 无法直接访问，满足零信任要求</li>
+        <li><strong>上下文保持</strong>：协议内置上下文同步，多轮对话可靠性更高</li>
+        <li><strong>多框架支持</strong>：LangChain、AutoGen、Microsoft MAF、Cursor 均可接入</li>
+      </ul>
+      <p style="margin-top:8px"><strong>来源说明：</strong>本卡综合 Anthropic MCP 官方规范（github.com/modelcontextprotocol）、主流 Agent 框架文档及行业调研，数据截至 2026 年 7 月。</p>
+      <div class="tag-cloud" style="margin-top:8px">
+        <span class="tag dark">MCP</span>
+        <span class="tag">Model Context Protocol</span>
+        <span class="tag blue">AgentKey</span>
+        <span class="tag">API Key 安全</span>
+        <span class="tag">零信任</span>
+        <span class="tag">AI Agent</span>
+        <span class="tag blue">LangChain</span>
+        <span class="tag">AutoGen</span>
+        <span class="tag red">Microsoft MAF</span>
+        <span class="tag">Cursor IDE</span>
+        <span class="tag">JSON-RPC</span>
+        <span class="tag blue">Function Calling</span>
+        <span class="tag dark">Open Source</span>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+    <p class="source-note">AgentKey · AI Agent API 密钥与 MCP 上下文管理框架 · 2026-07-19 · 硬核蓝手册风格</p>
+  </main>
+</body>
+</html>
