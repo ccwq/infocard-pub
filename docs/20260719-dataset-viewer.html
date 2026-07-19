@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Dataset Viewer：基于 Tauri + React 的大数据轻量浏览器，88G 文件秒开，支持 Parquet/Excel/CSV 与云存储直连。" />
+  <title>Dataset Viewer · 88G 文件秒开的轻量数据浏览器</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* SECTIONS */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* GRIDS */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card{border:2px solid var(--line);background:var(--paper);padding:16px;display:grid;gap:6px}
+    .card h3{margin:0;font-size:16px;line-height:1.3;letter-spacing:-.02em}
+    .card p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.62}
+    .card .icon{display:grid;place-items:center;width:38px;height:38px;border:2px solid var(--line);background:var(--soft-ink);font-size:18px;margin-bottom:4px}
+    .card.blue-card{border-color:var(--blue);background:var(--soft-blue)}
+    .card.red-card{border-color:var(--red);background:var(--soft-red)}
+    .card-stat{border:2px solid var(--line);background:var(--paper);padding:14px;text-align:center}
+    .card-stat .num{font-size:clamp(26px,4vw,42px);font-weight:950;line-height:1;color:var(--red);letter-spacing:-.04em}
+    .card-stat .num.blue{color:var(--blue)}
+    .card-stat .den{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.1em;text-transform:uppercase;font-weight:900}
+    .full-w{grid-column:1/-1}
+
+    /* ALERT */
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:12px 14px;display:grid;gap:8px;margin-top:10px}
+    .alert strong{display:block;font-size:13px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+
+    /* MATRIX TABLE */
+    .table-wrap{overflow-x:auto;border:2px solid var(--line);background:var(--paper)}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    thead th{background:var(--ink);color:#fff;padding:10px 12px;text-align:left;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:900;white-space:nowrap}
+    tbody td{padding:10px 12px;vertical-align:top;border-bottom:1px solid var(--line);line-height:1.55}
+    tbody tr:last-child td{border-bottom:none}
+    tbody tr:nth-child(even) td{background:var(--soft-ink)}
+
+    /* CODE */
+    .command{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto;font-size:12.5px;line-height:1.72}
+    .command pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap}
+
+    /* FOOTER */
+    .rule{border:0;border-top:3px solid var(--line);margin:30px 0 0}
+    .source-note{font-size:12px;color:var(--muted);margin-top:14px;text-align:center}
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+
+    /* RESPONSIVE */
+    @media(max-width:700px){
+      .page{width:min(100% - 20px,1040px);padding-top:12px}
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:none;border-bottom:3px solid var(--line)}
+      .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+      .section-head{grid-template-columns:72px 1fr}
+      .section-no{width:72px;height:72px;font-size:26px}
+      .section-meta h2{font-size:clamp(18px,5vw,28px)}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-copy">
+      <div class="kicker">开源项目 · 数据工具 · Tauri</div>
+      <h1 class="demo-title">Dataset Viewer<br>大数据轻量浏览器</h1>
+      <p class="subtitle">基于 Tauri + React，88 GB 大文件秒开，毫秒级搜索，ZIP/TAR 流式浏览，Parquet / Excel / CSV 全面支持，云存储直连。</p>
+      <div class="badge-row">
+        <span class="badge red">Tauri + React</span>
+        <span class="badge blue">88 GB 秒开</span>
+        <span class="badge dark">毫秒搜索</span>
+        <span class="badge">ZIP/TAR 流式</span>
+        <span class="badge">云存储</span>
+        <span class="badge">多语言 UI</span>
+      </div>
+    </div>
+    <aside class="hero-visual">
+      <div class="panel-top">
+        <div class="eyebrow">性能基准</div>
+        <h3>88 GB · 顺滑滚动</h3>
+        <p>分块懒加载 + Rust 异步流式读取，大文件无需全量加载到内存。</p>
+      </div>
+      <div class="panel-body">
+        <div class="flow">
+          <div class="flow-item red">
+            <div class="t">格式支持</div>
+            <div class="c">Parquet · Excel · CSV</div>
+          </div>
+          <div class="flow-item blue">
+            <div class="t">压缩包</div>
+            <div class="c">ZIP · TAR 流式浏览</div>
+          </div>
+          <div class="flow-item dark">
+            <div class="t">云存储</div>
+            <div class="c">WebDAV · HF 数据集</div>
+          </div>
+        </div>
+        <div class="quote" style="font-size:12px">「搜索即高亮，滚动无卡顿」</div>
+      </div>
+    </aside>
+  </header>
+
+  <!-- OVERVIEW -->
+  <div class="overview">
+    <div class="overview-sentence">Dataset Viewer 是一款面向大数据场景的本地轻量文件浏览器，基于 Tauri + React 构建，专注解决大文件秒开与高效检索问题。</div>
+    <div class="overview-body">
+      <p>当你需要查看几十 GB 的数据集时，传统工具往往卡顿或直接崩溃。Dataset Viewer 通过 Rust 后端的分块懒加载与异步流式 IO，让 88 GB 文件实现秒开、顺滑滚动；内置毫秒级搜索，支持关键词定位与高亮；无需解压即可直接浏览 ZIP/TAR 压缩包内容；针对 Parquet、Excel、CSV 格式做了专项优化；还支持 WebDAV、云存储和 HuggingFace 数据集直连。界面支持深色/浅色模式切换与多语言。</p>
+    </div>
+  </div>
+
+  <!-- SECTION 01: 核心能力 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">核心能力 · CORE CAPABILITIES</div>
+        <h2>大文件秒开 &amp; 高效浏览</h2>
+        <p>分块懒加载 + Rust 异步 IO，88 GB 文件无需全量加载内存，滚动顺滑无卡顿。</p>
+      </div>
+    </div>
+    <div class="grid-4">
+      <div class="card blue-card">
+        <div class="icon">📂</div>
+        <h3>大文件秒开</h3>
+        <p>分块懒加载架构，大文件无需全量读入内存，首屏毫秒级呈现。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔍</div>
+        <h3>毫秒级搜索</h3>
+        <p>关键词快速定位，结果即时高亮，无惧百万行数据量。</p>
+      </div>
+      <div class="card">
+        <div class="icon">📦</div>
+        <h3>压缩包直读</h3>
+        <p>ZIP、TAR 无需解压，流式浏览压缩包内数据，省时省空间。</p>
+      </div>
+      <div class="card">
+        <div class="icon">📊</div>
+        <h3>多格式支持</h3>
+        <p>Parquet、Excel（.xlsx/.xls）、CSV，针对行列结构专项优化。</p>
+      </div>
+    </div>
+    <div class="alert">
+      <strong>技术背景：Tauri + Rust</strong>
+      <p>Rust 后端负责文件 IO 与分块调度，React 前端负责渲染与交互，Tauri 桥接两端。相比 Electron，体积更小（~10 MB 安装包），内存占用更低，启动更快。</p>
+    </div>
+  </section>
+
+  <!-- SECTION 02: 技术亮点 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">02</div>
+      <div class="section-meta">
+        <div class="label b">技术亮点 · TECHNICAL HIGHLIGHTS</div>
+        <h2>架构设计与性能优化</h2>
+        <p>从 IO 模型到渲染策略，每一层都为大数据场景专门调优。</p>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-bottom:14px">
+      <div class="card-stat">
+        <div class="num">~10 MB</div>
+        <div class="den">安装包体积（Tauri）</div>
+      </div>
+      <div class="card-stat">
+        <div class="num blue">88 GB</div>
+        <div class="den">单文件秒开上限</div>
+      </div>
+      <div class="card-stat">
+        <div class="num">ms</div>
+        <div class="den">搜索响应级别</div>
+      </div>
+      <div class="card-stat">
+        <div class="num blue">0</div>
+        <div class="den">解压等待（压缩包直读）</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>优化维度</th>
+            <th>实现方案</th>
+            <th>效果</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>内存管理</strong></td>
+            <td>分块懒加载 + 虚拟滚动</td>
+            <td>只渲染视口内数据，内存占用恒定</td>
+          </tr>
+          <tr>
+            <td><strong>文件 IO</strong></td>
+            <td>Rust 异步流式读取</td>
+            <td>大文件边读边渲染，首屏先行</td>
+          </tr>
+          <tr>
+            <td><strong>格式解析</strong></td>
+            <td>Parquet 底层列式读取</td>
+            <td>只加载查询相关列，跳过无关数据</td>
+          </tr>
+          <tr>
+            <td><strong>搜索</strong></td>
+            <td>索引 + 增量高亮</td>
+            <td>毫秒级定位，无需全表扫描</td>
+          </tr>
+          <tr>
+            <td><strong>压缩包</strong></td>
+            <td>流式条目枚举</td>
+            <td>列出内容后再按需读取，无需解压</td>
+          </tr>
+          <tr>
+            <td><strong>跨平台</strong></td>
+            <td>Tauri（Windows / macOS / Linux）</td>
+            <td>原生性能，单一安装包</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 03: 使用方式 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">03</div>
+      <div class="section-meta">
+        <div class="label k">使用方式 · HOW TO USE</div>
+        <h2>快速上手 &amp; 云存储接入</h2>
+        <p>本地文件直接打开，云存储通过 WebDAV 或 HuggingFace 数据集 URL 直连。</p>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card full-w">
+        <h3>本地文件</h3>
+        <p>直接拖拽或文件选择器打开本地文件，支持超大地文件即开即浏览。</p>
+      </div>
+      <div class="card full-w">
+        <h3>压缩包浏览</h3>
+        <p>打开 ZIP 或 TAR 压缩包，无需解压，直接流式浏览内部文件列表与内容。</p>
+      </div>
+      <div class="card full-w blue-card">
+        <h3>云存储（WebDAV）</h3>
+        <p>配置 WebDAV 端点 URL，直接浏览远程服务器上的数据文件，适合 NAS 或私有云场景。</p>
+      </div>
+      <div class="card full-w">
+        <h3>HuggingFace 数据集</h3>
+        <p>输入 HuggingFace 数据集名称或 URL，Dataset Viewer 直接从 HF Hub 拉取并展示数据，无需本地下载。</p>
+      </div>
+    </div>
+
+    <div class="command" style="margin-top:14px">
+<pre><span style="color:#888"># 项目地址（Star 欢迎）</span>
+<span style="color:#d80018">github.com/stardustai/dataset-viewer</span>
+
+<span style="color:#888"># 本地运行（需要 Rust + Node 环境）</span>
+<span style="color:#1f63ff">cargo</span> tauri dev
+
+<span style="color:#888"># 构建安装包</span>
+<span style="color:#1f63ff">cargo</span> tauri build</pre>
+    </div>
+
+    <div class="grid-2" style="margin-top:14px">
+      <div class="card">
+        <h3>界面特性</h3>
+        <p>深色 / 浅色模式一键切换，多语言界面（英文/中文等），简洁无广告。</p>
+      </div>
+      <div class="card">
+        <h3>数据安全</h3>
+        <p>所有数据在本地处理（云存储仅传输必要内容），不上传不追踪。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="rule"></div>
+  <p class="source-note">Dataset Viewer · Tauri + React · 开源项目 · 信息卡制作时间：2026-07-19（Asia/Shanghai）</p>
+
+</main>
+</body>
+</html>
