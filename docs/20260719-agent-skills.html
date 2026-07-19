@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hermes Agent Skills 技能系统：能力入口、加载机制与使用指南</title>
+  <style>
+    :root {
+      --bg: #f4f1e8;
+      --paper: #fffdf7;
+      --ink: #111111;
+      --muted: #5f5950;
+      --line: #d8d2c4;
+      --red: #d80018;
+      --blue: #1f63ff;
+      --soft-red: #fde9eb;
+      --soft-blue: #e8f1ff;
+      --soft-ink: #f7f6f2;
+      --shadow: 0 8px 24px rgba(55,49,36,.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(rgba(80,76,65,.075) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(80,76,65,.075) 1px, transparent 1px);
+      background-size: 24px 24px;
+      color: var(--ink);
+      font-family: system-ui,-apple-system,"Noto Sans SC","Microsoft YaHei",sans-serif;
+      line-height: 1.72;
+    }
+    .shell {
+      width: min(1120px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 0 0 72px;
+    }
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+      border-bottom: 1px solid var(--ink);
+      padding: 14px 0 10px;
+      font: 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .topline span:last-child { color: var(--muted); text-transform: none; }
+
+    /* ── HERO ── */
+    .hero { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(320px,.95fr); gap: 34px; align-items: stretch; padding: 48px 0 34px; }
+    .hero-bar { grid-column: 1 / -1; display: grid; grid-template-columns: 3fr 1fr 1fr; height: 6px; border: 1.5px solid var(--ink); }
+    .hero-bar span:nth-child(1) { background: var(--red); }
+    .hero-bar span:nth-child(2) { background: var(--blue); }
+    .hero-bar span:nth-child(3) { background: var(--ink); }
+    .hero-copy { padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .kicker { display: inline-block; background: var(--soft-blue); color: var(--blue); font: 700 11.5px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; letter-spacing: .1em; padding: 5px 9px; text-transform: uppercase; border: 1px solid rgba(31,99,255,.25); }
+    .demo-title { font-size: clamp(24px,3.8vw,42px); line-height: 1.1; letter-spacing: -.04em; margin: 0; max-width: 640px; font-weight: 800; }
+    .subtitle { font-size: 12.5px; line-height: 1.52; color: var(--muted); margin: 0; max-width: 540px; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; background: var(--paper); border: 1.5px solid var(--ink); font: 700 11px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; letter-spacing: .06em; padding: 5px 9px; min-height: 28px; white-space: nowrap; }
+    .badge.blue { background: var(--soft-blue); color: var(--blue); border-color: rgba(31,99,255,.35); }
+    .badge.red { background: var(--soft-red); color: var(--red); border-color: rgba(216,0,24,.25); }
+    .badge.ink { background: var(--ink); color: #fff; min-height: 24px; padding: 4px 8px; }
+    .alert { border: 2px solid var(--ink); background: var(--paper); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .alert strong { font-size: 13.5px; font-weight: 700; }
+    .alert p { font-size: 12.5px; line-height: 1.6; color: var(--muted); margin: 0; }
+    .mini-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+    .mini-tag { font: 700 10px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; background: var(--soft-ink); color: var(--ink); border: 1px solid var(--line); padding: 2px 7px; letter-spacing: .05em; }
+
+    /* hero-visual */
+    .hero-visual { border: 1.5px solid var(--ink); background: rgba(255,253,247,.72); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
+    .panel-top { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); background: var(--paper); }
+    .eyebrow { font: 700 9px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color: var(--blue); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px; }
+    .panel-top h3 { font-size: 16px; line-height: 1.25; letter-spacing: -.02em; margin-bottom: 5px; }
+    .panel-top p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .panel-body { padding: 18px 20px; flex: 1; }
+    .quote { border-left: 3px solid var(--blue); padding: 8px 12px; background: var(--soft-blue); font-size: 12px; line-height: 1.55; color: var(--ink); margin-bottom: 14px; font-style: italic; }
+    .flow { display: flex; flex-direction: column; gap: 6px; }
+    .flow-item { display: grid; grid-template-columns: 60px 1fr; gap: 10px; align-items: center; border: 1.5px solid var(--ink); padding: 8px 12px; background: var(--paper); }
+    .flow-item .t { font: 700 10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color: var(--blue); letter-spacing: .08em; }
+    .flow-item .c { font-size: 12px; color: var(--ink); }
+
+    /* ── SECTIONS ── */
+    .section { border-top: 1px solid var(--ink); padding-top: 28px; margin-top: 30px; }
+    .section-head { display: grid; grid-template-columns: 96px 1fr; gap: 14px; margin-bottom: 20px; align-items: start; }
+    .section-no { width: 96px; height: 96px; border: 3px solid var(--ink); display: flex; align-items: center; justify-content: center; font: 700 34px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color: var(--ink); background: var(--paper); flex-shrink: 0; }
+    .section-meta { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; }
+    .label { font: 700 10px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color: var(--blue); letter-spacing: .1em; text-transform: uppercase; }
+    .section-meta h2 { font-size: clamp(22px,3vw,36px); line-height: 1.15; letter-spacing: -.03em; margin: 0; }
+    .section-meta p { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.55; }
+
+    /* grid */
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
+    .card, .mini { background: var(--paper); border: 1.5px solid var(--ink); padding: 14px; }
+    .card h3 { font-size: 15px; line-height: 1.3; letter-spacing: -.02em; margin-bottom: 8px; }
+    .card p { font-size: 12.5px; line-height: 1.6; color: var(--muted); margin: 0 0 10px; }
+    .card ul { margin: 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+    .card li + li { margin-top: 5px; }
+    .tagrow { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+    .tag { font: 700 10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; padding: 2px 7px; border: 1px solid currentColor; letter-spacing: .06em; }
+    .tag.red { color: var(--red); }
+    .tag.blue { color: var(--blue); }
+    .tag.ink { background: var(--ink); color: #fff; }
+
+    /* matrix / table */
+    .matrix { overflow-x: auto; border: 1.5px solid var(--ink); background: var(--paper); }
+    table { width: 100%; min-width: 580px; border-collapse: collapse; font-size: 12.5px; }
+    th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 11px 14px; }
+    th { background: #efede5; font: 700 10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    td:first-child { font-weight: 700; white-space: nowrap; color: var(--ink); }
+    td code { background: var(--soft-blue); color: var(--blue); font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size: 10.5px; padding: 1px 5px; border: 1px solid rgba(31,99,255,.2); }
+    .mark { color: var(--blue); font-weight: 700; }
+
+    /* risk-grid */
+    .risk-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
+    .risk { border: 1.5px solid var(--ink); background: var(--paper); padding: 14px; border-top-width: 6px; }
+    .risk.green { border-top-color: #006b3c; }
+    .risk.red { border-top-color: var(--red); }
+    .risk.yellow { border-top-color: #d4a200; }
+    .risk h3 { font-size: 14px; letter-spacing: -.01em; margin-bottom: 8px; }
+    .risk ul { margin: 0; padding-left: 18px; font-size: 12px; }
+    .risk li + li { margin-top: 5px; }
+    .risk li { color: var(--muted); }
+
+    /* code block */
+    .code-block { background: #111; color: #e8e8e8; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size: 11.5px; line-height: 1.6; padding: 14px 16px; overflow-x: auto; border: 1.5px solid #333; }
+    .code-block .kw { color: #ff7eb6; }
+    .code-block .str { color: #a8d8ff; }
+    .code-block .key { color: #ffd580; }
+    .code-block .cm { color: #777; }
+    .code-block .fn { color: #c3e88d; }
+
+    /* mini-row in card */
+    .card .mini-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+
+    /* sources */
+    .sources { font-size: 12px; color: var(--muted); }
+    .sources ol { margin: 0; padding-left: 20px; }
+    .sources li + li { margin-top: 7px; }
+    .sources a { color: var(--blue); overflow-wrap: anywhere; word-break: break-all; }
+
+    /* footer */
+    footer { border-top: 1px solid var(--ink); padding-top: 14px; color: var(--muted); font: 10.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; display: flex; justify-content: space-between; gap: 14px; margin-top: 30px; }
+
+    /* save button — position:static for mobile */
+    .save {
+      display: block;
+      width: fit-content;
+      position: static;
+      margin: 18px 0 0 auto;
+      z-index: 1;
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      background: linear-gradient(135deg,#0036a3,#002a7a);
+      color: #fff;
+      font: 900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing: .06em;
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+      cursor: pointer;
+    }
+    @media (max-width: 720px) {
+      .page { padding-bottom: 108px; }
+      .quickline { padding-right: 72px; }
+    }
+
+    /* responsive */
+    @media (max-width: 1080px) {
+      .hero { grid-template-columns: 1fr; gap: 22px; }
+      .hero-visual { display: none; }
+      .grid-4 { grid-template-columns: repeat(2,1fr); }
+      .risk-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .grid-3 { grid-template-columns: 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .section-head { grid-template-columns: 68px 1fr; }
+      .section-no { width: 68px; height: 68px; font-size: 24px; }
+      .hero-bar { grid-template-columns: 1fr 1fr 1fr; }
+      .topline { flex-direction: column; align-items: flex-start; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <!-- TOPLINE -->
+  <div class="topline">
+    <span>HERMES AGENT · 技能系统</span>
+    <span>Agent Skills 全景图 · 2026-07-19</span>
+  </div>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-bar"><span></span><span></span><span></span></div>
+    <div class="hero-copy">
+      <div class="kicker">知识库 · Agent 技能</div>
+      <h1 class="demo-title">Hermes Agent Skills<br>技能系统使用指南</h1>
+      <p class="subtitle">技能是 Agent 的可复用能力单元——内置或用户编写的标准操作流程，以 YAML+Markdown 文件存在于 <code>skills/</code> 目录，被 Agent 在对话中动态加载与执行。</p>
+      <div class="badge-row">
+        <span class="badge red">内置技能</span>
+        <span class="badge blue">用户技能</span>
+        <span class="badge">YAML + Markdown</span>
+        <span class="badge ink">动态加载</span>
+        <span class="badge">skill_manage</span>
+      </div>
+      <div class="alert">
+        <strong>核心定位：技能 = 可复用的标准操作流程</strong>
+        <p>技能不是提示词模板，而是 Agent 可直接执行的操作步骤。内置技能覆盖搜索、浏览器自动化、代码、数据库查询等高频场景；用户技能可自定义扩展，由 <code>skill_manage</code> 管理生命周期。</p>
+        <div class="mini-row">
+          <span class="mini-tag">SKILL.md</span>
+          <span class="mini-tag">YAML frontmatter</span>
+          <span class="mini-tag">skill_view()</span>
+          <span class="mini-tag">skill_manage()</span>
+        </div>
+      </div>
+    </div>
+    <figure class="hero-visual">
+      <div class="panel-top">
+        <div class="eyebrow">图 01 · 技能生命周期</div>
+        <h3>技能从加载到执行的全路径</h3>
+        <p>对话触发 → skill_view() 加载 → Agent 读取 SKILL.md → 按步骤执行</p>
+      </div>
+      <div class="panel-body">
+        <div class="quote">"Good skills: 触发条件、编号步骤、命令示例、坑点、验收步骤。"</div>
+        <div class="flow">
+          <div class="flow-item"><div class="t">① 触发</div><div class="c">用户对话匹配技能触发条件</div></div>
+          <div class="flow-item"><div class="t">② 加载</div><div class="c">skill_view() 读取 SKILL.md 内容</div></div>
+          <div class="flow-item"><div class="t">③ 执行</div><div class="c">Agent 按编号步骤调用工具</div></div>
+          <div class="flow-item"><div class="t">④ 交付</div><div class="c">返回结构化结果或写入制品</div></div>
+        </div>
+      </div>
+    </figure>
+  </header>
+
+  <!-- SECTION 01 · WHAT IS A SKILL -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">WHAT IS A SKILL</div>
+        <h2>什么是 Skill：能力单元的结构定义</h2>
+        <p>Skill 由 <code>SKILL.md</code>（YAML frontmatter + Markdown 正文）组成，被 Agent 在运行时通过 <code>skill_view()</code> 动态加载。</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">结构</span></div>
+        <h3>SKILL.md 组成</h3>
+        <p>每个技能文件包含 YAML frontmatter（name、description、category、tags 等）和 Markdown 正文（步骤、坑点、验收标准）。</p>
+        <ul>
+          <li>frontmatter 是元数据，供搜索和加载</li>
+          <li>正文是执行指令，供 Agent 读取执行</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">生命周期</span></div>
+        <h3>管理操作：skill_manage</h3>
+        <p>创建、修改、删除技能文件，由 <code>skill_manage</code> 工具完成。action 可选：<code>create</code> / <code>patch</code> / <code>edit</code> / <code>delete</code>。</p>
+        <ul>
+          <li>patch：增量修改，适合修复步骤或坑点</li>
+          <li>delete：删除技能，需确认无下游引用</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag ink">加载</span></div>
+        <h3>加载方式：skill_view()</h3>
+        <p>Agent 通过 <code>skill_view(name)</code> 读取技能内容，支持按 <code>file_path</code> 读取子文件（references/、templates/、scripts/）。</p>
+        <ul>
+          <li>skill_view(name)：读取主 SKILL.md</li>
+          <li>skill_view(name, file_path)：读取子文件</li>
+        </ul>
+      </article>
+    </div>
+    <div class="code-block" style="margin-top:14px">
+<span class="cm"># YAML frontmatter 示例</span>
+<span class="key">---</span>
+<span class="key">name</span><span class="kw">:</span> <span class="str">my-custom-skill</span>
+<span class="key">description</span><span class="kw">:</span> <span class="str">处理 X 场景的标准工作流</span>
+<span class="key">category</span><span class="kw">:</span> <span class="str">productivity</span>
+<span class="key">tags</span><span class="kw">:</span> [<span class="str">custom</span>, <span class="str">workflow</span>]
+<span class="key">required_environment_variables</span><span class="kw">:</span> []
+<span class="key">required_commands</span><span class="kw">:</span> [<span class="str">curl</span>]
+<span class="key">---</span>
+<span class="cm"># 正文：触发条件、步骤、坑点、验收</span>
+<span class="cm">## Trigger: 用户要求处理 X 时触发</span>
+<span class="cm">## Steps</span>
+<span class="fn">1. 准备环境</span>
+<span class="fn">2. 调用 API</span>
+<span class="fn">3. 处理结果</span>
+    </div>
+  </section>
+
+  <!-- SECTION 02 · BUILT-IN SKILLS -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">02</div>
+      <div class="section-meta">
+        <div class="label">BUILT-IN SKILLS</div>
+        <h2>内置技能分类：六大领域全覆盖</h2>
+        <p>Hermes Agent 提供 70+ 内置技能，覆盖搜索、浏览器自动化、编码、媒体、数据科学、社交媒体等高频场景。</p>
+      </div>
+    </div>
+    <div class="matrix">
+      <table>
+        <thead>
+          <tr>
+            <th>分类</th>
+            <th>技能数量</th>
+            <th>典型技能</th>
+            <th>适用场景</th>
+            <th>触发关键词</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>🔍 搜索 / 研究</td>
+            <td>~12</td>
+            <td>searxng-search、arxiv、github-repo-research、investigator</td>
+            <td>网络搜索、论文发现、仓库调研</td>
+            <td><code>搜索</code> <code>调研</code> <code>arxiv</code></td>
+          </tr>
+          <tr>
+            <td>🌐 浏览器自动化</td>
+            <td>~10</td>
+            <td>browser-social-evidence-capture、tinyfish、web-scraper</td>
+            <td>登录态截图、批量抓取、社交媒体证据</td>
+            <td><code>浏览器</code> <code>截图</code> <code>抓取</code></td>
+          </tr>
+          <tr>
+            <td>💻 编码 / 开发</td>
+            <td>~15</td>
+            <td>code-review、tdd、diagnose、claude-code、opencode</td>
+            <td>代码审查、TDD 开发、调试诊断</td>
+            <td><code>review</code> <code>TDD</code> <code>debug</code></td>
+          </tr>
+          <tr>
+            <td>🎨 创意 / 媒体</td>
+            <td>~10</td>
+            <td>ascii-art、ascii-video、comfyui、baoyu-article-illustrator</td>
+            <td>ASCII 艺术、视频转换、AI 图像生成</td>
+            <td><code>ASCII</code> <code>图</code> <code>视频</code></td>
+          </tr>
+          <tr>
+            <td>📊 数据科学 / MLOps</td>
+            <td>~12</td>
+            <td>jupyter-live-kernel、huggingface-hub、llama-cpp、fine-tuning</td>
+            <td>Jupyter 交互、模型下载、推理部署、微调训练</td>
+            <td><code>Jupyter</code> <code>模型</code> <code>微调</code></td>
+          </tr>
+          <tr>
+            <td>📱 社交 / 邮件</td>
+            <td>~8</td>
+            <td>xurl、spotify、himalaya、mail-2925、weibo-trends</td>
+            <td>X/Twitter 操作、Spotify 播放、邮件收发、微博舆情</td>
+            <td><code>发推</code> <code>邮件</code> <code>微博</code></td>
+          </tr>
+          <tr>
+            <td>📝 文档 / 知识</td>
+            <td>~6</td>
+            <td>obsidian、llm-wiki、ima-skill、notion</td>
+            <td>Obsidian 笔记、LLM Wiki、IMA 知识库、Notion 同步</td>
+            <td><code>笔记</code> <code>知识库</code> <code>Wiki</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 03 · HOW TO USE -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">03</div>
+      <div class="section-meta">
+        <div class="label">HOW TO USE</div>
+        <h2>技能使用方式：从对话触发到显式加载</h2>
+        <p>技能加载有三种方式：对话自动匹配、显式调用 <code>skill_view()</code>、列表浏览 <code>skills_list()</code>。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <div class="tagrow"><span class="tag red">自动匹配</span></div>
+        <h3>对话触发（推荐）</h3>
+        <p>用户以自然语言描述需求，Agent 自动识别匹配的技能并加载。触发词通常为技能名、场景关键词或工具名。</p>
+        <ul>
+          <li>"帮我搜索 X 的相关信息" → searxng-search</li>
+          <li>"调查 GitHub 仓库 Y" → github-repo-research</li>
+          <li>"用 TDD 写这个功能" → tdd</li>
+        </ul>
+        <div class="mini-row">
+          <span class="mini-tag">自动加载</span>
+          <span class="mini-tag">零配置</span>
+        </div>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">显式调用</span></div>
+        <h3>显式加载（精确控制）</h3>
+        <p>当自动匹配不够精确时，可显式调用 <code>skill_view(name)</code> 加载指定技能内容，Agent 按技能步骤执行。</p>
+        <ul>
+          <li>skill_view(name)：加载完整 SKILL.md</li>
+          <li>skill_view(name, file_path)：加载子文件</li>
+          <li>skills_list(category)：按分类浏览</li>
+        </ul>
+        <div class="mini-row">
+          <span class="mini-tag">精准加载</span>
+          <span class="mini-tag">可控</span>
+        </div>
+      </article>
+    </div>
+    <div class="code-block" style="margin-top:14px">
+<span class="cm"># 列出所有可用技能（按分类筛选）</span>
+<span class="kw">await</span> skills_list(category=<span class="str">"search"</span>)
+
+<span class="cm"># 加载指定技能完整内容</span>
+<span class="kw">await</span> skill_view(name=<span class="str">"searxng-search"</span>)
+
+<span class="cm"># 加载技能子文件（模板、脚本、参考文档）</span>
+<span class="kw">await</span> skill_view(name=<span class="str">"searxng-search"</span>, file_path=<span class="str">"references/api.md"</span>)
+
+<span class="cm"># 管理操作示例</span>
+<span class="kw">await</span> skill_manage(action=<span class="str">"patch"</span>, name=<span class="str">"searxng-search"</span>,
+    old_string=<span class="str">"旧步骤"</span>, new_string=<span class="str">"新步骤"</span>)
+    </div>
+  </section>
+
+  <!-- SECTION 04 · SKILL AUTHORING -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">04</div>
+      <div class="section-meta">
+        <div class="label">SKILL AUTHORING</div>
+        <h2>编写技能规范：好技能的标准结构</h2>
+        <p>一个可维护的技能应包含触发条件、编号步骤、坑点、验收步骤和子文件支撑（references/、templates/、scripts/）。</p>
+      </div>
+    </div>
+    <div class="grid-4">
+      <article class="card">
+        <div class="tagrow"><span class="tag red">必须</span></div>
+        <h3>触发条件</h3>
+        <p>明确说明技能何时被激活，包括触发词、场景描述和前置要求。模糊的触发条件会导致技能无法自动匹配。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag red">必须</span></div>
+        <h3>编号步骤</h3>
+        <p>用有序列表写出精确的操作步骤，包含命令示例和预期输出。步骤越具体，Agent 执行成功率越高。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">建议</span></div>
+        <h3>坑点与陷阱</h3>
+        <p>记录执行中常见的错误、失败原因和应对方案。坑点是最有价值的隐性知识，不写则重复踩坑。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">建议</span></div>
+        <h3>验收步骤</h3>
+        <p>提供可执行的验证命令或检查清单，确认技能执行结果符合预期。可自动化验收时给出命令脚本。</p>
+      </article>
+    </div>
+    <div class="code-block" style="margin-top:14px">
+<span class="cm"># SKILL.md 必填字段（YAML frontmatter）</span>
+<span class="key">name</span><span class="kw">:</span> <span class="str">my-skill-name</span>         <span class="cm"># 小写 + 连字符</span>
+<span class="key">description</span><span class="kw">:</span> <span class="str">技能的简短描述，说明用途和适用场景</span>
+<span class="key">category</span><span class="kw">:</span> <span class="str">category-slug</span>  <span class="cm"># 分类标签</span>
+<span class="key">tags</span><span class="kw">:</span> [<span class="str">tag1</span>, <span class="str">tag2</span>]
+<span class="key">required_environment_variables</span><span class="kw">:</span> [<span class="str">VAR_NAME</span>]
+<span class="key">required_commands</span><span class="kw">:</span> [<span class="str">curl</span>, <span class="str">jq</span>]
+
+<span class="cm"># 正文结构（Markdown）</span>
+<span class="cm">## Trigger</span>
+<span class="cm">## Steps</span>
+<span class="cm">## Pitfalls (坑点)</span>
+<span class="cm">## Verification (验收)</span>
+<span class="cm">## Related</span>
+    </div>
+  </section>
+
+  <!-- SECTION 05 · RISK & SAFETY -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">05</div>
+      <div class="section-meta">
+        <div class="label">RISK & SAFETY</div>
+        <h2>风险边界：技能执行的安全红线</h2>
+        <p>某些技能涉及高风险操作（文件写入、网络访问、外部服务调用），需注意权限边界和安全配置。</p>
+      </div>
+    </div>
+    <div class="risk-grid">
+      <article class="risk green">
+        <h3>✅ 低风险技能（可自动执行）</h3>
+        <ul>
+          <li>只读搜索：searxng-search、arxiv、llm-wiki</li>
+          <li>本地分析：code-review、jupyter-live-kernel（read-only）</li>
+          <li>知识管理：obsidian、notion（读操作）</li>
+          <li>创意生成：ascii-art、baoyu-article-illustrator</li>
+          <li>元数据读取：skills_list、skill_view</li>
+        </ul>
+      </article>
+      <article class="risk yellow">
+        <h3>⚠️ 中风险技能（建议显式确认）</h3>
+        <ul>
+          <li>文件写入：创建/修改文件、写入笔记库</li>
+          <li>浏览器操作：browser_vision、browser_click</li>
+          <li>API 调用：涉及外部服务写入</li>
+          <li>定时任务：cron 调度、后台进程管理</li>
+        </ul>
+      </article>
+      <article class="risk red">
+        <h3>🚫 高风险技能（需显式授权）</h3>
+        <ul>
+          <li>系统级操作：terminal 删除文件、git push、ssh</li>
+          <li>凭证写入：API key、token 写入环境变量</li>
+          <li>外部发布：社交媒体发帖、邮件群发</li>
+          <li>数据库写入：涉及数据修改的数据库操作</li>
+          <li>权限提升：sudo、chmod、修改系统配置</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag red">安全原则</span></div>
+        <h3>最小权限执行</h3>
+        <p>每个技能只授予完成目标所需的最小工具集。Agent 不自动执行高风险操作，需用户显式确认。</p>
+        <ul>
+          <li>内置技能默认安全边界：只读为主</li>
+          <li>用户编写技能需明确声明 required_tools</li>
+          <li>凭证不写入提示词或日志</li>
+          <li>高风险操作需二次确认机制</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- SECTION 06 · QUICK REFERENCE -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">06</div>
+      <div class="section-meta">
+        <div class="label">QUICK REFERENCE</div>
+        <h2>常用技能速查：按场景快速入口</h2>
+        <p>按常见使用场景整理的技能速查表，帮助快速找到最合适的技能。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <div class="tagrow"><span class="tag ink">场景 1</span></div>
+        <h3>网络搜索与调研</h3>
+        <ul>
+          <li><code>searxng-search</code> — SearXNG 元搜索，支持实时网络结果</li>
+          <li><code>web-scraper</code> — 批量网页抓取与信息整合</li>
+          <li><code>tinyfish</code> — Web 代理抓取，支持 JS 渲染页面</li>
+          <li><code>arxiv</code> — 学术论文搜索（关键词/作者/类别）</li>
+          <li><code>github-repo-research</code> — GitHub 仓库元数据抽取</li>
+          <li><code>wang-reporter</code> — 舆情/事件调查结构化报告</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag ink">场景 2</span></div>
+        <h3>编码与开发</h3>
+        <ul>
+          <li><code>claude-code</code> — 委托 Claude Code CLI 执行任务</li>
+          <li><code>code-review</code> — 代码审查（diff、inline 评论）</li>
+          <li><code>tdd</code> — 测试驱动开发（RED-GREEN-REFACTOR）</li>
+          <li><code>diagnose</code> — 系统性调试（4 阶段根因定位）</li>
+          <li><code>improve-codebase-architecture</code> — 代码深化机会扫描</li>
+          <li><code>opencode</code> — OpenCode CLI 任务委托</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag ink">场景 3</span></div>
+        <h3>浏览器与截图</h3>
+        <ul>
+          <li><code>browser-social-evidence-capture</code> — 登录态社交媒体截图</li>
+          <li><code>web-visual-acceptance</code> — 视觉化 Web 验收（自然语言）</li>
+          <li><code>tinyfish</code> — Web 代理截图与内容提取</li>
+          <li><code>computer-use</code> — 桌面级浏览器自动化（Linux）</li>
+          <li><code>webpage-vision-inspect-skill</code> — agent-browser 精确截图</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag ink">场景 4</span></div>
+        <h3>文档与知识管理</h3>
+        <ul>
+          <li><code>obsidian</code> — Obsidian Vault 读写搜索</li>
+          <li><code>llm-wiki</code> — Karpathy LLM Wiki 构建与查询</li>
+          <li><code>ima-skill</code> — IMA OpenAPI 知识库管理</li>
+          <li><code>notion</code> — Notion API + ntn CLI 操作</li>
+          <li><code>feishu</code> — 飞书文档/消息/云空间操作</li>
+          <li><code>himalaya</code> — 终端邮件收发（IMAP/SMTP）</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- SOURCES -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">REF</div>
+      <div class="section-meta">
+        <div class="label">SOURCES</div>
+        <h2>关键来源</h2>
+      </div>
+    </div>
+    <div class="sources">
+      <ol>
+        <li><a href="https://hermes-agent.nousresearch.com/docs">Hermes Agent 官方文档</a> — 技能系统完整 API 参考</li>
+        <li><a href="https://github.com/nousresearch/hermes-agent">Hermes Agent GitHub 仓库</a> — 技能文件示例与最佳实践</li>
+        <li>内置技能文件（位于 Agent 运行时 skills/ 目录）</li>
+      </ol>
+    </div>
+  </section>
+
+  <footer>
+    <span>HERMES AGENT SKILLS SYSTEM · 2026-07-19</span>
+    <span>hardblue style · Chinese primary</span>
+  </footer>
+
+  <button class="save" id="save-btn" onclick="saveCard()">保存为图片</button>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+  async function saveCard() {
+    const btn = document.getElementById('save-btn');
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '生成中…';
+    try {
+      const c = await html2canvas(document.querySelector('.shell'), {
+        scale: 2,
+        backgroundColor: '#f4f1e8',
+        useCORS: true,
+        scrollY: -window.scrollY
+      });
+      const a = document.createElement('a');
+      a.download = '20260719-agent-skills.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+    } catch (e) {
+      alert('截图失败: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
+  }
+</script>
+</body>
+</html>
