@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SkillSpec：让 Agent Skill 可测试、可证明</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+
+    /* === overview：一句话概述 + 正文缩略 === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ MATRIX + RISK ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+    }
+  </style>
+<style>
+@media(max-width:720px){
+.hero,.features,.content-row{display:flex!important;flex-direction:column!important}
+pre,code{overflow-x:auto!important;white-space:pre!important}
+img{max-width:100%!important}
+}
+pre{overflow-x:auto;background:#1a1e2e;padding:12px;border-radius:6px}
+code{overflow-x:auto}
+</style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">硬核蓝手册 · 元素演示</div>
+        <h1 class="demo-title">SkillSpec：让 Agent Skill 可测试、可证明</h1>
+        <p class="subtitle">演示 hero-bar 三色拼接（左红/中黑/右蓝）、96px 大数字编号块、grid-2/3/4、matrix、risk 顶部色带等组件，验证 infocard-hardblue-style 的视觉系统。</p>
+        <div class="badge-row">
+          <span class="badge red">硬核手册</span>
+          <span class="badge blue">编号块</span>
+          <span class="badge">网格底纹</span>
+          <span class="badge dark">多 grid</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge red">硬核手册</span>
+          <span class="badge blue">编号块</span>
+          <span class="badge">网格底纹</span>
+          <span class="badge dark">多 grid</span>
+          <span class="badge ink">主色 黑+红+蓝</span>
+          <span class="badge ink">底色 暖白纸</span>
+          <span class="badge ink">底纹 42px 网格</span>
+          <span class="badge ink">版式 grid-2/3/4</span>
+        </div>
+        <div class="alert">
+          <strong>核心差异：比 blue-technical-manual-style 更"硬核"</strong>
+          <p>同色系，但顶部 hero-bar 三色拼接 + 网格纸底纹 + 96px 大数字编号块 + risk 顶部色带；适合重型多章节手册/调查/观点拆解。</p>
+          <div class="mini-row">
+            <span class="mini-tag">hero-bar</span>
+            <span class="mini-tag">编号块</span>
+            <span class="mini-tag">grid-3</span>
+            <span class="mini-tag">matrix</span>
+            <span class="mini-tag">risk</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">STYLE TOKENS</div>
+          <h3>配色 / 字号 / 边框 / 网格</h3>
+          <p>--bg #f6f4ef / --paper #fffdf8 / --ink #111 / --red #d80018 / --blue #1f63ff；3px 厚边；42px 网格。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>一句话：</b>同色系 + 更厚边框 + 多 grid + 大编号块 = 硬核蓝手册。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">hero-bar 三色</div></div>
+            <div class="flow-item red"><div class="t">Step 2</div><div class="c">96px 编号块</div></div>
+            <div class="flow-item dark"><div class="t">Step 3</div><div class="c">grid-2/3/4</div></div>
+            <div class="flow-item blue"><div class="t">Step 4</div><div class="c">risk 顶部色带</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <!-- OVERVIEW：一句话概述 + 正文缩略（深度调查类必选） -->
+    <!--
+    <div class="overview">
+      <div class="overview-sentence">[一句话概述：≤50字，核心结论/定性，红色粗体]</div>
+      <div class="overview-body">
+        <p>[100~400字正文：全文缩略，包含时间/地点/人物/核心事件/结果/意义]</p>
+      </div>
+    </div>
+    -->
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">GRID-3</div>
+          <h2>三列卡片：标签 + 标题 + 要点</h2>
+          <p>grid-3 是硬核蓝手册最常用的版式，承载"对照/并列/并列三段论"。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">结论</span><span class="tag blue">红蓝</span></div>
+          <h3>硬核蓝手册强调什么</h3>
+          <p>适合重型多章节手册、调查、观点拆解；视觉锚点更多、更厚。</p>
+          <ul><li>hero-bar 三色</li><li>编号块 + 编号</li><li>风险顶部色带</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">版式</span><span class="tag dark">多 grid</span></div>
+          <h3>适合什么内容</h3>
+          <p>长卡、多章节、5+ 段落、每段需要 3-4 段小卡的内容。</p>
+          <ul><li>调查复盘</li><li>技术手册</li><li>观点拆解</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">边界</span><span class="tag red">不适合</span></div>
+          <h3>不适合什么</h3>
+          <p>轻量卡片、贴纸 Q 风、纸感单格图卡都不适合硬核蓝手册。</p>
+          <ul><li>Q 风贴纸</li><li>纸感手作</li><li>极简单图卡</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">MATRIX · 4 列</div>
+          <h2>matrix：四组对照</h2>
+          <p>适合 2×2 或 1×4 的对照、阶段、风险四象限。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <article class="mini">
+          <div class="lead">01 / 出场</div>
+          <h4>硬核蓝 vs Q 风</h4>
+          <p class="quote-line">前者用 3px 黑边+编号块，后者在暖米纸上贴贴纸。</p>
+          <p>气质的差别比配色更深。</p>
+        </article>
+        <article class="mini">
+          <div class="lead blue">02 / 排版</div>
+          <h4>网格 vs 自由</h4>
+          <p class="quote-line">42px 网格底纹 + 多 grid；Q 风基本不画网格。</p>
+          <p>硬核蓝把"工程感"做成视觉骨架。</p>
+        </article>
+        <article class="mini">
+          <div class="lead red">03 / 信息密度</div>
+          <h4>高密度 vs 低密度</h4>
+          <p class="quote-line">硬核蓝在 720 宽下塞 4 列 matrix；Q 风 2 列就算多。</p>
+          <p>一张卡的承载力不一样。</p>
+        </article>
+        <article class="mini">
+          <div class="lead">04 / 装饰</div>
+          <h4>色块 vs 贴纸</h4>
+          <p class="quote-line">红/蓝/黑纯色块当锚点；Q 风用贴纸和小图标。</p>
+          <p>前者像说明书，后者像笔记本。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">RISK · TOP-COLOR</div>
+          <h2>risk 顶部色带：data-accent 三色</h2>
+          <p>risk 顶部 8px 色带 + 编号方块 + 标题 + 正文；red/blue/dark 三套。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="red">
+          <div class="n">1</div>
+          <h4>结论 / 警示（红）</h4>
+          <p>用红色顶部色带 + 红色编号块；适合"红线 / 风险 / 必须停"。</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">2</div>
+          <h4>流程 / 中性（蓝）</h4>
+          <p>用蓝色顶部色带；适合"步骤 / 分层 / 工具用法"。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">3</div>
+          <h4>黑底 / 总结</h4>
+          <p>用黑色顶部色带；适合"最终结论 / 收口 / 黑头判断"。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">GRID-2 + QUOTE-BLOCK</div>
+          <h2>grid-2：双栏对照 + 蓝色 quote-block</h2>
+          <p>硬核蓝手册的"成对内容"和"单条引文"标准组合。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">适用</span><span class="tag dark">场景</span></div>
+          <h3>双栏对照标准用法</h3>
+          <p>左栏"是什么"，右栏"不是什么"；或"成立 / 失真边界"。</p>
+          <ul><li>对照式分析</li><li>边界说明</li><li>真伪并列</li></ul>
+        </article>
+        <div class="quote-block">
+          <b>最关键的一句：</b>硬核蓝手册 = 同色系 + 更厚边框 + 多 grid + 大编号块 + 网格底纹。它不是新色系，是 blue-technical-manual-style 的"重装版"。
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">ALERT · PARAM · COMPARE</div>
+          <h2>alert 变体 / 参数行 / mini-tag / 对比表</h2>
+          <p>hardblue 提供了多种强调与信息呈现方式：alert 黑底 / soft-red alert / 参数行 key-value / mini-tag 序列 / 对比矩阵。</p>
+        </div>
+      </div>
+
+      <!-- alert 红底变体 -->
+      <div class="alert" style="background:var(--soft-red);border-color:var(--red);color:var(--red);margin-bottom:12px">
+        <strong style="color:var(--red)">⚠ 注意：此变体适合"警示 / 红线 / 禁止"场景</strong>
+        <p style="color:#5a1010">红色背景 alert 是硬核蓝手册的"强警示"模式，适合"红线 / 禁止 / 必须停止"场景，与黑底 alert（信息）形成对比。</p>
+        <div class="mini-row">
+          <span class="mini-tag" style="background:var(--red)">禁止</span>
+          <span class="mini-tag" style="background:var(--red)">红线</span>
+          <span class="mini-tag" style="background:var(--red)">必须停</span>
+        </div>
+      </div>
+
+      <!-- 参数行 -->
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px">
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">分辨率</div>
+          <div style="font-size:15px;font-weight:900">1280×720</div>
+          <div style="font-size:11px;color:var(--muted)">16:9 标准</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">格式</div>
+          <div style="font-size:15px;font-weight:900">PNG / JPEG</div>
+          <div style="font-size:11px;color:var(--muted)">无压缩优先</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">字号</div>
+          <div style="font-size:15px;font-weight:900">≥ 12px</div>
+          <div style="font-size:11px;color:var(--muted)">正文最小</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">断点</div>
+          <div style="font-size:15px;font-weight:900">720 / 1080</div>
+          <div style="font-size:11px;color:var(--muted)">双档适配</div>
+        </div>
+      </div>
+
+      <!-- mini-tag 大展示 -->
+      <div style="margin-bottom:12px">
+        <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">MINI-TAG · 标签序列</div>
+        <div class="mini-row">
+          <span class="mini-tag" style="background:var(--red)">真本事</span>
+          <span class="mini-tag" style="background:var(--blue)">话术</span>
+          <span class="mini-tag" style="background:#111">排场</span>
+          <span class="mini-tag" style="background:var(--soft-blue);color:var(--blue);border:1.5px solid var(--blue)">信徒经济</span>
+          <span class="mini-tag" style="background:var(--soft-red);color:var(--red);border:1.5px solid var(--red)">风险外溢</span>
+        </div>
+      </div>
+
+      <!-- 对比表 -->
+      <div style="border:2px solid var(--line);background:#fff;overflow:hidden;margin-bottom:12px">
+        <div style="background:var(--ink);color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em">对比：hardblue vs blue-technical</span>
+          <span style="font-size:11px;color:var(--blue)">↔</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin:0">
+          <tr style="background:var(--soft-ink)">
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">维度</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">blue-technical-manual</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">hardblue-style</th>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">顶栏</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">蓝条</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--red);font-weight:800">三色 hero-bar（红+黑+蓝）</td>
+          </tr>
+          <tr style="background:var(--soft-blue)">
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">底纹</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">暖白纸</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">42px 网格 + 径向色斑</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">编号块</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">普通 section</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--red);font-weight:800">96×96 大数字方块</td>
+          </tr>
+          <tr style="background:var(--soft-red)">
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">版式</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">单 grid</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">grid-2/3/4 + matrix + risk</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">06</div>
+        <div class="section-meta">
+          <div class="label">CODE · FOOTER-BLOCK · SAVE-FAB</div>
+          <h2>代码块 + footer-block + 导出按钮</h2>
+          <p>硬核蓝手册支持代码高亮（pre）、footer-block（收口说明）、以及 save-fab 导出按钮的完整样式。</p>
+        </div>
+      </div>
+
+      <!-- 代码块 -->
+      <div style="background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;margin-bottom:12px;overflow-x:auto">
+        <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px">// 代码块风格</div>
+        <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap"><span style="color:#888"># 硬核蓝手册配置</span>
+<span style="color:#1f63ff">theme</span>:<span style="color:#e8c200"> "hardblue-style"</span>
+<span style="color:#1f63ff">grid</span>:<span style="color:#e8c200"> [2, 3, 4]</span>
+<span style="color:#1f63ff">accent</span>:<span style="color:#e8c200"> ["#d80018", "#1f63ff", "#111"]</span>
+<span style="color:#1f63ff">min_font_size</span>:<span style="color:#e8c200"> 12</span>
+<span style="color:#d80018"># 禁止事项</span>
+<span style="color:#888">not_use_blue_hardblue:</span> <span style="color:#d80018">true</span>  <span style="color:#888"># 蓝黄绿辅助色只作状态标识</span></pre>
+      </div>
+
+      <!-- footer-block -->
+      <div class="footer-block" style="border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px;margin-bottom:12px">
+        <h3 style="font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em">收口说明 · footer-block</h3>
+        <p style="font-size:14px;color:#222;line-height:1.66;margin:0">硬核蓝手册适合重型多章节技术手册、调查、观点拆解。footer-block 是最后一个信息块，用于放"收口句"和"来源说明"。</p>
+        <ul style="margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72">
+          <li>收口句：总结本卡的核心结论</li>
+          <li>来源：说明数据来源或方法论出处</li>
+          <li>边界：注明本卡的适用范围和局限性</li>
+        </ul>
+        <div style="font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px">本演示页 · infocard-hardblue-style · 元素演示页（非业务卡）</div>
+      </div>
+
+      <!-- save-fab 演示 -->
+      <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+        <button class="save-fab" style="position:static;display:inline-flex;align-items:center;gap:10px;border:2px solid var(--line);background:linear-gradient(135deg,var(--blue),#0f4fe0);color:#fff;padding:12px 14px 12px 12px;box-shadow:var(--shadow);font:900 13px/1.05 Inter,system-ui,sans-serif;letter-spacing:.04em;cursor:pointer">
+          <span style="display:grid;place-items:center;flex:0 0 auto;width:30px;height:30px;border:2px solid rgba(255,255,255,.92);background:rgba(0,0,0,.1);font-size:15px;line-height:1">⬇</span>
+          <span style="display:grid;gap:3px;min-width:0;text-align:left"><strong style="display:block;font-size:13px;line-height:1.05;letter-spacing:.05em">保存 PNG</strong><small style="display:block;font-size:10px;line-height:1.05;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.92)">Export image</small></span>
+        </button>
+        <button style="display:inline-flex;align-items:center;gap:8px;border:2px solid var(--red);background:var(--red);color:#fff;padding:10px 14px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer">
+          <span>⚠</span><strong>导出 CSV</strong>
+        </button>
+        <button style="display:inline-flex;align-items:center;gap:8px;border:2px solid var(--line);background:#fff;color:var(--ink);padding:10px 14px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer">
+          <strong>复制链接</strong>
+        </button>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">infocard-hardblue-style · 硬核蓝手册演示 · 元素演示页（非业务卡）</p>
+  </main>
+
+<div class="sections">
+<div class="overview">
+<h2>概述</h2>
+<p>将自然语言 SKILL.md 转换为可诊断、可测试、可证明执行的 Agent 技能契约</p>
+</div>
+<div class="features-row">
+<h2>核心特性</h2>
+<ul>
+<li>Doctor 风险评分</li>
+<li>skill.spec.yml 契约</li>
+<li>规则优先级检测</li>
+<li>依赖声明</li>
+<li>进度追踪</li>
+<li>Alignment 证明</li>
+</ul>
+</div>
+<div class="getting-started">
+<h2>快速上手</h2>
+<pre><code>curl -fsSL https://skillspec.sh/install.sh | sh</code></pre>
+</div>
+<div class="key-data">
+<h2>关键数据</h2>
+<table>
+<tr><td>⭐ Stars</td><td>993</td></tr>
+<tr><td>📜 许可证</td><td>Apache-2.0</td></tr>
+<tr><td>🏷️ 最新版本</td><td>v0.1.8 (2026-07-05)</td></tr>
+<tr><td>🔗 GitHub</td><td><a href="https://github.com/modiqo/skillspec" target="_blank">modiqo/skillspec</a></td></tr>
+</table>
+</div>
+<div class="footer-bar">
+<p>⭐ 993 · Apache-2.0 · v0.1.8 (2026-07-05)</p>
+</div>
+</div>
+</body>
+</html>
