@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Robostral Navigate：8B 具身机器人导航模型 | Mistral</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(20px,3.8vw,38px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .alert.warn{background:var(--red);border-color:var(--red)}
+    .alert.info{background:var(--blue);border-color:var(--blue)}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:18px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:12.5px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58;font-size:12.5px}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:13.5px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(20px,3.7vw,34px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:13px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    @media(max-width:700px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}}
+    @media(max-width:700px){.hero{grid-template-columns:1fr}.hero-copy{border-right:none;border-bottom:3px solid var(--line)}}
+
+    .card{border:2px solid var(--line);background:var(--paper);padding:14px;display:grid;gap:8px}
+    .card .card-label{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .card .card-title{font-size:15px;font-weight:900;line-height:1.3;letter-spacing:-.02em}
+    .card .card-body{font-size:12.5px;color:#333;line-height:1.65}
+    .card .card-body p{margin:0}
+    .card .card-foot{font-size:11.5px;color:var(--muted);border-top:1.5px solid #e0ddd5;padding-top:7px;margin-top:2px}
+    .card .big{font-size:clamp(24px,5vw,42px);font-weight:950;line-height:1;color:var(--red);letter-spacing:-.04em}
+    .card .big.blue{color:var(--blue)}
+    .card .big.dark{color:#111}
+    .card .unit{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.08em;margin-top:2px}
+
+    /* ============ TABLE ============ */
+    .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+    .tbl th,.tbl td{padding:8px 12px;border:1.5px solid var(--line);text-align:left;vertical-align:top;line-height:1.55}
+    .tbl th{background:#111;color:#fff;font-weight:900;letter-spacing:.08em;font-size:11.5px;text-transform:uppercase}
+    .tbl tr:nth-child(even) td{background:var(--soft-ink)}
+    .tbl tr:hover td{background:var(--soft-blue)}
+
+    /* ============ CALLOUT ============ */
+    .callout{border:2px solid var(--line);border-left-width:6px;padding:12px 14px;display:grid;gap:6px;font-size:12.5px;line-height:1.65}
+    .callout.red{border-left-color:var(--red);background:var(--soft-red)}
+    .callout.blue{border-left-color:var(--blue);background:var(--soft-blue)}
+    .callout.dark{background:#111;color:#fff;border-left-color:#fff}
+    .callout strong{display:block;font-weight:900;font-size:13px}
+
+    /* ============ TAG LIST ============ */
+    .tag-list{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;border:1.5px solid var(--line);background:#fff;padding:4px 9px;font-size:11.5px;font-weight:800}
+    .tag.blue{background:var(--soft-blue);color:var(--blue);border-color:var(--blue)}
+    .tag.red{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* ============ FOOTER ============ */
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+    .footer-block h3{font-size:16px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:12.5px;color:#222;line-height:1.66;margin:0}
+    .footer-block ul{margin:0;padding-left:16px;font-size:12.5px;color:#333;line-height:1.72}
+    .footer-block li{margin-bottom:3px}
+    .source-note{font-size:11.5px;color:var(--muted);text-align:center;padding:20px 0 0}
+    .rule{border-top:3px solid var(--line);margin-top:30px}
+
+    /* ============ RESPONSIVE ============ */
+    .section-head{grid-template-columns:72px 1fr}
+    .section-no{width:72px;height:72px;font-size:28px}
+    @media(max-width:500px){
+      .kicker,.badge,.tag,.card .card-title{font-size:11px}
+      .tbl{font-size:11.5px}
+      .tbl th,.tbl td{padding:6px 8px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- ===== HERO ===== -->
+    <div class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <span class="kicker">Mistral AI · 具身导航</span>
+        <h1 class="demo-title">Robostral Navigate</h1>
+        <p class="subtitle">8B 参数量 · 单 RGB 摄像头 · 无 LiDAR/Depth · 具身机器人导航模型</p>
+        <div class="badge-row">
+          <span class="badge dark">8B 参数</span>
+          <span class="badge">单 RGB 摄像头</span>
+          <span class="badge">无 LiDAR/Depth</span>
+          <span class="badge">具身导航</span>
+          <span class="badge blue">CISPO RL +3.2%</span>
+        </div>
+        <div class="alert warn">
+          <strong>⚠ X 帖误读澄清</strong>
+          <p>X @TeksCreate 将 Robostral Navigate 描述为"AI agents navigate the web autonomously"（网页自动化），这是严重误读。该模型是<strong>具身机器人导航模型</strong>，用 RGB 图像 + 自然语言指令操控真实机器人行走，不是浏览器自动化。</p>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="panel-top">
+          <span class="eyebrow">■ 核心指标</span>
+          <h3>R2R-CE 基准测试</h3>
+          <p>76.6% unseen / 79.4% seen · 单 RGB 摄像头超越多传感器方案</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote">
+            "Leave the lobby, walk through the corridor, enter the supply room, and stop to face the second shelf."
+          </div>
+          <div class="flow">
+            <div class="flow-item">
+              <span class="t">输入</span>
+              <span class="c">RGB 图像帧 + 自然语言指令</span>
+            </div>
+            <div class="flow-item blue">
+              <span class="t">核心机制</span>
+              <span class="c">指向式导航（pointing）+ 回退位移</span>
+            </div>
+            <div class="flow-item dark">
+              <span class="t">输出</span>
+              <span class="c">目标坐标指向 + 朝向角预测</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== OVERVIEW ===== -->
+    <div class="section">
+      <div class="overview">
+        <div class="overview-sentence">Robostral Navigate 是 Mistral 发布的首个具身导航模型，8B 参数，单 RGB 摄像头，无 LiDAR/depth，在 R2R-CE 基准 unseen 测试集上达 76.6%（超多传感器方案 4.5 分），训练数据 240 万条轨迹 / 35 万场景。</div>
+        <div class="overview-body">
+          <p>Mistral 完全自研，从视觉-语言基础模型初始化，构建仿真数据生成管线，结合前缀缓存高效训练与 CISPO 在线强化学习，在 wheeled/legged/flying 机器人上均可运行。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION 01: 核心参数 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">MODEL SPECS</div>
+          <h2>模型规格与核心指标</h2>
+          <p>全部数据来源于 Mistral 官方新闻页，数据截至 2026-07-21。</p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-label">参数量</div>
+          <div class="big dark">8B</div>
+          <div class="card-body"><p>Mistral 完全自研，未依赖开源 VLM，从视觉-语言基础模型初始化（专精指向、计数、目标定位）</p></div>
+        </div>
+        <div class="card">
+          <div class="card-label">R2R-CE unseen（验证）</div>
+          <div class="big">76.6%</div>
+          <div class="card-body"><p>比最佳单摄方案高 9.7 分；比多传感器（LiDAR/depth）最佳方案高 4.5 分</p></div>
+        </div>
+        <div class="card">
+          <div class="card-label">R2R-CE seen（验证）</div>
+          <div class="big blue">79.4%</div>
+          <div class="card-body"><p>已见场景下的成功率，R2R-CE 是连续环境 Room-to-Room 指令跟随基准</p></div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;overflow-x:auto">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>维度</th>
+              <th>内容</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>模型规模</strong></td>
+              <td>8B 参数</td>
+              <td>完全自研，未使用开源 VLM</td>
+            </tr>
+            <tr>
+              <td><strong>输入</strong></td>
+              <td>单 RGB 摄像头图像帧 + 自然语言指令</td>
+              <td>无 LiDAR、无 Depth、无多摄像头</td>
+            </tr>
+            <tr>
+              <td><strong>输出</strong></td>
+              <td>图像坐标指向目标 + 到达朝向角</td>
+              <td>主用 pointing；目标超出视野时回退位移指令</td>
+            </tr>
+            <tr>
+              <td><strong>训练数据</strong></td>
+              <td>约 240 万条轨迹 / 35 万场景</td>
+              <td>全仿真（simulation）生成</td>
+            </tr>
+            <tr>
+              <td><strong>Token 压缩</strong></td>
+              <td>22× 前缀缓存 token 减少</td>
+              <td>树形注意力掩码，单序列压缩整条 episode</td>
+            </tr>
+            <tr>
+              <td><strong>RL 提升</strong></td>
+              <td>CISPO 在线强化学习 +3.2%</td>
+              <td>缓解行为克隆分布偏移，支持探索行为</td>
+            </tr>
+            <tr>
+              <td><strong>机器人形态</strong></td>
+              <td>Wheeled / Legged / Flying</td>
+              <td>跨形态泛化，支持不同尺寸机型</td>
+            </tr>
+            <tr>
+              <td><strong>相机鲁棒</strong></td>
+              <td>对相机内参差异鲁棒</td>
+              <td>pointing 机制天然适应内参/尺度变化</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== SECTION 02: 技术架构 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">TECH ARCH</div>
+          <h2>指向式导航 + 仿真训练 + CISPO RL</h2>
+          <p>三大技术支柱：指向导航机制、仿真数据生成管线、前缀缓存高效训练。</p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-label">指向导航 · Pointing</div>
+          <div class="card-title">图像坐标指向目标</div>
+          <div class="card-body">
+            <p>给定任务指令 + 观测历史，在当前摄像头画面中预测目标所在像素坐标，同时输出到达朝向角。</p>
+            <p style="margin-top:6px;color:var(--blue);font-size:12px">天然对相机内参和世界尺度变化鲁棒。</p>
+            <p style="margin-top:6px;color:var(--muted);font-size:11.5px">超出视野时回退至位移指令（"向前2米、左1.5米、转25°"）。</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">仿真数据 · Simulation</div>
+          <div class="card-title">240 万轨迹 × 35 万场景</div>
+          <div class="card-body">
+            <p>全自研高效数据生成管线，完全在仿真环境构建，快速迭代。</p>
+            <p style="margin-top:6px;color:var(--blue);font-size:12px">覆盖办公室、住宅、商业建筑、室外等多种环境。</p>
+            <p style="margin-top:6px;color:var(--muted);font-size:11.5px">支持训练时未见过的真实障碍物泛化。</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">CISPO 在线强化学习</div>
+          <div class="card-title">成功率 +3.2%</div>
+          <div class="card-body">
+            <p>监督预训练后，用 CISPO 在线 RL 继续提升，有效缓解行为克隆的分布偏移问题。</p>
+            <p style="margin-top:6px;color:var(--blue);font-size:12px">模型通过试错学习恢复失败，探索新行为。</p>
+            <p style="margin-top:6px;color:var(--muted);font-size:11.5px">Mistral 表示目前未见 plateau，有信心继续提升。</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <div class="callout blue">
+          <strong>前缀缓存（Prefix-Caching）训练效率</strong>
+          采用树形注意力掩码策略，将整条 episode 压缩为单序列，一轮前向传播即可训练所有时间步。<br/>
+          <strong style="color:var(--blue)">Token 减少 22×</strong>，原本需要数月的训练压缩至数天完成。
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION 03: X 帖误读分析 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">X POST MISREAD</div>
+          <h2>X 帖误读澄清</h2>
+          <p>@TeksCreate 将具身机器人模型误读为"网页自动化 runtime"，属严重类别错误。</p>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>维度</th>
+              <th>X 帖内容（误读）</th>
+              <th>官方事实</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>模型定位</strong></td>
+              <td>"AI agents navigate the web autonomously"</td>
+              <td style="color:var(--red)"><strong>具身机器人导航</strong>，控制真实机器人在物理环境中行走</td>
+            </tr>
+            <tr>
+              <td><strong>链接</strong></td>
+              <td>mistral.ai/news/robostral（该路径不存在）</td>
+              <td style="color:var(--blue)"><strong>正确链接</strong>：mistral.ai/news/robostral-navigate</td>
+            </tr>
+            <tr>
+              <td><strong>应用场景</strong></td>
+              <td>"page navigation, form filling, multi-step workflows"</td>
+              <td style="color:var(--red)"><strong>办公室/住宅/商业/室外物理导航</strong>，非浏览器操作</td>
+            </tr>
+            <tr>
+              <td><strong>产品类型</strong></td>
+              <td>"web-native agent runtime, purpose-built for the browser"</td>
+              <td style="color:var(--red)"><strong>嵌入式具身 AI 模型</strong>，单 RGB 摄像头，无 LiDAR/depth</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout red" style="margin-top:14px">
+        <strong>类别错误（Category Error）</strong>
+        Robostral Navigate 是<strong>机器人嵌入式模型</strong>（Embodied AI），不是 Web/浏览器自动化工具。X 帖将"Navigate"理解为"网页导航"是望文生义，与模型实际功能（物理空间导航）完全不符。链接拼写也有误（少了"-navigate"后缀）。
+      </div>
+    </div>
+
+    <!-- ===== SECTION 04: 应用场景 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">USE CASES</div>
+          <h2>应用场景与目标市场</h2>
+          <p>Mistral 明确指出制造、递送、物流、酒店等行业存在强烈需求。</p>
+        </div>
+      </div>
+
+      <div class="grid-4">
+        <div class="card">
+          <div class="card-label">🏭 制造业</div>
+          <div class="card-body"><p>工厂内物料搬运、产线巡检、工序间导航</p></div>
+        </div>
+        <div class="card">
+          <div class="card-label">📦 递送 / 物流</div>
+          <div class="card-body"><p>仓库内拣货、最后一公里室内导航、分拣中心移动</p></div>
+        </div>
+        <div class="card">
+          <div class="card-label">🏨 酒店 / 服务业</div>
+          <div class="card-body"><p>客房服务、迎宾引导、物品递送</p></div>
+        </div>
+        <div class="card">
+          <div class="card-label">🏠 智能家居</div>
+          <div class="card-body"><p>家用移动机器人、全屋自主导航巡逻</p></div>
+        </div>
+      </div>
+
+      <div class="callout blue" style="margin-top:14px">
+        <strong>一句话描述</strong>
+        给 Robostral Navigate 一个指令，它自主完成整条任务路径，穿过有真实人员与障碍物的动态空间，无需预先建图或特殊传感器。
+      </div>
+    </div>
+
+    <!-- ===== SECTION 05: 风险边界 ===== -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no k">05</div>
+        <div class="section-meta">
+          <div class="label k">RISK BOUNDARY</div>
+          <h2>风险边界与已知局限</h2>
+          <p>基于官方页面公开信息整理，部分技术细节尚未公开。</p>
+        </div>
+      </div>
+
+      <div class="callout red">
+        <strong>指向超出视野的目标</strong>
+        当目标不在当前摄像头视野内时，模型回退为位移指令（"向前X米"），该回退机制在远距离目标场景的表现尚未披露。
+      </div>
+
+      <div style="margin-top:14px;display:grid;gap:10px">
+        <div class="callout blue">
+          <strong>仿真到真实的迁移（Sim-to-Real Gap）</strong>
+          训练数据全为仿真生成，虽然模型在未见障碍物上表现出泛化能力，但真实复杂环境（光照变化、玻璃反光、非结构化地形）中的长尾场景表现仍待验证。
+        </div>
+        <div class="callout blue">
+          <strong>实时性要求</strong>
+          官方展示了长时域（long-horizon）自主导航视频，但端到端推理延迟尚未披露；部署到边缘机器人（如 Jetson、NVIDIA Orin）上的帧率有待确认。
+        </div>
+        <div class="callout blue">
+          <strong>模型发布形式</strong>
+          官方页面未披露模型权重是否开源、API 开放计划或商业授权条款，该信息待跟进。
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <div class="rule"></div>
+
+    <div class="footer-block">
+      <h3>收口结论</h3>
+      <ul>
+        <li><strong>已核实</strong>：Robostral Navigate 是 8B 具身机器人导航模型，单 RGB 摄像头，无 LiDAR/depth；R2R-CE unseen 76.6%，seen 79.4%；CISPO RL +3.2%；支持 wheeled/legged/flying；训练数据 240 万轨迹 / 35 万场景；前缀缓存压缩 22× token</li>
+        <li><strong>误读纠正</strong>：X @TeksCreate 帖将 Robostral Navigate 描述为"网页自动化 runtime"，属严重类别错误，与模型实际功能（物理机器人导航）完全不符</li>
+        <li><strong>待核验</strong>：模型权重发布形式（开源/商业 API）、边缘部署帧率、长距离目标回退机制表现</li>
+      </ul>
+      <p style="border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px">
+        <strong>来源：</strong>
+        <a href="https://mistral.ai/news/robostral-navigate" style="color:var(--blue)">Mistral 官方新闻页</a>（主来源，已核实全部数据）&nbsp;·&nbsp;
+        <a href="https://x.com/TeksCreate/status/2079348684458704902" style="color:var(--blue)">X @TeksCreate</a>（误读线索，已标注）
+      </p>
+      <p style="font-size:11.5px;color:var(--muted)">
+        本卡由子智能体创作，内容截至 2026-07-21，不代表 Mistral 官方立场。所有技术细节以官方发布为准。
+      </p>
+    </div>
+
+    <p class="source-note">Robostral Navigate · Mistral AI · 8B 具身机器人导航 · 2026-07-21</p>
+  </main>
+</body>
+</html>

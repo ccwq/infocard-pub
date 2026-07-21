@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SeaweedFS Agent 安全存储：延迟删除与可恢复删除</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+
+    /* === overview === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+    /* ============ CARD ============ */
+    .card{border:2px solid var(--line);background:var(--paper);padding:14px;display:grid;gap:8px}
+    .card .card-label{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .card .card-title{font-size:15px;font-weight:900;line-height:1.25;letter-spacing:-.02em}
+    .card .card-title.blue{color:var(--blue)}
+    .card .card-title.red{color:var(--red)}
+    .card .card-body{font-size:12.5px;line-height:1.65;color:#333}
+    .card .card-body p{margin:0}
+    .card .card-tags{display:flex;flex-wrap:wrap;gap:5px}
+    .tag{display:inline-flex;border:1.5px solid var(--line);padding:3px 8px;font-size:11px;font-weight:750}
+    .tag.blue{background:var(--soft-blue);color:var(--blue)}
+    .tag.red{background:var(--soft-red);color:var(--red)}
+
+    /* ============ RISK TABLE ============ */
+    .risk-table{border-collapse:collapse;width:100%;font-size:12px}
+    .risk-table th{background:#111;color:#fff;padding:8px 12px;text-align:left;font-size:11px;letter-spacing:.14em;text-transform:uppercase;border:1.5px solid #111}
+    .risk-table td{padding:8px 12px;border:1.5px solid var(--line);vertical-align:top;line-height:1.6}
+    .risk-table tr:nth-child(even) td{background:var(--soft-ink)}
+
+    /* ============ FACT BADGE ============ */
+    .fact-badge{display:inline-flex;align-items:center;gap:5px;border:2px solid var(--line);padding:4px 9px;font-size:11.5px;font-weight:850}
+    .fact-badge.verified{background:#d4edda;color:#155724;border-color:#c3e6cb}
+    .fact-badge.unverified{background:#fff3cd;color:#856404;border-color:#ffeeba}
+    .fact-badge.claim{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* ============ MATRIX ============ */
+    .matrix{display:grid;gap:2px;font-size:12.5px}
+    .matrix-row{display:grid;grid-template-columns:160px 1fr 1fr;gap:2px}
+    .matrix-row.header{font-weight:900;font-size:11px;letter-spacing:.12em;text-transform:uppercase;background:#111;color:#fff}
+    .matrix-row > div{padding:8px 10px;border:1.5px solid var(--line);background:#fff}
+    .matrix-row > div:nth-child(3){background:var(--soft-ink)}
+    .matrix-row.header > div{background:#111;color:#fff;border-color:#111}
+
+    /* ============ CODE ============ */
+    pre{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto;font-size:12px;line-height:1.72;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    /* ============ FOOTER BLOCK ============ */
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+    .footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:12.5px;color:#333;line-height:1.66;margin:0}
+    .footer-block ul{margin:0;padding-left:16px;font-size:12.5px;color:#333;line-height:1.72}
+    .footer-block .source-note{font-size:11.5px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px}
+
+    /* ============ RULE ============ */
+    .rule{border-top:2px solid var(--line);margin:40px 0 20px}
+    .source-note{font-size:11.5px;color:var(--muted);text-align:center}
+
+    /* ============ RESPONSIVE ============ */
+    @media(max-width:640px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:none;border-bottom:3px solid var(--line)}
+      .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+      .section-head{grid-template-columns:60px 1fr}
+      .section-no{width:60px;height:60px;font-size:24px}
+      .matrix-row{grid-template-columns:100px 1fr 1fr;font-size:11.5px}
+      .risk-table{font-size:11px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- ============ HERO ============ -->
+    <div class="hero">
+      <div class="hero-bar"></div>
+
+      <div class="hero-copy">
+        <div class="kicker">分布式存储 · Agent 安全</div>
+        <h1 class="demo-title">Agent 时代：可恢复删除<br>与 rm -rf 防御策略</h1>
+        <p class="subtitle">SeaweedFS 分布式存储系统是否提供延迟删除机制来防止 AI Agent 误操作导致的数据永久丢失？风险边界与事实等级全解析。</p>
+
+        <div class="badge-row">
+          <span class="badge red">风险提示</span>
+          <span class="badge blue">待核验能力</span>
+          <span class="badge dark">延迟删除</span>
+        </div>
+
+        <div class="alert">
+          <strong>⚠ 事实等级声明</strong>
+          <p>SeaweedFS 是分布式文件系统（已核实）；X 帖所述"延迟删除可恢复"能力，<strong>尚未在官方文档核验</strong>，本卡将其标注为「待核验声明」，请勿将其当作已证实功能使用。</p>
+        </div>
+
+        <div class="mini-row">
+          <span class="mini-tag">rm -rf 防御</span>
+          <span class="mini-tag">分布式存储</span>
+          <span class="mini-tag">GC 垃圾回收</span>
+          <span class="mini-tag">Agent 安全</span>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">SeaweedFS 架构</div>
+          <h3>Master · Volume · Filer</h3>
+          <p>元数据由 Master 节点管理，数据实际存储在 Volume 服务器，支持 S3 协议兼容、POSIX 文件系统（Filer）与 Iceberg 表格式。</p>
+        </div>
+        <div class="panel-body">
+          <div class="flow">
+            <div class="flow-item red">
+              <div class="t">危险场景</div>
+              <div class="c">rm -rf /data</div>
+            </div>
+            <div class="flow-item blue">
+              <div class="t">延迟删除</div>
+              <div class="c">标记删除 → 暂存 → GC 回收</div>
+            </div>
+            <div class="flow-item dark">
+              <div class="t">恢复窗口</div>
+              <div class="c">GC 触发前可撤销</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OVERVIEW ============ -->
+    <div class="overview">
+      <div class="overview-sentence">AI Agent 的文件操作权限越大，误删风险越高——可恢复存储成为 Agent 安全的关键防线。</div>
+      <div class="overview-body">
+        <p>随着 LLM Agent 具备执行 shell 命令、读写文件系统能力的场景增多，"Agent 执行了 rm -rf" 已成为真实的灾难场景。SeaweedFS 作为开源分布式存储系统，据 X 帖宣传提供了"延迟删除 + 可恢复"机制，但该能力在中国主流技术社区的讨论中缺乏明确的官方文档佐证。本卡从技术原理、风险边界和事实等级三维度，厘清 SeaweedFS 在 Agent 安全场景下的真实能力与局限性。</p>
+      </div>
+    </div>
+
+    <!-- ============ SECTION 01: SeaweedFS 基本情况 ============ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">SECTION ONE</div>
+          <h2>SeaweedFS 是什么</h2>
+          <p>已核实：开源分布式存储系统，Go 语言开发，支持对象存储（S3 兼容）、POSIX 文件系统与 Iceberg 表格式，面向海量文件横向扩展。</p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-label">类型定位</div>
+          <div class="card-title blue">分布式文件系统</div>
+          <div class="card-body">
+            <p>SeaweedFS 最初基于 Facebook Haystack 论文实现，专注于海量小文件存储场景，声称可存储 billions 级别文件量，核心设计理念是元数据与数据分离。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag blue">已核实</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">核心组件</div>
+          <div class="card-title">Master · Volume · Filer</div>
+          <div class="card-body">
+            <p><strong>Master</strong>：管理文件 ID（fid）与 Volume 的映射关系，不存文件本身。<br><strong>Volume</strong>：实际存储数据的节点，多副本支持。<br><strong>Filer</strong>：提供类 POSIX 文件系统接口，支持目录层级与 S3 协议兼容。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag blue">已核实</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">协议支持</div>
+          <div class="card-title blue">S3 · Filer · Iceberg</div>
+          <div class="card-body">
+            <p>S3 兼容 API 可直接对接现有对象存储客户端；Filer 提供 HTTP 文件服务；Iceberg 支持使其可作为大数据表格式的底层存储引擎。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag blue">已核实</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">技术特点</div>
+          <div class="card-title">横向扩展 · 多副本 · O(1) 访问</div>
+          <div class="card-body">
+            <p>Master 仅维护 fid→Volume 映射，理论上 O(1) 查找；Volume 按需扩容，支持机架/数据中心级别的副本策略；去中心化设计避免单点瓶颈。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag blue">已核实</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">许可证</div>
+          <div class="card-title">Apache-2.0</div>
+          <div class="card-body">
+            <p>Apache License 2.0 开源许可证，允许商业使用，无需担心许可证合规风险。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag blue">已核实</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">仓库状态</div>
+          <div class="card-title blue">活跃维护</div>
+          <div class="card-body">
+            <p>GitHub 仓库：github.com/chrislusf/seaweedfs，持续更新，主要维护者积极合并 PR，社区有一定规模。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag blue">已核实</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION 02: Agent 误删风险 ============ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">SECTION TWO</div>
+          <h2>Agent 时代的文件操作风险</h2>
+          <p>当 Agent 获得 shell 执行权限时，rm -rf 类误操作的后果远超传统软件错误，延迟删除是降低损失的关键机制。</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">风险场景</div>
+          <div class="card-title red">Agent rm -rf 灾难链</div>
+          <div class="card-body">
+            <p>1. Agent 获取了服务器写权限<br>2. Agent 解析指令时将 "清理 /tmp" 误解为 "清理根目录"<br>3. 执行 rm -rf /* 或误删挂载卷<br>4. 传统存储：数据永久消失<br>5. 具备延迟删除的存储：在 GC 触发前保留数据副本</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag red">典型风险</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">与 S3 的对比</div>
+          <div class="card-title blue">S3 Delete Marker vs SeaweedFS</div>
+          <div class="card-body">
+            <p>AWS S3 本身就具备"版本控制 + 删除标记"机制，误删可在数秒内撤销。SeaweedFS 的 S3 兼容模式理论上可继承类似行为，但具体延迟删除配置需在 Filer 层面或 Volume GC 层面确认。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag blue">待核验</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 风险矩阵 -->
+      <div style="margin-top:14px">
+        <div class="matrix">
+          <div class="matrix-row header">
+            <div>风险维度</div>
+            <div>传统存储（本地磁盘）</div>
+            <div>具备延迟删除的分布式存储</div>
+          </div>
+          <div class="matrix-row">
+            <div>rm -rf 后数据状态</div>
+            <div style="color:var(--red);font-weight:750">永久消失（无恢复可能）</div>
+            <div style="color:var(--blue);font-weight:750">GC 回收前可恢复（取决于窗口期）</div>
+          </div>
+          <div class="matrix-row">
+            <div>Agent 误操作容错</div>
+            <div>❌ 无保护</div>
+            <div>⚠ 部分保护（依赖 GC 配置）</div>
+          </div>
+          <div class="matrix-row">
+            <div>性能影响</div>
+            <div>无额外开销</div>
+            <div>GC 阶段有额外 I/O</div>
+          </div>
+          <div class="matrix-row">
+            <div>运维复杂度</div>
+            <div>低</div>
+            <div>中等（需配置 GC 策略）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION 03: 延迟删除技术原理 ============ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">SECTION THREE</div>
+          <h2>延迟删除的技术原理</h2>
+          <p>SeaweedFS 的删除流程涉及 Filer 元数据标记、Volume GC 与物理回收三个阶段，以下为基于源码和社区讨论的推断性描述，非官方确认文档。</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">原理（推断性）</div>
+          <div class="card-title">标记删除 → 延迟回收 → GC 清理</div>
+          <div class="card-body">
+            <p><strong>第一步：标记删除</strong> — Filer 收到删除请求后，在元数据层标记文件为"已删除"，而非立即释放数据块。<br><br><strong>第二步：延迟窗口</strong> — 删除标记生效后，数据在 Volume 中暂存，物理文件尚未覆写，此时可通过恢复 fid 访问。<br><br><strong>第三步：GC 触发</strong> — Master 调度 Volume Garbage Collection，被标记文件的数据块被真正释放。GC 触发时机由配置参数（如 <code>garbageThreshold</code>）控制。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag red">待核验 · 推断性描述</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">S3 兼容模式（推断性）</div>
+          <div class="card-title blue">Delete Marker 机制</div>
+          <div class="card-body">
+            <p>SeaweedFS S3 网关（s3api）可能实现了类似 AWS S3 的 Delete Marker 行为：删除对象时写入一个删除标记而非物理删除，列出对象时该版本被跳过，恢复时删除标记被清除即可访问原对象。需在官方 S3 兼容文档中确认此行为。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag red">待核验 · 推断性描述</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 代码示例 -->
+      <div style="margin-top:14px">
+        <div style="background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px">// 推测的延迟删除配置参数（非官方确认）</div>
+          <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap;color:#e8e8e8"><span style="color:#888"># Master 启动参数（推测，需官方文档确认）</span>
+<span style="color:#1f63ff">weed</span> master <span style="color:#e8c200">\</span>
+  -mdir=/data/seaweedfs/master <span style="color:#e8c200">\</span>
+  -port=9333 <span style="color:#e8c200">\</span>
+  -garbageThreshold=<span style="color:#e8c200">0.3</span>   <span style="color:#888"># GC 触发阈值（推测）</span>
+  <span style="color:#888"># GC 窗口期越大，恢复时间窗口越宽，性能开销越高</span>
+
+<span style="color:#888"># Filer 配置延迟删除 TTL（推测，需核验）</span>
+<span style="color:#888"># 在 filer.conf 或启动参数中配置：</span>
+<span style="color:#1f63ff">deleting</span>.<span style="color:#1f63ff">delaySeconds</span>=<span style="color:#e8c200">3600</span>   <span style="color:#888"># 删除标记保留 1 小时（待核验）</span>
+<span style="color:#1f63ff">deleting</span>.<span style="color:#1f63ff">gcInterval</span>=<span style="color:#e8c200">300</span>       <span style="color:#888"># GC 检查间隔 5 分钟（待核验）</span>
+
+<span style="color:#888"># 查看 Volume GC 状态（推测命令）</span>
+<span style="color:#1f63ff">weed</span> shell <span style="color:#e8c200">\
+</span> -master=<span style="color:#e8c200">localhost:9333</span> <span style="color:#e8c200">\
+</span> -exec=<span style="color:#e8c200">"volume.list"</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION 04: 事实等级与风险边界 ============ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-no k">04</div>
+        <div class="section-meta">
+          <div class="label k">SECTION FOUR</div>
+          <h2>事实等级与风险边界</h2>
+          <p>区分已核实事实、待核验声明与已核实边界，是正确使用本卡信息的前提。</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-label">事实等级说明</div>
+          <div class="card-title">三级事实分类</div>
+          <div class="card-body">
+            <p>
+              <span class="fact-badge verified">✓ 已核实</span> 来自 GitHub 仓库 README、官方文档或一手技术博客，经核实无误的内容。<br><br>
+              <span class="fact-badge unverified">? 待核验</span> 来自 X 帖宣传、社区讨论或源码推断，官方文档未明确确认的内容，可能与实际行为不符。<br><br>
+              <span class="fact-badge claim">⚠ 声明性内容</span> 来自 X 帖等社交媒体，未被独立来源证实，不应作为技术决策依据。
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">风险边界</div>
+          <div class="card-title red">已知局限与注意事项</div>
+          <div class="card-body">
+            <p>1. 延迟删除依赖 Filer 或 S3 网关层实现，纯 Volume 层删除可能是即时的。<br><br>2. GC 触发后数据不可恢复，与 AWS S3 版本的即时性不同。<br><br>3. 分布式多副本场景下，各副本 GC 时机可能不同步，理论上存在短暂的恢复窗口不一致。<br><br>4. 配置不当（如过小的 GC threshold）可能导致存储空间快速耗尽。<br><br>5. 本卡信息不构成技术选型建议，实际部署前请阅读官方文档。</p>
+          </div>
+          <div class="card-tags">
+            <span class="tag red">重要</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 风险表 -->
+      <table class="risk-table">
+        <thead>
+          <tr>
+            <th style="width:200px">信息项</th>
+            <th>内容描述</th>
+            <th style="width:100px">事实等级</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SeaweedFS 是分布式文件系统</td>
+            <td>Go 语言开发，Apache-2.0 许可证，GitHub 活跃维护</td>
+            <td><span class="fact-badge verified" style="font-size:10px">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>支持 S3 兼容 API</td>
+            <td>通过 s3api 组件提供对象存储接口</td>
+            <td><span class="fact-badge verified" style="font-size:10px">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>支持 Filer（POSIX 文件系统）</td>
+            <td>Filer 提供目录层级和 HTTP 文件服务接口</td>
+            <td><span class="fact-badge verified" style="font-size:10px">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>支持 Iceberg 表格式</td>
+            <td>作为大数据底层存储引擎，支持 Iceberg</td>
+            <td><span class="fact-badge verified" style="font-size:10px">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>延迟删除 / Soft Delete 机制</td>
+            <td>X 帖宣传的核心卖点："AI agent 或误操作导致 rm -rf、延迟删除可恢复"</td>
+            <td><span class="fact-badge unverified" style="font-size:10px">? 待核验</span></td>
+          </tr>
+          <tr>
+            <td>GC 触发时机可配置</td>
+            <td>社区讨论中提及 garbageThreshold 参数，但官方文档未明确确认</td>
+            <td><span class="fact-badge unverified" style="font-size:10px">? 待核验</span></td>
+          </tr>
+          <tr>
+            <td>多副本延迟删除同步行为</td>
+            <td>多副本节点间 GC 时机是否同步，尚未找到明确资料</td>
+            <td><span class="fact-badge claim" style="font-size:10px">⚠ 未核验</span></td>
+          </tr>
+          <tr>
+            <td>Agent 安全最佳实践</td>
+            <td>建议 Agent 仅具备只读权限或通过 API 操作，而非直接 shell 权限</td>
+            <td><span class="fact-badge verified" style="font-size:10px">✓ 通用安全原则</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============ FOOTER BLOCK ============ -->
+    <div class="footer-block">
+      <h3>收口 · 本卡结论</h3>
+      <p>SeaweedFS 作为分布式存储系统，其 S3 兼容、Filer 和 Iceberg 能力已核实；"延迟删除可恢复"的核心卖点来源于 X 帖宣传，<strong>尚未在官方文档中核验</strong>，实际行为请以官方文档为准。在 Agent 场景下，无论使用何种存储系统，限制 Agent 的直接 shell 权限、通过 API 层暴露安全操作接口，均是比依赖延迟删除更可靠的安全策略。</p>
+      <ul>
+        <li><strong>已核实</strong>：SeaweedFS 是 Apache-2.0 分布式存储系统，支持 S3/Filer/Iceberg，架构为 Master+Volume+Filer。</li>
+        <li><strong>待核验</strong>：延迟删除 / GC 延迟回收的具体行为、参数配置、恢复窗口时长。</li>
+        <li><strong>建议</strong>：在生产环境部署前，测试实际删除行为，并结合备份策略，不将延迟删除作为唯一的数据保护手段。</li>
+      </ul>
+      <div class="source-note">
+        <strong>来源：</strong>
+        GitHub 仓库 github.com/chrislusf/seaweedfs（已核实基本信息）<br>
+        X 帖 https://x.com/SeaweedFS/status/2079349589048758505（待核验延迟删除声明）<br>
+        延迟删除机制描述基于社区讨论与源码推断，非官方确认文档。<br>
+        本卡由子智能体创作，内容截至 2026-07-21，不代表 SeaweedFS 官方立场。
+      </div>
+    </div>
+
+    <div class="rule"></div>
+    <p class="source-note">20260721-seaweedfs-agent-safety · SeaweedFS Agent 安全存储信息卡 · 硬核蓝手册风格</p>
+  </main>
+</body>
+</html>

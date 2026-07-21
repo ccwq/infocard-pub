@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用多 Agent 压缩产品发现周期</title>
+  <style>
+    :root{
+      --bg:#0b1020;--bg2:#11182d;--panel:rgba(23,30,52,.9);--panel2:#0f1629;
+      --ink:#eef4ff;--muted:#a9b8dc;--line:rgba(180,210,255,.18);
+      --cyan:#59c7ff;--blue:#5b7cff;--green:#38d996;--yellow:#f3ca57;--purple:#a17cff;--red:#ff7698;
+      --shadow:0 18px 42px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+      line-height:1.6;
+      background:
+        radial-gradient(circle at 10% 6%,rgba(89,199,255,.18) 0 8%,transparent 9%),
+        radial-gradient(circle at 88% 8%,rgba(161,124,255,.16) 0 8%,transparent 9%),
+        radial-gradient(circle at 65% 75%,rgba(56,217,150,.10) 0 12%,transparent 13%),
+        linear-gradient(180deg,#090e1d,#10172b 48%,#0a1020);
+    }
+    a{color:inherit}
+    .page{width:min(1160px,calc(100% - 24px));margin:auto;padding:20px 0 68px}
+
+    /* ── HERO ── */
+    .hero{display:grid;grid-template-columns:1.08fr .92fr;gap:14px;align-items:stretch}
+    .hero-copy,.hero-panel{
+      border:1px solid var(--line);
+      background:linear-gradient(145deg,rgba(27,36,64,.92),rgba(13,19,36,.92));
+      box-shadow:var(--shadow);border-radius:22px;
+    }
+    .hero-copy{padding:24px 22px;display:grid;gap:10px;align-content:start}
+    .eyebrow{font:800 11px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    h1{font-size:clamp(34px,5.5vw,68px);line-height:.97;letter-spacing:-.07em;margin:8px 0 4px}
+    .subtitle{font-size:16px;color:#dce7ff;max-width:660px}
+    .lede{font-size:13px;color:var(--muted);max-width:700px;line-height:1.65}
+    .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+    .chip{
+      border:1px solid var(--line);padding:5px 10px;border-radius:999px;
+      background:rgba(255,255,255,.05);font-size:12px;color:#dde6ff;
+    }
+    .chip.cyan{border-color:rgba(89,199,255,.42);color:#d7f5ff;background:rgba(89,199,255,.08)}
+    .chip.green{border-color:rgba(56,217,150,.42);color:#d7fff0;background:rgba(56,217,150,.08)}
+    .chip.yellow{border-color:rgba(243,202,87,.42);color:#fff4cc;background:rgba(243,202,87,.08)}
+    .chip.red{border-color:rgba(255,118,152,.42);color:#ffd6de;background:rgba(255,118,152,.08)}
+
+    .hero-panel{padding:20px;display:grid;gap:12px;align-content:start}
+    .panel-title{font:800 11px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .panel-h2{font-size:15px;font-weight:850;margin-bottom:4px;color:#fff}
+    .role-row{
+      display:grid;gap:7px;
+      background:rgba(255,255,255,.04);border:1px solid var(--line);
+      border-radius:14px;padding:10px 12px;
+    }
+    .role-name{font-size:13px;font-weight:850;color:var(--cyan)}
+    .role-desc{font-size:12px;color:var(--muted);line-height:1.55}
+    .divider{height:1px;background:var(--line);margin:2px 0}
+
+    /* ── SECTION ── */
+    .section{margin-top:14px}
+    .section-head{
+      border:1px solid var(--line);border-radius:16px 16px 0 0;
+      background:linear-gradient(135deg,rgba(91,124,255,.18),rgba(161,124,255,.12));
+      padding:10px 16px;border-bottom:none;
+      display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;
+    }
+    .section-head h2{font-size:16px;font-weight:900;letter-spacing:-.02em;margin:0}
+    .section-head p{font-size:12px;color:var(--muted);margin:0}
+    .section-body{
+      border:1px solid var(--line);border-top:none;
+      background:linear-gradient(180deg,rgba(13,19,36,.9),rgba(9,11,20,.95));
+      border-radius:0 0 16px 16px;padding:16px;
+    }
+
+    /* ── PHASES GRID ── */
+    .phase-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .phase-card{
+      background:rgba(255,255,255,.04);border:1px solid var(--line);
+      border-radius:14px;padding:13px 12px;
+    }
+    .phase-num{font:800 11px ui-monospace,Menlo,monospace;color:var(--cyan);letter-spacing:.1em;margin-bottom:5px}
+    .phase-title{font-size:14px;font-weight:850;margin-bottom:4px}
+    .phase-tasks{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:5px}
+    .phase-tasks li{font-size:12px;color:var(--muted);padding-left:10px;position:relative;line-height:1.5}
+    .phase-tasks li::before{content:"·";position:absolute;left:0;color:var(--cyan);font-weight:900}
+    .phase-agent{font-size:11px;color:var(--purple);margin-top:8px;padding:3px 8px;border:1px solid rgba(161,124,255,.3);border-radius:999px;display:inline-block;background:rgba(161,124,255,.08)}
+
+    /* ── WORKFLOW DIAGRAM ── */
+    .workflow{display:flex;gap:0;flex-wrap:wrap;align-items:center}
+    .wf-step{
+      flex:1;min-width:100px;
+      background:rgba(255,255,255,.05);border:1px solid var(--line);
+      border-radius:12px;padding:10px 12px;text-align:center;
+    }
+    .wf-step .wf-icon{font-size:18px;margin-bottom:4px}
+    .wf-step .wf-name{font-size:12px;font-weight:850}
+    .wf-step .wf-sub{font-size:11px;color:var(--muted);margin-top:2px}
+    .wf-arrow{font-size:16px;color:var(--cyan);padding:0 6px;flex-shrink:0}
+
+    /* ── CAPABILITY TABLE ── */
+    .cap-table{width:100%;border-collapse:collapse;font-size:12px}
+    .cap-table th{
+      background:rgba(91,124,255,.18);color:var(--cyan);
+      padding:8px 10px;text-align:left;font-size:11px;letter-spacing:.06em;
+      border-bottom:1px solid var(--line);
+    }
+    .cap-table td{padding:8px 10px;border-bottom:1px solid rgba(180,210,255,.07);vertical-align:top;color:var(--muted);line-height:1.5}
+    .cap-table tr:last-child td{border-bottom:none}
+    .cap-table td:first-child{font-weight:800;color:var(--ink);white-space:nowrap}
+    .badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;margin:1px}
+    .badge.cyan{background:rgba(89,199,255,.15);color:#d7f5ff}
+    .badge.green{background:rgba(56,217,150,.15);color:#d7fff0}
+    .badge.yellow{background:rgba(243,202,87,.15);color:#fff4cc}
+    .badge.red{background:rgba(255,118,152,.15);color:#ffd6de}
+    .badge.purple{background:rgba(161,124,255,.15);color:#ede3ff}
+    .badge.gray{background:rgba(180,210,255,.08);color:var(--muted)}
+
+    /* ── EVIDENCE BOX ── */
+    .evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .ev-box{
+      border:1px solid var(--line);border-radius:14px;padding:12px;
+      font-size:12px;line-height:1.6;
+    }
+    .ev-box.verified{border-color:rgba(56,217,150,.4);background:rgba(56,217,150,.06)}
+    .ev-box.unverified{border-color:rgba(255,118,152,.4);background:rgba(255,118,152,.06)}
+    .ev-box.boundary{border-color:rgba(243,202,87,.4);background:rgba(243,202,87,.06)}
+    .ev-label{font:800 11px ui-monospace,Menlo,monospace;letter-spacing:.1em;margin-bottom:5px}
+    .ev-box.verified .ev-label{color:var(--green)}
+    .ev-box.unverified .ev-label{color:var(--red)}
+    .ev-box.boundary .ev-label{color:var(--yellow)}
+    .ev-box p{margin:0;color:var(--muted)}
+    .ev-box strong{color:var(--ink)}
+
+    /* ── RISK SECTION ── */
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .risk-card{
+      border:1px solid var(--line);border-radius:14px;padding:12px;
+      background:rgba(255,255,255,.03);
+    }
+    .risk-icon{font-size:18px;margin-bottom:6px}
+    .risk-title{font-size:13px;font-weight:850;margin-bottom:4px}
+    .risk-desc{font-size:12px;color:var(--muted);line-height:1.55}
+
+    /* ── FOOTER ── */
+    .footer{
+      margin-top:14px;
+      border:1px solid var(--line);border-radius:14px;
+      background:rgba(9,11,20,.9);
+      padding:12px 16px;
+      display:flex;justify-content:space-between;gap:10px;align-items:center;
+      flex-wrap:wrap;
+    }
+    .footer-l{font-size:11px;color:var(--muted)}
+    .footer-r{font-size:11px;color:var(--cyan)}
+    .footer-r a{color:var(--cyan);text-decoration:underline;text-underline-offset:2px}
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:900px){
+      .hero{grid-template-columns:1fr}
+      .phase-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .evidence-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:600px){
+      .page{padding:12px 0 50px}
+      .page,.hero,.section-body{padding-left:10px;padding-right:10px}
+      .phase-grid{grid-template-columns:1fr 1fr}
+      .risk-grid{grid-template-columns:1fr}
+      .workflow{flex-direction:column;align-items:stretch}
+      .wf-arrow{transform:rotate(90deg);text-align:center;padding:4px 0}
+      h1{font-size:clamp(28px,11vw,48px)}
+      .cap-table{font-size:11px;display:block;overflow-x:auto}
+    }
+    @media(max-width:380px){
+      .phase-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="eyebrow">PRODUCT DISCOVERY · MULTI-AGENT · HERMES</div>
+      <h1>一个人如何用<br>多 Agent 压缩<br>产品发现周期</h1>
+      <p class="subtitle">用 Hermes Agent 的 subagent 并行能力，把传统产品发现流程（用户访谈→需求分析→原型设计→验证）的串行时间压缩为可重叠的并行流水线。</p>
+      <p class="lede">核心思路：把"人肉串行"换成"Agent 并行 + 结果汇总"。用 delegate_task 把研究、分析、生成、审查任务同时交给独立 Agent，结果由父 Agent 合成。每个阶段可审查、可中断、可修正。</p>
+      <div class="chips">
+        <span class="chip cyan">subagents 并行</span>
+        <span class="chip green">delegate_task</span>
+        <span class="chip yellow">terminal / web_search</span>
+        <span class="chip red">⚠ 证据边界标注</span>
+      </div>
+    </div>
+
+    <aside class="hero-panel">
+      <div class="panel-title">HERMES AGENT 角色映射</div>
+      <div class="panel-h2">四类 Agent × 产品发现阶段</div>
+
+      <div class="role-row">
+        <div class="role-name">🔍 研究 Agent</div>
+        <div class="role-desc">并行抓取竞品、用户评论、社交媒体信号；用 web_search 批量收集一手资料。</div>
+        <div style="font-size:11px;color:var(--yellow);margin-top:4px">工具：web_search、browser_navigate</div>
+      </div>
+      <div class="divider"></div>
+      <div class="role-row">
+        <div class="role-name">📊 分析 Agent</div>
+        <div class="role-desc">对研究结果做结构化分析：痛点聚类、需求分类、优先级打分，输出 Markdown 报告。</div>
+        <div style="font-size:11px;color:var(--yellow);margin-top:4px">工具：read_file、patch、terminal</div>
+      </div>
+      <div class="divider"></div>
+      <div class="role-row">
+        <div class="role-name">⚡ 原型 Agent</div>
+        <div class="role-desc">根据分析结论快速生成 PRD、原型描述或代码骨架，不等待人工确认。</div>
+        <div style="font-size:11px;color:var(--yellow);margin-top:4px">工具：terminal、write_file、skill_view</div>
+      </div>
+      <div class="divider"></div>
+      <div class="role-row">
+        <div class="role-name">✅ 审查 Agent</div>
+        <div class="role-desc">对原型做质量门禁检查：逻辑一致性、技术可行性、竞品差异化。</div>
+        <div style="font-size:11px;color:var(--yellow);margin-top:4px">工具：read_file、browser_*</div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- PHASES -->
+  <section class="section">
+    <div class="section-head">
+      <h2>01 / 四阶段并行流水线</h2>
+      <p>每个阶段由独立 subagent 执行，可单独审查、重新运行或中止</p>
+    </div>
+    <div class="section-body">
+      <div class="phase-grid">
+        <div class="phase-card">
+          <div class="phase-num">PHASE 01</div>
+          <div class="phase-title">🕵️ 竞品 &amp; 市场研究</div>
+          <ul class="phase-tasks">
+            <li>抓取 App Store / Google Play 评论区</li>
+            <li>搜索 Reddit / X / 微博相关话题</li>
+            <li>汇总竞品功能矩阵</li>
+            <li>识别市场空白点</li>
+          </ul>
+          <span class="phase-agent">研究 Agent</span>
+        </div>
+        <div class="phase-card">
+          <div class="phase-num">PHASE 02</div>
+          <div class="phase-title">🧩 需求分析与假设生成</div>
+          <ul class="phase-tasks">
+            <li>聚类用户痛点关键词</li>
+            <li>生成 3~5 个需求假设</li>
+            <li>评估市场规模与可行性</li>
+            <li>输出需求优先级矩阵</li>
+          </ul>
+          <span class="phase-agent">分析 Agent</span>
+        </div>
+        <div class="phase-card">
+          <div class="phase-num">PHASE 03</div>
+          <div class="phase-title">🛠️ 原型快速生成</div>
+          <ul class="phase-tasks">
+            <li>生成 PRD 草稿（Markdown）</li>
+            <li>输出功能描述与用户故事</li>
+            <li>生成初步 API 接口设计</li>
+            <li>创建技术选型建议</li>
+          </ul>
+          <span class="phase-agent">原型 Agent</span>
+        </div>
+        <div class="phase-card">
+          <div class="phase-num">PHASE 04</div>
+          <div class="phase-title">🔬 审查 &amp; 验证决策</div>
+          <ul class="phase-tasks">
+            <li>逻辑一致性审查</li>
+            <li>竞品差异化核对</li>
+            <li>技术可行性评估</li>
+            <li>输出 Go / No-Go 建议</li>
+          </ul>
+          <span class="phase-agent">审查 Agent</span>
+        </div>
+      </div>
+
+      <!-- WORKFLOW -->
+      <div style="margin-top:14px">
+        <div class="panel-title" style="margin-bottom:8px">并行执行示意</div>
+        <div class="workflow">
+          <div class="wf-step" style="border-color:rgba(89,199,255,.4)">
+            <div class="wf-icon">🔍</div>
+            <div class="wf-name">研究 Agent</div>
+            <div class="wf-sub">并行启动</div>
+          </div>
+          <div class="wf-arrow">→</div>
+          <div class="wf-step" style="border-color:rgba(161,124,255,.4)">
+            <div class="wf-icon">📊</div>
+            <div class="wf-name">分析 Agent</div>
+            <div class="wf-sub">并行启动</div>
+          </div>
+          <div class="wf-arrow">→</div>
+          <div class="wf-step" style="border-color:rgba(243,202,87,.4)">
+            <div class="wf-icon">⚡</div>
+            <div class="wf-name">原型 Agent</div>
+            <div class="wf-sub">等分析结果</div>
+          </div>
+          <div class="wf-arrow">→</div>
+          <div class="wf-step" style="border-color:rgba(56,217,150,.4)">
+            <div class="wf-icon">✅</div>
+            <div class="wf-name">审查 Agent</div>
+            <div class="wf-sub">等原型完成</div>
+          </div>
+          <div class="wf-arrow">→</div>
+          <div class="wf-step" style="background:rgba(91,124,255,.1);border-color:rgba(91,124,255,.4)">
+            <div class="wf-icon">📦</div>
+            <div class="wf-name">父 Agent 汇总</div>
+            <div class="wf-sub">结果合成</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAPABILITIES -->
+  <section class="section">
+    <div class="section-head">
+      <h2>02 / Hermes Agent 能力核查</h2>
+      <p>仅列出 github.com/NousResearch/hermes-agent README 明确标注的能力</p>
+    </div>
+    <div class="section-body">
+      <table class="cap-table">
+        <thead>
+          <tr>
+            <th>能力</th>
+            <th>描述</th>
+            <th>在本流程中的作用</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>subagents / parallel</td>
+            <td>父 Agent 可同时启动多个独立 subagent 进程并行执行任务</td>
+            <td>研究、分析、审查三路同时启动，时间成本从串行叠加变为最大路径</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>delegate_task</td>
+            <td>将任务分发给独立 Agent，每个拥有独立 session 和工具集</td>
+            <td>各阶段 Agent 互不干扰，工具集按需配置（研究用 web_search，审查用 browser_*）</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>terminal</td>
+            <td>在宿主机执行 Shell 命令，支持 Python/Node/Go 等工具链</td>
+            <td>运行 Python 脚本做数据清洗、执行 MCP 工具、部署验证脚本</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>memory</td>
+            <td>跨 session 持久化存储（User Profile + Agent Memory）</td>
+            <td>产品背景、品牌约束、技术栈偏好写入 memory，后续 Agent 自动注入</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>skills</td>
+            <td>可复用技能单元，SKILL.md 格式，支持触发条件与步骤</td>
+            <td>将"竞品研究 → 分析 → 原型 → 审查"封装为 4 个 Skill，一键加载完整工作流</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>cron</td>
+            <td>定时触发 Agent 任务，支持推送结果到指定平台</td>
+            <td>每日自动跑竞品监控竞品评论更新，新信号出现时主动推送</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>web_search</td>
+            <td>内置网页搜索工具</td>
+            <td>研究 Agent 批量抓取市场数据、用户评论、竞品信息</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>browser_*</td>
+            <td>浏览器操作工具集（navigate、snapshot、click、type 等）</td>
+            <td>审查 Agent 截图验证竞品 UI、分析页面结构、提取动态加载内容</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>gateway / 多平台</td>
+            <td>接入飞书、微信、Telegram 等多平台消息渠道</td>
+            <td>发现结果自动推送到飞书群或个人微信，减少人工盯屏成本</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+          <tr>
+            <td>session_search</td>
+            <td>在历史 session 中检索上下文</td>
+            <td>父 Agent 回顾上一轮发现结论，避免重复研究同一问题</td>
+            <td><span class="badge green">✓ 已核实</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- EVIDENCE BOUNDARIES -->
+  <section class="section">
+    <div class="section-head">
+      <h2>03 / 证据边界与风险</h2>
+      <p>显式区分"已核实事实"、"来源未核验"与"已知局限"</p>
+    </div>
+    <div class="section-body">
+      <div class="evidence-grid">
+        <div class="ev-box verified">
+          <div class="ev-label">✓ 已核实（Hermes 官方 README）</div>
+          <p><strong>terminal / subagents / parallel / delegate_task / memory / skills / cron / web_search / browser_* / gateway / session_search</strong> 均为 Hermes Agent 明确标注并文档化的能力，可直接在产品发现流程中调用。</p>
+        </div>
+        <div class="ev-box unverified">
+          <div class="ev-label">⚠ 来源未核验（X 帖文 / 第三方案例）</div>
+          <p>X 帖文 <strong>@tyaplyap_ai</strong>（<code>x.com/tyaplyap_ai/status/2079348474340888847</code>）提及的收入数字、人物背景、具体案例均为<strong>未核验信息</strong>，不代表 Hermes Agent 实际能力上限或行业平均水平，不作为结论依据。</p>
+        </div>
+        <div class="ev-box boundary">
+          <div class="ev-label">⚠ 已知局限与风险边界</div>
+          <p><strong>幻觉风险：</strong>各 Agent 的 LLM 生成内容（PRD、需求假设、技术选型）均可能产生幻觉，审查 Agent 只能降低概率，不能完全消除。<br><br><strong>并行成本：</strong>多 Agent 并行消耗 token 数量约为串行的 2~4 倍，需要评估 API 成本是否匹配发现阶段的价值。<br><br><strong>工具可用性：</strong>web_search 质量依赖搜索引擎返回内容，竞品新功能或未公开信息无法被自动发现。</p>
+        </div>
+        <div class="ev-box boundary">
+          <div class="ev-label">⚠ 流程适用边界</div>
+          <p>本流程适合<strong>探索期产品发现</strong>（方向未明确、需要快速扫市场），不适合以下场景：<br>· <strong>交付确定性要求高</strong>的产品迭代（需要人工深度审查）<br>· <strong>涉及敏感数据</strong>的用户研究（Agent 无法访问受保护数据源）<br>· <strong>需要面对面访谈</strong>才能捕捉的隐性需求（仅靠二手数据分析）</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RISK -->
+  <section class="section">
+    <div class="section-head">
+      <h2>04 / 使用风险速查</h2>
+      <p>三个最常见的使用误区与对应的防御策略</p>
+    </div>
+    <div class="section-body">
+      <div class="risk-grid">
+        <div class="risk-card">
+          <div class="risk-icon">🤖</div>
+          <div class="risk-title">把 Agent 结论当事实</div>
+          <div class="risk-desc">PRD、需求假设、竞品分析均由 LLM 生成，存在幻觉。建议至少保留一个人工审查节点，尤其是关键决策点（Go / No-Go）。</div>
+        </div>
+        <div class="risk-card">
+          <div class="risk-icon">💸</div>
+          <div class="risk-title">忽视并行 token 成本</div>
+          <div class="risk-desc">4 个 Agent 并行 → 约 4x 单 Agent 成本。发现阶段预算有限时，优先对研究 + 分析两个高价值阶段并行，原型与审查仍可串行。</div>
+        </div>
+        <div class="risk-card">
+          <div class="risk-icon">🔒</div>
+          <div class="risk-title">敏感信息注入风险</div>
+          <div class="risk-desc">将竞品分析、用户评论输入给 Agent 前，确认数据合规边界。涉及用户隐私、NDA 协议内容不应通过 Agent 处理。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <section class="footer">
+    <div class="footer-l">HERMES AGENT · 产品发现加速 · 2026-07-21 · infocard-pub</div>
+    <div class="footer-r">
+      核实来源：<a href="https://github.com/NousResearch/hermes-agent" target="_blank" rel="noopener">github.com/NousResearch/hermes-agent</a> ·
+      X 帖文标注未核验 ⚠
+    </div>
+  </section>
+
+</main>
+<script>
+(function(){
+  function send(){
+    var h=document.body.scrollHeight;
+    window.parent.postMessage({type:'theme-height',slug:'darkblue',height:h},'*');
+  }
+  if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+  setTimeout(send,500);
+})();
+</script>
+</body>
+</html>
