@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>三平台图像生成限制对比：gpt-image-2 / grok-imagine-image / gemini-3.1-flash-image</title>
+  <style>
+    :root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12);}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif}
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    /* SECTIONS */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-copy{padding-top:8px}
+    .section-copy h2{margin:0 0 8px;font-size:19px;line-height:1.2;letter-spacing:-.02em}
+    .section-copy p{font-size:12.5px;line-height:1.65;color:#333}
+    /* FACT BLOCKS */
+    .fact-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:12px}
+    .fact-block{border:2px solid var(--line);background:var(--paper);padding:12px 14px;display:grid;gap:6px}
+    .fact-block .tag{display:inline-flex;align-items:center;height:26px;padding:0 8px;border:2px solid var(--line);background:#fff;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .fact-block .tag.red{background:var(--red);color:#fff}
+    .fact-block .tag.blue{background:var(--blue);color:#fff}
+    .fact-block .tag.dark{background:#111;color:#fff}
+    .fact-block .tag.green{background:#1a7a3c;color:#fff}
+    .fact-block .tag.orange{background:#d87000;color:#fff}
+    .fact-block .tag.yellow{background:#f5c518;color:#111}
+    .fact-block .val{font-size:13.5px;font-weight:750;line-height:1.4}
+    .fact-block .sub{font-size:11.5px;color:var(--muted);line-height:1.5}
+    .fact-block.full{grid-column:1/-1}
+    .fact-block.full .val{font-size:14.5px}
+    /* TABLE */
+    .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:12px}
+    .comp-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:600px}
+    .comp-table th{background:#111;color:#fff;padding:9px 12px;text-align:left;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;border:2px solid #111}
+    .comp-table td{padding:9px 12px;border:2px solid var(--line);background:var(--paper);vertical-align:top;line-height:1.55}
+    .comp-table tr:hover td{background:#f7f6f2}
+    .good{color:#1a7a3c;font-weight:800}
+    .warn{color:#d87000;font-weight:800}
+    .bad{color:var(--red);font-weight:800}
+    .neutral{color:var(--muted)}
+    /* EVIDENCE */
+    .evidence{margin-top:14px;border:2px solid var(--line);background:var(--paper);padding:12px 14px}
+    .evidence-head{font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .ev-item{display:grid;grid-template-columns:60px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid rgba(17,17,17,.12);font-size:12px;line-height:1.5}
+    .ev-item:last-child{border-bottom:none}
+    .ev-grade{display:inline-flex;align-items:center;justify-content:center;width:44px;height:22px;font-size:11px;font-weight:900;border:2px solid var(--line)}
+    .ev-grade.A{background:var(--red);color:#fff}
+    .ev-grade.B{background:var(--blue);color:#fff}
+    .ev-grade.C{background:var(--muted);color:#fff}
+    /* CLOSING */
+    .closing{border:2px solid var(--line);background:var(--paper);padding:14px;margin-top:14px}
+    .closing h3{font-size:15px;letter-spacing:-.02em;margin-bottom:8px}
+    .closing p{font-size:12.5px;line-height:1.65;color:#333}
+    @media(max-width:720px){.hero{grid-template-columns:1fr}.hero-copy{border-right:none;border-bottom:3px solid var(--line)}.section-head{grid-template-columns:1fr}.section-no{width:60px;height:60px;font-size:22px}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">图像生成 · 限制政策对比</div>
+    <h1 class="demo-title">gpt-image-2 vs grok-imagine-image vs gemini-3.1-flash-image</h1>
+    <p class="subtitle">2026年三平台最新图像生成模型：NSFW安全策略、社区实测与本质差异横向对比。移除过时结论，仅含最新可核实信息。</p>
+    <div class="badge-row">
+      <span class="badge dark">gpt-image-2</span>
+      <span class="badge dark">grok-imagine-image</span>
+      <span class="badge dark">gemini-3.1-flash-image</span>
+      <span class="badge">2026-07 最新</span>
+    </div>
+    <div class="alert">
+      <strong>⚠️ 模型边界警告（2026-07-22）</strong>
+      <p>本卡仅比较三平台<strong>当前各自的图像生成模型</strong>：gpt-image-2（OpenAI）、grok-imagine-image（xAI，2026-03-02快照）、gemini-3.1-flash-image（Google，代号 Nano Banana 2）。GPT-5.2 / Grok 4.5 / Gemini 3.5 是<strong>文本模型</strong>，不在本卡讨论范围。</p>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="panel-top">
+      <div class="eyebrow">⚖️ 限制严格度排序</div>
+      <h3>Gemini &gt; GPT-Image-2 &gt; Grok-Imagine</h3>
+      <p>数字越小表示内容限制越严格（基于社区实测与官方政策对比）</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote">
+        <strong>社区共识</strong><br/>
+        Gemini 被 Reddit 用户描述为"过度审查"（80+评论），grok-imagine-image 的 xAI AUP（2026-06-26）允许版权角色与政治人物图像，GPT-image-2 提供 auto/low 两档 moderation 参数。
+      </div>
+      <div class="fact-grid" style="margin-top:10px">
+        <div class="fact-block">
+          <span class="tag orange">Gemini</span>
+          <div class="val">最严格</div>
+          <div class="sub">零容忍真实人物照片；误屏蔽历史人物/雕像</div>
+        </div>
+        <div class="fact-block">
+          <span class="tag blue">GPT-img-2</span>
+          <div class="val">中等偏严</div>
+          <div class="val">auto/low 两档</div>
+          <div class="sub">moderation 参数可选</div>
+        </div>
+        <div class="fact-block">
+          <span class="tag green">Grok-Imagine</span>
+          <div class="val">相对宽松</div>
+          <div class="sub">允许版权角色、政治人物图像生成</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OVERVIEW -->
+<div class="section">
+  <div class="overview">
+    <div class="overview-sentence">三平台图像模型均支持文生图与图生图，但设计哲学与限制策略截然不同。</div>
+    <div class="overview-body">
+      <p>本卡以<strong>官方文档原文</strong>（developers.openai.com、docs.x.ai、Google AI for Developers）与<strong>社区实测</strong>（Reddit r/GoogleGeminiAI、r/grok、r/ChatGPT）为双来源，聚焦 NSFW 限制政策、水印机制、文字渲染能力与平台差异。信息来源均注明证据等级（A 官方/B 媒体/C 社区）。</p>
+    </div>
+  </div>
+
+  <!-- SECTION 01 -->
+  <div class="section-head">
+    <div class="section-no">01</div>
+    <div class="section-copy">
+      <h2>官方限制政策：原文对比</h2>
+      <p>三平台对图像内容的限制政策均来自官方 Acceptable Use Policy / Usage Policy，含 2026 年最新版本。</p>
+    </div>
+  </div>
+
+  <div class="fact-grid">
+    <div class="fact-block full">
+      <span class="tag blue">gpt-image-2 · OpenAI</span>
+      <div class="val">moderation 参数：auto（默认）/ low；错误返回 <code>moderation_blocked</code> 含 <code>categories</code> 字段</div>
+      <div class="sub">官方文档：所有提示词与生成图像均依据 Usage Policy 过滤；moderation_stage 分为 input / output 两个阶段；错误返回可选的 moderation_details 对象（含 categories 列表如 harassment 等）</div>
+    </div>
+    <div class="fact-block full">
+      <span class="tag green">grok-imagine-image · xAI</span>
+      <div class="val">AUP 2026-06-26 生效；无公开 moderation 参数；明确允许版权角色、政治人物图像；禁止移除水印</div>
+      <div class="sub">xAI AUP 明确：禁止"undressing or nudifying real persons"、"depicting likenesses of persons in a pornographic manner"；允许版权角色（如米老鼠）、政治人物图像；明确禁止"Stripping, altering or circumventing embedded provenance metadata or watermarks"</div>
+    </div>
+    <div class="fact-block full">
+      <span class="tag orange">gemini-3.1-flash-image · Google</span>
+      <div class="val">SynthID 水印全量嵌入；2026-01 政策：可识别真实人物图像零容忍；禁止深度伪造、非自愿亲密图像</div>
+      <div class="sub">Google AI 内容政策（2026-01 更新）：禁止 CSAM、极端暴力、可识别真实人物的未经同意图像；SynthID 水印确认存在（社区已出现第三方移除工具 GeminiWatermarkRemover）</div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+  <table class="comp-table">
+    <thead>
+      <tr>
+        <th style="width:22%">限制项目</th>
+        <th style="width:26%">gpt-image-2</th>
+        <th style="width:26%">grok-imagine-image</th>
+        <th style="width:26%">gemini-3.1-flash-image</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>裸露/色情内容</b></td>
+        <td class="bad">❌ 硬屏蔽；auto/low 两档过滤</td>
+        <td class="warn">⚠️ 禁止真实人物裸体；但允许非写真版权角色</td>
+        <td class="bad">❌ 零容忍；禁止一切色情写真</td>
+      </tr>
+      <tr>
+        <td><b>版权角色图像</b></td>
+        <td class="warn">⚠️ 存在版权过滤机制，但吉卜力风格曾被大量生成（2025-03-27）</td>
+        <td class="good">✅ 允许（如米老鼠肖像等版权角色）</td>
+        <td class="warn">⚠️ 有限制；具体范围未完全公开</td>
+      </tr>
+      <tr>
+        <td><b>政治人物图像</b></td>
+        <td class="warn">⚠️ 有过滤，但历史上曾大量生成</td>
+        <td class="good">✅ AUP 允许政治人物图像（Elon 公开演示）</td>
+        <td class="warn">⚠️ 有过滤；政策2026-01收紧</td>
+      </tr>
+      <tr>
+        <td><b>真实人物照片编辑</b></td>
+        <td class="warn">⚠️ 有 moderation 过滤，但 auto/low 可调</td>
+        <td class="warn">⚠️ 禁止"undressing real persons"；普通编辑未明确禁止</td>
+        <td class="bad">❌ 2026-01起零容忍政策</td>
+      </tr>
+      <tr>
+        <td><b>深度伪造</b></td>
+        <td class="warn">⚠️ 有过滤，但不如 Gemini 严格</td>
+        <td class="warn">⚠️ 禁止"deceptively impersonating a real person"</td>
+        <td class="bad">❌ 全面禁止</td>
+      </tr>
+      <tr>
+        <td><b>儿童相关图像</b></td>
+        <td class="bad">❌ 绝对禁止</td>
+        <td class="bad">❌ 绝对禁止（Sexualizing or exploiting children）</td>
+        <td class="bad">❌ 绝对禁止（CSAM 零容忍）</td>
+      </tr>
+      <tr>
+        <td><b>水印/元数据移除</b></td>
+        <td class="neutral">未明确（官方未公开 C2PA 细节）</td>
+        <td class="bad">❌ 明确禁止（AUP 第2026-06-26版）</td>
+        <td class="bad">❌ 禁止（SynthID 嵌入）</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- SECTION 02 -->
+  <div class="section-head">
+    <div class="section-no b">02</div>
+    <div class="section-copy">
+      <h2>文字渲染能力（社区实测）</h2>
+      <p>文字渲染是三平台差距最显著的能力指标，也是用户感知最直接的区别。</p>
+    </div>
+  </div>
+
+  <div class="fact-grid">
+    <div class="fact-block">
+      <span class="tag blue">gpt-image-2</span>
+      <div class="val">中文准确率 95%+</div>
+      <div class="sub">2026-04 GPT-Image-2 发布后从约60%跃升至95%以上（社区多平台实测）</div>
+    </div>
+    <div class="fact-block">
+      <span class="tag green">grok-imagine-image</span>
+      <div class="val">中等偏强</div>
+      <div class="sub">Aurora/Imagine 在文字渲染上持续改善，但不如 GPT-image-2；社区将其列为第三优（Flux > GPT-image-2 > Aurora）</div>
+    </div>
+    <div class="fact-block">
+      <span class="tag orange">gemini-3.1-flash-image</span>
+      <div class="val">中等（Nano Banana 2 改善）</div>
+      <div class="sub">Google 官方称 Nano Banana 2 改善了文字渲染，但 Reddit 用户仍反映存在扭曲；早期版本中文渲染反馈"效果清晰"但非顶级</div>
+    </div>
+  </div>
+
+  <div class="alert" style="margin-top:12px">
+    <strong>文字渲染评级（2026-07 社区共识）</strong>
+    <p>GPT-image-2（95%+）&gt; grok-imagine-image &gt; gemini-3.1-flash-image。GPT-image-2 已在多个中文社区（知乎、CSDN）被评价为"终结 AI 文字乱码"。</p>
+  </div>
+
+  <!-- SECTION 03 -->
+  <div class="section-head">
+    <div class="section-no k">03</div>
+    <div class="section-copy">
+      <h2>图生图 / 编辑能力</h2>
+      <p>三平台均已支持图生图，但入口、成熟度与限制各有差异。</p>
+    </div>
+  </div>
+
+  <div class="fact-grid">
+    <div class="fact-block">
+      <span class="tag blue">gpt-image-2</span>
+      <div class="val">✅ 支持（成熟）</div>
+      <div class="sub">Image API：v1/images/edits；Responses API：多轮对话编辑（context 保留）；支持局部重绘、全图替换</div>
+    </div>
+    <div class="fact-block">
+      <span class="tag green">grok-imagine-image</span>
+      <div class="val">✅ 支持（Growing）</div>
+      <div class="sub">Image Editing + Multi-Image Editing 文档已发布；Aurora 定位为文生图引擎；Grok 3（2025-03-22）新增 Edit Image 功能</div>
+    </div>
+    <div class="fact-block">
+      <span class="tag orange">gemini-3.1-flash-image</span>
+      <div class="val">✅ 支持（严格受限）</div>
+      <div class="sub">支持图像编辑；所有编辑内容同样受零容忍政策约束；真实人物图像编辑几乎无法进行</div>
+    </div>
+  </div>
+
+  <!-- SECTION 04 -->
+  <div class="section-head">
+    <div class="section-no">04</div>
+    <div class="section-copy">
+      <h2>社区反馈热点（2026年）</h2>
+      <p>Reddit / X / 知乎 社区对三平台图像限制的代表性评价，含时间戳。</p>
+    </div>
+  </div>
+
+  <div class="fact-grid">
+    <div class="fact-block">
+      <span class="tag orange">Gemini · r/GoogleGeminiAI</span>
+      <div class="val">"Gemini became NSFW?" 80+评论</div>
+      <div class="val">"Overly restrictive censorship" 热点讨论</div>
+      <div class="sub">Reddit 2026年：Gemini 图像生成被描述为"hyper-sensitive"，频繁误屏蔽历史人物、宗教雕像、基本构图</div>
+    </div>
+    <div class="fact-block">
+      <span class="tag blue">GPT-image-2 · 多平台</span>
+      <div class="val">"gpt-image-2 quality over last 24 hours" 大量投诉</div>
+      <div class="sub">OpenAI 开发者社区（2026年）：用户反映近期质量下降；中文渲染 95%+ 评价稳定；API 限流问题持续</div>
+    </div>
+    <div class="fact-block">
+      <span class="tag green">Grok-Imagine · r/grok / X</span>
+      <div class="val">"Aurora vs GPT-image-2: Grok wins on policy" 讨论帖</div>
+      <div class="sub">Reddit/X 2026年：Grok 的版权/政治限制宽松度被社区多次正面提及；已知问题：人体解剖偶有怪异</div>
+    </div>
+  </div>
+
+  <!-- EVIDENCE GRID -->
+  <div class="evidence">
+    <div class="evidence-head">📌 关键信息来源（可核实）</div>
+    <div class="ev-item">
+      <span class="ev-grade A">A</span>
+      <span><b>gpt-image-2 Limitations</b>：<code>moderation auto/low</code>；错误返回 <code>moderation_blocked</code> 含 categories — <em>developers.openai.com/api/docs/guides/image-generation（2026-07持续更新）</em></span>
+    </div>
+    <div class="ev-item">
+      <span class="ev-grade A">A</span>
+      <span><b>xAI AUP 2026-06-26</b>：生效日期；禁止真实人物裸体；允许版权角色；禁止水印移除 — <em>x.ai/legal/acceptable-use-policy</em></span>
+    </div>
+    <div class="ev-item">
+      <span class="ev-grade A">A</span>
+      <span><b>grok-imagine-image 模型页</b>：快照版本 grok-imagine-image-2026-03-02；$0.02/张；支持 Image Editing / Multi-Image Editing — <em>docs.x.ai/developers/models/grok-imagine-image</em></span>
+    </div>
+    <div class="ev-item">
+      <span class="ev-grade A">A</span>
+      <span><b>Gemini 3.1 Flash Image</b>：代号 Nano Banana 2；SynthID 水印确认；2026-01 零容忍政策收紧 — <em>ai.google.dev，Google Cloud docs</em></span>
+    </div>
+    <div class="ev-item">
+      <span class="ev-grade B">B</span>
+      <span><b>GPT-image-2 中文渲染 95%+</b>：多平台社区实测（知乎、CSDN、SegmentFault），2026年4月后评价集中 — <em>搜索聚合</em></span>
+    </div>
+    <div class="ev-item">
+      <span class="ev-grade C">C</span>
+      <span><b>Gemini "过度审查"</b>：Reddit r/GoogleGeminiAI "Gemini became NSFW?" 80+评论；"overly restrictive" — <em>Reddit</em></span>
+    </div>
+  </div>
+
+  <!-- CLOSING -->
+  <div class="closing">
+    <h3>🎯 一句话结论</h3>
+    <p>三平台在限制严格度上形成明确梯度：<strong>Gemini（极严，SynthID 全量水印）&gt; gpt-image-2（auto/low 两档，可选宽松）&gt; grok-imagine-image（相对宽松，明确允许版权/政治内容）</strong>。本质差异在于产品哲学：Google 用最严格限制换安全可信，OpenAI 给开发者选择权，xAI 以最少限制换取创作自由度。</p>
+  </div>
+
+</div>
+</div>
+</body>
+</html>
