@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grok-skills：将 Grok 接入 Claude Code / Codex 作为 subagent</title>
+<style>
+:root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111;--muted:#5f5950;--line:#111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12)}
+*{box-sizing:border-box;margin:0;padding:0}html,body{overflow-x:hidden}
+body{color:var(--ink);background:linear-gradient(rgba(17,17,17,.045) 1px,transparent 1px) 0 0/100% 42px,linear-gradient(90deg,rgba(17,17,17,.04) 1px,transparent 1px) 0 0/42px 100%,var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:12.5px;line-height:1.6}
+.page{width:min(1040px,calc(100% - 20px));margin:auto;padding:18px 0 70px}
+a{color:inherit}.hero{display:grid;grid-template-columns:1.08fr .92fr;border:3px solid var(--line);background:var(--paper);overflow:hidden}.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}.hero-bar:before{content:"";position:absolute;left:0;top:0;bottom:0;width:190px;background:var(--red)}.hero-bar:after{content:"";position:absolute;right:0;top:0;bottom:0;width:136px;background:var(--blue)}.hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}.kicker{width:max-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.12em}.kicker:before{content:"■";color:var(--red);margin-right:8px}h1{font-size:clamp(22px,3.5vw,40px);line-height:1;letter-spacing:-.05em}.subtitle{color:var(--muted);font-size:13px}.badges{display:flex;flex-wrap:wrap;gap:6px}.badge{border:2px solid var(--line);padding:5px 9px;background:#fff;font-weight:850;font-size:11.8px}.badge.red{background:var(--red);color:#fff}.badge.blue{background:var(--blue);color:#fff}.alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px}.alert strong{display:block;font-size:14px}.alert p{color:#f0ebe0;font-size:12.5px;margin-top:4px}.hero-visual{background:#fff}.panel-top{padding:14px;border-bottom:3px solid var(--line);background:#18181c;color:#fff}.eyebrow{border:1.5px solid #fff;padding:3px 8px;font-size:11.2px;font-weight:900;letter-spacing:.12em}.panel-top h2{font-size:21px;line-height:1.1;letter-spacing:-.04em}.panel-top p{color:#ece8dc;font-size:13px;margin-top:6px}.panel-body{padding:14px;background:#f7f6f2;display:grid;gap:10px}.flow{display:grid;gap:8px}.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;position:relative}.flow-item::after{content:"↓";position:absolute;left:12px;bottom:-16px;color:var(--blue);font-size:15px;font-weight:900}.flow-item:last-child::after{display:none}.flow-item .t{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:900}.flow-item .c{font-size:13.5px;font-weight:900;margin-top:4px}.flow-item.red .c{color:var(--red)}.flow-item.blue .c{color:var(--blue)}.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:14px}.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}.section-no.b{background:var(--blue)}.section-no.k{background:#111}.section-meta{display:grid;gap:6px;padding-top:4px}.section-meta .label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red);font-weight:900}.section-meta .label.b{color:var(--blue)}.section-meta .label.k{color:#111}.section-meta h2{margin:0;font-size:clamp(20px,3.5vw,36px);line-height:1.02;letter-spacing:-.05em}.section-meta p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.6}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.card{border:2px solid var(--line);background:var(--paper);padding:14px;display:grid;gap:8px}.card h3{font-size:14.5px;font-weight:950;letter-spacing:-.01em}.card p,.card li{font-size:12.5px;line-height:1.65}.card ul{padding-left:16px}.card.red{border-color:var(--red);background:#fffdf5}.card.blue{border-color:var(--blue);background:var(--soft-blue)}.card.dark{border-color:#111;background:#111;color:#fff}.card.dark h3{color:#fff}.card.green{border-color:#111;background:#e8f8ef}.card.warn{border-color:#111;background:#fffbe6}table{width:100%;border-collapse:collapse;font-size:12.5px}.th,.td{padding:8px 10px;border:1.5px solid var(--line);text-align:left;vertical-align:top}.th{background:#111;color:#fff;font-weight:900;font-size:11.5px;letter-spacing:.08em}.tr-even{background:#f7f6f2}.tr-good{background:#e8f8ef}.tr-warn{background:#fffbe6}.good{color:#006400;font-weight:900}.warn{color:#8b4500;font-weight:900}.delta.green{color:#1a7a1a;font-weight:900}.delta.blue{color:var(--blue);font-weight:900}.delta.red{color:var(--red);font-weight:900}.grok{background:#fff5e6}.gpt{background:#e6f0ff}.code{border:2px solid var(--line);background:#111;color:#e8e8e8;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.65;overflow-x:auto;white-space:pre}.code .k{color:#f0c060}.code .c{color:#6a9955}.code .s{color:#ce9178}.code .f{color:#c586c0}.fact{border:2px solid var(--line);border-left:5px solid var(--blue);background:var(--soft-blue);padding:10px 12px;font-size:12.5px;font-weight:700}.fact.red{border-left-color:var(--red);background:var(--soft-red)}.rule{border-top:3px solid var(--line);margin-top:30px}.source-note{font-size:11.5px;color:var(--muted);margin-top:8px}.source-note a{color:var(--blue);text-decoration:underline}
+@media(max-width:640px){.hero{grid-template-columns:1fr}.hero-copy{border-right:none;border-bottom:3px solid var(--line)}.grid2,.grid3{grid-template-columns:1fr}.section-head{grid-template-columns:60px 1fr}.section-no{width:60px;height:60px;font-size:22px}}
+</style>
+</head>
+<body>
+<main class="page">
+
+<!-- ═══ HERO ═══ -->
+<header class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">开源插件 · 多 Agent 编排</div>
+    <h1>用 fable 框架把 Grok<br>接入 Claude&nbsp;Code / Codex</h1>
+    <p class="subtitle">grok-skills · 沙盒副脑 · 审查 / 推理 / 实现 / 验证 · 全流程编排</p>
+    <div class="badges">
+      <span class="badge red">Grok (xAI)</span>
+      <span class="badge blue">Claude Code</span>
+      <span class="badge">OpenAI Codex</span>
+      <span class="badge">grok-engineer-coder</span>
+      <span class="badge">ACP peer</span>
+    </div>
+    <div class="alert">
+      <strong>一句话结论</strong>
+      <p>grok-skills 是独立开发者 <strong>@SFourdrinier</strong> 开源的 Claude Code / Codex 插件，让 Grok（xAI）作为第三智能体在你的代码库里工作——审查、推理、实现、验证，通过沙盒隔离保护主工作树。</p>
+    </div>
+  </div>
+  <aside class="hero-visual">
+    <div class="panel-top">
+      <span class="eyebrow">WORKFLOW</span>
+      <h2>分工架构</h2>
+      <p>Claude Code / Codex = 编排者，Grok = 沙盒执行者。</p>
+    </div>
+    <div class="panel-body">
+      <div class="flow">
+        <div class="flow-item">
+          <span class="t">编排者（Orchestrator）</span>
+          <span class="c">Claude Code / Codex</span>
+        </div>
+        <div class="flow-item blue">
+          <span class="t">副脑（Second Pair of Hands）</span>
+          <span class="c">Grok · grok-skills</span>
+        </div>
+        <div class="flow-item">
+          <span class="t">Grok 副智能体</span>
+          <span class="c">grok-engineer-coder · grok-rescue</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+</header>
+
+<!-- ═══ SECTION 01: 项目概览 ═══ -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">01</div>
+    <div class="section-meta">
+      <div class="label">PROJECT OVERVIEW</div>
+      <h2>项目概览</h2>
+      <p>grok-skills 将 Grok（xAI）以插件形式接入 Claude Code 和 Codex，让 Grok 作为第三个 agent 在你的代码库中工作。</p>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card">
+      <h3>🎯 核心定位</h3>
+      <p><b>不在于替代主 Agent</b>，而是为 Claude Code / Codex 增加第二个（第三个）视角——用 Grok 的推理能力做审查、诊断、代码实现。</p>
+      <p style="margin-top:6px">作者 Stephane Fourdrinier（@SFourdrinier）称其适合用 <b>fable</b> 框架控制 Grok 在多 Agent 场景下的行为。</p>
+    </div>
+    <div class="card blue">
+      <h3>⚙️ 架构层次</h3>
+      <ul style="padding-left:16px">
+        <li>Node companion（companion 脚本）</li>
+        <li>Python wrapper（Grok Agent 封装）</li>
+        <li>Grok CLI（实际调用 xAI Grok）</li>
+        <li>Claude Code / Codex 插件层</li>
+        <li>ACP peer 协议（多轮对话）</li>
+      </ul>
+    </div>
+    <div class="card red">
+      <h3>📦 两个副智能体</h3>
+      <ul style="padding-left:16px">
+        <li><b>grok-engineer-coder</b>：实现代码（通过 worktree 或 live tree）</li>
+        <li><b>grok-rescue</b>：诊断 / 第二意见（reason / code）</li>
+        <li>均通过 plugin/agents/ 注册</li>
+        <li>Codex：SessionStart 自动安装</li>
+      </ul>
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <div class="fact">
+      <b>X 帖文（2026-07-21）</b> · 作者 @SFourdrinier（Stephane，ImagiExplain 创始人）：<br>
+      <i>"I really like using fable to control grok in those ways." — 在 Claude Code 和 Codex 中用 Grok 作为第三 agent。</i>
+      <br><span style="font-size:11px;color:var(--muted)">来源：https://x.com/SFourdrinier/status/2079714032295322089 · 23 次阅读</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 02: fable 是什么 ═══ -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no blue">02</div>
+    <div class="section-meta">
+      <div class="label b">FABLE FRAMEWORK</div>
+      <h2>fable 是什么？</h2>
+      <p>fable 是 Stephane Fourdrinier 自研的 Agent 编排框架，用于控制多个 AI 模型（尤其是 Grok）在同一工作流中的行为。</p>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card dark">
+      <h3>🔧 fable 在 grok-skills 中的作用</h3>
+      <p>fable 框架是 grok-skills 的"控制平面"——决定何时调用 Grok、如何分发任务、如何处理结果。</p>
+      <ul style="padding-left:16px;color:#e8e8dc">
+        <li>多 Agent 任务分发（orchestration）</li>
+        <li>行为规范（prompt 注入 / 约束）</li>
+        <li>结果路由（审查结果 → 人类确认）</li>
+        <li>与 Claude Code / Codex 的 Skill 系统集成</li>
+      </ul>
+      <p style="margin-top:8px;color:#aaa;font-size:12px">fable 源码未独立公开，作为 grok-skills 内部编排引擎使用。</p>
+    </div>
+    <div class="card blue">
+      <h3>🧩 fable vs. 其他 Agent 框架</h3>
+      <table style="margin-top:8px">
+        <tr><th>维度</th><th>fable</th><th>传统框架</th></tr>
+        <tr><td>定位</td><td>轻量级编排引擎</td><td>重型平台</td></tr>
+        <tr><td>集成目标</td><td>Grok + Claude Code/Codex</td><td>通用多模型</td></tr>
+        <tr><td>任务分发</td><td>Skill / subagent 双轨</td><td>单一大脑</td></tr>
+        <tr><td>沙盒隔离</td><td>worktree + 验证</td><td>各异</td></tr>
+        <tr><td>安全模型</td><td>双 runMode（hardened/direct）</td><td>各异</td></tr>
+      </table>
+    </div>
+  </div>
+  <div style="margin-top:12px" class="code">
+<span class="c"># fable 编排下的 Grok subagent 生命周期</span>
+<span class="f">1.</span> <span class="k">fable</span> 接收 Claude Code / Codex 的任务委托
+<span class="f">2.</span> <span class="k">fable</span> 选择合适的 subagent（grok-engineer-coder / grok-rescue）
+<span class="f">3.</span> 通过 ACP peer 协议建立 Grok 与主会话的多轮对话
+<span class="f">4.</span> Grok 在沙盒 worktree 中执行（hardened 模式）
+<span class="f">5.</span> <span class="k">fable</span> 收集验证结果，执行 handoff 逻辑
+<span class="f">6.</span> 结果路由回主 Agent，人类确认后合并到主工作树</div>
+</section>
+
+<!-- ═══ SECTION 03: 安装与使用 ═══ -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">03</div>
+    <div class="section-meta">
+      <div class="label">INSTALLATION</div>
+      <h2>安装与快速上手</h2>
+      <p>不需要手动 clone，通过插件市场直接安装。</p>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>📋 前置要求</h3>
+      <ul style="padding-left:16px">
+        <li><b>macOS</b>（live 模式需要 Seatbelt 沙盒）</li>
+        <li><b>Python 3</b> + <b>Node.js</b>（PATH 中）</li>
+        <li><b>Grok CLI</b> 已安装并登录（<code>grok --version</code> 正常）</li>
+        <li><b>Claude Code</b> 或 <b>OpenAI Codex</b> 已安装</li>
+        <li>无版本锁定：任意可用的 Grok CLI 均可</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <h3>⚡ Claude Code 安装</h3>
+      <div class="code" style="font-size:11px"><span class="c"># 1. 添加市场并安装</span>
+/plugin marketplace add sfourdrinier/grok-skills
+/plugin install grok@grok-skills
+
+<span class="c"># 2. 重载插件</span>
+/reload-plugins
+
+<span class="c"># 3. 确认安装成功</span>
+/grok:setup</div>
+    </div>
+    <div class="card blue">
+      <h3>⚡ Codex CLI 安装</h3>
+      <div class="code" style="font-size:11px"><span class="c"># 1. 添加市场并安装</span>
+codex plugin marketplace add sfourdrinier/grok-skills
+codex plugin add grok@grok-skills
+
+<span class="c"># 2. 开启新会话（SessionStart 自动加载）</span>
+<span class="c"># Grok Coder / Grok Rescue 出现在 Agent picker 中</span></div>
+    </div>
+    <div class="card">
+      <h3>🔐 记录集成授权</h3>
+      <div class="code" style="font-size:11px"><span class="c"># 允许直接写入当前工作树（默认）</span>
+/grok:setup --integration direct
+
+<span class="c"># 隔离模式：先进入 worktree，验证后合并</span>
+/grok:setup --integration auto
+
+<span class="c"># 审查模式：只审查，不写入</span>
+/grok:setup --integration review
+
+<span class="c"># 强制 worktree + 验证（不直接落地）</span>
+/grok:implement</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 04: 核心技能与命令 ═══ -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no blue">04</div>
+    <div class="section-meta">
+      <div class="label b">SKILLS &amp; COMMANDS</div>
+      <h2>核心技能与命令</h2>
+      <p>所有命令以 <code>/grok:</code> 开头（Claude Code）或同名的 Skill（Codex）。</p>
+    </div>
+  </div>
+  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+  <table>
+    <tr><th class="th">命令 / 技能</th><th class="th">用途</th><th class="th">输出</th></tr>
+    <tr><td class="td"><code>/grok:preflight</code></td><td class="td">环境就绪检查（Grok CLI、登录态、Python、Node）</td><td class="td">JSON 状态信封</td></tr>
+    <tr class="tr-even"><td class="td"><code>/grok:review</code></td><td class="td">代码审查（指定目标路径和任务描述）</td><td class="td">发现列表 + 修复建议</td></tr>
+    <tr><td class="td"><code>/grok:code</code></td><td class="td">代码实现（派生合约 → Grok 实现 → handoff）</td><td class="td">JSON 信封（runId）</td></tr>
+    <tr class="tr-even"><td class="td"><code>/grok:implement</code></td><td class="td">一键委托循环（code + handoff 验证，强制 worktree）</td><td class="td">双条件就绪状态</td></tr>
+    <tr><td class="td"><code>/grok:status --run-id &lt;id&gt;</code></td><td class="td">查询运行状态</td><td class="td">进度 + 状态</td></tr>
+    <tr class="tr-even"><td class="td"><code>/grok:handoff --run-id &lt;id&gt;</code></td><td class="td">提取交付物并验证（人工合并前必须调用）</td><td class="td">patch + manifest</td></tr>
+    <tr><td class="td"><code>/grok:setup</code></td><td class="td">初始化配置（runMode / integration / 通知）</td><td class="td">确认输出</td></tr>
+    <tr class="tr-even"><td class="td"><code>/grok:dual-lens</code></td><td class="td">双视角分析（用 Grok 做对抗性审查）</td><td class="td">交叉验证结果</td></tr>
+    <tr><td class="td"><code>/grok:rescue</code></td><td class="td">诊断 / 第二意见（不写代码，仅诊断）</td><td class="td">诊断报告</td></tr>
+  </table>
+  </div>
+  <div style="margin-top:12px" class="grid2">
+    <div class="card green">
+      <h3>🛡️ 双运行模式（runMode）</h3>
+      <ul style="padding-left:16px">
+        <li><b>hardened（默认）</b>：独立 Grok home、沙盒验证、密钥脱敏、worktree 隔离</li>
+        <li><b>direct</b>：使用已安装的 Grok CLI 和 ~/.grok 认证，速度更快，隔离更少</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>🔔 完成后通知</h3>
+      <ul style="padding-left:16px">
+        <li>默认关闭（no toast）</li>
+        <li><code>/grok:setup --notification-mode auto</code>：macOS 原生通知（仅 background 执行上下文）</li>
+        <li><code>--notification-mode webhook</code>：POST JSON（SSH/CI/Windows）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 05: 架构图 ═══ -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no k">05</div>
+    <div class="section-meta">
+      <div class="label k">ARCHITECTURE</div>
+      <h2>系统架构</h2>
+      <p>三层架构：主 Agent → fable 编排层 → Grok 执行层。</p>
+    </div>
+  </div>
+  <div class="code" style="line-height:1.8;font-size:12px">
+<span style="color:#888">┌─────────────────────────────────────────────────────────────┐</span>
+<span style="color:#888">│              开发者 / IDE / 终端                              │</span>
+<span style="color:#888">└────────────────────────────┬────────────────────────────────┘</span>
+                             <span style="color:#888">│</span>
+<span style="color:#888">┌────────────────────────────▼────────────────────────────────┐</span>
+<span style="color:#6a9955">│  Claude Code / Codex（主 Agent · 编排者）                     │</span>
+<span style="color:#6a9955">│  /grok:* 斜杠命令 或 Skill tool                              │</span>
+<span style="color:#888">└────────────────────────────┬────────────────────────────────┘</span>
+                             <span style="color:#888">│</span>
+<span style="color:#888">┌────────────────────────────▼────────────────────────────────┐</span>
+<span style="color:#f0c060">│  fable 编排框架（行为控制 / 任务分发 / 结果路由）             │</span>
+<span style="color:#f0c060">│  ├─ grok-engineer-coder  → 实现代码                          │</span>
+<span style="color:#f0c060">│  └─ grok-rescue          → 诊断 / 第二意见                   │</span>
+<span style="color:#888">└────────────────────────────┬────────────────────────────────┘</span>
+                             <span style="color:#888">│</span>
+<span style="color:#888">┌────────────────────────────▼────────────────────────────────┐</span>
+<span style="color:#c586c0">│  Node companion（companion 脚本）                             │</span>
+<span style="color:#c586c0">│  → 调用 Python wrapper（Grok Agent 封装）                     │</span>
+<span style="color:#888">└────────────────────────────┬────────────────────────────────┘</span>
+                             <span style="color:#888">│</span>
+<span style="color:#888">┌────────────────────────────▼────────────────────────────────┐</span>
+<span style="color:#ce9178">│  Python wrapper（grok_agent.py）                             │</span>
+<span style="color:#ce9178">│  ├─ runMode: hardened → 沙盒 / worktree / 验证              │</span>
+<span style="color:#ce9178">│  └─ runMode: direct   → 直接调用 CLI                        │</span>
+<span style="color:#888">└────────────────────────────┬────────────────────────────────┘</span>
+                             <span style="color:#888">│</span>
+<span style="color:#888">┌────────────────────────────▼────────────────────────────────┐</span>
+<span style="color:#4ec9b0">│  Grok CLI（xAI Grok · 已安装已登录）                          │</span>
+<span style="color:#4ec9b0">│  ├─ grok reason     → 推理 / 诊断                            │</span>
+<span style="color:#4ec9b0">│  └─ grok code      → 代码实现                                │</span>
+<span style="color:#888">└────────────────────────────┬────────────────────────────────┘</span>
+                             <span style="color:#888">│</span>
+<span style="color:#888">┌────────────────────────────▼────────────────────────────────┐</span>
+<span style="color:#888">│  xAI Grok API / Grok CLI                                      │</span>
+<span style="color:#888">└─────────────────────────────────────────────────────────────┘</span>
+
+<span style="color:#555">─────────────────────────────────────────────────────────────────</span>
+<span style="color:#888">路径A（hardened / auto / review）: 主 Agent → fable → worktree → handoff → 人工合并</span>
+<span style="color:#888">路径B（hardened / direct）      : 主 Agent → fable → live tree 直接写入</span>
+<span style="color:#888">路径C（ACP peer）               : 主 Agent → fable → ACP 多轮对话 → peer-stop 验证合并</span></div>
+</section>
+
+<!-- ═══ SECTION 06: 关键限制与注意事项 ═══ -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">06</div>
+    <div class="section-meta">
+      <div class="label">LIMITATIONS</div>
+      <h2>关键限制与注意事项</h2>
+      <p>了解边界，安全使用。</p>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card warn">
+      <h3>⚠️ 平台限制</h3>
+      <ul style="padding-left:16px">
+        <li>macOS 是唯一完整支持 live 模式的平台（依赖 Seatbelt 沙盒）</li>
+        <li>Linux / Windows 目前停留在 <code>probe-required</code> 阶段，待沙盒 profile 验证</li>
+        <li>直接落地（direct integration）需要先执行 <code>/grok:setup --integration direct</code> 记录授权</li>
+        <li>无授权的首次直接落地会 fail-closed（拒绝执行）</li>
+      </ul>
+    </div>
+    <div class="card warn">
+      <h3>⚠️ 安全限制</h3>
+      <ul style="padding-left:16px">
+        <li><b>审查命令</b>时需注意：Grok 也会列出被监控的路径（如 .git/hooks/），这会被记录为"文件变更"，属正常行为</li>
+        <li>hardened 模式对 worktree 做了 git 保护：检查 nested gitmodules、hooks/refs 路径</li>
+        <li>watch-hash 机制防止 Grok 在执行期间偷偷修改受保护文件</li>
+        <li>Codex 上的 stop gate / SubagentStop hook 默认休眠，需通过 <code>/hooks</code> 手动信任</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>📋 版本要求（已验证，2026-07-15）</h3>
+      <ul style="padding-left:16px">
+        <li>Claude Code CLI：<b>2.1.210</b></li>
+        <li>OpenAI Codex CLI：<b>0.144.4</b></li>
+        <li>Grok CLI：无版本锁定，任意可用版本均可</li>
+        <li>最新版本：grok-skills <b>v2.0.0</b>（2026-07-19）</li>
+      </ul>
+    </div>
+    <div class="card red">
+      <h3>❌ 不适合的场景</h3>
+      <ul style="padding-left:16px">
+        <li>纯 Q&A / 设计讨论（启动 Grok 太重）</li>
+        <li>单行 typo 修复（直接用主 Agent）</li>
+        <li>非 Grok 订阅者（Grok CLI 无法工作）</li>
+        <li>Linux/Windows 用户的 live 模式（沙盒未就绪）</li>
+        <li>worktree 中有未提交的变更时（直接模式下的 checkout 守卫）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 07: 关键链接 ═══ -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no blue">07</div>
+    <div class="section-meta">
+      <div class="label b">LINKS &amp; RESOURCES</div>
+      <h2>关键链接与资源</h2>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card blue">
+      <h3>🔗 核心资源</h3>
+      <ul style="padding-left:16px">
+        <li>GitHub：<a href="https://github.com/sfourdrinier/grok-skills" style="color:var(--blue);text-decoration:underline">github.com/sfourdrinier/grok-skills</a></li>
+        <li>X 帖文：<a href="https://x.com/SFourdrinier/status/2079714032295322089" style="color:var(--blue);text-decoration:underline">@SFourdrinier · 2026-07-21</a></li>
+        <li>作者 @SFourdrinier（Stephane，ImagiExplain 创始人）</li>
+        <li>最新版本：v2.0.0（2026-07-19）</li>
+        <li>Star：7 ⭐ · Fork：1</li>
+        <li>Commit：239 次</li>
+        <li>分支：5 · 标签：16</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>📂 关键文档</h3>
+      <ul style="padding-left:16px">
+        <li><a href="https://github.com/sfourdrinier/grok-skills/blob/main/docs/COMPATIBILITY.md" style="color:var(--blue);text-decoration:underline">COMPATIBILITY.md</a> — 版本与兼容性</li>
+        <li><a href="https://github.com/sfourdrinier/grok-skills/blob/main/docs/OPEN-SECURITY-DECISIONS.md" style="color:var(--blue);text-decoration:underline">OPEN-SECURITY-DECISIONS.md</a> — 安全决策</li>
+        <li><a href="https://github.com/sfourdrinier/grok-skills/blob/main/plugin/references/integration-modes.md" style="color:var(--blue);text-decoration:underline">integration-modes.md</a> — 集成模式矩阵</li>
+        <li><a href="https://github.com/sfourdrinier/grok-skills/blob/main/plugin/references/implementation-handoff.md" style="color:var(--blue);text-decoration:underline">implementation-handoff.md</a> — 交付流程</li>
+        <li><a href="https://github.com/sfourdrinier/grok-skills/blob/main/plugin/references/manual-smoke.md" style="color:var(--blue);text-decoration:underline">manual-smoke.md</a> — 手动冒烟测试</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+<p class="source-note">
+  来源：GitHub <a href="https://github.com/sfourdrinier/grok-skills">sfourdrinier/grok-skills</a> README + CHANGELOG + COMPATIBILITY.md · X 帖 <a href="https://x.com/SFourdrinier/status/2079714032295322089">@SFourdrinier</a>（2026-07-21）· 本卡非 xAI 官方项目
+</p>
+</main>
+</body>
+</html>
