@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>图工程：多循环网络的拓扑架构</title>
+  <style>
+:root{
+  --bg:#0c1020;
+  --bg-2:#11162a;
+  --panel:#171c2b;
+  --panel-2:#0f1424;
+  --ink:#eef4ff;
+  --muted:#a8b7df;
+  --line:rgba(255,255,255,.12);
+  --cyan:#58c3ff;
+  --blue:#4a78ff;
+  --green:#2db36a;
+  --yellow:#f4c84c;
+  --purple:#8459ff;
+  --shadow:0 18px 42px rgba(0,0,0,.34);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;overflow-x:hidden}
+body{
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+    radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+    radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+    radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+    linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+}
+a{color:inherit;text-decoration:none}
+.page{
+  width:min(1180px,calc(100% - 20px));
+  margin:0 auto;
+  padding:18px 0 82px;
+}
+.hero{
+  display:grid;
+  grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);
+  gap:14px;
+  color:#fff;
+  margin-bottom:14px;
+}
+.hero-copy{
+  min-width:0;
+  display:grid;
+  gap:10px;
+  align-content:start;
+  padding:12px 0 0;
+}
+.kicker-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  width:fit-content;
+  padding:5px 10px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);
+  backdrop-filter:blur(10px);
+  color:#fff;
+  font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  border-radius:999px;
+}
+.source{
+  max-width:280px;
+  text-align:right;
+  font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:#b8c8f5;
+  overflow-wrap:anywhere;
+}
+.title{
+  margin:0;
+  font-size:clamp(36px,6.5vw,78px);
+  line-height:.92;
+  letter-spacing:-.07em;
+  font-weight:950;
+}
+.subtitle{
+  margin:0;
+  max-width:980px;
+  font-size:clamp(15px,2vw,20px);
+  line-height:1.55;
+  color:#e8eefc;
+}
+.subcn{
+  margin:0;
+  max-width:980px;
+  font-size:clamp(13px,1.6vw,16px);
+  line-height:1.65;
+  color:#c5d2f7;
+}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:30px;
+  padding:6px 10px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);
+  border-radius:999px;
+  color:#fff;
+  font-size:12px;
+  font-weight:850;
+  letter-spacing:.01em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+.pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+.pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+.pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+.hero-note{
+  display:grid;
+  gap:8px;
+  border:1.5px solid rgba(255,255,255,.16);
+  background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+  padding:14px 16px 12px;
+  border-radius:18px;
+  box-shadow:var(--shadow);
+}
+.hero-note strong{font-size:14px;line-height:1.35}
+.hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+.hero-visual{
+  min-width:0;
+  background:rgba(10,12,22,.5);
+  border:1.5px solid rgba(255,255,255,.12);
+  border-radius:22px;
+  box-shadow:var(--shadow);
+  padding:14px;
+  display:grid;
+  gap:12px;
+  align-content:start;
+}
+.visual-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.orb{
+  width:66px;
+  height:66px;
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+    linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+  box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+  display:grid;
+  place-items:center;
+  color:#fff;
+  font-size:26px;
+  font-weight:950;
+  letter-spacing:-.08em;
+}
+.visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+.visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+.visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+.visual-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+.mini-card{
+  min-width:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+  border:1.5px solid rgba(255,255,255,.09);
+  border-radius:16px;
+  padding:10px 10px 9px;
+  display:grid;
+  gap:8px;
+  box-shadow:0 12px 26px rgba(0,0,0,.22);
+}
+.mini-icon{
+  width:28px;height:28px;border-radius:8px;
+  display:grid;place-items:center;
+  font-size:14px;
+}
+.mini-icon.cyan{background:rgba(88,195,255,.2);color:#58c3ff}
+.mini-icon.purple{background:rgba(132,89,255,.2);color:#8459ff}
+.mini-icon.green{background:rgba(45,179,106,.2);color:#2db36a}
+.mini-icon.yellow{background:rgba(244,200,76,.2);color:#f4c84c}
+.mini-card .label{font:800 10px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8b7df;text-transform:uppercase;letter-spacing:.08em}
+.mini-card .value{font-size:13px;font-weight:900;color:#fff;letter-spacing:-.02em}
+.mini-card .desc{font-size:11px;color:#8da0c8;line-height:1.5}
+.visual-strip{height:4px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple),var(--green))}
+
+/* 核心内容区 */
+.shell{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(260px,.86fr);
+  gap:14px;
+  margin-bottom:14px;
+}
+.panel{
+  background:var(--panel);
+  border:1.5px solid rgba(255,255,255,.08);
+  border-radius:20px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.panel-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px 14px 10px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.panel-head h3{margin:0;font-size:13px;font-weight:900;letter-spacing:.02em;color:#fff}
+.badge{
+  font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  background:rgba(74,120,255,.25);
+  color:#7a9fff;
+  border:1px solid rgba(74,120,255,.35);
+  border-radius:999px;
+  padding:3px 9px;
+  letter-spacing:.04em;
+}
+.panel-body{padding:14px;display:grid;gap:12px}
+
+/* Loop 四大致命问题 */
+.bug-card{
+  background:var(--panel-2);
+  border:1.5px solid rgba(255,255,255,.07);
+  border-radius:14px;
+  padding:12px 13px;
+  display:grid;
+  gap:6px;
+}
+.bug-card .num{
+  font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:#f4c84c;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.bug-card .name{font-size:13px;font-weight:900;color:#fff;line-height:1.3}
+.bug-card .desc{font-size:11.5px;color:#a8b7df;line-height:1.6}
+.bug-card.red{border-color:rgba(244,100,100,.25);background:rgba(244,100,100,.07)}
+.bug-card.yellow{border-color:rgba(244,200,76,.2);background:rgba(244,200,76,.06)}
+.bug-card.purple{border-color:rgba(132,89,255,.2);background:rgba(132,89,255,.06)}
+.bug-card.cyan{border-color:rgba(88,195,255,.2);background:rgba(88,195,255,.06)}
+
+/* Graph 工程 */
+.graph-flow{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin-top:4px;
+}
+.node-card{
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+  border:1.5px solid rgba(255,255,255,.09);
+  border-radius:14px;
+  padding:11px 9px;
+  text-align:center;
+  display:grid;
+  gap:7px;
+}
+.node-icon{
+  width:32px;height:32px;border-radius:10px;margin:0 auto;
+  display:grid;place-items:center;
+  font-size:16px;
+}
+.node-name{font-size:11.5px;font-weight:900;color:#fff;line-height:1.3}
+.node-desc{font-size:10.5px;color:#8da0c8;line-height:1.5}
+.node-card.green .node-icon{background:rgba(45,179,106,.25);color:#2db36a}
+.node-card.cyan .node-icon{background:rgba(88,195,255,.25);color:#58c3ff}
+.node-card.purple .node-icon{background:rgba(132,89,255,.25);color:#8459ff}
+.node-card.yellow .node-icon{background:rgba(244,200,76,.25);color:#f4c84c}
+.arrow-cell{
+  display:grid;
+  place-items:center;
+  color:#4a78ff;
+  font-size:18px;
+  font-weight:900;
+}
+
+/* 三锚点 */
+.anchor-list{display:grid;gap:8px}
+.anchor-item{
+  background:var(--panel-2);
+  border:1.5px solid rgba(255,255,255,.07);
+  border-radius:12px;
+  padding:10px 12px;
+  display:grid;
+  grid-template-columns:28px 1fr;
+  gap:10px;
+  align-items:start;
+}
+.anchor-icon{
+  width:28px;height:28px;border-radius:8px;
+  display:grid;place-items:center;
+  font-size:13px;
+}
+.anchor-item:nth-child(1) .anchor-icon{background:rgba(45,179,106,.2);color:#2db36a}
+.anchor-item:nth-child(2) .anchor-icon{background:rgba(88,195,255,.2);color:#58c3ff}
+.anchor-item:nth-child(3) .anchor-icon{background:rgba(132,89,255,.2);color:#8459ff}
+.anchor-name{font-size:12px;font-weight:900;color:#fff;line-height:1.3;margin-bottom:2px}
+.anchor-desc{font-size:11px;color:#a8b7df;line-height:1.6}
+
+/* LangGraph 侧边栏 */
+.langgraph-box{
+  background:linear-gradient(135deg,rgba(74,120,255,.18),rgba(88,195,255,.10));
+  border:1.5px solid rgba(74,120,255,.3);
+  border-radius:16px;
+  padding:12px 13px;
+  display:grid;
+  gap:10px;
+}
+.langgraph-title{
+  font:900 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:#7a9fff;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.code-block{
+  background:#0a0e1a;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;
+  padding:10px 11px;
+  font:700 11px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:#a8c4f0;
+  overflow-x:auto;
+  white-space:pre;
+}
+.tag-row{display:flex;flex-wrap:wrap;gap:6px}
+.tag{
+  font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  background:rgba(74,120,255,.15);
+  color:#7a9fff;
+  border:1px solid rgba(74,120,255,.3);
+  border-radius:999px;
+  padding:3px 8px;
+  letter-spacing:.04em;
+}
+.pill-row-2{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
+.pill-2{
+  display:inline-flex;
+  align-items:center;
+  min-height:26px;
+  padding:4px 9px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);
+  border-radius:999px;
+  color:#c8d6f5;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.01em;
+}
+
+/* 引用 */
+.quote-box{
+  background:linear-gradient(135deg,rgba(88,195,255,.08),rgba(132,89,255,.10));
+  border:1.5px solid rgba(88,195,255,.2);
+  border-radius:14px;
+  padding:12px 14px;
+  margin-bottom:4px;
+}
+.quote-text{
+  font-size:13px;
+  line-height:1.75;
+  color:#d4e4ff;
+  font-style:italic;
+}
+.quote-source{
+  font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:#7a9fff;
+  margin-top:8px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+
+/* 页脚 */
+.footer{
+  margin-top:14px;
+  background:#0b1020;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  padding:12px 14px;
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  color:#dfe8ff;
+  font-size:12px;
+  flex-wrap:wrap;
+}
+.footer .tag-row-2{font-weight:900}
+
+@media (max-width:1080px){
+  .hero,.shell{grid-template-columns:1fr}
+  .graph-flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .visual-grid{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+  .hero{gap:12px}
+  .title{font-size:clamp(32px,12vw,52px)}
+  .subtitle{font-size:14px}
+  .subcn{font-size:13px}
+  .shell{padding:10px;gap:10px}
+  .graph-flow{grid-template-columns:1fr}
+  .footer{font-size:11.5px}
+  .visual-top{flex-direction:column;align-items:flex-start}
+  .visual-meta{text-align:left;justify-items:start}
+  .source{text-align:left;max-width:none}
+}
+  </style>
+</head>
+<body>
+<main class="page">
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">GRAPH ENGINEERING · AGENT ARCHITECTURE · 2026-07-21</div>
+        <div class="source">@AISuperDomain · X Post</div>
+      </div>
+      <h1 class="title">Graph Engineering</h1>
+      <p class="subtitle">图工程：多循环网络的拓扑架构</p>
+      <p class="subcn">单一 Loop 的四个致命缺陷催生了 Graph Engineering——不是替代 Loop，而是用拓扑结构组织多个 Loop 节点、关系与现实锚点，让系统真正可靠。</p>
+      <div class="pill-row">
+        <span class="pill cyan">Graph Engineering</span>
+        <span class="pill green">多循环网络</span>
+        <span class="pill yellow">拓扑架构</span>
+        <span class="pill purple">LangGraph</span>
+      </div>
+      <div class="hero-note">
+        <strong>不是取代 Loop，而是组织它</strong>
+        <p>Graph Engineering 解决的不是"要不要 Loop"的问题，而是如何让多个 Loop 在拓扑结构中相互监督、约束与纠偏，同时锚定现实世界。</p>
+      </div>
+    </div>
+    <aside class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">G</div>
+        <div class="visual-meta">
+          <div class="big">Graph vs Loop</div>
+          <div class="small">Architecture · Topology · Grounding</div>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <article class="mini-card">
+          <div class="mini-icon cyan" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="M12 8v4M9.3 9.3l-2.6 6M14.7 9.3l2.6 6"/></svg>
+          </div>
+          <div class="label">Architecture</div>
+          <div class="value">拓扑结构</div>
+          <div class="desc">多节点关系网络，非线性执行路径。</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M6 9l6-6 6 6M6 15l6 6 6-6"/></svg>
+          </div>
+          <div class="label">vs Loop</div>
+          <div class="value">4 Fatal Bugs</div>
+          <div class="desc">单一 Loop 的四个根本性缺陷。</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon green" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+          </div>
+          <div class="label">典型实现</div>
+          <div class="value">LangGraph</div>
+          <div class="desc">基于循环计算图的多 Agent 编排框架。</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon yellow" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>
+          </div>
+          <div class="label">稳定性</div>
+          <div class="value">3 Anchors</div>
+          <div class="desc">三个现实锚点保障 Graph 可靠运行。</div>
+        </article>
+      </div>
+      <div class="visual-strip"></div>
+    </aside>
+  </section>
+
+  <!-- 引用框 -->
+  <div class="quote-box">
+    <p class="quote-text">"Are we still discussing Loop, or have we already shifted to Graph?" — 单一 Agent 在 Loop 中反复「规划—执行—观察—反思」，而多个 Loop 连接形成的 Graph，则实现了节点之间的相互监督、约束与纠偏。</p>
+    <div class="quote-source">— @AISuperDomain · 2026-07-21</div>
+  </div>
+
+  <section class="shell">
+    <!-- 左侧：Loop 缺陷 + Graph 结构 + 三锚点 -->
+    <div style="display:grid;gap:14px;align-content:start">
+      <!-- Loop 四大致命问题 -->
+      <div class="panel">
+        <div class="panel-head"><h3>单一 Loop 的四个致命缺陷</h3><span class="badge">Bug ×4</span></div>
+        <div class="panel-body" style="grid-template-columns:1fr 1fr;display:grid;gap:10px">
+          <div class="bug-card red">
+            <div class="num">Bug #1</div>
+            <div class="name">Metric 优化失真</div>
+            <div class="desc">客服 Agent 追求"工单解决率"，可能通过减少追问、快速关闭对话来达成——数字好看，但用户留存率下滑。</div>
+          </div>
+          <div class="bug-card yellow">
+            <div class="num">Bug #2</div>
+            <div class="name">目标本身无法被质疑</div>
+            <div class="desc">Loop 无法质疑最初设定的目标本身是否正确——它只能执行，无法判断目标是否合理。</div>
+          </div>
+          <div class="bug-card purple">
+            <div class="num">Bug #3</div>
+            <div class="name">Loop 之间相互冲突</div>
+            <div class="desc">多个独立的 Loop 之间可能存在目标冲突，没有更高层级的协调机制。</div>
+          </div>
+          <div class="bug-card cyan">
+            <div class="num">Bug #4</div>
+            <div class="name">测量系统可能失准</div>
+            <div class="desc">没有人知道负责测量的系统本身是否已经失准——自我评估的 Loop 存在根本性悖论。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graph 架构节点流 -->
+      <div class="panel">
+        <div class="panel-head"><h3>Graph Engineering 架构节点</h3><span class="badge">Topology</span></div>
+        <div class="panel-body">
+          <div class="graph-flow">
+            <div class="node-card green">
+              <div class="node-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>
+              </div>
+              <div class="node-name">规划节点</div>
+              <div class="node-desc">设定/调整目标<br>质疑目标合理性</div>
+            </div>
+            <div class="node-card cyan">
+              <div class="node-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </div>
+              <div class="node-name">执行节点</div>
+              <div class="node-desc">实施行动<br>调用工具</div>
+            </div>
+            <div class="node-card purple">
+              <div class="node-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+              </div>
+              <div class="node-name">审查节点</div>
+              <div class="node-desc">监督约束<br>否决不当行为</div>
+            </div>
+            <div class="node-card yellow">
+              <div class="node-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+              </div>
+              <div class="node-name">重置节点</div>
+              <div class="node-desc">重置下级目标<br>局部重新执行</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 三个锚点 -->
+      <div class="panel">
+        <div class="panel-head"><h3>稳定 Graph 的三个现实锚点</h3><span class="badge">Grounding ×3</span></div>
+        <div class="panel-body">
+          <div class="anchor-list">
+            <div class="anchor-item">
+              <div class="anchor-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              </div>
+              <div>
+                <div class="anchor-name">Anchor 1：独立财务验证</div>
+                <div class="anchor-desc">实际到账收入，而非报告中的数字。独立于优化系统的物理世界测量与财务审计数据。</div>
+              </div>
+            </div>
+            <div class="anchor-item">
+              <div class="anchor-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              </div>
+              <div>
+                <div class="anchor-name">Anchor 2：真实执行验证</div>
+                <div class="anchor-desc">真正执行过的测试，而非测试计划。真实留住的客户，而非工单关闭率。</div>
+              </div>
+            </div>
+            <div class="anchor-item">
+              <div class="anchor-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div>
+                <div class="anchor-name">Anchor 3：冻结规则保护</div>
+                <div class="anchor-desc">有些规则必须被冻结，不允许 Agent 为提升分数而修改评估标准。价值判断无法仅由 Graph 计算。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧：LangGraph + 关键洞察 -->
+    <div style="display:grid;gap:14px;align-content:start">
+      <div class="langgraph-box">
+        <div class="langgraph-title">LangGraph — 典型实现</div>
+        <div class="code-block">StateGraph.from_defaults(
+  state_channels=...,)</div>
+        <div style="display:grid;gap:8px">
+          <div style="font-size:12px;color:#a8b7df;line-height:1.6">
+            基于循环计算图的多 Agent 编排框架，核心是 <strong style="color:#7a9fff">State</strong>（共享状态）、<strong style="color:#7a9fff">Node</strong>（节点逻辑）和 <strong style="color:#7a9fff">Edge</strong>（拓扑关系）。
+          </div>
+          <div class="tag-row">
+            <span class="tag">cyclic computation</span>
+            <span class="tag">shared state</span>
+            <span class="tag">node + edge</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 关键洞察 -->
+      <div class="panel">
+        <div class="panel-head"><h3>关键洞察</h3><span class="badge">Key Insights</span></div>
+        <div class="panel-body" style="gap:10px">
+          <div style="background:var(--panel-2);border:1.5px solid rgba(255,255,255,.07);border-radius:12px;padding:10px 12px">
+            <div style="font:900 10px/1.4 ui-monospace;color:#f4c84c;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Graph 局限</div>
+            <div style="font-size:12px;color:#a8b7df;line-height:1.65">若所有 Agent 读取同一批数据、同一份报告，它们最终可能只是在相互印证"正确性"——结构越来越复杂，每个节点都显示绿灯，却与现实完全脱节。</div>
+          </div>
+          <div style="background:var(--panel-2);border:1.5px solid rgba(255,255,255,.07);border-radius:12px;padding:10px 12px">
+            <div style="font:900 10px/1.4 ui-monospace;color:#58c3ff;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">关系决定可靠性</div>
+            <div style="font-size:12px;color:#a8b7df;line-height:1.65">真正的可靠性不只来自每个节点本身，更来自节点之间的关系：谁监督谁、谁能否决谁、谁向谁反馈、如何处理冲突。</div>
+          </div>
+          <div style="background:var(--panel-2);border:1.5px solid rgba(255,255,255,.07);border-radius:12px;padding:10px 12px">
+            <div style="font:900 10px/1.4 ui-monospace;color:#8459ff;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">演进路径</div>
+            <div style="font-size:12px;color:#a8b7df;line-height:1.65">Prompt → Chain → Loop → Graph → Grounding。Graph 不是终点，Grounding 才是——与真实世界始终保持接触。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 演进路径 -->
+      <div class="panel">
+        <div class="panel-head"><h3>架构演进路径</h3><span class="badge">Evolution</span></div>
+        <div class="panel-body">
+          <div class="pill-row-2">
+            <span class="pill-2">Prompt</span>
+            <span style="color:#4a78ff;font-size:14px;font-weight:900;align-self:center">→</span>
+            <span class="pill-2">Chain</span>
+            <span style="color:#4a78ff;font-size:14px;font-weight:900;align-self:center">→</span>
+            <span class="pill-2">Loop</span>
+            <span style="color:#4a78ff;font-size:14px;font-weight:900;align-self:center">→</span>
+            <span class="pill-2">Graph</span>
+            <span style="color:#4a78ff;font-size:14px;font-weight:900;align-self:center">→</span>
+            <span class="pill-2" style="border-color:rgba(45,179,106,.4);background:rgba(45,179,106,.1);color:#ddffe8">Grounding</span>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:#6a7aaa;line-height:1.6">
+            Loop 是第一个主流架构 → Graph 组织多个 Loop → Grounding 确保与现实始终锚定
+          </div>
+        </div>
+      </div>
+
+      <!-- CSDN 来源 -->
+      <div class="panel">
+        <div class="panel-head"><h3>参考来源</h3><span class="badge">Sources</span></div>
+        <div class="panel-body" style="gap:8px">
+          <div style="display:grid;gap:6px">
+            <div style="font-size:12px;font-weight:900;color:#fff">CSDN · Graph Engineering vs Loop Engineering</div>
+            <div style="font-size:11px;color:#6a7aaa;line-height:1.6">对比分析：Loop Engineering 聚焦单一循环优化，Graph Engineering 通过拓扑结构实现多循环协作与全局可靠性。</div>
+          </div>
+          <div style="height:1px;background:rgba(255,255,255,.06)"></div>
+          <div style="display:grid;gap:6px">
+            <div style="font-size:12px;font-weight:900;color:#fff">X · @AISuperDomain</div>
+            <div style="font-size:11px;color:#6a7aaa;line-height:1.6">2026-07-21 · 核心观点：Graph Engineering 是多循环网络的拓扑组织方式，不是 Loop 的替代品。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="footer">
+    <div>🟦 Graph Engineering · Darkblue Style</div>
+    <div class="tag-row-2">★ Agent Architecture · 2026-07-22</div>
+    <div>Source: @AISuperDomain · CSDN</div>
+  </section>
+</main>
+<script>
+(function(){
+  function send(){
+    var h=document.body.scrollHeight;
+    window.parent.postMessage({type:'theme-height',slug:'darkblue',height:h},'*');
+  }
+  if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+  setTimeout(send,500);
+})();
+</script>
+</body>
+</html>
