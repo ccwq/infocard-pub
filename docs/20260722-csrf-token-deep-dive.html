@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c1020">
+<title>csrftoken 原理与防护：从 L2 比喻到 L5 认证链路</title>
+<style>
+:root{--bg:#0c1020;--paper:#111827;--card:#1a2235;--border:#1e2d4a;--ink:#e8edf5;--muted:#7a8ba8;--blue:#4a78ff;--cyan:#58c3ff;--green:#2db36a;--red:#e05a5a;--yellow:#f4c84c;--purple:#8459ff;--max:1200px}
+*{box-sizing:border-box}html,body{margin:0;overflow-x:hidden}body{background:var(--bg);color:var(--ink);font-family:"JetBrains Mono","Fira Code",ui-monospace,"Cascadia Code",monospace;line-height:1.68}a{color:var(--cyan)}.page{width:min(var(--max),100%);margin:0 auto;padding:0}.box{background:var(--paper);border:1px solid var(--border)}.top{display:flex;justify-content:space-between;gap:16px;padding:10px 22px;background:var(--bg);border-bottom:1px solid var(--border);font:700 11px/1.3 ui-monospace,monospace;letter-spacing:.1em}.top span:first-child{color:var(--cyan)}.top span:last-child{color:var(--muted)}
+/* hero */
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:0}
+.hero-left{padding:32px 28px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center}.eyebrow{font:700 10px/1.2 ui-monospace,monospace;color:var(--cyan);letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}.hero h1{font-size:clamp(28px,4.8vw,52px);line-height:1.05;letter-spacing:-.04em;margin:0 0 14px;font-weight:800}.lead{font-size:14px;line-height:1.8;color:var(--muted);margin:0;max-width:520px}.hero-right{padding:28px;background:linear-gradient(135deg,rgba(74,120,255,.08),rgba(88,195,255,.05));display:flex;align-items:center;justify-content:center}.flow-chart{width:100%;max-width:420px}
+/* sections */
+.section{border-top:1px solid var(--border);padding:24px 22px}.section h2{font-size:20px;line-height:1.15;letter-spacing:-.02em;margin:0 0 5px;font-weight:800;color:var(--ink)}.section-meta{font-size:11px;color:var(--muted);margin:0 0 14px;font-family:ui-monospace,monospace}.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.cell{border:1px solid var(--border);padding:14px 15px;background:var(--card)}.cell h3{font-size:13.5px;font-weight:700;margin:0 0 6px;color:var(--cyan)}.cell p{margin:0;font-size:12.5px;line-height:1.65;color:var(--muted)}.cell.highlight{border-color:var(--blue);background:rgba(74,120,255,.08)}
+/* attack flow */
+.flow-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.step-box{flex:0 0 auto;border:1px solid var(--border);padding:10px 12px;background:var(--card);text-align:center;min-width:100px}.step-box.attacker{border-color:var(--red);background:rgba(224,90,90,.08)}.step-box.browser{border-color:var(--yellow);background:rgba(244,200,76,.08)}.step-box.server{border-color:var(--green);background:rgba(45,179,106,.08)}.step-box .icon{display:block;font-size:22px;margin-bottom:5px}.step-box .label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:2px}.step-box .name{font-size:11px;font-weight:700}.step-box.attacker .name{color:var(--red)}.step-box.browser .name{color:var(--yellow)}.step-box.server .name{color:var(--green)}.arrow{color:var(--muted);font-size:18px;flex:0 0 auto}
+/* table */
+.tb{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}.tb th,.tb td{border:1px solid var(--border);padding:10px 11px;text-align:left;vertical-align:top;line-height:1.55}.tb th{background:var(--bg);color:var(--cyan);font:700 10.5px/1.3 ui-monospace,monospace;letter-spacing:.07em;text-transform:uppercase}.tb td{background:var(--card);color:var(--muted)}.tb td:first-child{font-weight:700;color:var(--ink);width:18%}.tb td:first-child span{display:block;font-size:10px;color:var(--muted);font-weight:400}.tb code{color:var(--cyan);font-size:11.5px}.tb .green{color:var(--green)}.tb .red{color:var(--red)}.tb .yellow{color:var(--yellow)}
+/* checklist */
+.chain{display:flex;flex-direction:column;gap:8px}.c-step{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start;border:1px solid var(--border);padding:10px 13px;background:var(--card)}.c-num{font:800 16px/1 ui-monospace,monospace;color:var(--cyan)}.c-text{font-size:12.5px;line-height:1.6;color:var(--ink)}.c-text small{color:var(--muted);display:block;font-size:11px;margin-top:2px}.c-text code{color:var(--cyan);font-size:11px}.c-good .c-num{color:var(--green)}.c-fail .c-num{color:var(--red)}.c-fail{border-color:rgba(224,90,90,.3);background:rgba(224,90,90,.05)}
+/* concept compare */
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.concept{border:1px solid var(--border);padding:13px;background:var(--card)}.concept .tag{font:700 10px ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;display:inline-block;margin-bottom:8px}.concept.cors .tag{background:rgba(74,120,255,.2);color:var(--blue)}.concept.csrf .tag{background:rgba(244,200,76,.15);color:var(--yellow)}.concept.xss .tag{background:rgba(224,90,90,.15);color:var(--red)}.concept h3{font-size:15px;margin:0 0 6px;font-weight:700}.concept p{font-size:12px;line-height:1.65;color:var(--muted);margin:0}.concept .q{font-size:12px;color:var(--ink);font-weight:700;margin-bottom:5px;display:block}.concept .a{font-size:12px;color:var(--muted)}
+/* token row */
+.token-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}.token-chip{border:1px solid var(--border);padding:6px 10px;background:var(--card);flex:0 0 auto;font-size:11.5px}.token-chip .k{font-weight:700;color:var(--cyan);display:block}.token-chip .v{color:var(--muted);font-size:11px}
+/* summary box */
+.summary{border:1px solid var(--border);padding:14px 16px;background:var(--card)}.summary h3{font-size:15px;font-weight:700;margin:0 0 8px}.summary h3.l2{color:var(--cyan)}.summary h3.l5{color:var(--purple)}.summary p{font-size:13px;line-height:1.75;color:var(--muted);margin:0}.summary p code{color:var(--cyan)}
+/* http lines */
+.http-line{font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.55;white-space:pre;overflow-x:auto;color:var(--ink)}.http-line .k{color:var(--cyan)}.http-line .v{color:var(--green)}.http-line .c{color:var(--muted)}
+/* footer */
+.footer{border-top:1px solid var(--border);padding:13px 22px;color:var(--muted);font-size:11px;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}.print{position:fixed;right:18px;bottom:18px;border:1px solid var(--border);background:var(--card);color:var(--cyan);padding:9px 13px;font:700 12px ui-monospace,monospace;cursor:pointer}
+@media(max-width:900px){.hero{grid-template-columns:1fr}.grid-2{grid-template-columns:1fr}.grid-3{grid-template-columns:1fr}.three-col{grid-template-columns:1fr}.flow-row{flex-direction:column;align-items:stretch}.step-box{min-width:unset}.step-box .arrow{transform:rotate(90deg)}}
+@media(max-width:600px){.page{width:100%}.section{padding:18px 14px}.top,.hero-left,.hero-right{padding:14px}.tb{table-layout:auto}.tb thead{display:none}.tb,.tb tbody,.tb tr,.tb td{display:block;width:100%}.tb tr{border-top:1px solid var(--border);padding:9px 0}.tb td{border:0;padding:2px 0}.tb td:first-child{font-size:15px;padding-bottom:4px}.tb td:before{content:attr(data-label);display:inline-block;color:var(--muted);font:700 10px ui-monospace,monospace;margin-right:6px}.print{position:static;display:block;margin:14px 14px 0}.footer{padding:12px 14px}}
+</style>
+</head>
+<body>
+<main class="page">
+<div class="box">
+
+<div class="top">
+<span>SECURITY · AUTHENTICATION · BROWSER MECHANISM</span>
+<span>csrftoken · L2→L5 · 2026</span>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+<div class="hero-left">
+<div class="eyebrow">Cookie 证明"你是谁"</div>
+<h1>csrftoken<br>认证链路</h1>
+<p class="lead">CSRF Token 证明"这个请求是否来自可信的前端页面"。它不加密，不验证权限，只验证来源。</p>
+</div>
+<div class="hero-right">
+<svg class="flow-chart" viewBox="0 0 420 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="8" markerHeight="8" refX="5" refY="4" orient="auto">
+<path d="M0 0L8 4L0 8Z" fill="#4a78ff"/>
+</marker>
+<marker id="ar-red" markerWidth="8" markerHeight="8" refX="5" refY="4" orient="auto">
+<path d="M0 0L8 4L0 8Z" fill="#e05a5a"/>
+</marker>
+<marker id="ar-green" markerWidth="8" markerHeight="8" refX="5" refY="4" orient="auto">
+<path d="M0 0L8 4L0 8Z" fill="#2db36a"/>
+</marker>
+</defs>
+<!-- labels -->
+<text x="10" y="14" fill="#7a8ba8" font-family="monospace" font-size="9">CSRF 攻击路径（自动携带 Cookie）</text>
+<!-- attacker box -->
+<rect x="8" y="22" width="86" height="56" rx="3" fill="#2a1218" stroke="#e05a5a" stroke-width="1.5"/>
+<text x="51" y="40" text-anchor="middle" fill="#e05a5a" font-family="monospace" font-size="10" font-weight="bold">恶意网站</text>
+<text x="51" y="55" text-anchor="middle" fill="#7a8ba8" font-family="monospace" font-size="9">evil.com</text>
+<text x="51" y="68" text-anchor="middle" fill="#7a8ba8" font-family="monospace" font-size="9">诱导提交表单</text>
+<!-- arrow: attacker → browser (auto cookie) -->
+<path d="M 94 50 L 126 50" stroke="#e05a5a" stroke-width="1.5" marker-end="url(#ar-red)"/>
+<text x="110" y="46" text-anchor="middle" fill="#e05a5a" font-family="monospace" font-size="8">自动携带</text>
+<text x="110" y="58" text-anchor="middle" fill="#e05a5a" font-family="monospace" font-size="8">Cookie</text>
+<!-- browser box -->
+<rect x="130" y="22" width="86" height="56" rx="3" fill="#2a2010" stroke="#f4c84c" stroke-width="1.5"/>
+<text x="173" y="40" text-anchor="middle" fill="#f4c84c" font-family="monospace" font-size="10" font-weight="bold">浏览器</text>
+<text x="173" y="55" text-anchor="middle" fill="#f4c84c" font-family="monospace" font-size="9">Cookie: session</text>
+<text x="173" y="68" text-anchor="middle" fill="#f4c84c" font-family="monospace" font-size="9">+ csrftoken?</text>
+<!-- arrow: browser → server (request) -->
+<path d="M 216 50 L 248 50" stroke="#f4c84c" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="232" y="46" text-anchor="middle" fill="#f4c84c" font-family="monospace" font-size="8">POST /transfer</text>
+<text x="232" y="58" text-anchor="middle" fill="#f4c84c" font-family="monospace" font-size="8">Cookie: session</text>
+<!-- server box -->
+<rect x="252" y="22" width="86" height="56" rx="3" fill="#0d1f18" stroke="#2db36a" stroke-width="1.5"/>
+<text x="295" y="40" text-anchor="middle" fill="#2db36a" font-family="monospace" font-size="10" font-weight="bold">银行服务端</text>
+<text x="295" y="55" text-anchor="middle" fill="#2db36a" font-family="monospace" font-size="9">检查 session ✓</text>
+<text x="295" y="68" text-anchor="middle" fill="#2db36a" font-family="monospace" font-size="9">检查 X-CSRFToken ✗</text>
+<!-- arrow: server response -->
+<path d="M 252 65 L 226 82" stroke="#e05a5a" stroke-width="1.2" stroke-dasharray="3 2" marker-end="url(#ar-red)"/>
+<text x="225" y="88" text-anchor="middle" fill="#e05a5a" font-family="monospace" font-size="8">403 Forbidden</text>
+<!-- note -->
+<text x="10" y="108" fill="#7a8ba8" font-family="monospace" font-size="9">防护原理：攻击者能自动携带 Cookie，但通常读不到 csrftoken Cookie</text>
+<!-- protection flow -->
+<text x="10" y="126" fill="#7a8ba8" font-family="monospace" font-size="9">正常请求链路（Double Submit）</text>
+<rect x="8" y="134" width="60" height="36" rx="3" fill="#0d1a2a" stroke="#4a78ff" stroke-width="1.2"/>
+<text x="38" y="152" text-anchor="middle" fill="#58c3ff" font-family="monospace" font-size="9">Set-Cookie</text>
+<text x="38" y="164" text-anchor="middle" fill="#58c3ff" font-family="monospace" font-size="9">csrftoken=…</text>
+<path d="M 68 152 L 88 152" stroke="#4a78ff" stroke-width="1.2" marker-end="url(#ar)"/>
+<rect x="92" y="134" width="60" height="36" rx="3" fill="#0d1a2a" stroke="#4a78ff" stroke-width="1.2"/>
+<text x="122" y="152" text-anchor="middle" fill="#58c3ff" font-family="monospace" font-size="9">JS 读取</text>
+<text x="122" y="164" text-anchor="middle" fill="#58c3ff" font-family="monospace" font-size="9">getCookie()</text>
+<path d="M 152 152 L 172 152" stroke="#4a78ff" stroke-width="1.2" marker-end="url(#ar)"/>
+<rect x="176" y="134" width="64" height="36" rx="3" fill="#0d1a2a" stroke="#2db36a" stroke-width="1.2"/>
+<text x="208" y="152" text-anchor="middle" fill="#2db36a" font-family="monospace" font-size="9">X-CSRFToken</text>
+<text x="208" y="164" text-anchor="middle" fill="#2db36a" font-family="monospace" font-size="9">请求头</text>
+<path d="M 240 152 L 260 152" stroke="#2db36a" stroke-width="1.2" marker-end="url(#ar-green)"/>
+<rect x="264" y="134" width="72" height="36" rx="3" fill="#0d1f18" stroke="#2db36a" stroke-width="1.2"/>
+<text x="300" y="148" text-anchor="middle" fill="#2db36a" font-family="monospace" font-size="9">服务端比较</text>
+<text x="300" y="160" text-anchor="middle" fill="#2db36a" font-family="monospace" font-size="9">Cookie==Header</text>
+<text x="300" y="172" text-anchor="middle" fill="#2db36a" font-family="monospace" font-size="9">✓ 200 OK</text>
+<!-- xss note -->
+<text x="10" y="198" fill="#7a8ba8" font-family="monospace" font-size="9">⚠ XSS 可读取 csrftoken：需配合 CSP、输出转义等 XSS 防护</text>
+</svg>
+</div>
+</section>
+
+<!-- WHAT IS CSRF -->
+<section class="section">
+<h2>什么是 CSRF：浏览器 Cookie 的双刃剑</h2>
+<p class="section-meta">攻击者借用已登录的浏览器，自动携带 Cookie 发起有副作用的请求</p>
+<div class="flow-row">
+<div class="step-box attacker"><span class="icon">🎯</span><span class="label">攻击者</span><span class="name">恶意网页</span></div>
+<div class="arrow">→</div>
+<div class="step-box browser"><span class="icon">🌐</span><span class="label">浏览器</span><span class="name">自动带 Cookie</span></div>
+<div class="arrow">→</div>
+<div class="step-box server"><span class="icon">🏦</span><span class="label">目标服务端</span><span class="name">只验 Cookie → 被骗</span></div>
+</div>
+<div style="margin-top:12px" class="http-line"><span class="k">GET /transfer?to=attacker&amount=10000 HTTP/1.1</span>
+<span class="c">  ← 恶意网页诱导浏览器发起请求</span>
+<span class="k">Cookie: session=abc123</span>
+<span class="c">  ← 浏览器自动携带已登录 Cookie</span></div>
+<div class="http-line" style="color:var(--red)"><span class="k">HTTP/1.1 200 OK</span>
+<span class="c">  ← 服务端只验证 Cookie，误以为是你本人操作</span></div>
+<p style="margin-top:10px;font-size:12.5px;color:var(--muted)">攻击者不一定需要读取响应——只要能"借用"你的浏览器和登录态触发请求，就能造成风险。转账、修改邮箱、删除数据、创建订单等操作都是常见目标。</p>
+</section>
+
+<!-- HOW CSRFTOKEN WORKS -->
+<section class="section">
+<h2>csrftoken 如何阻止 CSRF</h2>
+<p class="section-meta">Double Submit 模式：同一令牌从 Cookie 和请求头两处提交，服务端比对</p>
+<div class="grid-2">
+<div class="cell">
+<h3>① 服务端下发 Token</h3>
+<p>登录成功后，服务端同时下发登录 Cookie 和 CSRF Cookie。前者证明身份，后者携带随机令牌。</p>
+<div class="http-line" style="margin-top:6px"><span class="k">Set-Cookie: session=abc123</span> <span class="c">← 身份</span>
+<span class="k">Set-Cookie: csrftoken=7e1a…9b42</span> <span class="c">← 来源校验</span></div>
+</div>
+<div class="cell highlight">
+<h3>② 前端读取并显式提交</h3>
+<p>前端 JavaScript 读取 CSRF Cookie 的值，复制到自定义请求头或表单字段。这是"显式提交"，区别于浏览器自动携带。</p>
+<div class="http-line" style="margin-top:6px"><span class="k">POST /api/profile</span>
+<span class="k">Cookie: session=abc123; csrftoken=7e1a…9b42</span>
+<span class="k">X-CSRFToken: 7e1a…9b42</span> <span class="c">← 显式提交</span></div>
+</div>
+<div class="cell">
+<h3>③ 服务端比对</h3>
+<p>服务端收到请求后，同时检查 Cookie 里的 csrftoken 和请求头里的 X-CSRFToken 是否一致。缺失或不一致 → <span style="color:var(--red)">403 Forbidden</span>。</p>
+<div class="http-line" style="margin-top:6px"><span class="k">Cookie[csrftoken] == X-CSRFToken</span>
+<span class="c">  → </span><span class="green">一致 → 处理请求</span>
+<span class="c">  → </span><span class="red">不一致 → 403</span></div>
+</div>
+<div class="cell">
+<h3>④ 为什么攻击者伪造不了</h3>
+<p>恶意网页可以让浏览器自动带 Cookie，但通常无法读取目标站点的 CSRF Cookie（受同源策略限制），因此构造不出正确的 <code>X-CSRFToken</code> 请求头。</p>
+<p style="margin-top:6px;color:var(--yellow);font-size:12px">⚠ 前提：应用没有 XSS。XSS 可以直接读取 CSRF Cookie。</p>
+</div>
+</div>
+</section>
+
+<!-- HTTPONLY TRADE -->
+<section class="section">
+<h2>为什么 csrftoken Cookie 不能设 HttpOnly</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div class="cell">
+<h3 style="color:var(--green)">登录 Cookie → HttpOnly ✓</h3>
+<p>登录会话 Cookie 设置 HttpOnly：浏览器 JavaScript 无法读取。即使页面存在 XSS，攻击脚本也拿不到会话 Cookie，避免被盗用登录态。</p>
+</div>
+<div class="cell">
+<h3 style="color:var(--yellow)">CSRF Cookie → 不能 HttpOnly</h3>
+<p>前端必须能读取 CSRF Cookie 才能把它复制到请求头。如果设置 HttpOnly，JavaScript 无法获取值，就无法构造正确的 X-CSRFToken。</p>
+<div class="http-line" style="margin-top:8px"><span class="c">// 需要这样读取：</span>
+<span class="k">const csrf = getCookie('csrftoken')</span>
+<span class="k">headers:{'X-CSRFToken': csrf}</span></div>
+</div>
+</div>
+<p style="margin-top:10px;font-size:12.5px;color:var(--muted)">这意味着：CSRF 防护和 XSS 防护必须配合使用。单独一个 csrftoken 无法防御 XSS；单独的 HttpOnly 无法防御 CSRF。</p>
+</section>
+
+<!-- TOKEN COMPARE -->
+<section class="section">
+<h2>四种 Token 的职责对比</h2>
+<p class="section-meta">它们不是重复的——分别承担身份识别、权限判断、来源校验和凭证续期</p>
+<div style="overflow-x:auto">
+<table class="tb">
+<thead><tr><th>Token / 凭证</th><th>回答什么问题</th><th>常见位置</th><th>CSRF 风险</th></tr></thead>
+<tbody>
+<tr><td data-label="Token"><code>session</code> Cookie<span>登录会话</span></td><td data-label="问题">这个请求对应哪个用户？</td><td data-label="位置">Cookie（自动携带）</td><td data-label="风险" class="red">高 ← 浏览器自动发送</td></tr>
+<tr><td data-label="Token"><code>Authorization</code><span>Bearer / JWT</span></td><td data-label="问题">调用者有没有权限？</td><td data-label="位置">请求头（不自动跨带）</td><td data-label="风险" class="green">低 ← 浏览器不自动跨带</td></tr>
+<tr><td data-label="Token"><code>csrftoken</code><span>CSRF 令牌</span></td><td data-label="问题">请求是否来自可信前端？</td><td data-label="位置">Cookie + 请求头（Double Submit）</td><td data-label="风险">— ← 本身就是防护手段</td></tr>
+<tr><td data-label="Token"><code>refreshToken</code><span>刷新令牌</span></td><td data-label="问题">如何获得新的 access token？</td><td data-label="位置">Cookie 或存储体</td><td data-label="风险" class="yellow">中 ← 取决于刷新路径设计</td></tr>
+</tbody>
+</table>
+</div>
+<div class="token-row" style="margin-top:12px">
+<div class="token-chip"><span class="k">Cookie: session</span><span class="v">session=abc123  ← 浏览器自动带</span></div>
+<div class="token-chip"><span class="k">Cookie: csrftoken</span><span class="v">csrftoken=7e1a  ← 自动带，但 JS 可读</span></div>
+<div class="token-chip"><span class="k">Header: X-CSRFToken</span><span class="v">7e1a  ← JS 显式提交</span></div>
+<div class="token-chip"><span class="k">Header: Authorization</span><span class="v">Bearer eyJ…  ← 不自动跨带</span></div>
+</div>
+</section>
+
+<!-- CHECKLIST -->
+<section class="section">
+<h2>认证重构检查清单：CSRF 链路五步</h2>
+<p class="section-meta">每一步缺失都是 CSRF 漏洞</p>
+<div class="chain">
+<div class="c-step"><span class="c-num">①</span><div class="c-text">服务端下发 <code>csrftoken</code> Cookie <small>登录成功后同时 Set-Cookie，而非只在某次请求时才给</small></div></div>
+<div class="c-step"><span class="c-num">②</span><div class="c-text">浏览器保存 Cookie <small>设置合理 <code>SameSite</code>（Lax 或 Strict），避免 <code>SameSite=None</code> 在跨站场景滥用</small></div></div>
+<div class="c-step"><span class="c-num">③</span><div class="c-text">前端请求封装统一读取并附加 <small>所有 <code>POST</code> / <code>PUT</code> / <code>PATCH</code> / <code>DELETE</code> 请求都要走统一封装，自动加 <code>X-CSRFToken</code></small></div></div>
+<div class="c-step"><span class="c-num">④</span><div class="c-text">服务端比较 Cookie 值与请求头值 <small>不一致 → <code>403</code>；不能降级为只检查请求头或只检查 Cookie</small></div></div>
+<div class="c-step c-good"><span class="c-num">⑤</span><div class="c-text">一致 → 继续处理 <small>此时才执行修改操作；高风险操作（转账、删数据）可叠加额外确认步骤</small></div></div>
+</div>
+<p style="margin-top:10px;font-size:12px;color:var(--muted)">还需要检查：<code>Secure</code>（HTTPS only）、<code>Domain</code>/<code>Path</code> 范围、<code>Origin</code>/<code>Referer</code> 头校验、CORS 配置，以及 XSS 防护（CSP、输出转义）。</p>
+</section>
+
+<!-- THREE CONFUSIONS -->
+<section class="section">
+<h2>三个常混淆的概念：CORS · CSRF · XSS</h2>
+<div class="three-col">
+<div class="concept cors">
+<span class="tag">CORS</span>
+<span class="q">问：</span><p class="a">一个源的 JavaScript 能不能读取另一个源的响应？</p>
+<p>服务器显式允许（<code>Access-Control-Allow-Origin</code>）后，浏览器才放行跨域读取。是一种"读取权限"机制。</p>
+<p style="margin-top:6px;font-size:11.5px;color:var(--blue)">≠ CSRF 防护。CORS 只管读，不管写。</p>
+</div>
+<div class="concept csrf">
+<span class="tag">CSRF</span>
+<span class="q">问：</span><p class="a">恶意页面能不能借用我的登录态执行修改操作？</p>
+<p>利用浏览器自动携带 Cookie 的特性。防护核心：让请求不是"纯浏览器自动触发"，而需要前端显式参与。</p>
+<p style="margin-top:6px;font-size:11.5px;color:var(--yellow)">≠ CORS 替代品。两者解决不同维度的问题。</p>
+</div>
+<div class="concept xss">
+<span class="tag">XSS</span>
+<span class="q">问：</span><p class="a">攻击者的 JavaScript 能不能在我网站上执行？</p>
+<p>恶意脚本注入后可以读取任意 Cookie（除非 HttpOnly）、操作 DOM、发起任意请求。是最危险的攻击向量之一。</p>
+<p style="margin-top:6px;font-size:11.5px;color:var(--red)">可绕过 CSRF 防护：XSS 能直接读取 csrftoken Cookie。</p>
+</div>
+</div>
+<div style="margin-top:12px;font-size:12px;color:var(--muted);font-family:ui-monospace,monospace">
+CORS：限制跨域读取 → <span style="color:var(--blue)">蓝</span>
+CSRF：防止跨站伪造请求 → <span style="color:var(--yellow)">黄</span>
+XSS：防止恶意脚本注入 → <span style="color:var(--red)">红</span>
+· 三者有关联，但不能相互替代
+</div>
+</section>
+
+<!-- SUMMARY -->
+<section class="section">
+<h2>两句话总结</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div class="summary">
+<h3 class="l2">L2 · 简单比喻版</h3>
+<p><code>csrftoken</code> 是银行给前端的一张"一次性暗号"。浏览器可以自动带登录 Cookie 进门，但只有带上正确暗号的请求才会被当作"你本人"处理。</p>
+</div>
+<div class="summary">
+<h3 class="l5">L5 · 技术机制版</h3>
+<p>CSRF Token 利用浏览器同源策略保护一个不可预测的随机值，要求前端将其以自定义请求头或表单字段显式提交；服务端比对 Cookie 中的值与请求头中的值，区分"浏览器自动携带登录态的跨站请求"和"可信前端主动发起的请求"。</p>
+</div>
+</div>
+</section>
+
+<!-- SELF TEST -->
+<section class="section">
+<h2>自测</h2>
+<div class="cell highlight">
+<h3>为什么攻击者即使能自动携带 session Cookie，通常仍无法伪造正确的 X-CSRFToken？</h3>
+<p style="margin-top:6px"><span style="color:var(--green);font-weight:700">参考答案：</span>攻击者的网页通常无法读取目标站点（bank.com）的 CSRF Cookie（受同源策略限制），因此不知道正确的随机令牌值，也就构造不出匹配的自定义请求头。服务端要求 Cookie 中的值与请求头中的值完全一致，两者都正确才能通过。</p>
+</div>
+</section>
+
+<!-- SOURCES -->
+<section class="section" style="padding-bottom:60px">
+<h2>参考来源</h2>
+<ol style="margin:0;padding-left:20px;font-size:12px;color:var(--muted);line-height:2">
+<li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html" style="color:var(--cyan)">OWASP: Cross-Site Request Forgery Prevention Cheat Sheet</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Glossary/CSRF" style="color:var(--cyan)">MDN: Cross-site request forgery</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie" style="color:var(--cyan)">MDN: Set-Cookie（SameSite / HttpOnly / Secure 属性）</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy" style="color:var(--cyan)">MDN: Same-origin policy（同源策略边界）</a></li>
+</ol>
+</section>
+
+<footer class="footer">
+<span>csrftoken · 认证安全科普卡 · 2026-07-22</span>
+<span>hardblue · 浏览器安全 · 认证重构</span>
+</footer>
+</div>
+<button class="print" onclick="window.print()">▣ 导出 / 打印</button>
+</main>
+</body></html>
