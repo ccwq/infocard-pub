@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unlimited OCR：R-SWA 机制解决长文档 OCR 困境</title>
+  <style>
+:root{
+  --bg:#0c1020;
+  --bg-2:#11162a;
+  --panel:#171c2b;
+  --panel-2:#0f1424;
+  --ink:#eef4ff;
+  --muted:#a8b7df;
+  --line:rgba(255,255,255,.12);
+  --cyan:#58c3ff;
+  --blue:#4a78ff;
+  --green:#2db36a;
+  --yellow:#f4c84c;
+  --purple:#8459ff;
+  --shadow:0 18px 42px rgba(0,0,0,.34);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;overflow-x:hidden}
+body{
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+    radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+    radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+    radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+    linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+}
+a{color:inherit;text-decoration:none}
+.page{
+  width:min(1180px,calc(100% - 20px));
+  margin:0 auto;
+  padding:18px 0 82px;
+}
+
+/* ─── HERO ─── */
+.hero{
+  display:grid;
+  grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);
+  gap:14px;
+  color:#fff;
+  margin-bottom:14px;
+}
+.hero-copy{
+  min-width:0;
+  display:grid;
+  gap:10px;
+  align-content:start;
+  padding:12px 0 0;
+}
+.kicker-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  width:fit-content;
+  padding:5px 10px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);
+  backdrop-filter:blur(10px);
+  color:#fff;
+  font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  border-radius:999px;
+}
+.title{
+  margin:0;
+  font-size:clamp(32px,6vw,72px);
+  line-height:.92;
+  letter-spacing:-.07em;
+  font-weight:950;
+  color:#fff;
+}
+.subtitle{
+  margin:0;
+  font-size:clamp(13px,1.8vw,18px);
+  line-height:1.55;
+  color:#e8eefc;
+}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:30px;
+  padding:6px 10px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);
+  border-radius:999px;
+  color:#fff;
+  font-size:11.2px;
+  font-weight:850;
+  letter-spacing:.01em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+.pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+.pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+.pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+
+/* hero note */
+.hero-note{
+  display:grid;
+  gap:8px;
+  border:1.5px solid rgba(255,255,255,.16);
+  background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+  padding:14px 16px 12px;
+  border-radius:18px;
+  box-shadow:var(--shadow);
+}
+.hero-note strong{font-size:14px;line-height:1.35}
+.hero-note p{margin:0;font-size:11.5px;line-height:1.66;color:#edf2ff}
+
+/* hero visual */
+.hero-visual{
+  min-width:0;
+  background:rgba(10,12,22,.5);
+  border:1.5px solid rgba(255,255,255,.12);
+  border-radius:22px;
+  box-shadow:var(--shadow);
+  padding:14px;
+  display:grid;
+  gap:12px;
+  align-content:start;
+}
+.visual-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.orb{
+  width:66px;
+  height:66px;
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+    linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+  box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+  display:grid;
+  place-items:center;
+  color:#fff;
+  font-size:26px;
+  font-weight:950;
+  letter-spacing:-.08em;
+  flex-shrink:0;
+}
+.visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+.visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+.visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+
+/* yann badge */
+.yann-badge{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  background:rgba(132,89,255,.10);
+  border:1.5px solid rgba(132,89,255,.30);
+  border-radius:14px;
+  padding:10px 12px;
+}
+.yann-avatar{
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#8459ff,#4a78ff);
+  display:grid;
+  place-items:center;
+  font-size:16px;
+  font-weight:950;
+  flex-shrink:0;
+}
+.yann-info{display:grid;gap:2px;min-width:0}
+.yann-name{font-size:12px;font-weight:900;color:#ede3ff}
+.yann-title{font-size:11px;color:#a8b7df;line-height:1.4}
+.yann-quote{font-size:11.2px;color:#d8c8ff;line-height:1.55;margin-top:3px;font-style:italic}
+
+/* ─── PROBLEM VS SOLUTION ─── */
+.section-label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);
+  border-radius:999px;
+  color:#fff;
+  font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  margin-bottom:12px;
+}
+.problem-solution{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-bottom:14px;
+}
+.card{
+  background:var(--panel);
+  border:1.5px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:14px;
+  box-shadow:var(--shadow);
+}
+.card.red{border-color:rgba(232,64,64,.30);background:linear-gradient(180deg,rgba(232,64,64,.12),rgba(232,64,64,.05))}
+.card.green{border-color:rgba(45,179,106,.30);background:linear-gradient(180deg,rgba(45,179,106,.12),rgba(45,179,106,.05))}
+.card-head{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.card-icon{
+  width:28px;height:28px;border-radius:50%;
+  display:grid;place-items:center;
+  font-size:14px;
+  flex-shrink:0;
+}
+.card-icon.red-icon{background:rgba(232,64,64,.20);border:1px solid rgba(232,64,64,.35)}
+.card-icon.green-icon{background:rgba(45,179,106,.20);border:1px solid rgba(45,179,106,.35)}
+.card-title{font-size:13px;font-weight:900;color:#fff}
+.card ul{
+  margin:0;padding:0 0 0 16px;
+  display:grid;gap:6px;
+}
+.card li{font-size:11.5px;line-height:1.6;color:#c8d5f5}
+.card li strong{color:#fff;font-weight:700}
+.arrow-hint{
+  text-align:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#58c3ff;
+  font-size:22px;
+  font-weight:900;
+  padding:4px 0;
+}
+
+/* ─── R-SWA DIAGRAM ─── */
+.rswadiagram{
+  background:var(--panel);
+  border:1.5px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:18px 14px 14px;
+  margin-bottom:14px;
+  box-shadow:var(--shadow);
+}
+.diagram-title{
+  font-size:12px;font-weight:900;color:#fff;
+  letter-spacing:.08em;text-transform:uppercase;
+  margin-bottom:14px;
+  display:flex;align-items:center;gap:8px;
+}
+.diagram-svg{
+  width:100%;
+  display:block;
+}
+
+/* ─── FEATURES ─── */
+.features{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:14px;
+}
+.feature-card{
+  background:var(--panel);
+  border:1.5px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:13px 11px;
+  display:grid;
+  gap:8px;
+  box-shadow:var(--shadow);
+}
+.feat-icon{
+  width:34px;height:34px;border-radius:50%;
+  display:grid;place-items:center;
+  font-size:17px;
+  margin:0 auto;
+}
+.feat-icon.cyan{background:linear-gradient(180deg,rgba(88,195,255,.22),rgba(88,195,255,.10));border:1px solid rgba(88,195,255,.35)}
+.feat-icon.green{background:linear-gradient(180deg,rgba(45,179,106,.22),rgba(45,179,106,.10));border:1px solid rgba(45,179,106,.35)}
+.feat-icon.yellow{background:linear-gradient(180deg,rgba(244,200,76,.22),rgba(244,200,76,.10));border:1px solid rgba(244,200,76,.35)}
+.feat-icon.purple{background:linear-gradient(180deg,rgba(132,89,255,.22),rgba(132,89,255,.10));border:1px solid rgba(132,89,255,.35)}
+.feat-num{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#58c3ff;text-align:center;letter-spacing:.06em;text-transform:uppercase}
+.feat-name{font-size:12.5px;font-weight:900;color:#fff;text-align:center;line-height:1.3}
+.feat-desc{font-size:11.2px;color:#a8b7df;line-height:1.6;text-align:center}
+
+/* ─── DATA WALL ─── */
+.data-wall{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:14px;
+}
+.data-card{
+  background:var(--panel);
+  border:1.5px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:14px 12px;
+  text-align:center;
+  display:grid;
+  gap:6px;
+  box-shadow:var(--shadow);
+}
+.data-card .num{
+  font-size:clamp(22px,4vw,38px);
+  font-weight:950;
+  letter-spacing:-.05em;
+  line-height:1;
+}
+.data-card .num.cyan{color:var(--cyan)}
+.data-card .num.green{color:var(--green)}
+.data-card .num.yellow{color:var(--yellow)}
+.data-card .label{font-size:11.2px;color:#a8b7df;font-weight:600}
+.data-card .sub{font-size:11px;color:#7a8bc4;line-height:1.5}
+.data-card .tag{
+  display:inline-block;
+  padding:3px 8px;
+  border-radius:999px;
+  font-size:10.5px;
+  font-weight:800;
+  margin-top:2px;
+}
+.data-card .tag.top{background:rgba(244,200,76,.15);border:1px solid rgba(244,200,76,.35);color:#fff0bf}
+
+/* ─── AUDIENCE ─── */
+.audience-section{
+  background:var(--panel);
+  border:1.5px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:14px;
+  margin-bottom:14px;
+  box-shadow:var(--shadow);
+}
+.audience-section h3{
+  font-size:12px;font-weight:900;color:#fff;
+  letter-spacing:.08em;text-transform:uppercase;
+  margin:0 0 10px;
+  display:flex;align-items:center;gap:8px;
+}
+.audience-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.audience-card{
+  background:rgba(255,255,255,.04);
+  border:1.5px solid rgba(255,255,255,.09);
+  border-radius:14px;
+  padding:11px 10px;
+  display:grid;gap:6px;
+}
+.audience-card .who{font-size:13px;font-weight:900;color:#fff}
+.audience-card .why{font-size:11.2px;color:#a8b7df;line-height:1.6}
+.audience-card .pill{margin-top:2px}
+
+/* ─── SOURCES ─── */
+.sources{
+  background:var(--panel);
+  border:1.5px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:14px;
+  margin-bottom:14px;
+  box-shadow:var(--shadow);
+}
+.sources h3{
+  font-size:12px;font-weight:900;color:#fff;
+  letter-spacing:.08em;text-transform:uppercase;
+  margin:0 0 10px;
+  display:flex;align-items:center;gap:8px;
+}
+.source-row{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.source-item{
+  display:grid;gap:4px;
+  background:rgba(255,255,255,.04);
+  border:1.5px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  padding:10px;
+}
+.source-item .platform{font-size:11px;font-weight:900;color:#a8b7df;text-transform:uppercase;letter-spacing:.08em}
+.source-item .url{font-size:11.2px;color:#58c3ff;line-height:1.5;word-break:break-all}
+.source-item .note{font-size:11px;color:#7a8bc4}
+
+/* ─── FOOTER ─── */
+.footer{
+  background:#0b1020;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  padding:12px 14px;
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  color:#dfe8ff;
+  font-size:11.5px;
+  flex-wrap:wrap;
+}
+.footer .tag{font-weight:900}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width:720px){
+  .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+  .hero,.problem-solution,.data-wall,.audience-grid,.source-row{grid-template-columns:1fr}
+  .features{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero{gap:12px}
+  .title{font-size:clamp(28px,12vw,48px)}
+  .subtitle{font-size:13px}
+  .footer{font-size:11px}
+  .visual-top{flex-direction:column;align-items:flex-start}
+  .visual-meta{text-align:left;justify-items:start}
+  .yann-badge{flex-direction:column}
+}
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <div class="kicker">熊厂出品 · 端到端长文档 OCR</div>
+        </div>
+        <h1 class="title">Unlimited OCR</h1>
+        <p class="subtitle">R-SWA 机制解决长文档 OCR 困境</p>
+        <div class="pill-row">
+          <span class="pill cyan">30亿参数</span>
+          <span class="pill green">224万下载</span>
+          <span class="pill yellow">完全免费可本地运行</span>
+          <span class="pill purple">Yann LeCun 转发</span>
+        </div>
+        <div class="hero-note">
+          <strong>突破 KV Cache 瓶颈：模拟人类阅读方式处理长文档</strong>
+          <p>核心创新 R-SWA（Reference Sliding Window Attention）：始终盯着原始文档 + 保留最近工作记忆，无需分页切割，100页 PDF 一次端到端解析，跨页表格、公式、阅读顺序全部保留。</p>
+        </div>
+      </div>
+
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">U</div>
+          <div class="visual-meta">
+            <div class="big">Unlimited OCR</div>
+            <div class="small">R-SWA · 224万下载 · 1.65万★</div>
+          </div>
+        </div>
+
+        <div class="yann-badge">
+          <div class="yann-avatar">Y</div>
+          <div class="yann-info">
+            <div class="yann-name">Yann LeCun 转推背书</div>
+            <div class="yann-title">深度学习三巨头之一 · Meta 首席 AI 科学家</div>
+            <div class="yann-quote">"突破性工作，让本地长文档 OCR 成为可能。"</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="card green" style="padding:10px">
+            <div class="card-title" style="font-size:12px">GitHub Stars</div>
+            <div style="font-size:20px;font-weight:950;color:#2db36a;letter-spacing:-.05em">1.65万+</div>
+          </div>
+          <div class="card cyan" style="padding:10px">
+            <div class="card-title" style="font-size:12px">HuggingFace 下载</div>
+            <div style="font-size:20px;font-weight:950;color:#58c3ff;letter-spacing:-.05em">224万</div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- PROBLEM VS SOLUTION -->
+    <div class="section-label">📋 问题 vs 方案</div>
+    <div class="problem-solution">
+      <div class="card red">
+        <div class="card-head">
+          <div class="card-icon red-icon">✕</div>
+          <div class="card-title">传统 OCR 痛点</div>
+        </div>
+        <ul>
+          <li><strong>分页切割处理</strong> → 跨页表格断裂、阅读顺序错乱</li>
+          <li><strong>KV Cache 线性增长</strong> → 文档越长，速度越慢，显存爆炸</li>
+          <li><strong>多页 PDF 多次调用</strong> → 上下文割裂，无法建立跨页语义关联</li>
+        </ul>
+      </div>
+      <div class="card green">
+        <div class="card-head">
+          <div class="card-icon green-icon">✓</div>
+          <div class="card-title">Unlimited OCR 方案</div>
+        </div>
+        <ul>
+          <li><strong>端到端连续解析</strong> → 100页 PDF 一次处理，保持全局上下文</li>
+          <li><strong>R-SWA 恒定 KV Cache</strong> → 不随文档长度线性增长，显存可控</li>
+          <li><strong>跨页结构保持</strong> → 表格、公式、阅读顺序全部完整保留</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- R-SWA DIAGRAM -->
+    <div class="rswadiagram">
+      <div class="diagram-title">⚙️ R-SWA 技术原理简图</div>
+      <svg class="diagram-svg" viewBox="0 0 800 180" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background grid lines -->
+        <defs>
+          <linearGradient id="refGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#58c3ff" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#4a78ff" stop-opacity="0.15"/>
+          </linearGradient>
+          <linearGradient id="winGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#8459ff" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#8459ff" stop-opacity="0.15"/>
+          </linearGradient>
+          <linearGradient id="outGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#2db36a" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#2db36a" stop-opacity="0.15"/>
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#58c3ff" opacity="0.7"/>
+          </marker>
+          <marker id="arrow2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#8459ff" opacity="0.7"/>
+          </marker>
+        </defs>
+
+        <!-- Node 1: Reference (原始文档) -->
+        <rect x="10" y="20" width="200" height="140" rx="16" fill="url(#refGrad)" stroke="#58c3ff" stroke-width="1.5" stroke-opacity="0.5"/>
+        <rect x="20" y="30" width="180" height="100" rx="10" fill="rgba(88,195,255,0.08)" stroke="#58c3ff" stroke-width="1" stroke-opacity="0.3"/>
+        <!-- Doc lines -->
+        <rect x="30" y="42" width="120" height="5" rx="2" fill="#58c3ff" opacity="0.5"/>
+        <rect x="30" y="54" width="160" height="4" rx="2" fill="#58c3ff" opacity="0.35"/>
+        <rect x="30" y="64" width="140" height="4" rx="2" fill="#58c3ff" opacity="0.35"/>
+        <rect x="30" y="74" width="155" height="4" rx="2" fill="#58c3ff" opacity="0.35"/>
+        <rect x="30" y="84" width="130" height="4" rx="2" fill="#58c3ff" opacity="0.35"/>
+        <rect x="30" y="94" width="148" height="4" rx="2" fill="#58c3ff" opacity="0.35"/>
+        <rect x="30" y="104" width="110" height="4" rx="2" fill="#58c3ff" opacity="0.35"/>
+        <rect x="30" y="114" width="145" height="4" rx="2" fill="#58c3ff" opacity="0.25"/>
+        <rect x="30" y="124" width="100" height="4" rx="2" fill="#58c3ff" opacity="0.25"/>
+        <!-- Table in doc -->
+        <rect x="30" y="76" width="160" height="28" rx="4" fill="rgba(88,195,255,0.12)" stroke="#58c3ff" stroke-width="0.8" stroke-opacity="0.5"/>
+        <line x1="30" y1="85" x2="190" y2="85" stroke="#58c3ff" stroke-width="0.6" stroke-opacity="0.4"/>
+        <line x1="30" y1="94" x2="190" y2="94" stroke="#58c3ff" stroke-width="0.6" stroke-opacity="0.4"/>
+        <line x1="100" y1="76" x2="100" y2="104" stroke="#58c3ff" stroke-width="0.6" stroke-opacity="0.4"/>
+        <line x1="150" y1="76" x2="150" y2="104" stroke="#58c3ff" stroke-width="0.6" stroke-opacity="0.4"/>
+        <text x="110" y="60" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#58c3ff" opacity="0.8" text-anchor="middle" font-weight="700">原始文档 Reference</text>
+        <text x="110" y="148" font-family="Inter,system-ui,sans-serif" font-size="10.5" fill="#a8b7df" text-anchor="middle">始终被 Attention 引用</text>
+        <text x="110" y="162" font-family="Inter,system-ui,sans-serif" font-size="10.5" fill="#7a8bc4" text-anchor="middle">KV Cache 不爆炸</text>
+
+        <!-- Arrow 1: Reference → Sliding Window (cyan) -->
+        <path d="M215 90 C250 90, 265 90, 280 90" stroke="#58c3ff" stroke-width="1.5" stroke-dasharray="6,3" fill="none" marker-end="url(#arrow)" opacity="0.7"/>
+        <text x="247" y="83" font-family="Inter,system-ui,sans-serif" font-size="9.5" fill="#58c3ff" text-anchor="middle" opacity="0.85">选择性引用</text>
+
+        <!-- Node 2: Sliding Window (工作记忆) -->
+        <rect x="285" y="20" width="200" height="140" rx="16" fill="url(#winGrad)" stroke="#8459ff" stroke-width="1.5" stroke-opacity="0.5"/>
+        <rect x="295" y="30" width="180" height="100" rx="10" fill="rgba(132,89,255,0.08)" stroke="#8459ff" stroke-width="1" stroke-opacity="0.3"/>
+        <!-- Working memory blocks -->
+        <rect x="305" y="42" width="160" height="12" rx="5" fill="#8459ff" opacity="0.25"/>
+        <rect x="305" y="42" width="120" height="12" rx="5" fill="#8459ff" opacity="0.5"/>
+        <rect x="305" y="60" width="160" height="12" rx="5" fill="#8459ff" opacity="0.25"/>
+        <rect x="305" y="60" width="140" height="12" rx="5" fill="#8459ff" opacity="0.5"/>
+        <rect x="305" y="78" width="160" height="12" rx="5" fill="#8459ff" opacity="0.35"/>
+        <rect x="305" y="78" width="100" height="12" rx="5" fill="#8459ff" opacity="0.65"/>
+        <rect x="305" y="96" width="160" height="12" rx="5" fill="#8459ff" opacity="0.20"/>
+        <rect x="305" y="96" width="80" height="12" rx="5" fill="#8459ff" opacity="0.45"/>
+        <rect x="305" y="114" width="160" height="12" rx="5" fill="#8459ff" opacity="0.15"/>
+        <rect x="305" y="114" width="60" height="12" rx="5" fill="#8459ff" opacity="0.35"/>
+        <!-- Window frame -->
+        <rect x="295" y="30" width="180" height="100" rx="10" fill="none" stroke="#8459ff" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.6"/>
+        <text x="385" y="60" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#ede3ff" text-anchor="middle" font-weight="700">Sliding Window</text>
+        <text x="385" y="75" font-family="Inter,system-ui,sans-serif" font-size="10.5" fill="#c8b8f8" text-anchor="middle">工作记忆区</text>
+        <text x="385" y="148" font-family="Inter,system-ui,sans-serif" font-size="10.5" fill="#a8b7df" text-anchor="middle">固定窗口大小</text>
+        <text x="385" y="162" font-family="Inter,system-ui,sans-serif" font-size="10.5" fill="#7a8bc4" text-anchor="middle">KV Cache 恒定</text>
+
+        <!-- Arrow 2: Sliding Window → Output (purple) -->
+        <path d="M490 90 C520 90, 535 90, 550 90" stroke="#8459ff" stroke-width="1.5" stroke-dasharray="6,3" fill="none" marker-end="url(#arrow2)" opacity="0.7"/>
+        <text x="520" y="83" font-family="Inter,system-ui,sans-serif" font-size="9.5" fill="#8459ff" text-anchor="middle" opacity="0.85">上下文整合</text>
+
+        <!-- Node 3: Output (端到端结果) -->
+        <rect x="555" y="20" width="235" height="140" rx="16" fill="url(#outGrad)" stroke="#2db36a" stroke-width="1.5" stroke-opacity="0.5"/>
+        <rect x="565" y="30" width="215" height="100" rx="10" fill="rgba(45,179,106,0.08)" stroke="#2db36a" stroke-width="1" stroke-opacity="0.3"/>
+        <!-- Structured output -->
+        <rect x="575" y="42" width="80" height="8" rx="3" fill="#2db36a" opacity="0.5"/>
+        <rect x="575" y="56" width="195" height="5" rx="2" fill="#2db36a" opacity="0.3"/>
+        <rect x="575" y="67" width="180" height="5" rx="2" fill="#2db36a" opacity="0.3"/>
+        <rect x="575" y="78" width="190" height="5" rx="2" fill="#2db36a" opacity="0.3"/>
+        <!-- Table output -->
+        <rect x="575" y="89" width="195" height="32" rx="5" fill="rgba(45,179,106,0.15)" stroke="#2db36a" stroke-width="0.8" stroke-opacity="0.5"/>
+        <line x1="575" y1="100" x2="770" y2="100" stroke="#2db36a" stroke-width="0.6" stroke-opacity="0.4"/>
+        <line x1="575" y1="111" x2="770" y2="111" stroke="#2db36a" stroke-width="0.6" stroke-opacity="0.4"/>
+        <line x1="640" y1="89" x2="640" y2="121" stroke="#2db36a" stroke-width="0.6" stroke-opacity="0.4"/>
+        <line x1="705" y1="89" x2="705" y2="121" stroke="#2db36a" stroke-width="0.6" stroke-opacity="0.4"/>
+        <rect x="575" y="127" width="195" height="5" rx="2" fill="#2db36a" opacity="0.25"/>
+        <text x="672" y="60" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#ddffe8" text-anchor="middle" font-weight="700">Output</text>
+        <text x="672" y="75" font-family="Inter,system-ui,sans-serif" font-size="10.5" fill="#a8dfc0" text-anchor="middle">端到端完整结果</text>
+        <text x="672" y="148" font-family="Inter,system-ui,sans-serif" font-size="10.5" fill="#a8b7df" text-anchor="middle">完整结构保留</text>
+        <text x="672" y="162" font-family="Inter,system-ui,sans-serif" font-size="10.5" fill="#7a8bc4" text-anchor="middle">表格·公式·阅读顺序</text>
+
+        <!-- Center label -->
+        <text x="400" y="175" font-family="Inter,system-ui,sans-serif" font-size="9.5" fill="#7a8bc4" text-anchor="middle">R-SWA = Reference Sliding Window Attention</text>
+      </svg>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="section-label">✨ 核心特性</div>
+    <div class="features">
+      <div class="feature-card">
+        <div class="feat-icon cyan" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#58c3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </div>
+        <div class="feat-num">Feature 01</div>
+        <div class="feat-name">不分页连续解析</div>
+        <div class="feat-desc">100页 PDF 一次端到端处理，保持全局上下文关联，无需分页切割</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon green" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2db36a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        </div>
+        <div class="feat-num">Feature 02</div>
+        <div class="feat-name">恒定 KV Cache</div>
+        <div class="feat-desc">Sliding Window 机制保证 KV Cache 不随文档长度线性增长，显存可控</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon yellow" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f4c84c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+        </div>
+        <div class="feat-num">Feature 03</div>
+        <div class="feat-name">完整结构保持</div>
+        <div class="feat-desc">跨页表格、公式、阅读顺序全部保留，输出结构化结果</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon purple" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8459ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        </div>
+        <div class="feat-num">Feature 04</div>
+        <div class="feat-name">完全免费本地运行</div>
+        <div class="feat-desc">30亿参数，个人电脑可跑，无需联网/订阅/上传服务器</div>
+      </div>
+    </div>
+
+    <!-- DATA WALL -->
+    <div class="section-label">📊 数据表现</div>
+    <div class="data-wall">
+      <div class="data-card">
+        <div class="num cyan">1.65万+</div>
+        <div class="label">GitHub Stars</div>
+        <div class="sub">发布首月横扫 GitHub 榜单第一</div>
+      </div>
+      <div class="data-card">
+        <div class="num green">224万+</div>
+        <div class="label">HuggingFace 下载量</div>
+        <div class="sub">开源社区广泛认可</div>
+      </div>
+      <div class="data-card">
+        <div class="num yellow">TOP 3</div>
+        <div class="label">HuggingFace 全球趋势</div>
+        <div class="sub">模型总趋势前三（第二次上榜）</div>
+        <div><span class="tag top">🔥 热门模型</span></div>
+      </div>
+    </div>
+
+    <!-- AUDIENCE -->
+    <div class="audience-section">
+      <h3>🎯 适合人群</h3>
+      <div class="audience-grid">
+        <div class="audience-card">
+          <div class="who">👨💻 开发者</div>
+          <div class="why">集成到本地工作流，处理项目文档、代码截图、API 文档</div>
+          <span class="pill cyan" style="font-size:10.5px;padding:3px 8px">本地集成</span>
+        </div>
+        <div class="audience-card">
+          <div class="who">🔬 研究者</div>
+          <div class="why">处理长篇 PDF 论文、学术文献，保持引用关系和脚注顺序</div>
+          <span class="pill purple" style="font-size:10.5px;padding:3px 8px">学术场景</span>
+        </div>
+        <div class="audience-card">
+          <div class="who">🏢 企业</div>
+          <div class="why">合同/发票/表格批量 OCR，数据完全不上云，满足合规要求</div>
+          <span class="pill green" style="font-size:10.5px;padding:3px 8px">数据安全</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOURCES -->
+    <div class="sources">
+      <h3>🔗 参考来源</h3>
+      <div class="source-row">
+        <div class="source-item">
+          <div class="platform">GitHub</div>
+          <div class="url">github.com/bingo-ai/UnlimitedOCR</div>
+          <div class="note">⭐ 1.65万+ · 待核实完整路径</div>
+        </div>
+        <div class="source-item">
+          <div class="platform">HuggingFace</div>
+          <div class="url">huggingface.co/spaces/…</div>
+          <div class="note">224万+ 下载 · 待核实完整路径</div>
+        </div>
+        <div class="source-item">
+          <div class="platform">Yann LeCun X</div>
+          <div class="url">@ylecun 转推动态</div>
+          <div class="note">Meta 首席 AI 科学家背书</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <section class="footer">
+      <div>🟦 infocard-darkblue-style</div>
+      <div class="tag">Unlimited OCR · R-SWA</div>
+      <div>30亿参数 · 完全免费本地运行</div>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      function send(){
+        var h=document.body.scrollHeight;
+        window.parent.postMessage({type:'theme-height',slug:'darkblue',height:h},'*');
+      }
+      if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+      setTimeout(send,500);
+    })();
+  </script>
+</body>
+</html>
