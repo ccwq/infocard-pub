@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>本地部署 QWable：从显存匹配到 LM Studio</title>
+<style>
+/* ============================================================
+   infocard-crayon-style — R6 纸感编辑风
+   基于 R5（空间效率优化）叠加以下改造：
+   ① 常规档字号层级：标题 36–56px / 序号 52px / 条目 18px / 正文 14px
+   ② 时间轴骨架：左侧大号衬线编号 + 赭石色虚线 / 圆点
+   ③ 五色降饱和保留识别性（-35%）
+   ④ 衬线 / 无衬线混排：标题衬线、编号衬线、正文无衬线
+   ⑤ 编辑海报式标题层级：眉标 + 大衬线标题 + 赭石副标题 + 装饰线
+   ⑥ 底部工作流轻量编辑化
+   ⑦ 默认适用于 3–7 个并列条目的编辑型内容，不锁定当前 demo 内容
+   ============================================================ */
+
+/* ============================================================
+   COMPONENT TOKENS — 供主题外部复用
+   ============================================================ */
+
+:root {
+  /* --- 背景与纸张 --- */
+  --crayon-bg:         #f0ead8;   /* 暖米白纸底 */
+  --crayon-paper:       #f5f0e2;   /* 略深纸卡底 */
+
+  /* --- 墨色体系 --- */
+  --crayon-ink:        #1c1c1c;   /* 主文字 */
+  --crayon-muted:      #6b6252;   /* 次级文字 */
+  --crayon-faint:      #9b8e7a;   /* 极淡辅助 */
+
+  /* --- 赭石强调色 --- */
+  --crayon-accent:     #b8924a;   /* 赭石/土黄，用于副标题、装饰圆点 */
+
+  /* --- 五色（降饱和 -35%，保留识别性）--- */
+  --crayon-blue:       #4a7fa8;   /* 原 #2a6fa8 */
+  --crayon-green:      #3a8a70;   /* 原 #2a8a6e */
+  --crayon-purple:     #7a5aaa;   /* 原 #7955ab */
+  --crayon-orange:     #c06030;   /* 原 #d45c1a */
+  --crayon-yellow:     #b08830;   /* 原 #c8971f */
+
+  /* --- 通用 --- */
+  --crayon-red:        #c23a2a;
+  --crayon-line:       rgba(0,0,0,.10);      /* 细分隔线 */
+  --crayon-dash:       rgba(83,73,57,.45);   /* 虚线 */
+  --crayon-radius:     0px;                  /* R6 无圆角，保持编辑感 */
+  --crayon-shadow:     none;                 /* R6 无阴影，保持纸质感 */
+}
+
+/* 主题画布：demo 与实际输出都从视口边缘开始，不保留浏览器白边 */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--crayon-bg);
+}
+body { min-width: 0; }
+
+/* 统一盒模型：避免主题被外部页面注入样式后重新产生边缘溢出 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   POSTER SHELL — 纸感编辑海报覆盖层
+   ============================================================ */
+
+/* 主容器：温暖米白 + 宽松页边 + 纸感 */
+.poster-shell {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  box-sizing: border-box;
+  margin: 0 auto;
+  background: var(--crayon-bg);
+  padding: 32px 34px 26px;
+}
+
+/* 眉标 */
+.poster-shell .poster-kicker {
+  font: 700 10px/1.2 Georgia, "Songti SC", serif;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--crayon-faint);
+  margin-bottom: 16px;
+}
+.poster-shell .poster-kicker strong {
+  color: var(--crayon-accent);
+}
+
+/* ============================================================
+   HERO — 编辑海报式标题区
+   ============================================================ */
+
+.poster-shell .hero {
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--crayon-ink);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 0 22px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+/* 标题条纹（隐藏） */
+.poster-shell .hero-stripe { display: none; }
+
+/* 表情图标：小号 */
+.poster-shell .hero-inner { padding-top: 0; }
+.poster-shell .hero-emoji {
+  font-size: 20px;
+  opacity: .5;
+  margin-bottom: 8px;
+}
+
+/* 主标题：常规档衬线字，保留编辑入口层级 */
+.poster-shell .hero-title {
+  font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
+  font-size: clamp(36px, 6vw, 56px);
+  font-weight: 700;
+  line-height: .95;
+  letter-spacing: -.04em;
+  color: var(--crayon-ink);
+  max-width: 600px;
+  margin-bottom: 14px;
+}
+
+/* 副标题：赭石色强调 */
+.poster-shell .hero-subtitle {
+  font-family: Georgia, "Songti SC", serif;
+  color: var(--crayon-accent);
+  font-size: 16px;
+  max-width: none;
+  margin-bottom: 14px;
+}
+
+/* 标签行：黑 / 灰，无色块 */
+.poster-shell .hero-tags { gap: 0; margin-top: 12px; }
+.poster-shell .hero-tag {
+  background: transparent !important;
+  color: var(--crayon-muted) !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  font: 11px/1.4 Georgia, "Songti SC", serif !important;
+}
+.poster-shell .hero-tag:not(:last-child)::after {
+  content: "  ·  ";
+  color: var(--crayon-faint);
+}
+
+/* 标题底部装饰线 + 圆点 */
+.hero::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--crayon-accent) 0,
+    var(--crayon-accent) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+.hero .hero-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hero .hero-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--crayon-accent);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   STAT ROW — 编辑索引带（无卡片 / 无阴影）
+   ============================================================ */
+
+.poster-shell .stat-row {
+  display: flex;
+  gap: 0;
+  margin: 0 0 16px;
+  padding: 0 0 16px;
+  border-bottom: 1px dashed var(--crayon-dash);
+  flex-wrap: wrap;
+}
+
+.poster-shell .stat-item {
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px dashed var(--crayon-dash) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  min-width: 0;
+  padding: 0 16px;
+  text-align: left;
+  flex: 1;
+  min-width: 80px;
+}
+.poster-shell .stat-item:first-child { padding-left: 0; }
+.poster-shell .stat-item:last-child { border-right: 0 !important; }
+
+/* 数字放大，正文保持清晰 */
+.poster-shell .stat-item b {
+  font: 700 26px/1 Georgia, "Noto Serif SC", serif;
+  color: var(--crayon-ink);
+  display: block;
+}
+.poster-shell .stat-item span {
+  font: 10px/1.4 Georgia, "Songti SC", serif;
+  color: var(--crayon-muted);
+  display: block;
+  margin-top: 3px;
+}
+
+/* ============================================================
+   SECTION TITLE — 章节眉标
+   ============================================================ */
+
+.poster-shell .section-title {
+  font: 700 10px/1.2 Arial, sans-serif;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--crayon-faint);
+  background: transparent;
+  border-bottom: 1px dashed var(--crayon-dash);
+  padding: 0 0 6px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.poster-shell .section-title .num {
+  color: var(--crayon-accent);
+  background: transparent;
+  padding: 0;
+  font-size: 10px;
+}
+
+/* ============================================================
+   CARDS GRID — 时间轴网格
+   ============================================================ */
+
+.poster-shell .cards-grid { display: block; margin: 0; }
+
+/* 单条目骨架：左侧编号列 + 赭石虚线 / 圆点 + 右侧正文 */
+.poster-shell .skill-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 100px 1fr;   /* R6: 编号列扩到 100px，容纳 32px 留白 */
+  gap: 0;
+  border-bottom: 1px dashed var(--crayon-dash);
+  min-height: 104px;                 /* 常规档行高 */
+}
+.poster-shell .skill-card:last-child { border-bottom: 0; }
+
+/* 编号格 */
+.poster-shell .card-num {
+  grid-column: 1;
+  grid-row: 1;
+  background: transparent !important;
+  color: var(--crayon-blue) !important;  /* 灰蓝色衬线大字 */
+  border-radius: 0;
+  padding: 0 32px 0 0;                /* R6: 编号与时间轴之间 32px 留白 */
+  margin: 0;
+  font: 400 52px/.9 Georgia, "Times New Roman", serif;
+  letter-spacing: -.05em;
+  text-align: right;
+  align-self: center;
+}
+.poster-shell .card-num.green  { color: var(--crayon-green)  !important; }
+.poster-shell .card-num.purple { color: var(--crayon-purple) !important; }
+.poster-shell .card-num.orange { color: var(--crayon-orange) !important; }
+.poster-shell .card-num.yellow { color: var(--crayon-yellow) !important; }
+
+/* 赭石色时间轴：竖虚线 */
+.poster-shell .card-stripe {
+  position: absolute;
+  left: 96px;              /* R6: 与网格列右缘 100px 配合，预留 4px 余量 */
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  height: auto;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--crayon-accent) 0,
+    var(--crayon-accent) 5px,
+    transparent 5px,
+    transparent 9px
+  );
+  opacity: .7;
+}
+
+/* 时间轴圆点 */
+.poster-shell .card-stripe::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -3px;
+  transform: translateY(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--crayon-accent);
+}
+
+/* 五色条纹（细线） */
+.poster-shell .card-stripe.blue   { background-color: var(--crayon-blue);   opacity: .6; }
+.poster-shell .card-stripe.green  { background-color: var(--crayon-green);  opacity: .6; }
+.poster-shell .card-stripe.purple { background-color: var(--crayon-purple); opacity: .6; }
+.poster-shell .card-stripe.orange { background-color: var(--crayon-orange); opacity: .6; }
+.poster-shell .card-stripe.yellow { background-color: var(--crayon-yellow); opacity: .6; }
+
+/* 正文区 */
+.poster-shell .card-body {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 14px 22px 14px 18px;
+  min-width: 0;
+  position: relative;
+}
+
+/* 条目标题：无衬线粗体，常规档 18px */
+.poster-shell .card-title {
+  font: 700 18px/1.3 Arial, "PingFang SC", sans-serif;
+  color: var(--crayon-ink);
+  margin: 0 0 6px 0;
+}
+
+/* 正文：无衬线，常规档 14px */
+.poster-shell .card-desc {
+  font: 14px/1.6 Arial, "PingFang SC", sans-serif;
+  color: var(--crayon-muted);
+  max-width: none;
+}
+
+/* 标签链 */
+.poster-shell .card-tags { margin-top: 8px; gap: 0; }
+.poster-shell .card-tag {
+  background: transparent;
+  color: var(--crayon-faint);
+  border-radius: 0;
+  padding: 0;
+  font: 10px/1.3 Georgia, "Songti SC", serif;
+}
+.poster-shell .card-tag:not(:last-child)::after {
+  content: "  |  ";
+  color: var(--crayon-faint);
+}
+
+/* ============================================================
+   USAGE — 底部工作流（轻量编辑化）
+   ============================================================ */
+
+.poster-shell .usage-shell {
+  margin: 18px 0 0;
+  border-top: 1px solid var(--crayon-ink);
+  border-bottom: 1px solid var(--crayon-ink);
+}
+.poster-shell .usage-stripe { display: none; }
+
+.poster-shell .usage-body {
+  padding: 14px 0;
+}
+
+.poster-shell .usage-title {
+  font: 700 10px/1.2 Georgia, "Songti SC", serif;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--crayon-faint);
+  margin-bottom: 10px;
+  background: none;
+  -webkit-text-fill-color: initial;
+  padding: 0;
+}
+
+/* 步骤网格：无边框，虚线分隔 */
+.poster-shell .usage-grid {
+  display: flex;
+  gap: 0;
+  border-top: 1px dashed var(--crayon-dash);
+}
+.poster-shell .usage-step {
+  flex: 1;
+  border: 0;
+  border-right: 1px dashed var(--crayon-dash);
+  border-radius: 0;
+  padding: 10px 12px;
+  background: transparent;
+  box-shadow: none;
+}
+.poster-shell .usage-step:last-child { border-right: 0; }
+.poster-shell .usage-step b {
+  font: 700 9px/1 Arial, sans-serif;
+  color: var(--crayon-faint);
+  display: block;
+  margin-bottom: 4px;
+}
+.poster-shell .usage-step h4 {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 0 3px;
+  color: var(--crayon-ink);
+}
+.poster-shell .usage-step p {
+  font: 10px/1.35 Georgia, "Songti SC", serif;
+  color: var(--crayon-muted);
+  margin: 0;
+}
+
+/* 代码块：缩小视觉权重 */
+.poster-shell .code-block {
+  border-radius: 0;
+  margin-top: 12px;
+  font-size: 10px;
+  opacity: .85;
+  background: #161412;
+  color: #cdd9e5;
+  padding: 10px 14px;
+  overflow-wrap: anywhere;        /* R6: 防止 npx 长 token 撑破 390px */
+  word-break: break-word;
+}
+
+/* ============================================================
+   FOOTER — 出版信息
+   ============================================================ */
+
+.poster-shell .footer {
+  border-top: 1.5px solid var(--crayon-ink);
+  padding: 10px 0 0;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font: 10px/1.4 Georgia, "Songti SC", serif;
+  color: var(--crayon-faint);
+  margin-top: 14px;
+}
+
+.poster-shell .poster-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--crayon-dash);
+  font: 10px/1.4 Georgia, "Songti SC", serif;
+  color: var(--crayon-faint);
+}
+
+/* ============================================================
+   RESPONSIVE — 移动端适配
+   ============================================================ */
+
+@media (max-width: 720px) {
+  .poster-shell {
+    padding: 22px 20px 18px;  /* 20px 左右内边距保证英文长字符串不贴边 */
+  }
+
+  /* 标题压缩但不破坏层级 */
+  .poster-shell .hero-title {
+    font-size: clamp(32px, 9vw, 46px);
+  }
+  .poster-shell .hero-subtitle {
+    font-size: 14px;
+  }
+
+  /* 常规档移动端：编号列 72px，间距与桌面端成比例 */
+  .poster-shell .skill-card {
+    grid-template-columns: 72px 1fr;
+    min-height: 104px;
+  }
+  .poster-shell .card-num {
+    font-size: 42px;
+    padding-right: 24px;              /* R6: 移动端编号-时间轴留白 */
+  }
+  .poster-shell .card-stripe {
+    left: 68px;
+  }
+  .poster-shell .card-body {
+    padding: 12px 10px 12px 14px;
+  }
+  .poster-shell .card-title {
+    font-size: 16px;
+  }
+  .poster-shell .card-desc {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* 统计带：保持横向但更紧凑 */
+  .poster-shell .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .poster-shell .stat-item {
+    padding: 0 8px;
+    min-width: 0;
+    border-right: 1px dashed var(--crayon-dash) !important;
+  }
+  .poster-shell .stat-item:nth-child(3n) { border-right: 0 !important; }
+  .poster-shell .stat-item:nth-child(n+4) { margin-top: 10px; }
+  .poster-shell .stat-item b {
+    font-size: 20px;
+  }
+
+  /* 工作流改为 2 列 */
+  .poster-shell .usage-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .poster-shell .usage-step {
+    border-right: 1px dashed var(--crayon-dash);
+    border-bottom: 1px dashed var(--crayon-dash);
+  }
+  .poster-shell .usage-step:nth-child(2n) { border-right: 0; }
+  .poster-shell .usage-step:nth-last-child(-n+2) { border-bottom: 0; }
+  .poster-shell .footer { flex-direction: column; }
+}
+
+/* 本卡扩展：导出控制与风险边界 */
+.save-row{display:flex;justify-content:flex-end;gap:10px;margin:14px 0 0}
+.save-png{appearance:none;border:1px solid var(--crayon-ink);background:var(--crayon-paper);color:var(--crayon-ink);font:700 11px/1 Arial,"PingFang SC",sans-serif;padding:8px 12px;cursor:pointer}
+.save-png:hover,.save-png:focus{background:var(--crayon-ink);color:var(--crayon-bg)}
+.risk-shell{border-top:1px dashed var(--crayon-dash);border-bottom:1px dashed var(--crayon-dash);padding:12px 0;margin-top:16px}
+.risk-title{font:700 10px/1.2 Arial,"PingFang SC",sans-serif;letter-spacing:.14em;color:var(--crayon-red);margin-bottom:6px}
+.risk-text{font:13px/1.65 Arial,"PingFang SC",sans-serif;color:var(--crayon-muted);margin:0}
+@media(max-width:720px){.save-row{justify-content:stretch}.save-png{width:100%}}
+code,pre,table{max-width:100%;overflow:auto}
+</style>
+<body>
+<main>
+<div class="poster-shell">
+  <div class="poster-kicker"><strong>LOCAL AI DEPLOYMENT</strong> · QWABLE · 冻结资料版</div>
+
+  <div class="hero">
+    <div class="hero-emoji" aria-hidden="true">🖥️</div>
+    <h1 class="hero-title">把模型<br>留在本地</h1>
+    <p class="hero-subtitle">QWable 本地部署速查 · 先看显存，再选量化，最后用 LM Studio 跑起来</p>
+    <div class="hero-tags">
+      <span class="hero-tag">降低云 API 费用</span>
+      <span class="hero-tag">保护隐私</span>
+      <span class="hero-tag">Agent 开发</span>
+      <span class="hero-tag">代码辅助</span>
+      <span class="hero-tag">文档翻译</span>
+    </div>
+    <div class="hero-dots" aria-hidden="true"><span class="hero-dot"></span><span class="hero-dot"></span><span class="hero-dot"></span></div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-item"><b>24GB</b><span>QWable-v1 建议显存</span></div>
+    <div class="stat-item"><b>12–16GB</b><span>Qwen-9B 参考区间</span></div>
+    <div class="stat-item"><b>LM Studio</b><span>下载与推理工具链</span></div>
+  </div>
+
+  <div class="section-title"><span class="num">01</span>从需求到落地的四个判断</div>
+  <div class="cards-grid">
+    <div class="skill-card">
+      <div class="card-stripe blue"></div><div class="card-num blue">01</div>
+      <div class="card-body"><h3 class="card-title">为什么放到本地？ <span aria-hidden="true">🔒</span></h3>
+      <p class="card-desc">核心诉求是降低云 API 费用并保护隐私。适用场景包括本地 Agent 开发、代码辅助、文档翻译与自动化处理。</p>
+      <div class="card-tags"><span class="card-tag">成本控制</span><span class="card-tag">隐私</span><span class="card-tag">本地工作流</span></div></div>
+    </div>
+    <div class="skill-card">
+      <div class="card-stripe green"></div><div class="card-num green">02</div>
+      <div class="card-body"><h3 class="card-title">先按显存选模型 <span aria-hidden="true">🧠</span></h3>
+      <p class="card-desc"><strong>QWable-v1</strong>：基于 Qwen 基座，融合 F5 与 GPT-v5 数据蒸馏微调；建议 24GB 显存（RTX 4090/5080）。<br><strong>Qwen-9B</strong>：面向轻量文本转换与基础任务。</p>
+      <div class="card-tags"><span class="card-tag">QWable-v1</span><span class="card-tag">Qwen-9B</span><span class="card-tag">模型选型</span></div></div>
+    </div>
+    <div class="skill-card">
+      <div class="card-stripe purple"></div><div class="card-num purple">03</div>
+      <div class="card-body"><h3 class="card-title">量化不是越大越好 <span aria-hidden="true">🎚️</span></h3>
+      <p class="card-desc">QWable-v1 推荐 Q4_K_M 或 Q5/Q6。Qwen-9B：12GB 显存选 Q6 以下，16GB 显存可选 Q8。按显存严格匹配，避免上下文增长导致 OOM。</p>
+      <div class="card-tags"><span class="card-tag">Q4_K_M</span><span class="card-tag">Q5/Q6</span><span class="card-tag">Q8</span></div></div>
+    </div>
+    <div class="skill-card">
+      <div class="card-stripe orange"></div><div class="card-num orange">04</div>
+      <div class="card-body"><h3 class="card-title">用工具把路径缩短 <span aria-hidden="true">🛠️</span></h3>
+      <p class="card-desc">使用 LM Studio，利用其 Hugging Face 下载与推理集成。Mac 优先考虑专用优化量化如 Q4_1；代码与 Agent 场景优先最新微调迭代。</p>
+      <div class="card-tags"><span class="card-tag">LM Studio</span><span class="card-tag">Hugging Face</span><span class="card-tag">Mac</span></div></div>
+    </div>
+  </div>
+
+  <div class="usage-shell">
+    <div class="usage-body">
+      <div class="usage-title">部署步骤 · 从显存到运行</div>
+      <div class="usage-grid">
+        <div class="usage-step"><b>STEP 01</b><h4>确认设备</h4><p>先确认可用显存与系统平台。</p></div>
+        <div class="usage-step"><b>STEP 02</b><h4>匹配模型</h4><p>24GB 看 QWable-v1；轻量任务看 Qwen-9B。</p></div>
+        <div class="usage-step"><b>STEP 03</b><h4>选择量化</h4><p>按显存边界选择 Q4_K_M、Q5/Q6 或 Q8。</p></div>
+        <div class="usage-step"><b>STEP 04</b><h4>下载运行</h4><p>在 LM Studio 中从 Hugging Face 获取并推理。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="risk-shell">
+    <div class="risk-title">风险边界 / 事实声明</div>
+    <p class="risk-text">参数与建议来自用户提供资料，实际兼容性需自行复核。本卡不对速度、质量、显存占用、上下文长度或任何基准性能作未经核验的官方结论；实际效果取决于硬件、量化、上下文与运行配置。</p>
+  </div>
+
+  <div class="save-row"><button class="save-png" type="button" data-save-png>保存为 PNG</button></div>
+  <footer class="footer"><span>QWable Local Deploy · VOL.01</span><span>infocard-crayon-style · R6 poster-shell</span></footer>
+  <div class="poster-note"><span>本地部署 · 显存匹配 · 量化选择</span><span>中文冻结事实版</span></div>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
+
+<script>
+(function(){
+  const button = document.querySelector('[data-save-png]');
+  button.addEventListener('click', async function(){
+    const target = document.querySelector('.poster-shell');
+    if (window.html2canvas) {
+      const canvas = await window.html2canvas(target, {backgroundColor: '#f0ead8', scale: 2, useCORS: true});
+      const link = document.createElement('a');
+      link.download = '20260726-qwable-local-deploy.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      return;
+    }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="100%" height="100%" fill="#f0ead8"/><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="font:24px sans-serif;padding:48px;color:#1c1c1c">请在联网环境加载 html2canvas 后重试导出。</div></foreignObject></svg>';
+    const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = '20260726-qwable-local-deploy.png';
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+  function reportHeight(){
+    const height = Math.ceil(document.documentElement.scrollHeight);
+    if (window.parent && window.parent !== window) window.parent.postMessage({type:'infocard-height', height:height}, '*');
+  }
+  window.addEventListener('load', reportHeight);
+  window.addEventListener('resize', reportHeight);
+  new MutationObserver(reportHeight).observe(document.body, {subtree:true, childList:true, attributes:true});
+})();
+</script>
+</body>
+</html>
