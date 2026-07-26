@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>动手学 Pi：15 个 Checkpoint 从零构建 Pi-style Coding Agent</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+    .card{border:2px solid var(--line);background:var(--paper);padding:14px;display:grid;gap:8px}
+    .card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+    .card-tag{display:inline-flex;align-items:center;border:1.5px solid var(--line);padding:3px 7px;font-size:10.5px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;background:#fff;white-space:nowrap;flex-shrink:0}
+    .card-tag.red{background:var(--soft-red);border-color:var(--red);color:var(--red)}
+    .card-tag.blue{background:var(--soft-blue);border-color:var(--blue);color:var(--blue)}
+    .card-title{font-size:14.5px;font-weight:900;line-height:1.3;letter-spacing:-.02em}
+    .card-body{font-size:12px;line-height:1.65;color:#333}
+    .card-body p{margin:0}
+    .card-footer{border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px;font-size:11.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px}
+    .pill{display:inline-flex;align-items:center;border:1.5px solid var(--line);padding:2px 8px;font-size:11px;font-weight:750;background:#fff}
+
+    /* ============ CHECKPOINT TABLE ============ */
+    .cp-table{border-collapse:collapse;width:100%;border:2px solid var(--line);font-size:12.5px}
+    .cp-table th{background:#111;color:#fff;text-align:left;padding:8px 12px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:900;border-bottom:2px solid var(--line)}
+    .cp-table td{padding:8px 12px;border-bottom:1px solid #e0ddd6;vertical-align:top;line-height:1.55}
+    .cp-table tr:last-child td{border-bottom:none}
+    .cp-table tr:hover td{background:var(--soft-ink)}
+    .cp-table .cp-no{font-weight:950;color:var(--blue);white-space:nowrap;font-size:13px}
+    .cp-table .cp-part{font-size:11px;color:var(--muted);font-weight:750;letter-spacing:.1em;text-transform:uppercase}
+    .cp-table .cp-title{font-weight:850;color:var(--ink)}
+    .cp-table .cp-link a{color:var(--blue);font-weight:750;text-decoration:underline}
+    .cp-row-I{background:#fff}
+    .cp-row-II{background:#f9f8f5}
+    .cp-row-III{background:#fff}
+    .cp-row-IV{background:#f9f8f5}
+
+    /* ============ CODE BLOCK ============ */
+    .code-block{border:2px solid var(--line);background:#1a1a2e;color:#e8e8e8;padding:14px;margin-bottom:12px;overflow-x:auto}
+    .code-block .lang{display:inline-flex;align-items:center;border:1.5px solid rgba(255,255,255,.4);padding:2px 8px;font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:10px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap}
+    .code-block .c1{color:#7ec8e3}
+    .code-block .c2{color:#ff9f43}
+    .code-block .c3{color:#a8e6cf}
+    .code-block .c4{color:#e8e8e8}
+    .code-block .cm{color:#888}
+
+    /* ============ FOOTER ============ */
+    .rule{border-top:3px solid var(--line);margin-top:32px}
+    .source-note{font-size:11.5px;color:var(--muted);margin-top:10px;letter-spacing:.04em}
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px;margin-bottom:12px}
+    .footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+    .footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+    .footer-link{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:7px 14px;font-size:12.5px;font-weight:850;background:#fff;color:var(--ink)}
+    .footer-link.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .footer-link:hover{background:var(--soft-ink)}
+
+    /* ============ CTA BAR ============ */
+    .cta-bar{border:3px solid var(--line);background:var(--soft-blue);padding:14px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .cta-bar span{font-size:13px;font-weight:850;color:var(--blue)}
+    .cta-btn{display:inline-flex;align-items:center;gap:8px;border:2px solid var(--blue);background:var(--blue);color:#fff;padding:8px 14px;font-size:12.5px;font-weight:850;letter-spacing:.04em}
+    .cta-btn.outline{border:2px solid var(--line);background:#fff;color:var(--ink)}
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- ===== HERO ===== -->
+    <div class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <span class="kicker">Agent Engineering · 教科书</span>
+        <h1 class="demo-title">动手学 Pi：15 个 Checkpoint 从零构建 Pi-style Coding Agent</h1>
+        <p class="subtitle">沿真实 Git 历史，手把手实现 TypeScript Agent 协议、工具循环、状态管理与评测</p>
+        <div class="badge-row">
+          <span class="badge dark">TypeScript</span>
+          <span class="badge dark">15 Checkpoints</span>
+          <span class="badge red">MIT + CC BY 4.0</span>
+          <span class="badge blue">373 ★</span>
+          <span class="badge ink">agent-engineering</span>
+        </div>
+        <div class="alert">
+          <strong>课程不是伪代码 — 是一整条可 checkout、运行和验证的 Git 历史</strong>
+          <p>15 个真实 commit，每章四件套：教材正文 + 真实 commit + 聚焦测试 + 故障实验</p>
+        </div>
+        <div class="mini-row">
+          <span class="mini-tag">TS 协议</span>
+          <span class="mini-tag">流式模型</span>
+          <span class="mini-tag">Provider</span>
+          <span class="mini-tag">工具循环</span>
+          <span class="mini-tag">会话树</span>
+          <span class="mini-tag">Context Compaction</span>
+          <span class="mini-tag">评测</span>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="panel-top">
+          <span class="eyebrow">技术链路</span>
+          <h3>TS 协议 → 流式模型 → Provider → 工具 → Agent Loop → 会话树 → Context Compaction → 扩展 → Eval</h3>
+          <p>从一次 README 请求的完整 Agent 闭环出发，沿 15 个 checkpoint 逐层推进</p>
+        </div>
+        <div class="panel-body">
+          <div class="flow">
+            <div class="flow-item red">
+              <div class="t">Part I · Checkpoint 00</div>
+              <div class="c">一次 README 读取走完 Agent 闭环</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">Part I · Checkpoint 01–05</div>
+              <div class="c">TS 生存集 → EventStream → 消息 IR → ScriptedModel → Provider</div>
+            </div>
+            <div class="flow-item blue">
+              <div class="t">Part II · Checkpoint 06–08</div>
+              <div class="c">工具调用 → Agent Loop → 编码工具（read/write/edit/bash）</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">Part III · Checkpoint 09–11</div>
+              <div class="c">有状态 Agent → Session 树 → Context Compaction</div>
+            </div>
+            <div class="flow-item dark">
+              <div class="t">Part IV · Checkpoint 12–14</div>
+              <div class="c">资源/扩展 → Runtime 组合 → 独立评测 capstone</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 概览 ===== -->
+    <section class="section">
+      <div class="overview">
+        <div class="overview-sentence">沿 15 个可运行 checkpoint，从一条离线 Agent 轨迹出发，亲手实现完整 Pi-style coding agent。</div>
+        <div class="overview-body">
+          <p>本课程将 Agent 工程拆解为一条清晰的技术链路：从 TypeScript 协议定义、流式模型接入、Provider 适配器，到工具调用、Agent Loop、会话树、Context Compaction、资源扩展，最后用独立评测验证全流程。每章由四部分闭环——教材正文 + 真实 commit + 聚焦测试 + 故障实验——课程代码不是伪代码，而是一条可以 checkout、运行和验证的 Git 历史。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 核心能力 ===== -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">核心能力</div>
+          <h2>为什么选这门课</h2>
+          <p>从协议层到评测层的完整 Agent 工程链路，代码即历史，实验即学习</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag red">协议层</span>
+          </div>
+          <div class="card-title">TypeScript 类型安全的 Agent 协议</div>
+          <div class="card-body"><p>用 DemoEvent 联合类型、EventStream、消息 IR 构建全链路类型安全，从 TS 生存集到 Provider 适配器，每一步都有类型守卫。</p></div>
+          <div class="card-footer">
+            <span class="pill">TS 生存集</span>
+            <span class="pill">EventStream</span>
+            <span class="pill">消息 IR</span>
+            <span class="pill">Provider</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag blue">工具层</span>
+          </div>
+          <div class="card-title">Agent Loop 与编码工具闭环</div>
+          <div class="card-body"><p>实现工具 schema、Registry、executor；两轮 Agent Loop 让模型提出 read、接收工具结果、生成最终回答；在同一 workspace 内完成 read/write/edit/bash 文件任务。</p></div>
+          <div class="card-footer">
+            <span class="pill">工具调用</span>
+            <span class="pill">Agent Loop</span>
+            <span class="pill">Workspace</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag">状态层</span>
+          </div>
+          <div class="card-title">会话状态管理与 Context Compaction</div>
+          <div class="card-body"><p>让 Agent 保存跨运行消息并管理订阅、取消、follow-up 与重入；将完成消息追加为带父指针的 JSONL 记录并从指定叶子恢复对话；按 token 预算重建上下文并用结构化摘要补回早期事实。</p></div>
+          <div class="card-footer">
+            <span class="pill">有状态 Agent</span>
+            <span class="pill">Session 树</span>
+            <span class="pill">Context Compaction</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag blue">验证层</span>
+          </div>
+          <div class="card-title">可 checkout 的 Git 历史 + 独立评测</div>
+          <div class="card-body"><p>课程代码为真实 Git 历史，checkpoint/practice 命令定位章节、创建不含答案的练习目录；capstone 用全新 fixture 运行 Runtime，核对活动路径与文件结果，输出稳定分类和计数。</p></div>
+          <div class="card-footer">
+            <span class="pill">Git History</span>
+            <span class="pill">Checkpoint</span>
+            <span class="pill">Eval</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Checkpoints 速览 ===== -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">Checkpoints 速览</div>
+          <h2>15 个 Checkpoint 完整路径</h2>
+          <p>从离线路径（CP 00）到完整 Pi-style agent（CP 14），沿同一 Agent 执行链逐层推进</p>
+        </div>
+      </div>
+
+      <table class="cp-table">
+        <thead>
+          <tr>
+            <th>部分</th>
+            <th>CP</th>
+            <th>章节</th>
+            <th>核心内容</th>
+            <th>阅读</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="cp-row-I">
+            <td class="cp-part" rowspan="1">序章</td>
+            <td class="cp-no">00</td>
+            <td class="cp-title">一次 README 读取走完 Agent 闭环</td>
+            <td>跟随一次 README 请求，把用户消息、两次模型调用、工具调用与结果、最终回答连成完整闭环</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/prologue">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-I">
+            <td class="cp-part" rowspan="5">I · 模型与协议</td>
+            <td class="cp-no">01</td>
+            <td class="cp-title">TypeScript 生存集</td>
+            <td>四个 DemoEvent 串起联合类型、运行时校验、Promise 与 ESM 测试</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/typescript-survival">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-I">
+            <td class="cp-no">02</td>
+            <td class="cp-title">EventStream</td>
+            <td>实现 EventStream，让事件先到与消费者先等两种时序都能交付过程项和最终结果</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/event-stream">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-I">
+            <td class="cp-no">03</td>
+            <td class="cp-title">消息 IR</td>
+            <td>把文本、工具调用和配对结果保存为统一消息，并从模型事件收束出完整 assistant message</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/message-ir">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-I">
+            <td class="cp-no">04</td>
+            <td class="cp-title">ScriptedModel</td>
+            <td>实现可重复播放预设回合的 ScriptedModel，保存请求快照并投影稳定事件流</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/scripted-model">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-I">
+            <td class="cp-no">05</td>
+            <td class="cp-title">Provider 适配器</td>
+            <td>把课程消息写成 Provider 请求，再将 SSE 响应还原为统一模型事件</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/provider-adapter">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-II">
+            <td class="cp-part" rowspan="3">II · 工具与循环</td>
+            <td class="cp-no">06</td>
+            <td class="cp-title">工具调用</td>
+            <td>让 echo 调用经过 schema、Registry 和 executor，返回沿用原 call id 的工具结果</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/tool-contract">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-II">
+            <td class="cp-no">07</td>
+            <td class="cp-title">Agent Loop</td>
+            <td>实现两轮 Agent Loop：模型提出 read，工具结果写回后再生成最终回答</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/agent-loop">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-II">
+            <td class="cp-no">08</td>
+            <td class="cp-title">编码工具</td>
+            <td>让 read、write、edit、bash 在同一 workspace 内完成受控的文件与进程操作</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/coding-tools">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-III">
+            <td class="cp-part" rowspan="3">III · 状态与历史</td>
+            <td class="cp-no">09</td>
+            <td class="cp-title">有状态 Agent</td>
+            <td>让同一个 Agent 保存跨运行消息，并管理订阅、取消、运行中指令、follow-up 与重入</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/stateful-agent">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-III">
+            <td class="cp-no">10</td>
+            <td class="cp-title">Session 树</td>
+            <td>把完成消息追加为带父指针的 JSONL 记录，再从指定叶子恢复当前对话路径</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/session-tree">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-III">
+            <td class="cp-no">11</td>
+            <td class="cp-title">Context Compaction</td>
+            <td>按完整工具交互切分历史，在 token 预算内保留后缀，并用结构化摘要补回早期事实</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/context-compaction">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-IV">
+            <td class="cp-part" rowspan="3">IV · 扩展与验证</td>
+            <td class="cp-no">12</td>
+            <td class="cp-title">资源与扩展</td>
+            <td>发现项目规则、Skill 与模板，按需送入上下文，并让可信扩展原子注册工具与 hooks</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/resources-extensions">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-IV">
+            <td class="cp-no">13</td>
+            <td class="cp-title">Runtime 组合</td>
+            <td>把 Agent、Session Store、上下文、资源与扩展接成 Runtime，让 prompt 在新消息被接受后完成</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/composition-root">打开 →</a></td>
+          </tr>
+          <tr class="cp-row-IV">
+            <td class="cp-no">14</td>
+            <td class="cp-title">评测 capstone</td>
+            <td>用全新 fixture 运行 Runtime，核对活动路径与文件结果，再输出稳定的分类和计数</td>
+            <td class="cp-link"><a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site/learn/eval-capstone">打开 →</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== 快速上手 ===== -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">快速上手</div>
+          <h2>开始学习</h2>
+          <p>在线阅读教材，或在本地克隆并运行课程代码</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag blue">在线阅读</span>
+          </div>
+          <div class="card-title">直接打开教材</div>
+          <div class="card-body"><p>访问在线教材网站，无需安装任何依赖，即可按章节阅读全部 15 个 checkpoint 的内容。</p></div>
+          <div class="card-footer">
+            <a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site" class="cta-btn" style="text-decoration:none">访问教材 →</a>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag red">本地运行</span>
+          </div>
+          <div class="card-title">克隆教材仓库</div>
+          <div class="card-body"><p>在本地运行教材网站，边学边练。</p></div>
+          <div class="card-footer">
+            <span class="pill">npm install</span>
+            <span class="pill">npm run dev</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag">课程代码</span>
+          </div>
+          <div class="card-title">练习课程代码</div>
+          <div class="card-body"><p>克隆课程分支，运行 checkpoint 定位章节，用 practice 创建不含答案的练习目录，交给陪学 Agent 边练边学。</p></div>
+          <div class="card-footer">
+            <span class="pill">course/build-your-own-pi</span>
+            <span class="pill">checkpoint</span>
+            <span class="pill">practice</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag">仓库</span>
+          </div>
+          <div class="card-title">两个仓库</div>
+          <div class="card-body"><p><code>pi-textbook</code> 为 HTML 教材与网站；<code>pi</code> 的课程分支（<code>course/build-your-own-pi</code>）为 15 个 checkpoint 的可运行代码。</p></div>
+          <div class="card-footer">
+            <a href="https://github.com/hahhforest/pi-textbook" class="cta-btn outline" style="text-decoration:none">教材仓库 →</a>
+            <a href="https://github.com/hahhforest/pi/tree/course/build-your-own-pi" class="cta-btn outline" style="text-decoration:none">课程代码 →</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-block" style="margin-top:14px">
+        <div class="lang">bash</div>
+        <pre><span class="cm"># 克隆教材并本地运行</span>
+<span class="c1">git</span> <span class="c1">clone</span> https://github.com/hahhforest/pi-textbook.git
+<span class="c1">cd</span> pi-textbook
+<span class="c1">npm</span> install
+<span class="c1">npm</span> run dev
+
+<span class="cm"># 克隆课程代码并练习指定章节</span>
+<span class="c1">git</span> clone --branch course/build-your-own-pi https://github.com/hahhforest/pi.git
+<span class="c1">cd</span> pi
+<span class="c1">npm</span> install
+<span class="c1">npm</span> run checkpoint -w @pi/course -- <span class="c2">05</span>
+<span class="c1">npm</span> run practice -w @pi/course -- <span class="c2">05</span> ../pi-practice-05</pre>
+      </div>
+    </section>
+
+    <!-- ===== LICENSE ===== -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="label b">LICENSE</div>
+          <h2>开源许可证</h2>
+          <p>课程代码与教材内容采用不同的开源许可证</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag">代码许可</span>
+          </div>
+          <div class="card-title">MIT License</div>
+          <div class="card-body"><p>课程中的原创代码（Agent、Runtime、工具、评测等）采用 MIT License，可自由使用、修改和分发。</p></div>
+          <div class="card-footer">
+            <span class="pill">MIT</span>
+            <span class="pill">可商用</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-tag blue">教材许可</span>
+          </div>
+          <div class="card-title">CC BY 4.0</div>
+          <div class="card-body"><p>教材正文与原创媒体采用 CC BY 4.0 协议，署名即可自由分享和改编。Pi 上游代码沿用其原许可证和作者归属。</p></div>
+          <div class="card-footer">
+            <span class="pill">CC BY 4.0</span>
+            <span class="pill">需署名</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-block" style="margin-top:14px">
+        <h3>本项目非官方声明</h3>
+        <p>这是社区原创的非官方课程，不隶属于或代表 Pi / Earendil Works。感谢 <strong>Linux Do</strong> 提供中文技术交流空间。</p>
+        <ul>
+          <li>教材仓库：<a href="https://github.com/hahhforest/pi-textbook" style="color:var(--blue);font-weight:750">github.com/hahhforest/pi-textbook</a></li>
+          <li>课程代码（pi 仓库 course 分支）：<a href="https://github.com/hahhforest/pi/tree/course/build-your-own-pi" style="color:var(--blue);font-weight:750">github.com/hahhforest/pi</a></li>
+          <li>在线教材：<a href="https://build-your-own-pi-cn.enochzhang.chatgpt.site" style="color:var(--blue);font-weight:750">build-your-own-pi-cn.enochzhang.chatgpt.site</a></li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">动手学 Pi · 硬核蓝手册风格 · pi-textbook · 2026-07-26</p>
+  </main>
+</body>
+</html>
