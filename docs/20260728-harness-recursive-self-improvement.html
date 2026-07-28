@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Harness 递归自我改进：让 Agent 自我优化</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f6f4ef;
+  --paper:#fffdf8;
+  --ink:#111111;
+  --muted:#5f5950;
+  --line:#111111;
+  --red:#d80018;
+  --blue:#1f63ff;
+  --soft-red:#fde9eb;
+  --soft-blue:#e8f1ff;
+  --soft-ink:#f7f6f2;
+  --shadow:5px 5px 0 rgba(0,0,0,.18);
+  --dim:#d8d4cc;
+}
+body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;min-width:320px}
+.page{max-width:1100px;margin:0 auto;padding:24px 20px 120px;position:relative}
+
+/* Hero */
+.hero{display:grid;grid-template-columns:1fr 340px;gap:0;border:3px solid var(--line);background:var(--paper);box-shadow:var(--shadow);margin-bottom:30px;position:relative;overflow:hidden}
+.hero-bar{position:absolute;top:0;left:0;right:0;height:6px;background:var(--blue)}
+.hero-bar::before{content:'';position:absolute;top:6px;left:0;width:100%;height:3px;background:var(--red)}
+.hero-bar::after{content:'';position:absolute;top:9px;left:0;width:100%;height:3px;background:var(--ink)}
+.hero-copy{padding:20px 18px 18px;display:flex;flex-direction:column;gap:10px}
+.kicker{font-size:11.2px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--blue);padding:5px 9px;background:var(--soft-blue);border:1.5px solid var(--blue);display:inline-block;align-self:flex-start}
+.demo-title{font-size:clamp(22px,3.8vw,40px);font-weight:900;line-height:1.15;letter-spacing:-.02em;color:var(--ink)}
+.subtitle{font-size:12.5px;color:var(--muted);line-height:1.55}
+.badge-row{display:flex;flex-wrap:wrap;gap:6px}
+.badge{min-height:28px;padding:5px 9px;background:var(--soft-ink);border:1.5px solid var(--line);font-size:11.2px;font-weight:600;display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
+.badge.blue{background:var(--soft-blue);border-color:var(--blue);color:var(--blue)}
+.badge.red{background:var(--soft-red);border-color:var(--red);color:var(--red)}
+.badge.dark{background:var(--ink);color:#fff}
+.badge.ink{background:var(--ink);color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+.alert{border:2px solid var(--blue);background:var(--soft-blue);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.alert strong{font-size:13px;font-weight:800;color:var(--blue)}
+.alert p{font-size:12px;color:var(--ink);line-height:1.6}
+.mini-row{display:flex;flex-wrap:wrap;gap:5px}
+.mini-tag{font-size:11px;padding:3px 7px;background:var(--paper);border:1.5px solid var(--blue);color:var(--blue);font-weight:600}
+.hero-visual{background:var(--ink);color:#fff;padding:18px 16px;display:flex;flex-direction:column;gap:14px;border-left:3px solid var(--line);position:relative}
+.panel-top{border-bottom:1.5px solid rgba(255,255,255,.2);padding-bottom:12px}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+.panel-top h3{font-size:14px;font-weight:800;margin-bottom:4px}
+.panel-top p{font-size:11.5px;color:rgba(255,255,255,.7);line-height:1.5}
+.panel-body{display:flex;flex-direction:column;gap:12px}
+.quote{font-size:12px;font-style:italic;color:rgba(255,255,255,.85);border-left:3px solid var(--red);padding-left:10px;line-height:1.55}
+.flow{display:flex;flex-direction:column;gap:8px}
+.flow-item{background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.2);padding:8px 10px;display:flex;gap:10px;align-items:center}
+.flow-item.blue{border-color:var(--blue)}
+.flow-item .t{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--blue);min-width:50px}
+.flow-item .c{font-size:11.5px;font-weight:600}
+
+/* Sections */
+.section{margin-top:30px}
+.section-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px}
+.section-no{min-width:52px;height:52px;background:var(--paper);border:3px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;box-shadow:var(--shadow);flex-shrink:0}
+.section-meta{display:flex;flex-direction:column;gap:4px}
+.section-meta .label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.section-meta h2{font-size:clamp(16px,2.5vw,22px);font-weight:800;line-height:1.2}
+.section-meta p{font-size:12px;color:var(--muted);line-height:1.55}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.card{background:var(--paper);border:2px solid var(--line);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.card .tagrow{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:10.5px;font-weight:700;padding:3px 7px;border:1.5px solid currentColor;text-transform:uppercase;letter-spacing:.04em}
+.tag.red{color:var(--red);background:var(--soft-red);border-color:var(--red)}
+.tag.blue{color:var(--blue);background:var(--soft-blue);border-color:var(--blue)}
+.card h3{font-size:13.5px;font-weight:800;line-height:1.3}
+.card p{font-size:11.5px;color:var(--muted);line-height:1.6}
+.card ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.card ul li{font-size:11.5px;padding-left:12px;position:relative;line-height:1.55}
+.card ul li::before{content:'▸';position:absolute;left:0;color:var(--blue);font-size:10px;top:2px}
+
+/* Highlight card */
+.card.highlight-blue{background:var(--soft-blue);border-color:var(--blue)}
+.card.highlight-red{background:var(--soft-red);border-color:var(--red)}
+
+/* Process diagram */
+.process-flow{display:flex;flex-direction:column;gap:0;border:2px solid var(--line);background:var(--paper);overflow:hidden}
+.process-step{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:2px solid var(--line)}
+.process-step:last-child{border-bottom:none}
+.process-step .step-num{min-width:36px;height:36px;background:var(--ink);color:#fff;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.process-step .step-num.blue{background:var(--blue)}
+.process-step .step-num.red{background:var(--red)}
+.process-step .step-content{flex:1}
+.process-step .step-content h4{font-size:12.5px;font-weight:800;margin-bottom:2px}
+.process-step .step-content p{font-size:11.2px;color:var(--muted);line-height:1.5}
+.arrow-row{display:flex;align-items:center;justify-content:center;padding:4px;background:var(--ink);color:#fff;font-size:11px;font-weight:700}
+
+/* Matrix */
+.matrix{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.matrix-item{background:var(--paper);border:2px solid var(--line);padding:12px;box-shadow:var(--shadow)}
+.matrix-item .m-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin-bottom:6px}
+.matrix-item h4{font-size:12.5px;font-weight:800;margin-bottom:5px}
+.matrix-item p{font-size:11.2px;color:var(--muted);line-height:1.55}
+.matrix-item.highlight-blue{border-color:var(--blue);background:var(--soft-blue)}
+
+/* Bottom meta */
+.meta-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 0;border-top:2px solid var(--line);margin-top:20px}
+.meta-chip{font-size:11px;padding:4px 9px;background:var(--soft-ink);border:1.5px solid var(--dim);color:var(--muted);font-weight:600}
+.meta-chip strong{color:var(--ink)}
+.save{
+  display:block;width:fit-content;
+  position:static;margin:14px 0 0 auto;
+  z-index:1;border:0;border-radius:10px;
+  padding:11px 14px;
+  background:linear-gradient(135deg,#0036a3,#002a7a);
+  color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  letter-spacing:.06em;box-shadow:0 10px 24px rgba(0,0,0,.35);cursor:pointer;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media(max-width:720px){
+  .hero{grid-template-columns:1fr}
+  .hero-visual{border-left:none;border-top:3px solid var(--line)}
+  .grid-3{grid-template-columns:1fr}
+  .grid-2{grid-template-columns:1fr}
+  .matrix{grid-template-columns:1fr}
+  .section-head{flex-direction:column}
+  .page{padding-bottom:108px}
+}
+@media(max-width:1080px){
+  .hero{grid-template-columns:1fr}
+  .hero-visual{border-left:none;border-top:3px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- Hero -->
+<header class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">开源框架 · AI Engineering</div>
+    <h1 class="demo-title">Agent Harness 递归自我改进</h1>
+    <p class="subtitle">让 Agent 持续自我优化的反馈循环机制 · Recursive Self-Improvement</p>
+    <div class="badge-row">
+      <span class="badge blue">Harness</span>
+      <span class="badge red">递归自我改进</span>
+      <span class="badge dark">Agent</span>
+      <span class="badge">方法论</span>
+      <span class="badge ink">v1.0</span>
+    </div>
+    <div class="alert">
+      <strong>核心定位</strong>
+      <p>Harness 框架不仅评测 Agent 行为，还通过反馈循环让 Agent 持续自我优化。每一轮改进都基于上一轮的评测结果，形成正向循环螺旋上升。</p>
+      <div class="mini-row">
+        <span class="mini-tag">递归循环</span>
+        <span class="mini-tag">反馈驱动</span>
+        <span class="mini-tag">持续优化</span>
+      </div>
+    </div>
+  </div>
+  <figure class="hero-visual">
+    <div class="panel-top">
+      <div class="eyebrow">Core Concept</div>
+      <h3>递归自我改进闭环</h3>
+      <p>评测 → 反馈 → 优化 → 再评测 → 持续升级</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote">"每一轮改进都建立在前一轮的评测结果之上"</div>
+      <div class="flow">
+        <div class="flow-item blue"><div class="t">评测</div><div class="c">Agent 执行 → 收集结果</div></div>
+        <div class="flow-item blue"><div class="t">反馈</div><div class="c">分析差距 → 生成洞察</div></div>
+        <div class="flow-item blue"><div class="t">优化</div><div class="c">调整策略 → 更新 Agent</div></div>
+        <div class="flow-item blue"><div class="t">再评测</div><div class="c">验证效果 → 继续循环</div></div>
+      </div>
+    </div>
+  </figure>
+</header>
+
+<!-- Section 01: 什么是递归自我改进 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">01</div>
+    <div class="section-meta">
+      <div class="label">Foundation</div>
+      <h2>什么是递归自我改进</h2>
+      <p>Recursive Self-Improvement 的本质是从"静态评测"升级为"动态进化"</p>
+    </div>
+  </div>
+  <div class="grid-3">
+    <article class="card highlight-blue">
+      <div class="tagrow"><span class="tag blue">定义</span></div>
+      <h3>递归自我改进是什么</h3>
+      <p>Agent Harness 的递归自我改进机制，核心是将"评测结果"作为"优化输入"，驱动 Agent 不断迭代升级的闭环过程。</p>
+      <ul>
+        <li>不再是一次性评测</li>
+        <li>而是持续进化循环</li>
+        <li>每一轮都基于上一轮结果</li>
+      </ul>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag red">关键</span></div>
+      <h3>为什么需要递归</h3>
+      <p>单次评测只能发现问题，无法持续优化。递归机制让 Agent 在真实环境中不断打磨，形成稳定的能力提升曲线。</p>
+      <ul>
+        <li>发现薄弱环节</li>
+        <li>针对性优化策略</li>
+        <li>验证提升效果</li>
+      </ul>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">对比</span></div>
+      <h3>传统评测 vs 递归改进</h3>
+      <p>传统评测：一次性打分 → 结束。递归改进：打分 → 分析 → 优化 → 再次打分 → 循环。</p>
+      <ul>
+        <li>传统：静态快照</li>
+        <li>递归：动态视频</li>
+        <li>进化而非评估</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- Section 02: 工作原理 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">02</div>
+    <div class="section-meta">
+      <div class="label">Mechanism</div>
+      <h2>递归改进的工作原理</h2>
+      <p>四步闭环：评测 → 反馈 → 优化 → 再评测，螺旋式上升</p>
+    </div>
+  </div>
+  <div class="process-flow">
+    <div class="process-step">
+      <div class="step-num blue">1</div>
+      <div class="step-content">
+        <h4>评测（Evaluate）</h4>
+        <p>Harness 运行 Agent，执行预定义的评测任务集，收集执行结果、轨迹、日志和指标数据。</p>
+      </div>
+    </div>
+    <div class="process-step">
+      <div class="step-num red">2</div>
+      <div class="step-content">
+        <h4>反馈（Feedback）</h4>
+        <p>将评测结果与预期目标进行对比，识别差距、错误模式和薄弱环节，生成结构化反馈报告。</p>
+      </div>
+    </div>
+    <div class="process-step">
+      <div class="step-num blue">3</div>
+      <div class="step-content">
+        <h4>优化（Optimize）</h4>
+        <p>根据反馈报告调整 Agent 的策略、提示词、工具选择或内部逻辑，形成改进方案并应用。</p>
+      </div>
+    </div>
+    <div class="process-step">
+      <div class="step-num red">4</div>
+      <div class="step-content">
+        <h4>再评测（Re-evaluate）</h4>
+        <p>用改进后的 Agent 重新运行评测，验证优化效果。若未达标，继续反馈→优化循环。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Section 03: 核心优势 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">03</div>
+    <div class="section-meta">
+      <div class="label">Advantages</div>
+      <h2>递归改进的核心优势</h2>
+      <p>相比静态评测，递归机制带来的关键能力提升</p>
+    </div>
+  </div>
+  <div class="matrix">
+    <div class="matrix-item highlight-blue">
+      <div class="m-label">持续进化</div>
+      <h4>永不停止的能力提升</h4>
+      <p>不依赖人工干预，Agent 可以在无人值守情况下持续优化自己，适应不断变化的任务需求。</p>
+    </div>
+    <div class="matrix-item">
+      <div class="m-label">精准定位</div>
+      <h4>问题发现与修复闭环</h4>
+      <p>每一次评测都精确定位失败原因，优化后立即验证，形成"发现→修复→确认"的完整链条。</p>
+    </div>
+    <div class="matrix-item">
+      <div class="m-label">可量化</div>
+      <h4>改进效果清晰可见</h4>
+      <p>通过迭代间的指标对比（准确率、效率、稳定性），直观看到每一轮优化的实际效果。</p>
+    </div>
+  </div>
+</section>
+
+<!-- Section 04: 适用场景 -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">04</div>
+    <div class="section-meta">
+      <div class="label">Use Cases</div>
+      <h2>适用场景与实践</h2>
+      <p>递归自我改进在真实 AI 工程中的典型应用</p>
+    </div>
+  </div>
+  <div class="grid-2">
+    <article class="card highlight-blue">
+      <div class="tagrow"><span class="tag blue">场景一</span></div>
+      <h3>复杂任务分解优化</h3>
+      <p>当 Agent 在处理多步骤复杂任务时，递归改进可以帮助识别每一步的失败原因，逐级优化任务分解和执行策略。</p>
+      <ul>
+        <li>识别分解错误</li>
+        <li>优化中间步骤</li>
+        <li>提升端到端成功率</li>
+      </ul>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag red">场景二</span></div>
+      <h3>工具调用策略调优</h3>
+      <p>Agent 在选择和使用工具时的策略直接影响任务成功率。递归改进可以系统性地优化工具选择逻辑。</p>
+      <ul>
+        <li>分析工具调用模式</li>
+        <li>识别冗余/错误调用</li>
+        <li>优化选择策略树</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- Meta Footer -->
+<div class="meta-row">
+  <span class="meta-chip"><strong>作者：</strong>CrazyAllen</span>
+  <span class="meta-chip"><strong>来源：</strong>小红书</span>
+  <span class="meta-chip"><strong>日期：</strong>2026-07-19</span>
+  <span class="meta-chip"><strong>分类：</strong>开源框架</span>
+</div>
+
+<button class="save" onclick="window.print()">保存 / 打印</button>
+</div>
+</body>
+</html>
