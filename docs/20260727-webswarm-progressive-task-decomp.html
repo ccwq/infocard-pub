@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebSwarm：动态多智能体调研分工</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{
+      width:min(1180px,calc(100% - 20px));
+      margin:0 auto;
+      padding:18px 0 82px;
+    }
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);
+      gap:14px;
+      color:#fff;
+      margin-bottom:14px;
+    }
+    .hero-copy{
+      min-width:0;
+      display:grid;
+      gap:10px;
+      align-content:start;
+      padding:12px 0 0;
+    }
+    .kicker-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:fit-content;
+      padding:5px 10px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);
+      backdrop-filter:blur(10px);
+      color:#fff;
+      font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      border-radius:999px;
+    }
+    .source{
+      max-width:280px;
+      text-align:right;
+      font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#b8c8f5;
+      overflow-wrap:anywhere;
+    }
+    .title{
+      margin:0;
+      font-size:clamp(40px,7vw,88px);
+      line-height:.92;
+      letter-spacing:-.07em;
+      font-weight:950;
+    }
+    .subtitle{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(15px,2vw,20px);
+      line-height:1.55;
+      color:#e8eefc;
+    }
+    .subcn{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(13px,1.6vw,16px);
+      line-height:1.65;
+      color:#c5d2f7;
+    }
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.05);
+      border-radius:999px;
+      color:#fff;
+      font-size:12px;
+      font-weight:850;
+      letter-spacing:.01em;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{
+      display:grid;
+      gap:8px;
+      border:1.5px solid rgba(255,255,255,.16);
+      background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+      padding:14px 16px 12px;
+      border-radius:18px;
+      box-shadow:var(--shadow);
+    }
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{
+      min-width:0;
+      background:rgba(10,12,22,.5);
+      border:1.5px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:14px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+    .visual-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .orb{
+      width:66px;
+      height:66px;
+      border-radius:22px;
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+        linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+      box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      display:grid;
+      place-items:center;
+      color:#fff;
+      font-size:22px;
+      font-weight:950;
+      letter-spacing:-.04em;
+    }
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .mini-card{
+      min-width:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1.5px solid rgba(255,255,255,.09);
+      border-radius:16px;
+      padding:10px 10px 9px;
+      display:grid;
+      gap:8px;
+      box-shadow:0 12px 26px rgba(0,0,0,.2);
+    }
+    .mini-icon{
+      width:30px;height:30px;border-radius:9px;
+      display:grid;place-items:center;
+      background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.1);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .mini-icon svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-card .label{font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#b7c6f4}
+    .mini-card .value{font-size:13.5px;font-weight:900;letter-spacing:-.01em;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.5;color:#c5d2f7}
+    .visual-strip{
+      height:10px;border-radius:999px;
+      background:linear-gradient(90deg,var(--cyan) 0%,#53a3ff 22%,var(--purple) 54%,var(--green) 80%,var(--yellow) 100%);
+      box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 24px rgba(88,195,255,.16);
+    }
+    .phase-row{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:10px;
+    }
+    .phase{
+      background:#171c2b;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:14px 12px;
+      display:grid;
+      gap:8px;
+      align-content:start;
+    }
+    .phase-n{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .n{
+      width:22px;height:22px;border-radius:50%;
+      display:grid;place-items:center;
+      font-size:11px;font-weight:950;
+    }
+    .phase:nth-child(1) .n{background:rgba(88,195,255,.22);color:var(--cyan)}
+    .phase:nth-child(2) .n{background:rgba(74,120,255,.22);color:var(--blue)}
+    .phase:nth-child(3) .n{background:rgba(132,89,255,.22);color:var(--purple)}
+    .phase-title{font-size:12.5px;font-weight:900;color:#fff}
+    .phase-desc{font-size:11.5px;line-height:1.5;color:#c5d2f7}
+    .phase .mini-icon{margin:0 auto}
+    .benchmark-row{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .benchmark{
+      background:#171c2b;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      padding:14px;
+    }
+    .benchmark-name{font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#b7c6f4;margin-bottom:6px}
+    .benchmark-score{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+    .benchmark-score .before{font-size:20px;font-weight:950;color:var(--muted);text-decoration:line-through}
+    .benchmark-score .arrow{font-size:14px;color:var(--yellow)}
+    .benchmark-score .after{font-size:26px;font-weight:950;color:var(--cyan)}
+    .benchmark-score .gain{font-size:12px;font-weight:900;color:var(--green);margin-left:2px}
+    .benchmark-bar{height:8px;background:#0d1220;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.06);margin-top:8px}
+    .benchmark-bar span{display:block;height:100%;border-radius:999px}
+    .benchmark-bar.before span{width:50.5%;background:var(--muted)}
+    .benchmark-bar.after span{width:68%;background:linear-gradient(90deg,var(--cyan),var(--green))}
+    .quote-block{
+      margin-top:14px;
+      background:linear-gradient(135deg,rgba(132,89,255,.18),rgba(88,195,255,.12));
+      border:1.5px solid rgba(132,89,255,.28);
+      border-radius:18px;
+      padding:16px 18px;
+      display:grid;
+      gap:8px;
+    }
+    .quote-block .label{font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--purple)}
+    .quote-block blockquote{margin:0;font-size:13px;line-height:1.65;color:#e8edf8;font-style:italic;border-left:3px solid var(--cyan);padding-left:12px}
+    .stats-row{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:10px;
+    }
+    .stat-card{
+      background:#171c2b;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      padding:14px 12px;
+      text-align:center;
+    }
+    .stat-card .value{font-size:22px;font-weight:950;color:var(--cyan);margin-bottom:4px}
+    .stat-card .label{font-size:10.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#b7c6f4}
+    .footer{
+      margin-top:14px;
+      background:#0b1020;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      color:#dfe8ff;
+      font-size:12px;
+      flex-wrap:wrap;
+    }
+    .footer .source-info{font-size:11px;color:#a8b7df}
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .phase-row{grid-template-columns:1fr}
+      .benchmark-row{grid-template-columns:1fr}
+      .stats-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+      .stats-row{grid-template-columns:1fr 1fr}
+      .footer{font-size:11.5px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <div class="kicker">DEEP RESEARCH · MULTI-AGENT</div>
+          <div class="source">来源：X @Xudong07452910 · 2026-07-27</div>
+        </div>
+        <h1 class="title">WebSwarm</h1>
+        <p class="subtitle">Dynamic Multi-Agent Research Division</p>
+        <p class="subcn">从"预设分工"到"边搜边组织"——多智能体调研的范式转变，让任务分解随搜索证据动态展开。</p>
+        <div class="pill-row">
+          <span class="pill cyan">动态任务分解</span>
+          <span class="pill green">并行搜索</span>
+          <span class="pill yellow">层级决策</span>
+          <span class="pill purple">渐进式分工</span>
+        </div>
+        <div class="hero-note">
+          <strong>核心洞察：复杂问题的结构往往在看到中间证据后才真正浮现</strong>
+          <p>传统预设分工在面对"深度钻研"与"广度搜索"双重需求时迅速失效。WebSwarm 让多智能体在搜索过程中实时决定谁该继续搜索、朝什么方向探索。</p>
+        </div>
+      </div>
+
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">WS</div>
+          <div class="visual-meta">
+            <div class="big">Multi-Agent Swarm</div>
+            <div class="small">动态调度 / 渐进分工 / 证据驱动</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <article class="mini-card">
+            <div class="mini-icon cyan" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            </div>
+            <div class="label">Node</div>
+            <div class="value">独立搜索节点</div>
+            <div class="desc">每个节点拥有独立目标和模式，可直接解决问题或创建子节点</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon purple" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M6 9l6-6 6 6"></path><path d="M6 15l6 6 6-6"></path></svg>
+            </div>
+            <div class="label">Hierarchical</div>
+            <div class="value">层级决策</div>
+            <div class="desc">上层智能体根据返回证据决定扩展、调整方向或整合结果</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon yellow" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"></path><path d="M7 10l3 3-3 3"></path><path d="M12 16h5"></path></svg>
+            </div>
+            <div class="label">Observe</div>
+            <div class="value">信息分布感知</div>
+            <div class="desc">先观察网页信息集中或分散，再决定如何切分任务</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon green" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 19h16"></path><path d="M6 15l3-4 3 2 4-6 2 2"></path></svg>
+            </div>
+            <div class="label">Batch</div>
+            <div class="value">经验传递</div>
+            <div class="desc">可靠来源和无效路径被传递给后续智能体，避免重复劳动</div>
+          </article>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <section class="phase-row">
+      <div class="phase">
+        <div class="phase-n">
+          <div class="n">1</div>
+          <div class="phase-title">观察与判断</div>
+        </div>
+        <div class="phase-desc">分析当前页面信息分布，判断是集中型还是分散型任务</div>
+        <div class="mini-icon cyan" style="margin-top:4px">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-n">
+          <div class="n">2</div>
+          <div class="phase-title">动态分解</div>
+        </div>
+        <div class="phase-desc">根据观察结果决定任务切分：直接解决或创建子节点</div>
+        <div class="mini-icon purple" style="margin-top:4px">
+          <svg viewBox="0 0 24 24"><path d="M16 3h5v5"></path><path d="M8 3H3v5"></path><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"></path><path d="m15 9 6-6"></path></svg>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-n">
+          <div class="n">3</div>
+          <div class="phase-title">整合与决策</div>
+        </div>
+        <div class="phase-desc">上层智能体整合返回证据，决定下一步行动方向</div>
+        <div class="mini-icon green" style="margin-top:4px">
+          <svg viewBox="0 0 24 24"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="benchmark-row">
+      <div class="benchmark">
+        <div class="benchmark-name">BrowseComp-Plus 准确率</div>
+        <div class="benchmark-score">
+          <span class="before">50.5</span>
+          <span class="arrow">→</span>
+          <span class="after">68.0</span>
+          <span class="gain">+17.5</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#a8b7df;margin-bottom:4px">
+          <span>基线</span><span>WebSwarm (GLM-4.5)</span>
+        </div>
+        <div class="benchmark-bar before"><span></span></div>
+        <div class="benchmark-bar after" style="margin-top:4px"><span></span></div>
+      </div>
+      <div class="benchmark">
+        <div class="benchmark-name">DeepWideSearch Item F1</div>
+        <div class="benchmark-score">
+          <span class="before">46.63</span>
+          <span class="arrow">→</span>
+          <span class="after">58.40</span>
+          <span class="gain">+11.77</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#a8b7df;margin-bottom:4px">
+          <span>基线</span><span>WebSwarm (GLM-4.5)</span>
+        </div>
+        <div class="benchmark-bar before"><span></span></div>
+        <div class="benchmark-bar after" style="margin-top:4px"><span></span></div>
+      </div>
+    </section>
+
+    <section class="stats-row">
+      <div class="stat-card">
+        <div class="value">4</div>
+        <div class="label">复杂搜索基准测试</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">GLM-4.5</div>
+        <div class="label">基础模型</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">57</div>
+        <div class="label">点赞数</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">52</div>
+        <div class="label">收藏数</div>
+      </div>
+    </section>
+
+    <div class="quote-block">
+      <div class="label">关键洞察</div>
+      <blockquote>"更强的 Deep Research，可能需要在搜索答案的同时，动态地重新决定谁应该继续搜索、朝什么方向搜索。"</blockquote>
+    </div>
+
+    <section class="footer">
+      <div>🟦 WebSwarm · Dynamic Multi-Agent Research</div>
+      <div class="source-info">来源：Xudong Han · 2026-07-27</div>
+      <div class="source-info">基准：GLM-4.5 Base</div>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      function send(){
+        var h=document.body.scrollHeight;
+        window.parent.postMessage({type:'theme-height',slug:'webswarm-progressive-task-decomp',height:h},'*');
+      }
+      if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+      setTimeout(send,500);
+    })();
+  </script>
+</body>
+</html>
