@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hallmark · 反 AI-Slop 设计技能</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"→";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+
+    /* === overview === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ MATRIX + RISK ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+
+    /* ============ CODE BLOCK ============ */
+    .code-block{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto}
+    .code-block .code-label{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap}
+
+    /* ============ COMPARE TABLE ============ */
+    .compare-table{border:2px solid var(--line);background:#fff;overflow:hidden}
+    .compare-table .table-head{background:var(--ink);color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center}
+    .compare-table .table-head span{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+    .compare-table table{width:100%;border-collapse:collapse;font-size:12.5px;margin:0}
+    .compare-table th{padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--soft-ink)}
+    .compare-table td{padding:8px 12px;border:1.5px solid var(--line)}
+    .compare-table tr:nth-child(even) td{background:#fafaf7}
+
+    /* ============ FOOTER ============ */
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+    .footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+    .footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- HERO -->
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">Agent Design Skill</div>
+        <h1 class="demo-title">Hallmark：拒绝 AI 默认审美，给 Agent 生成的 UI 上一道"品味锁"</h1>
+        <p class="subtitle">57 个 slop-test 门禁 + 六轴 critique，让紫色渐变 + 三个 feature card + "Revolutionize your workflow" 彻底消失。</p>
+        <div class="badge-row">
+          <span class="badge dark">Together AI 出品</span>
+          <span class="badge red">MIT License</span>
+          <span class="badge blue">11.1K ★</span>
+          <span class="badge">v1.1.0</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge ink">跨 Claude Code</span>
+          <span class="badge ink">跨 Cursor</span>
+          <span class="badge ink">跨 Codex</span>
+        </div>
+        <div class="alert">
+          <strong>一句话结论：</strong>
+          <p>Hallmark 是一个设计质量门禁系统，在 AI 生成的代码到达你之前，先过 57 道 slop-test + 六轴 critique（Philosophy / Hierarchy / Execution / Specificity / Restraint / Variety），确保输出不再是千篇一律的"紫色渐变 + 三个卡片"。</p>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">SLOP TEST GATE</div>
+          <h3>57 道门禁 × 六轴 critique</h3>
+          <p>层次结构 · 排版 · 色彩锚定 · 字体配对 · 宏观结构 · 具体性</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>AI-Slop 典型症状：</b>紫色渐变背景 + 三个等宽 feature card + "Revolutionize your workflow" hero 标语 + Inter 字体 + 圆角卡片</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">扫描类型 → 宏观结构</div></div>
+            <div class="flow-item red"><div class="t">Step 2</div><div class="c">57 项 slop test</div></div>
+            <div class="flow-item dark"><div class="t">Step 3</div><div class="c">六轴 critique</div></div>
+            <div class="flow-item blue"><div class="t">Step 4</div><div class="c">输出自包含 HTML+CSS</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <!-- OVERVIEW -->
+    <div class="overview">
+      <div class="overview-sentence">Hallmark 是 Together AI 出品的反 AI-Slop 设计技能，通过 57 道门禁测试和六轴 critique，让 Agent 生成不再是「紫色渐变 + 三个卡片」的同质化 UI。</div>
+      <div class="overview-body">
+        <p>AI coding agent 时代，Agent 生成的 UI 正在快速同质化：紫色渐变背景、三个 feature card、"Revolutionize your workflow" hero——这套模板统治了 90% 的 AI 生成页面。Hallmark 的核心贡献在于编码了一套可执行的设计质量门禁，把「品味判断」变成「可测试的规则」，在代码输出前拦截掉所有已知反模式。它支持 build（生成）、audit（打分）、redesign（重建）、study（提取 DNA）四个动词，内置 20 个主题目录，覆盖 Claude Code / Cursor / Codex 三大主流 Agent IDE。</p>
+      </div>
+    </div>
+
+    <!-- SECTION 01: FOUR VERBS -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">FOUR VERBS</div>
+          <h2>四个核心动词</h2>
+          <p>Hallmark 的四种使用模式，覆盖从生成到诊断到重建的完整工作流。</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">默认模式</span></div>
+          <h3>build</h3>
+          <p>扫描类型 → 宏观结构 → slop test → 六轴 critique → 输出自包含 HTML+CSS 页面。</p>
+          <ul><li>输入：页面类型 + 品牌要素</li><li>输出：设计系统级 HTML</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">诊断模式</span></div>
+          <h3>audit</h3>
+          <p>对现有代码打分，列出所有违反设计原则的反模式，并给出修复优先级。</p>
+          <ul><li>定量评分</li><li>逐项反模式清单</li><li>优先级排序</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">重建模式</span></div>
+          <h3>redesign</h3>
+          <p>扔掉现有视觉结构，保留品牌要素和路由逻辑，从零重建布局与排版。</p>
+          <ul><li>保留品牌 / 路由</li><li>重建宏观结构</li><li>重配字体 + 色彩</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">提取模式</span></div>
+          <h3>study</h3>
+          <p>提取现有设计的 DNA 结构：宏观结构 + 字体配对 + 色彩锚定，形成可复用的设计规范。</p>
+          <ul><li>宏观结构分析</li><li>字体配对提取</li><li>色彩锚定映射</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- SECTION 02: SIX AXES -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">SIX-AXIS CRITIQUE</div>
+          <h2>六轴 critique 系统</h2>
+          <p>在代码输出前，每个设计都必须通过以下六个维度的审视。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="red">
+          <div class="n">P</div>
+          <h4>Philosophy</h4>
+          <p>设计的整体哲学是否清晰？信息层级是否反映了真实优先级？页面是否有明确的叙事逻辑？</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">H</div>
+          <h4>Hierarchy</h4>
+          <p>视觉层次是否符合内容优先级？标题、正文、辅助信息之间的对比是否到位？是否有视觉噪音干扰核心信息？</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">E</div>
+          <h4>Execution</h4>
+          <p>技术实现是否精良？间距、边框、圆角是否一致？响应式断点是否合理？交互状态是否完整？</p>
+        </article>
+        <article class="risk" data-accent="red">
+          <div class="n">S</div>
+          <h4>Specificity</h4>
+          <p>设计是否具体且有针对性？是否避免了泛泛的"AI 默认样式"（如通用渐变、通用卡片）？</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">R</div>
+          <h4>Restraint</h4>
+          <p>设计是否克制？是否避免了过度装饰、信息过载、不必要的动画和视觉噪音？</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">V</div>
+          <h4>Variety</h4>
+          <p>设计是否有多样性？是否避免了与主流 AI 生成页面的同质化？是否有独特的视觉个性？</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- SECTION 03: 20 THEMES + INSTALL -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">THEMES & INSTALL</div>
+          <h2>20 内置主题 · 跨 Agent 支持</h2>
+          <p>开箱即用的主题目录，覆盖主流设计风格；安装一条命令，Claude Code / Cursor / Codex 全部支持。</p>
+        </div>
+      </div>
+      <div class="grid-3" style="margin-bottom:16px">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">核心特性</span></div>
+          <h3>20 个内置主题</h3>
+          <p>涵盖 editorial、minimal、brutalist、glassmorphism 等主流风格；每个主题都是完整的设计系统，包含字体、色彩、间距、动效规范。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">输出格式</span></div>
+          <h3>自包含 HTML+CSS</h3>
+          <p>不依赖外部框架，不依赖 CDN；输出的 HTML 文件自带完整 CSS，可直接在浏览器打开或嵌入任何环境。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">跨 Agent</span></div>
+          <h3>Claude Code / Cursor / Codex</h3>
+          <p>三大主流 AI coding agent 全部支持；在任意一个 IDE 中安装后，skill 即可调用 Hallmark 的门禁和主题系统。</p>
+        </article>
+      </div>
+      <div class="code-block">
+        <div class="code-label">// 安装命令</div>
+        <pre>npx skills add https://github.com/Nutlope/hallmark --skill hallmark</pre>
+      </div>
+    </section>
+
+    <!-- SECTION 04: SLOP TEST vs ANTI-SLOP -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="label b">SLOP TEST</div>
+          <h2>57 道门禁：紫色渐变问题的系统性解法</h2>
+          <p>AI-Slop 的本质是「统计平均美学的过拟合」——所有模型都在同一批网页上训练，输出必然趋同。Hallmark 的 57 道门禁把「反模式」逐条编码为可测试规则。</p>
+        </div>
+      </div>
+      <div class="compare-table">
+        <div class="table-head">
+          <span>AI-Slop 典型症状 vs Hallmark 门禁</span>
+          <span style="color:var(--blue)">↔</span>
+        </div>
+        <table>
+          <tr>
+            <th>维度</th>
+            <th>AI-Slop 典型症状</th>
+            <th>Hallmark 门禁规则</th>
+          </tr>
+          <tr>
+            <td><b>色彩</b></td>
+            <td>紫色/蓝色渐变背景，毫无色彩锚点</td>
+            <td>检测全局渐变滥用；验证色彩锚点（主色/辅色/中性色的对比关系）</td>
+          </tr>
+          <tr>
+            <td><b>布局</b></td>
+            <td>三个等宽 feature card 并排，高度雷同</td>
+            <td>检测等宽等高卡片组；验证布局节奏变化和视觉层级差异</td>
+          </tr>
+          <tr>
+            <td><b>文案</b></td>
+            <td>"Revolutionize your workflow" / "Cutting-edge solution"</td>
+            <td>检测套话关键词库；验证文案是否具体、是否有真实信息密度</td>
+          </tr>
+          <tr>
+            <td><b>字体</b></td>
+            <td>全站 Inter / Roboto，无字体层次</td>
+            <td>检测字体配对（标题/正文字体是否形成对比）+ 字号梯度是否完整</td>
+          </tr>
+          <tr>
+            <td><b>层次</b></td>
+            <td>标题/正文/注释之间无视觉区分</td>
+            <td>验证字重/字号/色彩的三层对比是否到位；检测"扁平化层次"反模式</td>
+          </tr>
+          <tr>
+            <td><b>排版</b></td>
+            <td>行高过大/过小，段落间距随机</td>
+            <td>检测基线网格偏离度；验证段落间距是否是字体大小的整数倍</td>
+          </tr>
+          <tr>
+            <td><b>动效</b></td>
+            <td>全站 fade-in，无目的的微动效</td>
+            <td>检测无信息量的装饰性动效；验证动效是否服务于信息传达</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 05: COMPARE -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">ALTERNATIVES</div>
+          <h2>竞品对比：为什么需要 Hallmark</h2>
+          <p>市场上不缺 UI 生成工具，缺的是「在输出前拦截烂设计」的品味门禁。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <article class="mini">
+          <div class="lead">无门禁</div>
+          <h4>纯生成工具</h4>
+          <p class="quote-line">输出质量完全依赖模型运气；无系统性质量保障。</p>
+          <p>代表：大多数 AI UI 工具</p>
+        </article>
+        <article class="mini">
+          <div class="lead red">Hallmark</div>
+          <h4>57 slop test + 6轴 critique</h4>
+          <p class="quote-line">把设计质量判断编码为可执行规则，系统性拦截已知反模式。</p>
+          <p>Together AI 出品，MIT 协议</p>
+        </article>
+        <article class="mini">
+          <div class="lead blue">设计系统</div>
+          <h4>shadcn / Tailwind UI</h4>
+          <p class="quote-line">提供组件库，但不解决 AI 生成过程中的同质化问题。</p>
+          <p>需要人工选择和组装</p>
+        </article>
+        <article class="mini">
+          <div class="lead">人工 review</div>
+          <h4>设计师审核</h4>
+          <p class="quote-line">最可靠但成本最高，无法规模化；每次生成都需要人工介入。</p>
+          <p>不适合 agentic workflow</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="footer-block" style="margin-top:30px">
+      <h3>收口说明</h3>
+      <p>Hallmark 的核心价值是把「品味」变成「规则」——在 AI 生成的那一瞬间，用 57 道门禁和六轴 critique 确保输出不是「紫色渐变 + 三个卡片」。它是面向 Agent IDE 的设计质量基础设施，适合所有希望在 AI coding workflow 中保持设计独特性的团队。</p>
+      <ul>
+        <li>仓库：<a href="https://github.com/Nutlope/hallmark" style="color:var(--blue);text-decoration:underline">https://github.com/Nutlope/hallmark</a></li>
+        <li>安装：<code>npx skills add https://github.com/Nutlope/hallmark --skill hallmark</code></li>
+        <li>支持：Claude Code · Cursor · Codex</li>
+      </ul>
+    </div>
+
+    <div class="rule"></div>
+    <p class="source-note">来源：@yibie（Twitter/X，2026-07-28，3401 Views）· https://x.com/i/status/2081932972559855907 · style: infocard-hardblue-style · category: 工具推荐</p>
+  </main>
+</body>
+</html>

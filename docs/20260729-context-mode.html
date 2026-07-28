@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Context Mode：把工具噪音挡在上下文窗外的沙箱</title>
+<style>
+:root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#0a0a0a;--red:#c8102e;--soft-red:#fff5f6;--line:#0a0a0a;--shadow:6px 6px 0 rgba(10,10,10,.10)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+/* ── Topbar ── */
+.topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:14px;overflow:hidden}
+.topbar-hero{padding:18px 18px 14px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+.topbar-meta{padding:14px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto;gap:0;align-content:start;background:#f6f1f1}
+.meta-row-high{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+.meta-row-low{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.meta-pill-lg{border:2px solid var(--line);padding:7px 9px 5px;background:#fff;font-weight:900;font-size:15px;line-height:1.1}
+.meta-pill-lg .sub{display:block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+.meta-pill-md{border:2px solid var(--line);border-left:4px solid var(--red);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25}
+.meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+.meta-pill-sm{border:2px solid var(--line);border-left:4px solid #666;padding:3px 7px 3px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3}
+.meta-pill-sm .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+.kicker{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.7);margin-bottom:6px}
+.headline{font-size:20px;font-weight:900;line-height:1.15;margin-bottom:8px}
+.subhead{font-size:11.5px;color:rgba(255,255,255,.75);line-height:1.5;font-weight:400}
+.tagline{display:inline-block;border:1.5px solid rgba(255,255,255,.5);padding:3px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.9);margin-top:10px}
+
+/* ── Sections ── */
+.section{margin-bottom:20px}
+.sec-header{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.sec-num{font-size:10px;font-weight:900;color:var(--red);text-transform:uppercase;letter-spacing:.1em}
+.sec-title{font-size:13.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em}
+
+/* ── Hero callout ── */
+.hero-callout{border:3px solid var(--ink);background:var(--paper);padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.hero-callout .hc-main{font-size:22px;font-weight:900;line-height:1.2;color:var(--ink);margin-bottom:8px}
+.hero-callout .hc-main em{color:var(--red);font-style:normal}
+.hero-callout .hc-sub{font-size:12px;color:#555;line-height:1.6}
+
+/* ── Problem ── */
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.problem-card{border:2px solid var(--line);background:#fff;padding:10px 12px;box-shadow:4px 4px 0 rgba(10,10,10,.08)}
+.problem-card .p-icon{font-size:16px;margin-bottom:5px}
+.problem-card .p-title{font-size:12px;font-weight:900;margin-bottom:4px}
+.problem-card .p-desc{font-size:11px;color:#444;line-height:1.5}
+
+/* ── Solution ── */
+.solution-box{border:2px solid var(--ink);background:linear-gradient(135deg,#fff 60%,var(--soft-red));padding:14px;margin-top:6px}
+.solution-box .sol-header{font-size:12px;font-weight:900;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.solution-box .sol-title{font-size:15px;font-weight:900;margin-bottom:6px}
+.solution-box .sol-desc{font-size:12px;color:#333;line-height:1.7}
+.solution-box .sol-highlight{border:2px solid var(--red);background:var(--soft-red);padding:8px 10px;margin-top:8px}
+.solution-box .sol-highlight .hl-label{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:var(--red);margin-bottom:3px}
+.solution-box .sol-highlight .hl-num{font-size:26px;font-weight:900;color:var(--red);line-height:1}
+
+/* ── Capabilities ── */
+.cap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:6px}
+.cap-card{border:2px solid var(--line);background:#fff;padding:10px 12px;box-shadow:4px 4px 0 rgba(10,10,10,.08)}
+.cap-card .cap-num{font-size:9px;font-weight:900;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.cap-card .cap-title{font-size:12px;font-weight:900;margin-bottom:5px}
+.cap-card .cap-desc{font-size:11px;color:#444;line-height:1.5}
+
+/* ── Agent support ── */
+.agent-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.agent-chip{border:2px solid var(--line);background:#fff;padding:5px 10px;font-size:11px;font-weight:800}
+
+/* ── Tags ── */
+.tags-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border:1.5px solid var(--line);text-transform:uppercase;letter-spacing:.06em;background:#fff}
+.tag.red{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* ── Mobile ── */
+@media(max-width:720px){
+  .topbar{grid-template-columns:1fr}
+  .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+  .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+  .problem-grid{grid-template-columns:1fr}
+  .cap-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .headline{font-size:17px}
+  .hero-callout .hc-main{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">工具推荐 · Context Window</div>
+      <div class="headline">Context Mode：把工具噪音挡在上下文窗外的沙箱</div>
+      <div class="subhead">原始工具输出塞爆上下文？沙箱化后 token 用量直降 98%，长程 Agent 会话重新清爽</div>
+      <div class="tagline">★ 16.3K Stars · 趋势看涨</div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">
+          16.3K
+          <span class="sub">GitHub Stars</span>
+        </div>
+        <div class="meta-pill-lg" style="color:var(--red)">
+          -98%
+          <span class="sub">Token 消耗降低</span>
+        </div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">
+          Sandbox
+          <span class="sub">核心机制</span>
+        </div>
+        <div class="meta-pill-md">
+          Cross-Agent
+          <span class="sub">多 Agent 支持</span>
+        </div>
+        <div class="meta-pill-md">
+          Session
+          <span class="sub">状态恢复</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HERO CALLOUT -->
+  <div class="hero-callout">
+    <div class="hc-main">把原始工具输出存在沙箱，<em>只把结构化摘要注入上下文</em></div>
+    <div class="hc-sub">Agent 在十几轮工具调用后变慢、变笨、变健忘——根因是 grep 结果、构建日志、API 响应全部挤进上下文窗口。Context Mode 用沙箱机制隔离原始数据，让 LLM 只看到精简后的摘要，token 消耗直降 <strong>98%</strong>。</div>
+  </div>
+
+  <!-- PROBLEM -->
+  <div class="section">
+    <div class="sec-header">
+      <span class="sec-num">01</span>
+      <span class="sec-title">问题背景：工具输出正在谋杀你的上下文窗口</span>
+    </div>
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="p-icon">📈</div>
+        <div class="p-title">上下文膨胀</div>
+        <div class="p-desc">grep 结果、构建日志、API 响应、文件内容——每轮工具调用都在往上下文窗口塞原始数据，十几轮后窗口就被撑爆了。</div>
+      </div>
+      <div class="problem-card">
+        <div class="p-icon">🐢</div>
+        <div class="p-title">Agent 降级</div>
+        <div class="p-desc">上下文被工具输出淹没后，LLM 开始变慢、变笨、遗忘关键上下文，输出质量断崖式下降。</div>
+      </div>
+      <div class="problem-card">
+        <div class="p-icon">💸</div>
+        <div class="p-title">Token 成本失控</div>
+        <div class="p-desc">原始工具输出不做过滤直接注入上下文，token 消耗速度极快，预算很快见底。</div>
+      </div>
+      <div class="problem-card">
+        <div class="p-icon">🔄</div>
+        <div class="p-title">Session 无法恢复</div>
+        <div class="p-desc">Agent 重置或对话中断后，上下文全部丢失，无法从断点继续，重复劳动严重。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOLUTION -->
+  <div class="section">
+    <div class="sec-header">
+      <span class="sec-num">02</span>
+      <span class="sec-title">解法：沙箱化工具输出</span>
+    </div>
+    <div class="solution-box">
+      <div class="sol-header">核心机制</div>
+      <div class="sol-title">Sandbox — 原始数据隔离，摘要注入上下文</div>
+      <div class="sol-desc">
+        Context Mode 为每次工具调用建立沙箱：原始工具输出（grep、build、API 响应）存在沙箱中，只有经过结构化提炼的摘要才会被注入 LLM 的上下文窗口。<br><br>
+        这意味着 LLM 仍然"看到"工具调用的结果，但看到的是精华版而非原始噪音。
+      </div>
+      <div class="sol-highlight">
+        <div class="hl-label">实测效果</div>
+        <div class="hl-num">-98% Token 消耗</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAPABILITIES -->
+  <div class="section">
+    <div class="sec-header">
+      <span class="sec-num">03</span>
+      <span class="sec-title">三大附带能力</span>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-card">
+        <div class="cap-num">Capability 01</div>
+        <div class="cap-title">Session 状态恢复</div>
+        <div class="cap-desc">Agent 重置或对话中断后，沙箱中存储的上下文可完整恢复，不丢进度，不丢记忆。</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-num">Capability 02</div>
+        <div class="cap-title">上下文自动过滤</div>
+        <div class="cap-desc">自动剥离工具输出中的噪声（冗长日志、重复内容），只保留决策相关关键信息。</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-num">Capability 03</div>
+        <div class="cap-title">跨 Agent 架构支持</div>
+        <div class="cap-desc">不绑定特定 Agent 实现，适配多种主流 Agent 框架的上下文管理需求。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGENT SUPPORT -->
+  <div class="section">
+    <div class="sec-header">
+      <span class="sec-num">04</span>
+      <span class="sec-title">跨 Agent 支持</span>
+    </div>
+    <div class="agent-row">
+      <div class="agent-chip">Claude Code</div>
+      <div class="agent-chip">Gemini CLI</div>
+      <div class="agent-chip">Copilot</div>
+      <div class="agent-chip">OpenCode</div>
+    </div>
+  </div>
+
+  <!-- SCENARIOS -->
+  <div class="section">
+    <div class="sec-header">
+      <span class="sec-num">05</span>
+      <span class="sec-title">适用场景</span>
+    </div>
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="p-icon">🧠</div>
+        <div class="p-title">长程 Agent 会话</div>
+        <div class="p-desc">需要多轮工具调用的复杂任务，上下文窗口被工具输出快速撑满是核心痛点，沙箱化是根本解法。</div>
+      </div>
+      <div class="problem-card">
+        <div class="p-icon">⚡</div>
+        <div class="p-title">大量工具调用的复杂任务</div>
+        <div class="p-desc">grep / build / API / file read 多类型工具混合调用，每轮都在积累上下文噪音，沙箱化可保持会话始终清爽。</div>
+      </div>
+      <div class="problem-card">
+        <div class="p-icon">💰</div>
+        <div class="p-title">Token 预算紧张</div>
+        <div class="p-desc">上下文 token 成本高、预算有限时，减少 98% 的工具输出注入可以直接降低使用成本。</div>
+      </div>
+      <div class="problem-card">
+        <div class="p-icon">🔁</div>
+        <div class="p-title">需要 Session 恢复的场景</div>
+        <div class="p-desc">长时间运行任务、可能被中断的任务，沙箱存储的上下文可随时从断点恢复，无需重来。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="section" style="margin-top:8px;border-top:2px solid var(--line);padding-top:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:#888">
+      <div>📦 <strong style="color:var(--ink)">仓库</strong>：github.com/mksglu/context-mode</div>
+      <div>👤 <strong style="color:var(--ink)">来源</strong>：@yibie（X / Twitter）</div>
+    </div>
+    <div class="tags-row">
+      <span class="tag red">agent-skills</span>
+      <span class="tag">context-window</span>
+      <span class="tag">token-optimization</span>
+      <span class="tag">Claude-Code</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

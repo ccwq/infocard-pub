@@ -123,7 +123,7 @@ function processFile(metaFile) {
 
   // 3) path must match sidecar sibling HTML when the sibling exists
   const expectedPath = expectedHtmlFromMeta(metaFile);
-  const expectedAbs = path.join(ROOT_DIR, expectedPath);
+  const expectedAbs = expectedPath ? path.join(ROOT_DIR, expectedPath) : null;
   const currentPath = parseScalarLine(next, 'path');
   if (expectedPath && fs.existsSync(expectedAbs)) {
     if (currentPath == null) {
