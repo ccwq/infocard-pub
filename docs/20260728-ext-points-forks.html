@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Extension Points vs Forks：为什么你的改动不需要提交到上游</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:     #0c1020;
+    --bg-2:   #11162a;
+    --panel:  #171c2b;
+    --panel-2:#0f1424;
+    --ink:    #eef4ff;
+    --muted:  #a8b7df;
+    --line:   rgba(255,255,255,.12);
+    --cyan:   #58c3ff;
+    --blue:   #4a78ff;
+    --green:  #2db36a;
+    --yellow: #f4c84c;
+    --purple: #8459ff;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 40px;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  /* ── Hero ──────────────────────────────────────────────────── */
+  .hero {
+    max-width: 760px;
+    margin: 0 auto 28px;
+    padding: 36px 32px 32px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 15% 0%, rgba(74,120,255,.22) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 85% 100%, rgba(132,89,255,.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.2px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 14px;
+  }
+
+  .kicker svg { flex-shrink: 0; }
+
+  .hero-title {
+    font-size: clamp(22px, 5.5vw, 40px);
+    font-weight: 950;
+    line-height: 1.12;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .hero-sub {
+    font-size: clamp(13px, 2vw, 16px);
+    color: var(--muted);
+    margin-bottom: 20px;
+    line-height: 1.6;
+    position: relative;
+  }
+
+  .hero-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 22px;
+    position: relative;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.2px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 1px solid var(--line);
+    background: rgba(88,195,255,.08);
+    color: var(--cyan);
+  }
+
+  .pill.green { background: rgba(45,179,106,.1); color: var(--green); border-color: rgba(45,179,106,.25); }
+  .pill.yellow { background: rgba(244,200,76,.1); color: var(--yellow); border-color: rgba(244,200,76,.25); }
+  .pill.purple { background: rgba(132,89,255,.1); color: var(--purple); border-color: rgba(132,89,255,.25); }
+
+  .gradient-bar {
+    height: 4px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--cyan), var(--blue), var(--purple));
+    position: relative;
+  }
+
+  /* ── Shell / workbench ─────────────────────────────────────── */
+  .shell {
+    max-width: 760px;
+    margin: 0 auto 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .card-cyan::before   { background: var(--cyan); }
+  .card-blue::before   { background: var(--blue); }
+  .card-purple::before { background: var(--purple); }
+  .card-green::before  { background: var(--green); }
+
+  .card-title {
+    font-size: 11.2px;
+    font-weight: 900;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .card-title svg { color: var(--cyan); flex-shrink: 0; }
+
+  .card-body {
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.75;
+  }
+
+  .card-body p + p { margin-top: 10px; }
+  .card-body strong { color: var(--cyan); font-weight: 700; }
+
+  /* ── Feature row ───────────────────────────────────────────── */
+  .feature-row {
+    max-width: 760px;
+    margin: 0 auto 24px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .feat {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+
+  .feat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 8px;
+    font-size: 18px;
+  }
+
+  .feat-icon.cyan   { background: rgba(88,195,255,.15); color: var(--cyan); }
+  .feat-icon.green  { background: rgba(45,179,106,.15); color: var(--green); }
+  .feat-icon.yellow { background: rgba(244,200,76,.15);  color: var(--yellow); }
+  .feat-icon.purple { background: rgba(132,89,255,.15);  color: var(--purple); }
+  .feat-icon.blue   { background: rgba(74,120,255,.15);  color: var(--blue); }
+
+  .feat-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .feat-sub {
+    font-size: 11.2px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── Callout ───────────────────────────────────────────────── */
+  .callout {
+    max-width: 760px;
+    margin: 0 auto 20px;
+    background: var(--panel);
+    border: 1px solid rgba(88,195,255,.25);
+    border-left: 4px solid var(--cyan);
+    border-radius: 12px;
+    padding: 18px 22px;
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.75;
+  }
+
+  .callout p + p { margin-top: 8px; }
+
+  /* ── Footer ────────────────────────────────────────────────── */
+  .footer {
+    max-width: 760px;
+    margin: 0 auto;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 11.2px;
+    color: var(--muted);
+  }
+
+  .footer-author {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .footer-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .tag {
+    font-size: 11.2px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+
+  /* ── Responsive ────────────────────────────────────────────── */
+  @media (max-width: 600px) {
+    body { padding: 16px 12px 32px; font-size: 12.5px; }
+    .hero { padding: 24px 18px 22px; }
+    .shell { grid-template-columns: 1fr; }
+    .feature-row { grid-template-columns: repeat(2, 1fr); }
+    .footer { flex-direction: column; align-items: flex-start; }
+  }
+
+  @media (max-width: 390px) {
+    .feature-row { grid-template-columns: 1fr; }
+    .hero-title { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Hero ─────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="kicker">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+    Essay · 工程方法论
+  </div>
+  <h1 class="hero-title">Extension Points vs Forks</h1>
+  <p class="hero-sub">为什么你的改动不需要提交到上游</p>
+  <div class="hero-pills">
+    <span class="pill green">Fork 文化</span>
+    <span class="pill">可扩展性</span>
+    <span class="pill yellow">AI 工具</span>
+    <span class="pill purple">开源哲学</span>
+  </div>
+  <div class="gradient-bar"></div>
+</div>
+
+<!-- ── Shell ────────────────────────────────────────────────────── -->
+<div class="shell">
+
+  <div class="card card-cyan">
+    <div class="card-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      文章概述
+    </div>
+    <div class="card-body">
+      <p><strong>Abdul Rehman</strong> 在《Don't Wait. Fork It.》中提出一个被忽视的开发文化命题：</p>
+      <p>开发者一直都在搭建自己的<strong>工作台（workbench）</strong>——dotfiles、别名、自定义脚本、定制配置。三十年来，每个工具的协议都是：如果你不满意，就改它，改动跟你走。没有人要求你把 dotfiles 提交到上游。</p>
+      <p>AI 工具短暂打破了这个协议——云端模型、闭源封装，让"改动跟你走"变得不可能。作者认为，这个局面<strong>不必如此</strong>。</p>
+    </div>
+  </div>
+
+  <div class="card card-purple">
+    <div class="card-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      核心论点
+    </div>
+    <div class="card-body">
+      <p><strong>Extension Point</strong>（扩展点）：官方预留的定制接口——插件系统、hook、脚本注入点。</p>
+      <p><strong>Fork</strong>（分叉）：直接改动源码，改动属于你自己。</p>
+      <p>传统开发时代，两条路都开放；AI 工具时代，几乎只剩 Extension Point，且往往还不可用。作者呼吁：<strong>重新打开 Fork 这扇门</strong>，让开发者能持有自己的改动。</p>
+    </div>
+  </div>
+
+  <div class="card card-blue">
+    <div class="card-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      为什么重要
+    </div>
+    <div class="card-body">
+      <p>AI 编程工具（Copilot、Cursor Agent 等）提供了前所未有的上下文理解和代码生成能力，但代价是：<strong>你失去了对工具本身的可控性</strong>。</p>
+      <p>prompt 改不了模型行为，配置改不了推理路径，bug 修不了只能等官方——开发者从工具的主人变成了工具的用户。</p>
+      <p>这篇 essay 提醒我们：<strong>工具定制权是开发文化的根基</strong>，不应该因为 AI 时代的基础设施变化而拱手让出。</p>
+    </div>
+  </div>
+
+  <div class="card card-green">
+    <div class="card-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      行动建议
+    </div>
+    <div class="card-body">
+      <p>① 优先选择<strong>可本地部署</strong>的 AI 工具（Ollama、Cline、本地模型），保留 Fork 能力</p>
+      <p>② 推动工具支持 <strong>extension point</strong>——prompt 模板、自定义规则、本地补丁</p>
+      <p>③ 保留 <strong>dotfiles 思维</strong>：改动跟你走，工具是你的 Workbench</p>
+      <p>④ 不要等上游批准——<strong>先 Fork，先改，先跑通</strong></p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Feature row ───────────────────────────────────────────────── -->
+<div class="feature-row">
+
+  <div class="feat">
+    <div class="feat-icon cyan">⚙</div>
+    <div class="feat-label">Extension Points</div>
+    <div class="feat-sub">官方预留的定制接口，限制多但稳定</div>
+  </div>
+
+  <div class="feat">
+    <div class="feat-icon green">🍴</div>
+    <div class="feat-label">Fork</div>
+    <div class="feat-sub">改动属于你自己，完全可控</div>
+  </div>
+
+  <div class="feat">
+    <div class="feat-icon yellow">⚡</div>
+    <div class="feat-label">Workbench 文化</div>
+    <div class="feat-sub">30 年来开发者定制工具的共识</div>
+  </div>
+
+  <div class="feat">
+    <div class="feat-icon purple">🤖</div>
+    <div class="feat-label">AI 工具困境</div>
+    <div class="feat-sub">云端模型剥夺了 Fork 能力</div>
+  </div>
+
+  <div class="feat">
+    <div class="feat-icon blue">🔓</div>
+    <div class="feat-label">本地优先</div>
+    <div class="feat-sub">Ollama / Cline 重获工具主权</div>
+  </div>
+
+  <div class="feat">
+    <div class="feat-icon cyan">🚀</div>
+    <div class="feat-label">Don't Wait</div>
+    <div class="feat-sub">先 Fork，先改，先跑通</div>
+  </div>
+
+</div>
+
+<!-- ── Callout ───────────────────────────────────────────────────── -->
+<div class="callout">
+  <p>"Nobody has ever asked you to upstream your dotfiles."</p>
+  <p>三十年的协议是：如果你不满意，改它，改动跟你走。AI 工具时代，这个协议被悄悄改变了——但它不必如此。<strong>Extension Points vs Forks</strong> 的讨论，本质上是关于开发者对工具的主权问题。</p>
+</div>
+
+<!-- ── Footer ────────────────────────────────────────────────────── -->
+<div class="footer">
+  <div class="footer-author">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    Abdul Rehman · @ArjunagiARehman · 2026-07-26
+  </div>
+  <div class="footer-tags">
+    <span class="tag">AI工具</span>
+    <span class="tag">可扩展性</span>
+    <span class="tag">Fork</span>
+    <span class="tag">开源文化</span>
+    <span class="tag">工程化</span>
+  </div>
+</div>
+
+</body>
+</html>
