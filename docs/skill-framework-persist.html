@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skill 框架不会消失：Agent Harness 进化论</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{
+      width:min(1180px,calc(100% - 20px));
+      margin:0 auto;
+      padding:18px 0 82px;
+    }
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);
+      gap:14px;
+      color:#fff;
+      margin-bottom:14px;
+    }
+    .hero-copy{
+      min-width:0;
+      display:grid;
+      gap:10px;
+      align-content:start;
+      padding:12px 0 0;
+    }
+    .kicker-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:fit-content;
+      padding:5px 10px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);
+      backdrop-filter:blur(10px);
+      color:#fff;
+      font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      border-radius:999px;
+    }
+    .source{
+      max-width:280px;
+      text-align:right;
+      font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#b8c8f5;
+      overflow-wrap:anywhere;
+    }
+    .title{
+      margin:0;
+      font-size:clamp(40px,7vw,88px);
+      line-height:.92;
+      letter-spacing:-.07em;
+      font-weight:950;
+    }
+    .subtitle{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(15px,2vw,20px);
+      line-height:1.55;
+      color:#e8eefc;
+    }
+    .subcn{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(13px,1.6vw,16px);
+      line-height:1.65;
+      color:#c5d2f7;
+    }
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.05);
+      border-radius:999px;
+      color:#fff;
+      font-size:12px;
+      font-weight:850;
+      letter-spacing:.01em;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{
+      display:grid;
+      gap:8px;
+      border:1.5px solid rgba(255,255,255,.16);
+      background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+      padding:14px 16px 12px;
+      border-radius:18px;
+      box-shadow:var(--shadow);
+    }
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{
+      min-width:0;
+      background:rgba(10,12,22,.5);
+      border:1.5px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:14px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+    .visual-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .orb{
+      width:66px;
+      height:66px;
+      border-radius:22px;
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+        linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+      box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      display:grid;
+      place-items:center;
+      color:#fff;
+      font-size:26px;
+      font-weight:950;
+      letter-spacing:-.08em;
+    }
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .mini-card{
+      min-width:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1.5px solid rgba(255,255,255,.09);
+      border-radius:16px;
+      padding:10px 10px 9px;
+      display:grid;
+      gap:8px;
+      box-shadow:0 12px 26px rgba(0,0,0,.2);
+    }
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{
+      width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+      background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.1);
+      color:#fff;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{
+      height:12px;
+      border-radius:999px;
+      background:
+        linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);
+      box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16);
+    }
+
+    .shell{
+      display:grid;
+      grid-template-columns:1fr 1.28fr .92fr;
+      gap:12px;
+      background:rgba(9,12,22,.42);
+      border:1.5px solid rgba(255,255,255,.1);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:12px;
+      margin-bottom:14px;
+    }
+    .panel{
+      min-width:0;
+      background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow:0 12px 26px rgba(0,0,0,.18);
+      display:flex;
+      flex-direction:column;
+    }
+    .panel-head{
+      padding:10px 12px 9px;
+      border-bottom:1.5px solid rgba(255,255,255,.08);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+    }
+    .panel-head h3{
+      margin:0;
+      font-size:12px;
+      line-height:1.2;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:#fff;
+    }
+    .panel-head .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.04);
+      color:#dfe8ff;
+      font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      white-space:nowrap;
+    }
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .search{
+      display:flex;align-items:center;gap:8px;
+      border:1.5px solid rgba(255,255,255,.1);
+      background:#0f1424;
+      padding:9px 10px;
+      border-radius:12px;
+      color:#9fb0de;
+      font-size:12px;
+    }
+    .project{
+      border:1.5px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,#1a2131,#171c2b);
+      padding:10px 11px;
+      border-radius:14px;
+      display:grid;
+      gap:4px;
+      min-width:0;
+    }
+    .project .name{font-size:13px;font-weight:900;color:#fff}
+    .project .path{font-size:11.5px;color:#9fb0de;overflow-wrap:anywhere}
+    .project .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .mini-dot{
+      width:10px;height:10px;border-radius:50%;margin-top:2px;
+      background:linear-gradient(135deg,var(--cyan),var(--purple));box-shadow:0 0 0 3px rgba(88,195,255,.12)
+    }
+    .task{
+      border:1.5px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,#1a2030,#151a28);
+      padding:10px 11px;
+      border-radius:14px;
+      display:grid;
+      gap:8px;
+    }
+    .task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .task-name{font-size:13px;font-weight:900;color:#fff}
+    .status{
+      font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+      padding:4px 8px;border-radius:999px;
+      background:rgba(45,179,106,.14);
+      color:#7fe1a2;
+      border:1px solid rgba(45,179,106,.32)
+    }
+    .task p{font-size:12px;line-height:1.55;color:#d9e2ff;margin:0}
+    .progress{height:10px;border-radius:999px;background:#101525;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .progress > span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--green))}
+    .task-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#b6c5f2}
+    .chip{
+      display:inline-flex;align-items:center;gap:5px;
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.04);
+      padding:4px 8px;border-radius:999px;
+    }
+    .status-list{display:grid;gap:8px}
+    .status-item{
+      display:flex;justify-content:space-between;gap:10px;align-items:center;
+      border:1px solid rgba(255,255,255,.08);
+      background:#0f1424;
+      padding:9px 10px;
+      border-radius:12px;
+      font-size:12px;
+      color:#d8e2ff;
+    }
+    .status-item .left{display:grid;gap:2px}
+    .status-item .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
+    .term{
+      background:#0b1020;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .term-top{
+      display:flex;justify-content:space-between;gap:8px;align-items:center;
+      padding:9px 12px;
+      background:#111831;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      color:#dfe8ff;
+      font-size:11px;
+    }
+    .term-body{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#a8f59f;
+      font-size:12px;
+      line-height:1.7;
+      min-height:180px;
+      white-space:pre-wrap;
+    }
+    .term .url{color:#7ad9ff}
+    .editor{
+      background:#0f1524;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .editor-top{
+      display:flex;justify-content:space-between;gap:8px;align-items:center;
+      padding:9px 12px;
+      background:#131a2d;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      color:#fff;
+    }
+    .editor-top .tab{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .code{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#dbe5ff;
+      font-size:11.8px;
+      line-height:1.7;
+      white-space:pre-wrap;
+    }
+    .code .kw{color:#7ad9ff}
+    .code .fn{color:#f4c84c}
+    .diff{
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+      background:#0d1220;
+    }
+    .diff-top{
+      padding:9px 12px;
+      background:#13192c;
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      border-bottom:1px solid rgba(255,255,255,.08);
+    }
+    .diff-body{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:11.5px;
+      line-height:1.6;
+      color:#dbe5ff;
+      white-space:pre-wrap;
+    }
+    .diff .add{color:#90f0a8}
+    .stats{
+      background:#13192c;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .stats-top{
+      padding:9px 12px;
+      background:#171f35;
+      color:#fff;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+    .stats-body{padding:12px;display:grid;gap:12px;color:#dce4ff}
+    .stat{display:grid;gap:6px}
+    .stat .label{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+    .bar{height:10px;border-radius:999px;background:#0d1220;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .bar > span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--purple))}
+    .donut{
+      width:126px;height:126px;border-radius:50%;
+      background:conic-gradient(#58c3ff 0 38%, #2db36a 38% 62%, #f4c84c 62% 80%, #8459ff 80% 92%, #54627f 92% 100%);
+      margin:4px auto 0;
+      position:relative;
+      box-shadow:inset 0 0 0 14px #13192c;
+    }
+    .donut::after{
+      content:"Activity";
+      position:absolute;
+      inset:50% auto auto 50%;
+      transform:translate(-50%,-50%);
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .feature-row{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:repeat(6,minmax(0,1fr));
+      gap:10px;
+    }
+    .feature{
+      background:#171c2b;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      padding:11px 9px;
+      color:#e8edf8;
+      text-align:center;
+      display:grid;
+      gap:7px;
+      min-width:0;
+    }
+    .icon{
+      width:28px;height:28px;margin:0 auto;border-radius:50%;
+      background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.09);
+      display:grid;place-items:center;
+      font-size:14px;
+      color:#fff;
+    }
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+    .download{margin:16px auto 0;display:flex;justify-content:center}
+    .download-btn{
+      display:inline-flex;align-items:center;gap:12px;
+      background:linear-gradient(135deg,var(--purple),#6a4cff 54%, var(--blue));
+      color:#fff;border:0;border-radius:18px;
+      padding:16px 24px;
+      box-shadow:0 16px 36px rgba(132,89,255,.34);
+      font-weight:950;
+      letter-spacing:.02em;
+      font-size:18px;
+    }
+    .download-btn small{display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em}
+    .footer{
+      margin-top:14px;
+      background:#0b1020;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      color:#dfe8ff;
+      font-size:12px;
+      flex-wrap:wrap;
+    }
+    .footer .stars{font-weight:900}
+
+    @media (max-width:1080px){
+      .hero,.shell{grid-template-columns:1fr}
+      .feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .shell{padding:10px;gap:10px}
+      .feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .download-btn{width:100%;justify-content:center;text-align:center;font-size:16px;padding:14px 16px;border-radius:16px}
+      .footer{font-size:11.5px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">AI CODING · 工具链 · 2026-07</div>
+        <h1 class="demo-title">Skill 框架不会消失：Agent Harness 进化论</h1>
+        <p class="subtitle">@卡颂：Skill 框架会一直存在，只不过随着 Agent 发展不断新老更替</p>
+        <div class="badge-row">
+          <span class="badge red">47 赞</span>
+          <span class="badge blue">25 回复</span>
+          <span class="badge">卡颂</span>
+          <span class="badge dark">Jul 27 2026</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge ink">Skill 框架</span>
+          <span class="badge ink">Agent Harness</span>
+          <span class="badge ink">Matt Skills</span>
+          <span class="badge ink">SuperPowers</span>
+        </div>
+        <div class="alert">
+          <strong>核心论点：Skill 框架不会消失，只会被替换</strong>
+          <p>SuperPowers 出现时 Agent 还没有长程执行能力（/goal）。现在很多人抛弃 SuperPowers 转投 Matt Skills，也是因为 Harness 本身在进步。但"如何对齐需求"（BFS grill-me vs 模糊方向 brainstorming）Agent 没法内置，这是 Skill 框架存在的理由。</p>
+          <div class="mini-row">
+            <span class="mini-tag">Harness 会进化</span>
+            <span class="mini-tag">Skill 不会消失</span>
+            <span class="mini-tag">场景相关</span>
+            <span class="mini-tag">新老更替</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">CORE CLAIM</div>
+          <h3>Skill 框架会一直存在</h3>
+          <p>Agent Harness 会内置流程，但"具体怎么做"没法内置，这是 Skill 框架存在的价值。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>错误解读：</b>AI Coding 不需要 Matt Skills / SuperPowers 这类 Skill 框架了。</div>
+          <div class="quote" style="border-color:var(--blue);background:var(--soft-blue)"><b>正确理解：</b>Skill 框架会一直存在，只不过随着 Agent 发展不断新老更替。</div>
+          <div class="flow">
+            <div class="flow-item"><div class="t">SuperPowers</div><div class="c">/goal 时代前的框架</div></div>
+            <div class="flow-item blue"><div class="t">↓</div><div class="c">Harness 进化</div></div>
+            <div class="flow-item red"><div class="t">Matt Skills</div><div class="c">长程执行时代的框架</div></div>
+            <div class="flow-item dark"><div class="t">Next?</div><div class="c">新框架还会出现</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <div class="overview">
+      <div class="overview-sentence">Skill 框架是 Agent 能力的"场景相关层"，Harness 进化替代不了它，只会推动新老更替。</div>
+      <div class="overview-body">
+        <p>@卡颂（X 账号）在 2026-07-27 发帖回应"Skill 框架将消亡"的观点，核心论点：Skill 框架不会消失，只会被替换。他指出 SuperPowers 出现时 Agent 还没有长程执行能力（/goal），现在很多人抛弃 SuperPowers 转投 Matt Skills 是因为 Harness 本身在进步。但 Harness 只能内置"先对齐需求再实现"这个流程，而"如何对齐"——是采用 grill-me 这样的 BFS，还是 brainstorming 这样的只对齐模糊方向——都是场景相关的，Agent 没法内置。Skill 框架负责的就是这个"场景相关层"，所以会一直存在。</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER · 错误解读 vs 正确理解</div>
+          <h2>Skill 框架消亡论的问题</h2>
+          <p>有人误读了 Matt Pocock 的文章，以为 AI Coding 不再需要 Skill 框架。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <div class="risk" data-accent="red">
+          <div class="n">✗</div>
+          <h4>错误解读</h4>
+          <p>AI Coding 以后不需要 mattpocock/skills、superpowers 这样的 Skill 框架了。Harness 能替代一切。</p>
+        </div>
+        <div class="risk" data-accent="blue">
+          <div class="n">✓</div>
+          <h4>正确理解</h4>
+          <p>Skill 框架会一直存在，只不过随着 Agent 发展不断新老更替。Harness 进化是驱动力，不是替代者。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">CHAPTER · SuperPowers vs Matt Skills</div>
+          <h2>新老 Skill 框架的更替逻辑</h2>
+          <p>不是"旧的被淘汰"，而是"Harness 进化让新框架成为可能"。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">SuperPowers</span><span class="tag dark">已更替</span></div>
+          <h3>SuperPowers 时代的 Agent 能力</h3>
+          <p>SuperPowers 出现的时候，Agent 还没有 /goal 这样的长程执行能力。那时候的 Skill 框架要填补的空白比现在大得多。</p>
+          <ul>
+            <li>Agent 缺乏长程记忆</li>
+            <li>没有 /goal 长程执行</li>
+            <li>上下文窗口有限</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">Matt Skills</span><span class="tag dark">当前主流</span></div>
+          <h3>Matt Skills 时代的 Agent 能力</h3>
+          <p>现在很多人抛弃 SuperPowers 转投 Matt Skills，是因为 Agent Harness 本身在进步——有了更长的上下文、更强的 /goal 执行。</p>
+          <ul>
+            <li>长程执行能力成熟</li>
+            <li>Harness 内置了更多流程</li>
+            <li>Skill 框架可以专注于更垂直的场景</li>
+          </ul>
+        </article>
+      </div>
+      <div style="height:12px"></div>
+      <div class="quote-block">
+        <b>关键洞察：</b>Harness 的进化不是"消灭 Skill 框架"，而是"让更先进的 Skill 框架成为可能"。每代 Skill 框架都比上一代更贴合当前 Agent 的能力边界。
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">CHAPTER · Agent 没法内置什么</div>
+          <h2>Harness 能内置 vs 不能内置的边界</h2>
+          <p>Harness 进化让 Skill 框架专注更垂直的领域，但不能完全取代。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <article class="mini">
+          <div class="lead red">Harness 能内置</div>
+          <h4>通用流程</h4>
+          <p class="quote-line">"先对齐需求再实现"——这类流程可以内置</p>
+        </article>
+        <article class="mini">
+          <div class="lead blue">Harness 没法内置</div>
+          <h4>场景相关路径</h4>
+          <p class="quote-line">如何对齐需求？BFS / 模糊对齐 / 其他？</p>
+        </article>
+        <article class="mini">
+          <div class="lead dark">Skill 框架的领域</div>
+          <h4>场景化策略</h4>
+          <p class="quote-line">grill-me（BFS式追问）vs brainstorming（模糊对齐方向）</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER · Skill 框架的本质</div>
+          <h2>Skill 框架 = Agent 能力的"场景相关层"</h2>
+          <p>它填补的是 Harness 和真实场景之间的空白。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <div class="risk" data-accent="red">
+          <div class="n">Layer 1</div>
+          <h4>Agent Core（Harness）</h4>
+          <p>通用能力：理解、执行、长程记忆、/goal 执行。这是 Agent 自己的，不能被 Skill 框架替代。</p>
+        </div>
+        <div class="risk" data-accent="blue">
+          <div class="n">Layer 2</div>
+          <h4>Skill 框架</h4>
+          <p>场景化策略：grill-me（BFS 追问）、brainstorming（模糊对齐）、tdd（TDD 流程）、diagnose（诊断流程）。这些是 Harness 没法内置的。</p>
+        </div>
+        <div class="risk" data-accent="dark">
+          <div class="n">Layer 3</div>
+          <h4>场景微调 / 模板</h4>
+          <p>针对具体项目/领域的 prompt 模板、工作流约定。这是 Skill 框架之上的最后一层。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">CHAPTER · 新老更替的方向</div>
+          <h2>Skill 框架的演进规律</h2>
+          <p>每一代 Skill 框架都更贴合当前 Agent 能力边界。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">旧框架</span></div>
+          <h3>SuperPowers 时代</h3>
+          <p>要填补的大空白：长程记忆、上下文管理、工具编排基础。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">当前主流</span></div>
+          <h3>Matt Skills 时代</h3>
+          <p>Agent 已有 /goal 长程执行。Skill 框架专注于更垂直的场景（grill-me / tdd / diagnose）。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">下一代</span></div>
+          <h3>未来 Skill 框架</h3>
+          <p>当 Agent 有了更强的多模态、更长的上下文，Skill 框架会进一步专业化。场景化程度会更高。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">06</div>
+        <div class="section-meta">
+          <div class="label k">CHAPTER · 典型 Skill 框架案例</div>
+          <h2>grill-me vs brainstorming：两种对齐路径</h2>
+          <p>Harness 内置"要对齐需求"，但具体怎么对齐由 Skill 框架决定。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">BFS 追问</span></div>
+          <h3>grill-me</h3>
+          <p>Broad（广度优先）：把问题拆成最小子问题，逐个追问确认，不遗漏任何假设。适合：需求模糊、利益相关方多、必须对齐所有边界条件。</p>
+          <ul>
+            <li>"你说的 X，具体指什么？"</li>
+            <li>"如果出现 Y 情况，系统怎么处理？"</li>
+            <li>"这个约束是必须的还是可以松的？"</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">模糊对齐</span></div>
+          <h3>brainstorming</h3>
+          <p>只对齐模糊方向：快速产出、允许偏差、迭代收敛。适合：创意类任务、方向探索、团队对齐初期。</p>
+          <ul>
+            <li>"我们先出一个版本，看看方向对不对"</li>
+            <li>"这个方向可以，先往下走"</li>
+            <li>"这个方向偏差较大，需要调整"</li>
+          </ul>
+        </article>
+      </div>
+      <div style="height:12px"></div>
+      <div class="quote-block">
+        <b>Harness 能内置"要对齐"，但内置不了"用什么策略对齐"——这是 Skill 框架永恒的价值。</b>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">
+      来源：X 平台 @卡颂 · 2026-07-27 · 47 赞 · 25 回复 · 223K 浏览（参照同期推文）<br/>
+      主文：<a href="https://x.com/i/status/2081742736265527447">x.com/i/status/2081742736265527447</a><br/>
+      创作声明：本文档为 X 平台公开内容的中文整理，观点归属 @卡颂，数据时间戳 2026-07-27。
+    </p>
+  </main>
+</body>
+</html>
