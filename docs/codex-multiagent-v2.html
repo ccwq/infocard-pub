@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Multi-agent V2 多智能体调度系统：架构、配置与最佳实践</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+      --grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 10px 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{
+      min-width:0;
+      display:grid;
+      gap:10px;
+      align-content:start;
+      padding:12px 0 0;
+    }
+    .kicker-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:fit-content;
+      padding:5px 10px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);
+      backdrop-filter:blur(10px);
+      color:#fff;
+      font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      border-radius:999px;
+    }
+    .source{
+      max-width:280px;
+      text-align:right;
+      font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#b8c8f5;
+      overflow-wrap:anywhere;
+    }
+    .title{
+      margin:0;
+      font-size:clamp(32px,4.8vw,64px);
+      line-height:1.24;
+      letter-spacing:-.025em;
+      font-weight:950;
+    }
+    .subtitle{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(15px,2vw,20px);
+      line-height:1.55;
+      color:#e8eefc;
+    }
+    .subcn{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(13px,1.6vw,16px);
+      line-height:1.65;
+      color:#c5d2f7;
+    }
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.05);
+      border-radius:999px;
+      color:#fff;
+      font-size:12px;
+      font-weight:850;
+      letter-spacing:.01em;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{
+      display:grid;
+      gap:8px;
+      border:1.5px solid rgba(255,255,255,.16);
+      background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+      padding:14px 16px 12px;
+      border-radius:18px;
+      box-shadow:var(--shadow);
+    }
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{
+      min-width:0;
+      background:rgba(10,12,22,.5);
+      border:1.5px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:14px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+    .visual-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .orb{
+      width:66px;
+      height:66px;
+      border-radius:22px;
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+        linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+      box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      display:grid;
+      place-items:center;
+      color:#fff;
+      font-size:26px;
+      font-weight:950;
+      letter-spacing:-.08em;
+    }
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .mini-card{
+      min-width:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1.5px solid rgba(255,255,255,.09);
+      border-radius:16px;
+      padding:10px 10px 9px;
+      display:grid;
+      gap:8px;
+      box-shadow:0 12px 26px rgba(0,0,0,.2);
+    }
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{
+      width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+      background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.1);
+      color:#fff;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{
+      height:12px;
+      border-radius:999px;
+      background:
+        linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);
+      box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16);
+    }
+
+    .shell{
+      display:grid;
+      grid-template-columns:1fr 1.28fr .92fr;
+      gap:12px;
+      background:rgba(9,12,22,.42);
+      border:1.5px solid rgba(255,255,255,.1);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:12px;
+      margin-bottom:14px;
+    }
+    .panel{
+      min-width:0;
+      background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow:0 12px 26px rgba(0,0,0,.18);
+      display:flex;
+      flex-direction:column;
+    }
+    .panel-head{
+      padding:10px 12px 9px;
+      border-bottom:1.5px solid rgba(255,255,255,.08);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+    }
+    .panel-head h3{
+      margin:0;
+      font-size:12px;
+      line-height:1.2;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:#fff;
+    }
+    .panel-head .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.04);
+      color:#dfe8ff;
+      font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      white-space:nowrap;
+    }
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .search{
+      display:flex;align-items:center;gap:8px;
+      border:1.5px solid rgba(255,255,255,.1);
+      background:#0f1424;
+      padding:9px 10px;
+      border-radius:12px;
+      color:#9fb0de;
+      font-size:12px;
+    }
+    .project{
+      border:1.5px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,#1a2131,#171c2b);
+      padding:10px 11px;
+      border-radius:14px;
+      display:grid;
+      gap:4px;
+      min-width:0;
+    }
+    .project .name{font-size:13px;font-weight:900;color:#fff}
+    .project .path{font-size:11.5px;color:#9fb0de;overflow-wrap:anywhere}
+    .project .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .mini-dot{
+      width:10px;height:10px;border-radius:50%;margin-top:2px;
+      background:linear-gradient(135deg,var(--cyan),var(--purple));box-shadow:0 0 0 3px rgba(88,195,255,.12)
+    }
+    .task{
+      border:1.5px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,#1a2030,#151a28);
+      padding:10px 11px;
+      border-radius:14px;
+      display:grid;
+      gap:8px;
+    }
+    .task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .task-name{font-size:13px;font-weight:900;color:#fff}
+    .status{
+      font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+      padding:4px 8px;border-radius:999px;
+      background:rgba(45,179,106,.14);
+      color:#7fe1a2;
+      border:1px solid rgba(45,179,106,.32)
+    }
+    .task p{font-size:12px;line-height:1.55;color:#d9e2ff;margin:0}
+    .progress{height:10px;border-radius:999px;background:#101525;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .progress > span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--green))}
+    .task-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#b6c5f2}
+    .chip{
+      display:inline-flex;align-items:center;gap:5px;
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.04);
+      padding:4px 8px;border-radius:999px;
+    }
+    .status-list{display:grid;gap:8px}
+    .status-item{
+      display:flex;justify-content:space-between;gap:10px;align-items:center;
+      border:1px solid rgba(255,255,255,.08);
+      background:#0f1424;
+      padding:9px 10px;
+      border-radius:12px;
+      font-size:12px;
+      color:#d8e2ff;
+    }
+    .status-item .left{display:grid;gap:2px}
+    .status-item .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
+    .term{
+      background:#0b1020;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .term-top{
+      display:flex;justify-content:space-between;gap:8px;align-items:center;
+      padding:9px 12px;
+      background:#111831;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      color:#dfe8ff;
+      font-size:11px;
+    }
+    .term-body{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#a8f59f;
+      font-size:12px;
+      line-height:1.7;
+      min-height:180px;
+      white-space:pre-wrap;
+    }
+    .term .url{color:#7ad9ff}
+    .editor{
+      background:#0f1524;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .editor-top{
+      display:flex;justify-content:space-between;gap:8px;align-items:center;
+      padding:9px 12px;
+      background:#131a2d;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      color:#fff;
+    }
+    .editor-top .tab{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .code{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#dbe5ff;
+      font-size:11.8px;
+      line-height:1.7;
+      white-space:pre-wrap;
+    }
+    .code .kw{color:#7ad9ff}
+    .code .fn{color:#f4c84c}
+    .diff{
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+      background:#0d1220;
+    }
+    .diff-top{
+      padding:9px 12px;
+      background:#13192c;
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      border-bottom:1px solid rgba(255,255,255,.08);
+    }
+    .diff-body{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:11.5px;
+      line-height:1.6;
+      color:#dbe5ff;
+      white-space:pre-wrap;
+    }
+    .diff .add{color:#90f0a8}
+    .stats{
+      background:#13192c;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .stats-top{
+      padding:9px 12px;
+      background:#171f35;
+      color:#fff;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+    .stats-body{padding:12px;display:grid;gap:12px;color:#dce4ff}
+    .stat{display:grid;gap:6px}
+    .stat .label{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+    .bar{height:10px;border-radius:999px;background:#0d1220;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .bar > span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--purple))}
+    .donut{
+      width:126px;height:126px;border-radius:50%;
+      background:conic-gradient(#58c3ff 0 38%, #2db36a 38% 62%, #f4c84c 62% 80%, #8459ff 80% 92%, #54627f 92% 100%);
+      margin:4px auto 0;
+      position:relative;
+      box-shadow:inset 0 0 0 14px #13192c;
+    }
+    .donut::after{
+      content:"Activity";
+      position:absolute;
+      inset:50% auto auto 50%;
+      transform:translate(-50%,-50%);
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .feature-row{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:repeat(6,minmax(0,1fr));
+      gap:10px;
+    }
+    .feature{
+      background:#171c2b;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      padding:11px 9px;
+      color:#e8edf8;
+      text-align:center;
+      display:grid;
+      gap:7px;
+      min-width:0;
+    }
+    .icon{
+      width:28px;height:28px;margin:0 auto;border-radius:50%;
+      background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.09);
+      display:grid;place-items:center;
+      font-size:14px;
+      color:#fff;
+    }
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+    .download{margin:16px auto 0;display:flex;justify-content:center}
+    .download-btn{
+      display:inline-flex;align-items:center;gap:12px;
+      background:linear-gradient(135deg,var(--purple),#6a4cff 54%, var(--blue));
+      color:#fff;border:0;border-radius:18px;
+      padding:16px 24px;
+      box-shadow:0 16px 36px rgba(132,89,255,.34);
+      font-weight:950;
+      letter-spacing:.02em;
+      font-size:18px;
+    }
+    .download-btn small{display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em}
+    .footer{
+      margin-top:14px;
+      background:#0b1020;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      color:#dfe8ff;
+      font-size:12px;
+      flex-wrap:wrap;
+    }
+    .footer .stars{font-weight:900}
+
+    @media (max-width:1080px){
+      .hero,.shell{grid-template-columns:1fr}
+      .feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .grid-2,.grid-3,.matrix,.risk-grid,.flow{grid-template-columns:1fr !important}
+      p,.quote-line{overflow-wrap:anywhere;word-break:break-word}
+      .section-meta h2{font-size:18px;line-height:1.28;letter-spacing:-.01em}
+      .source{text-align:left;max-width:none;font-size:12px;color:#f0f5ff !important;line-height:1.35}
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(26px,7.6vw,40px);line-height:1.36;letter-spacing:-.01em}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .shell{padding:10px;gap:10px}
+      .feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .download-btn{width:100%;justify-content:center;text-align:center;font-size:16px;padding:14px 16px;border-radius:16px}
+      .footer{font-size:11.5px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+    }
+  
+    .section{margin:18px 0;padding:18px 20px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(20,28,52,.78), rgba(12,18,38,.82));box-shadow:0 14px 30px rgba(0,0,0,.34)}
+    .section-head{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .section-no{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#f4f9ff;background:linear-gradient(135deg,#3aa8ff,#4a78ff 60%,#8459ff);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 8px 18px rgba(74,120,255,.30)}
+    .section-no.b{background:linear-gradient(135deg,#8459ff,#4a78ff)}
+    .section-no.k{background:linear-gradient(135deg,#2db36a,#3aa8ff)}
+    .section-meta .label{font-size:12px;color:#9fb0e0;letter-spacing:.08em;margin-bottom:4px}
+    .section-meta h2{margin:0 0 6px;font-size:24px;color:#f4f9ff}
+    .section-meta p{margin:0;color:#b8c4e8;font-size:13px}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk-grid > *{min-width:0;max-width:100%}
+    .risk{box-sizing:border-box;max-width:100%;overflow:hidden}
+    .risk p{overflow-wrap:break-word;word-break:break-word;white-space:normal}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .matrix{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card,.mini,.risk{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));box-shadow:0 8px 18px rgba(0,0,0,.24)}
+    .risk[data-accent="red"]{border-color:rgba(244,84,84,.36);background:linear-gradient(180deg, rgba(244,84,84,.14), rgba(255,255,255,.02))}
+    .risk[data-accent="blue"]{border-color:rgba(88,195,255,.36);background:linear-gradient(180deg, rgba(74,120,255,.16), rgba(255,255,255,.02))}
+    .risk[data-accent="dark"]{border-color:rgba(132,89,255,.36);background:linear-gradient(180deg, rgba(132,89,255,.16), rgba(255,255,255,.02))}
+    .card h3,.risk h4,.mini h4{margin:6px 0 8px;font-size:16px;color:#f4f9ff}
+    .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+    .tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#cfd9f5;background:rgba(255,255,255,.05)}
+    .tag.red{border-color:rgba(244,84,84,.45);color:#ffd1d1;background:rgba(244,84,84,.12)}
+    .tag.blue{border-color:rgba(88,195,255,.45);color:#d8f4ff;background:rgba(88,195,255,.12)}
+    .tag.dark{border-color:rgba(132,89,255,.45);color:#ede3ff;background:rgba(132,89,255,.14)}
+    .risk .n{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font-weight:800;font-size:13px;color:#0c1020;background:#cfd9f5;margin-bottom:8px;line-height:1}
+    .risk.red .n{background:#ffd1d1}
+    .risk.blue .n{background:#d8f4ff}
+    .risk.dark .n{background:#ede3ff}
+    .card h3,.mini h4{margin:6px 0 8px;font-size:16px;color:#f4f9ff}
+    .risk h4{margin:0 0 4px;font-size:13px;line-height:1.4;color:#f4f9ff;letter-spacing:-.01em}
+    .card p,.mini p,.risk p{margin:0;color:#cfd9f5;font-size:12.5px;line-height:1.55;overflow-wrap:anywhere;word-break:break-word}
+    .lead{font-size:11px;letter-spacing:.08em;color:#9fb0e0;margin-bottom:4px}
+    .lead.red{color:#ffd1d1}.lead.blue{color:#d8f4ff}.lead.dark{color:#ede3ff}
+    .quote-line{margin:0;color:#cfd9f5;font-size:13px;line-height:1.5;overflow-wrap:anywhere;word-break:break-word}
+    .rule{height:1px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);margin:18px 0}
+    .source-note{margin:0;color:#9fb0e0;font-size:12px;line-height:1.7}
+    .flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .flow-item{padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+    .flow-item .t{font-weight:700;color:#f4f9ff;font-size:13px}
+    .flow-item .c{color:#f0f5ff;font-size:12px;font-weight:600;margin-top:2px}
+    .flow-item.red{border-color:rgba(244,84,84,.4);background:rgba(244,84,84,.10)}
+    .flow-item.blue{border-color:rgba(88,195,255,.4);background:rgba(88,195,255,.10)}
+    .flow-item.dark{border-color:rgba(132,89,255,.4);background:rgba(132,89,255,.10)}
+
+</style>
+</head>
+<body>
+  <main class="page">
+<div class="hero-bar"></div>
+<header class="hero"><div class="hero-copy"><div class="kicker-row"><div class="kicker">Codex · Multi-agent V2 · 2026-07</div><div class="source">Hermes · 工程化拆解 · 用户原档</div></div>
+<h1 class="title">Codex Multi-agent V2 多智能体调度系统：架构、配置与最佳实践</h1>
+<p class="subtitle">把主智能体 + Subagent 做成可工程化的任务图：主调度拆任务、动态派生 Subagent 派发执行、独立 Subagent 上下文汇总结果。</p>
+<p class="subcn">本文按用户原档结构组织：核心功能、工作模式（主智能体 + 子智能体配置）、辅助工具 CC Switch 转接、最佳实践与工程约束。</p>
+<div class="pill-row"><span class="pill red">Main + Subagent</span><span class="pill blue">CC Switch</span><span class="pill purple">Pi Agent</span><span class="pill yellow">Graph Engineering</span></div>
+</div><aside class="hero-visual"><div class="panel-top"><div class="eyebrow">CORE</div><h3>主智能体 + Subagent 任务图</h3><p>任务拆解 → Subagent 派生 → 并行执行 → 统一汇总。</p></div><div class="panel-body"><div class="flow"><div class="flow-item red"><div class="t">主</div><div class="c">调度器</div></div><div class="flow-item"><div class="t">Sub 1</div><div class="c">代码探索</div></div><div class="flow-item blue"><div class="t">Sub 2</div><div class="c">方案设计</div></div><div class="flow-item dark"><div class="t">Sub 3</div><div class="c">测试 / 审查</div></div></div></div></aside></header>
+<div class="overview"><div class="overview-sentence">Codex Multi-agent V2 的核心不是"多开几个 Agent"，而是把任务图跑成流水线。</div><div class="overview-body"><p>主智能体按任务复杂度动态决定是否派生 Subagent；每个 Subagent 拥有独立上下文、模型、推理层级和工具绑定；主智能体最后负责汇总与冲突裁决。配合 CC Switch 转接第三方 API，整个调度可运行在 Graph Engineering 任务图上，控制 Token 消耗。</p></div></div>
+
+<section class="section"><div class="section-head"><div class="section-no">01</div><div class="section-meta"><div class="label">CHAPTER · 核心功能</div><h2>多智能体调度系统</h2><p>不是多 Agent 同时跑，而是调度器把任务图拆给可独立执行的 Subagent。</p></div></div><div class="risk-grid"><div class="risk" data-accent="red"><div class="n">核</div><h4>核心目标</h4><p>把复杂任务拆成可独立执行、可汇总的子任务图，而不是堆线性 Prompt。</p></div><div class="risk" data-accent="blue"><div class="n">结</div><h4>结构</div><p>主智能体（调度器）+ 多个 Subagent（执行器）+ 结果汇总与冲突合并。</p></div><div class="risk" data-accent="dark"><div class="n">边</div><h4>适用边界</div><p>适合跨探索、设计、测试、审查的多阶段任务；不适合一次性的小修小补。</p></div></div></section>
+
+<section class="section"><div class="section-head"><div class="section-no b">02</div><div class="section-meta"><div class="label b">CHAPTER · 工作模式 · 主智能体职责</div><h2>三件事：拆 · 派 · 合</h2><p>主调度器的职责边界。</p></div></div><div class="grid-3"><article class="card"><div class="tagrow"><span class="tag red">拆</span></div><h3>任务拆解与分发</h3><p>把目标拆成代码探索、方案设计、开发测试、代码审查四类子任务。</p></article><article class="card"><div class="tagrow"><span class="tag blue">派</span></div><h3>动态派生 Subagent</h3><p>按任务复杂度决定是否新建 Subagent，或调度已存在的 Subagent 实例。</p></article><article class="card"><div class="tagrow"><span class="tag dark">合</span></div><h3>结果收集与汇总</h3><p>统一判断、合并冲突，输出最终解决方案。</p></article></div></section>
+
+<section class="section"><div class="section-head"><div class="section-no k">03</div><div class="section-meta"><div class="label k">CHAPTER · 工作模式 · Subagent 配置</div><h2>每个 Subagent 都是独立单元</h2><p>模型、推理、工具、嵌套都可以独立配。</p></div></div><div class="matrix"><article class="mini"><div class="lead red">多模型</div><h4>多模型混用</h4><p class="quote-line">GPT、Kimi、MiniMax 等不同模型独立配置。</p></article><article class="mini"><div class="lead blue">推理</div><h4>推理层级 + 并发</h4><p class="quote-line">自定义思考级别与并发数量控制。</p></article><article class="mini"><div class="lead dark">工具</div><h4>工具 / Skill 绑定</h4><p class="quote-line">独立绑定 Pi Agent 或特定 Skill 扩展功能。</p></article></div><div style="height:10px"></div><div class="grid-2"><article class="card"><div class="tagrow"><span class="tag red">嵌套</span></div><h3>嵌套与并行</h3><p>Subagent 可再派生孙级 agent；多轨道并行审查。</p></article><article class="card"><div class="tagrow"><span class="tag blue">上下文</span></div><h3>独立上下文</h3><p>每个 Subagent 独立上下文窗口，避免主线程污染。</p></article></div></section>
+
+<section class="section"><div class="section-head"><div class="section-no">04</div><div class="section-meta"><div class="label">CHAPTER · 辅助工具集成 · CC Switch</div><h2>第三方 API 转接</h2><p>CC Switch 把非标准 API 格式转成 Codex 兼容。</p></div></div><div class="grid-2"><article class="card"><div class="tagrow"><span class="tag red">作用</span></div><h3>格式转接</h3><p>转换第三方非标准 API 格式以兼容 Codex 接口。</p></article><article class="card"><div class="tagrow"><span class="tag blue">配置项</span></div><h3>必填字段</h3><p>提供商名称、模型映射、API 链接、Prompt Caching。</p></article><article class="card"><div class="tagrow"><span class="tag dark">场景</span></div><h3>为何需要</h3><p>Codex 本身只对官方响应格式友好；第三方 KIMI / DeepSeek 等需要中转。</p></article><article class="card"><div class="tagrow"><span class="tag red">收益</span></div><h3>节省成本</h3><p>把昂贵的主模型任务和便宜的 Subagent 任务分开。</p></article></div></section>
+
+<section class="section"><div class="section-head"><div class="section-no b">05</div><div class="section-meta"><div class="label b">CHAPTER · 最佳实践与约束</div><h2>Graph Engineering 任务图编排</h2><p>目标 + 约束条件。</p></div></div><div class="risk-grid"><div class="risk" data-accent="red"><div class="n">目标</div><h4>协作 + Token</h4><p>提高协作效率并降低 Token 消耗；任务图结构降低重复 Prompt。</p></div><div class="risk" data-accent="blue"><div class="n">主模型</div><h4>必须强模型</h4><p>主模型建议 GPT-5.6S 等强模型，保证精确调度与冲突裁决。</p></div><div class="risk" data-accent="dark"><div class="n">第三方</div><h4>格式与限流</h4><p>第三方 API 注意接口格式兼容性和 API 调用速率限制。</p></div></div></section>
+
+<section class="section"><div class="section-head"><div class="section-no k">06</div><div class="section-meta"><div class="label k">CHAPTER · 实际落地链路</div><h2>从配置到运行的 5 步</h2><p>工程化推进流程。</p></div></div><div class="grid-2"><article class="card"><div class="tagrow"><span class="tag red">Step 1</span></div><h3>配置主模型</h3><p>主调度器接入 GPT-5.6S 等强模型。</p></article><article class="card"><div class="tagrow"><span class="tag blue">Step 2</span></div><h3>配置 CC Switch</h3><p>提供商名称、模型映射、API 链接、Prompt Caching。</p></article><article class="card"><div class="tagrow"><span class="tag dark">Step 3</span></div><h3>Subagent 编排</h3><p>为每个阶段指定模型、推理层级、并发数。</p></article><article class="card"><div class="tagrow"><span class="tag red">Step 4</span></div><h3>任务拆解</h3><p>把需求拆为代码探索 / 设计 / 测试 / 审查。</p></article><article class="card"><div class="tagrow"><span class="tag blue">Step 5</span></div><h3>运行与汇总</h3><p>观察 Subagent 日志与 Token 用量；主智能体裁决输出。</p></article><article class="card"><div class="tagrow"><span class="tag dark">后续</span></div><h3>迭代与限流</h3><p>记录每个 Subagent 的实际 Token；按限流配置错峰。</p></article></div></section>
+
+<div class="rule"></div><p class="source-note">本文按用户原档整理 · 工作模式 / 子智能体配置 / CC Switch / 最佳实践与约束 / Graph Engineering · 2026-07-29 · 本卡为工程化拆解，不构成对特定厂商或模型的背书</p>
+</main></body></html>

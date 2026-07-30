@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alacritty · GPU加速终端模拟器</title>
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === 顶栏 === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .kicker{
+      display:inline-block;border:2px solid #fff;padding:4px 8px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;
+    }
+    h1.demo-title{
+      margin:10px 0 6px;
+      font-size:clamp(20px,3.2vw,38px);font-weight:800;
+      letter-spacing:-.03em;line-height:1.05;
+    }
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+
+    .topbar-meta{
+      padding:14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 0.8fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);
+      padding:7px 9px 5px;
+      background:#fff;
+      font-weight:900;
+      font-size:14px;
+      line-height:1.1;
+    }
+    .meta-pill-lg .sub{
+      display:block;
+      font-size:9px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:2px;
+    }
+    .meta-pill-md{
+      border:2px solid var(--line);
+      border-left:4px solid var(--red);
+      padding:4px 7px 3px;
+      background:#fff;
+      font-weight:800;
+      font-size:11.5px;
+      line-height:1.25;
+    }
+    .meta-pill-md .sub{
+      display:block;
+      font-size:8.5px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:1px;
+    }
+    .meta-pill-sm{
+      border:2px solid var(--line);
+      border-left:4px solid #666;
+      padding:3px 7px 3px;
+      background:#fff;
+      font-weight:700;
+      font-size:11px;
+      color:#555;
+      line-height:1.3;
+    }
+    .meta-pill-sm .sub{
+      display:block;
+      font-size:8px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#aaa;
+      margin-top:1px;
+    }
+
+    /* === overview === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* === stats === */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* === pills === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === section === */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{
+      background:var(--ink);color:#fff;padding:7px 12px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+    .sec-body{padding:12px 14px}
+
+    .sec-body h3{font-size:14px;font-weight:900;margin:0 0 10px;letter-spacing:-.01em}
+
+    /* === grid-2 === */
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+    .card{border:2px solid var(--line);padding:10px 12px;background:#fff;box-shadow:var(--shadow)}
+    .card .lead{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--red);margin-bottom:4px}
+    .card h4{font-size:12.5px;font-weight:900;margin-bottom:4px;letter-spacing:-.01em}
+    .card p{font-size:11.5px;color:#444;line-height:1.55;margin:0}
+
+    /* === install block === */
+    .install-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .install-card{border:2px solid var(--line);padding:10px 12px;background:#fff;box-shadow:var(--shadow)}
+    .install-card h4{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;padding-bottom:5px;border-bottom:1.5px solid var(--line)}
+    .install-card pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.65;color:var(--ink)}
+
+    /* === TOML config === */
+    .config-block{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:12px 14px;overflow-x:auto;font-size:11.5px}
+    .config-block .cfg-comment{color:#666;font-size:10.5px}
+    .config-block .cfg-key{color:var(--red)}
+    .config-block .cfg-val{color:#d4d0c8}
+    .config-block .cfg-section{color:#f0c060;font-weight:700}
+
+    /* === comparison table === */
+    table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px;box-shadow:var(--shadow)}
+    th{background:var(--ink);color:#fff;padding:7px 10px;border:1.5px solid var(--line);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;text-align:left}
+    td{padding:7px 10px;border:1.5px solid var(--line);vertical-align:top}
+    tr:nth-child(even){background:#faf8f4}
+    td:first-child{font-weight:800}
+
+    /* === footer-block === */
+    .footer-block{border:2px solid var(--line);background:#fff;padding:12px 14px;display:grid;gap:6px}
+    .footer-block h4{font-size:13px;font-weight:900;margin:0;letter-spacing:-.01em}
+    .footer-block p{font-size:11.5px;color:#444;line-height:1.6;margin:0}
+    .footer-block .source-tag{font-size:10.5px;color:#888;border-top:1.5px solid var(--line);padding-top:6px;margin-top:2px}
+
+    /* === buttons === */
+    .btn{display:inline-block;padding:6px 14px;border:2px solid var(--line);font-size:11.5px;font-weight:800;background:#fff;cursor:pointer}
+    .btn.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .btn.dark{background:var(--ink);color:#fff}
+
+    /* === rule === */
+    .rule{border-top:1.5px solid var(--line);margin:14px 0 10px}
+    .source-note{font-size:10.5px;color:#999;text-align:center}
+
+    /* === mobile === */
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .grid-2,.install-grid{grid-template-columns:1fr}
+      .overview{padding:10px 0}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">GPU · RUST · TERMINAL</div>
+      <h1 class="demo-title">Alacritty</h1>
+      <p class="sub-line">GPU加速的跨平台终端模拟器 — 用 Rust + OpenGL 重新定义「快」</p>
+      <div class="tagline">极速启动 · 超低内存 · 无冗余功能</div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">27.7K<span class="sub">GitHub Stars</span></div>
+        <div class="meta-pill-lg">Apache 2.0<br/>MIT</div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">Rust<span class="sub">语言</span></div>
+        <div class="meta-pill-md">TOML<span class="sub">配置格式</span></div>
+        <div class="meta-pill-sm">macOS<br/><span class="sub">Linux · BSD · Win</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 一句话概述 -->
+  <section class="overview">
+    <div class="overview-sentence">Alacritty：目前已知最快的终端模拟器</div>
+    <div class="overview-body">
+      <p>Alacritty 放弃所有非必要功能，用 GPU + OpenGL 将渲染性能推到极限。默认配置开箱即用，TOML 文件深度定制窗口、字体、快捷键。极简设计哲学：终端只做终端做的事。</p>
+    </div>
+  </section>
+
+  <!-- 关键指标 -->
+  <div class="stats">
+    <div class="stat"><strong>&lt;40ms</strong><span>冷启动时间</span></div>
+    <div class="stat"><strong>&lt;1MB</strong><span>空闲内存</span></div>
+    <div class="stat"><strong>0</strong><span>内置多标签/分屏</span></div>
+    <div class="stat"><strong>0</strong><span>内置主题/配置GUI</span></div>
+  </div>
+
+  <!-- 标签 -->
+  <div class="pills">
+    <span class="pill dark">GPU 渲染</span>
+    <span class="pill dark">OpenGL / Vulkan</span>
+    <span class="pill dark">Rust</span>
+    <span class="pill dark">TOML 配置</span>
+    <span class="pill dark">跨平台</span>
+    <span class="pill red">极速</span>
+    <span class="pill soft">零依赖设计</span>
+  </div>
+
+  <!-- 四大核心特性 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <span class="label">FEATURES</span>
+    </div>
+    <div class="sec-body">
+      <h3>GPU 加速渲染 · Rust 安全底座</h3>
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">GPU</div>
+          <h4>OpenGL 渲染管线</h4>
+          <p>告别 CPU 文字渲染，用 GPU 绘制每个字符。大幅降低 CPU 占用，滚动和重绘速度提升数倍。支持平滑滚动与 Delta Row Rendering 优化。</p>
+        </div>
+        <div class="card">
+          <div class="lead">RUST</div>
+          <h4>内存安全 + 高性能</h4>
+          <p>Rust 语言编写，无 GC 停顿，无运行时开销。编译为本地二进制，启动即达峰值性能，内存占用远低于 Electron 方案。</p>
+        </div>
+        <div class="card">
+          <div class="lead">ZERO</div>
+          <h4>无内置多标签/分屏</h4>
+          <p>刻意不做内置 tab 或 split。专注做好一件事：渲染终端。你可以用 tmux、zellij 等外部工具实现窗口管理，保持极简设计边界。</p>
+        </div>
+        <div class="card">
+          <div class="lead">SANE</div>
+          <h4>合理默认值</h4>
+          <p>开箱即用，无需配置。但所有选项（字体、颜色、快捷键、窗口参数）均可通过 alacritty.toml 完全定制，支持 live reload。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOML 配置 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">02</span>
+      <span class="label">CONFIGURATION</span>
+    </div>
+    <div class="sec-body">
+      <h3>alacritty.toml · TOML 配置文件示例</h3>
+      <div class="config-block">
+<span class="cfg-comment"># ~/.config/alacritty/alacritty.toml</span>
+<span class="cfg-section">[window]</span>
+<span class="cfg-key">opacity</span> = <span class="cfg-val">0.92</span>
+<span class="cfg-key">title</span> = <span class="cfg-val">"Alacritty"</span>
+<span class="cfg-key">dimensions</span> = <span class="cfg-val">{ cols = 120, lines = 32 }</span>
+
+<span class="cfg-section">[font]</span>
+<span class="cfg-key">size</span> = <span class="cfg-val">11.0</span>
+<span class="cfg-key">normal</span>.<span class="cfg-key">family</span> = <span class="cfg-val">"JetBrains Mono"</span>
+
+<span class="cfg-section">[colors]</span>
+<span class="cfg-key">primary</span>.<span class="cfg-key">background</span> = <span class="cfg-val">"#0d1117"</span>
+<span class="cfg-key">primary</span>.<span class="cfg-key">foreground</span> = <span class="cfg-val">"#c9d1d9"</span>
+
+<span class="cfg-section">[scrolling]</span>
+<span class="cfg-key">history</span> = <span class="cfg-val">10000</span>
+
+<span class="cfg-section">[keyboard]</span>
+<span class="cfg-key">bindings</span> = [
+  { key = "Copy",       mods = "Ctrl|Shift",  action = "Copy" },
+  { key = "Paste",      mods = "Ctrl|Shift",  action = "Paste" },
+  { key = "NewTab",     mods = "Cmd",         action = "SpawnNewInstance" },
+]
+      </div>
+    </div>
+  </div>
+
+  <!-- 安装方式 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">03</span>
+      <span class="label">INSTALLATION</span>
+    </div>
+    <div class="sec-body">
+      <h3>多平台安装</h3>
+      <div class="install-grid">
+        <div class="install-card">
+          <h4>macOS</h4>
+          <pre>brew install --cask alacritty
+
+# 或从源码编译
+cargo build --release
+./target/release/alacritty</pre>
+        </div>
+        <div class="install-card">
+          <h4>Linux</h4>
+          <pre># Arch
+sudo pacman -S alacritty
+
+# Debian / Ubuntu
+sudo apt install alacritty
+
+# Fedora
+sudo dnf install alacritty</pre>
+        </div>
+        <div class="install-card">
+          <h4>cargo</h4>
+          <pre>cargo install alacritty
+
+# 需要 Rust 工具链
+curl --proto '=https' \
+  --tlsv1.2 -sSf \
+  https://sh.rustup.rs | sh</pre>
+        </div>
+        <div class="install-card">
+          <h4>Windows</h4>
+          <pre># winget
+winget install Alacritty.Alacritty
+
+# 或从 GitHub Releases 下载 .exe</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 对比表 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="label">COMPARE</span>
+    </div>
+    <div class="sec-body">
+      <h3>与主流终端模拟器对比</h3>
+      <table>
+        <tr>
+          <th>维度</th>
+          <th>Alacritty</th>
+          <th>Kitty</th>
+          <th>Ghostty</th>
+          <th>macOS Terminal</th>
+        </tr>
+        <tr>
+          <td>渲染引擎</td>
+          <td style="color:var(--red);font-weight:800">GPU / OpenGL</td>
+          <td>GPU / OpenGL</td>
+          <td>GPU / Vulkan</td>
+          <td>CPU / CoreText</td>
+        </tr>
+        <tr>
+          <td>内存占用</td>
+          <td style="color:var(--red);font-weight:800">&lt;1MB 空闲</td>
+          <td>~10MB 空闲</td>
+          <td>~8MB 空闲</td>
+          <td>~30MB 空闲</td>
+        </tr>
+        <tr>
+          <td>内置多标签</td>
+          <td>无</td>
+          <td>无</td>
+          <td>有</td>
+          <td>有</td>
+        </tr>
+        <tr>
+          <td>配置格式</td>
+          <td style="color:var(--red);font-weight:800">TOML</td>
+          <td>kitty.conf</td>
+          <td>CLI / GUI</td>
+          <td>GUI 偏好设置</td>
+        </tr>
+        <tr>
+          <td>主题系统</td>
+          <td>外部工具</td>
+          <td>内置</td>
+          <td>内置</td>
+          <td>基础</td>
+        </tr>
+        <tr>
+          <td>平台覆盖</td>
+          <td>macOS · Linux · BSD · Win</td>
+          <td>macOS · Linux · Win</td>
+          <td>macOS · Linux</td>
+          <td>macOS only</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 收口 -->
+  <div class="footer-block">
+    <h4>适合谁用 Alacritty？</h4>
+    <p>追求极致终端性能、已在外部管理多标签（tmux/zellij）、想要完全掌控配置的开发者和运维工程师。如果你需要开箱即用的多标签和主题，选 Kitty 或 Ghostty。</p>
+    <p style="font-size:11px;color:#666;margin-top:4px">配置文档：<a href="https://github.com/alacritty/alacritty" style="color:var(--red);font-weight:800">github.com/alacritty/alacritty</a> · Live Reload 支持 · 主题共享：alacritty-theme</p>
+    <div class="source-tag">Alacritty · GPU-accelerated terminal emulator · Apache 2.0 + MIT dual license</div>
+  </div>
+
+  <!-- 按钮 -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+    <a class="btn red" href="https://github.com/alacritty/alacritty" target="_blank">GitHub</a>
+    <a class="btn" href="https://alacritty.org" target="_blank">官网</a>
+    <a class="btn" href="https://github.com/alacritty/alacritty/blob/master/INSTALL.md" target="_blank">安装指南</a>
+  </div>
+
+  <div class="rule"></div>
+  <p class="source-note">Alacritty · GPU加速终端模拟器 · 红黑瑞士编辑风</p>
+</main>
+</body>
+</html>
