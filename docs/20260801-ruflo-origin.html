@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ruflo：跨框架 Agent 编排总线</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%)}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;display:grid;gap:3px;align-content:start}
+    .source span{display:block;color:var(--muted);font-size:10px}
+    h1{margin:0;font-size:clamp(22px,3.6vw,38px);line-height:1.05;letter-spacing:-.04em;font-weight:950}
+    .subtitle{color:var(--muted);font-size:13px;line-height:1.55}
+    .tag-row{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid var(--line);background:rgba(255,255,255,.05);font-size:11px;font-weight:700;color:var(--cyan)}
+    .tag.green{color:var(--green)}.tag.purple{color:var(--purple)}.tag.yellow{color:var(--yellow)}
+    .hero-panel{border:1px solid var(--line);background:var(--panel);overflow:hidden;display:grid;grid-template-rows:auto 1fr}
+    .panel-hd{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--panel-2)}
+    .panel-hd span{font:800 10px/1 ui-monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .panel-body{padding:12px;display:grid;gap:8px}
+    .swarm-node{border:1px solid var(--line);padding:9px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;background:var(--panel-2)}
+    .node-icon{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;font-size:13px}
+    .node-name{font-size:12.5px;font-weight:800}.node-role{font-size:10.5px;color:var(--muted)}
+    .node-status{font-size:9.5px;font-weight:900;padding:2px 7px;border-radius:999px}
+    .s-active{background:rgba(45,179,106,.2);color:var(--green);border:1px solid var(--green)}
+    .s-idle{background:rgba(168,183,223,.15);color:var(--muted);border:1px solid var(--muted)}
+    .s-planning{background:rgba(244,200,76,.2);color:var(--yellow);border:1px solid var(--yellow)}
+    .section{margin-top:22px}
+    .section-head{display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .sec-no{width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:var(--blue);color:#fff;font-size:20px;font-weight:950;border:1.5px solid var(--blue);flex-shrink:0;box-shadow:var(--shadow)}
+    .sec-title{margin:6px 0 0;font-size:17px;font-weight:950;letter-spacing:-.02em}
+    .sec-sub{color:var(--muted);font-size:12px;margin-top:3px}
+    .overview{border:1px solid var(--line);background:var(--panel);padding:16px;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:900;color:var(--cyan);margin-bottom:10px;line-height:1.38}
+    .overview-body{font-size:12.8px;line-height:1.7;color:var(--muted)}
+    .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px}
+    .feat-card{border:1px solid var(--line);background:var(--panel);padding:14px;display:grid;gap:6px}
+    .feat-card .fc-icon{font-size:18px;margin-bottom:2px}
+    .feat-card h4{margin:0;font-size:13px;font-weight:900;color:var(--ink)}
+    .feat-card p{margin:0;font-size:11.8px;line-height:1.58;color:var(--muted)}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px}
+    th{background:var(--panel-2);color:var(--cyan);padding:9px 12px;border:1px solid var(--line);text-align:left;font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+    td{padding:9px 12px;border:1px solid var(--line);color:var(--ink);vertical-align:top;line-height:1.55}
+    tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+    .code-block{border:1px solid var(--line);background:var(--panel-2);padding:14px;margin-bottom:14px;overflow-x:auto}
+    .code-block pre{margin:0;font-size:11.8px;line-height:1.7;color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .code-block .c{color:#6b9fff}.code-block .k{color:var(--purple);font-weight:900}.code-block .s{color:var(--green)}.code-block .r{color:var(--muted)}
+    .footer-bar{border-top:1px solid var(--line);margin-top:22px;padding-top:14px;display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--muted);justify-content:space-between;align-items:center}
+    .footer-bar a{color:var(--cyan)}
+    @media(max-width:720px){.hero{grid-template-columns:1fr}.hero-panel{display:none}.grid-2{grid-template-columns:1fr}.section-head{grid-template-columns:40px 1fr}.sec-no{width:40px;height:40px;font-size:16px}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker"><span style="width:8px;height:8px;border-radius:50%;background:var(--cyan);display:inline-block"></span>Multi-Agent Framework</span>
+        <span class="kicker" style="background:rgba(45,179,106,.15);border-color:var(--green);color:var(--green)">⭐ 66,714 Stars</span>
+      </div>
+      <h1>ruflo：跨框架 Agent 编排总线</h1>
+      <p class="subtitle">把 Claude Code / Codex / Hermes 组成 swarm 的元框架，具备自适应记忆和自学习，定位是 Agent 操作系统而非具体应用。</p>
+      <div class="tag-row">
+        <span class="tag green">自适应记忆</span>
+        <span class="tag purple">自学习智能</span>
+        <span class="tag yellow">RAG 集成</span>
+        <span class="tag">Claude Code</span>
+        <span class="tag">Codex</span>
+        <span class="tag">Hermes</span>
+      </div>
+    </div>
+    <div class="hero-panel">
+      <div class="panel-hd"><span>Swarm Monitor</span><span style="color:var(--green)">● 3 Active</span></div>
+      <div class="panel-body">
+        <div class="swarm-node">
+          <div class="node-icon" style="background:rgba(88,195,255,.2);color:var(--cyan)">⚡</div>
+          <div><div class="node-name">Orchestrator</div><div class="node-role">主调度节点</div></div>
+          <span class="node-status s-active">ACTIVE</span>
+        </div>
+        <div class="swarm-node">
+          <div class="node-icon" style="background:rgba(132,89,255,.2);color:var(--purple)">🧠</div>
+          <div><div class="node-name">Memory Agent</div><div class="node-role">记忆 & RAG</div></div>
+          <span class="node-status s-active">ACTIVE</span>
+        </div>
+        <div class="swarm-node">
+          <div class="node-icon" style="background:rgba(244,200,76,.2);color:var(--yellow)">🔍</div>
+          <div><div class="node-name">Tool Router</div><div class="node-role">工具分发</div></div>
+          <span class="node-status s-planning">PLANNING</span>
+        </div>
+        <div class="swarm-node">
+          <div class="node-icon" style="background:rgba(168,183,223,.15);color:var(--muted)">📦</div>
+          <div><div class="node-name">Claude Code Node</div><div class="node-role">代码执行</div></div>
+          <span class="node-status s-idle">IDLE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: Overview -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no">1</div>
+      <div><div class="sec-title">核心定位</div><div class="sec-sub">What ruflo actually is</div></div>
+    </div>
+    <div class="overview">
+      <div class="overview-sentence">ruflo 是"元框架"层面的 Agent 编排引擎——它不替代 Claude Code 或 Codex，而是让它们成为同一个 swarm 中的节点。</div>
+      <div class="overview-body">
+        传统 Agent 工具是独立运行的：一个 Claude Code 实例、一个 Codex 会话，各自为战。ruflo 的思路是：把这些工具当作"可调度的能力节点"，通过统一的编排层让它们共享记忆、协作任务、自动路由。<br><br>
+        它的核心创新是"Adaptive Memory"（自适应记忆）——每个 Agent 的经验会积累到共享记忆池，后续任务自动复用，不需要每次重新上下文。"Self-learning Intelligence"（自学习智能）则让 swarm 越用越聪明。
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: Features -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no" style="background:var(--purple)">2</div>
+      <div><div class="sec-title">关键特性</div><div class="sec-sub">What makes ruflo different</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="feat-card">
+        <div class="fc-icon">🔀</div>
+        <h4>跨框架编排</h4>
+        <p>同时调度 Claude Code、Codex、Claude CLI、Hermes Agent，不被单一工具绑定。</p>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon">🧠</div>
+        <h4>自适应记忆</h4>
+        <p>Agent 经验自动积累到共享记忆池，后续任务复用上下文，无需重复说明。</p>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon">📈</div>
+        <h4>自学习智能</h4>
+        <p>swarm 随使用时间增长而优化决策路径，越用越聪明（Self-learning Intelligence）。</p>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon">🔍</div>
+        <h4>RAG 原生集成</h4>
+        <p>内置检索增强生成，无需额外配置即可对接知识库和文档。</p>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon">⚙️</div>
+        <h4>对话式编排</h4>
+        <p>通过自然语言指令协调多个 Agent，适合复杂工作流的快速原型。</p>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon">🌊</div>
+        <h4>Multi-player Swarms</h4>
+        <p>支持多个 Agent 并行/串行协作，节点可增删，swarm 动态伸缩。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: Comparison -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no" style="background:var(--green)">3</div>
+      <div><div class="sec-title">竞品对比</div><div class="sec-sub">ruflo vs alternatives</div></div>
+    </div>
+    <table>
+      <tr>
+        <th>维度</th>
+        <th>ruflo</th>
+        <th>LoopFlow</th>
+        <th>oh-my-claudecode</th>
+        <th>agents marketplace</th>
+      </tr>
+      <tr>
+        <td><strong>定位</strong></td>
+        <td style="color:var(--cyan)">跨框架编排总线</td>
+        <td>单 Agent 循环验证</td>
+        <td>Claude Code 团队扩展</td>
+        <td>插件分发市场</td>
+      </tr>
+      <tr>
+        <td><strong>平台支持</strong></td>
+        <td style="color:var(--cyan)">Claude Code + Codex + Hermes</td>
+        <td>Claude Code</td>
+        <td>Claude Code</td>
+        <td>6 大工具通用</td>
+      </tr>
+      <tr>
+        <td><strong>记忆系统</strong></td>
+        <td style="color:var(--cyan)">✅ 自适应 + RAG</td>
+        <td>✅ Markdown 循环记忆</td>
+        <td>❌ 无</td>
+        <td>❌ 无</td>
+      </tr>
+      <tr>
+        <td><strong>自学习</strong></td>
+        <td style="color:var(--cyan)">✅ 是</td>
+        <td>❌ 否</td>
+        <td>❌ 否</td>
+        <td>❌ 否</td>
+      </tr>
+      <tr>
+        <td><strong>多 Agent 协作</strong></td>
+        <td style="color:var(--cyan)">✅ swarm 编排</td>
+        <td>❌ 单 Agent 循环</td>
+        <td>✅ 多 Agent 团队</td>
+        <td>❌ 无</td>
+      </tr>
+      <tr>
+        <td><strong>接入门槛</strong></td>
+        <td>中（需理解 swarm 概念）</td>
+        <td style="color:var(--green)">低（YAML 配置）</td>
+        <td>中（TypeScript）</td>
+        <td style="color:var(--green)">低（直接安装）</td>
+      </tr>
+      <tr>
+        <td><strong>适合场景</strong></td>
+        <td>多工具混合编排</td>
+        <td>代码循环验证</td>
+        <td>Claude Code 团队协作</td>
+        <td>插件发现/管理</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- SECTION 4: Install -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no" style="background:var(--yellow);color:#111">4</div>
+      <div><div class="sec-title">快速上手</div><div class="sec-sub">Get started in minutes</div></div>
+    </div>
+    <div class="code-block">
+<pre><span class="c"># 安装 ruflo</span>
+<span class="k">npm</span> install -g <span class="s">@ruflo/cli</span>
+
+<span class="c"># 初始化项目</span>
+ruflo init my-swarm
+<span class="k">cd</span> my-swarm
+
+<span class="c"># 定义 swarm 配置（swarm.yaml）</span>
+nodes:
+  - name: <span class="s">claude-node</span>
+    type: <span class="s">claude-code</span>
+    memory: adaptive
+  - name: <span class="s">codex-node</span>
+    type: <span class="s">codex</span>
+    memory: shared
+tools:
+  - name: <span class="s">file-ops</span>
+    adapter: <span class="s">universal</span>
+
+<span class="c"># 启动 swarm</span>
+ruflo start
+
+<span class="c"># 或作为服务运行（REST API）</span>
+ruflo serve --port <span class="s">8080</span></pre>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-bar">
+    <span>📦 ruflo · Agent Meta-Harness</span>
+    <span>⭐ 66,714 · MIT License · <a href="https://github.com/ruvnet/ruflo" target="_blank">GitHub ↗</a></span>
+  </div>
+</div>
+</body>
+</html>
