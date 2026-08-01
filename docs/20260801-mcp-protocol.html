@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP 协议拆解：为什么它可能重塑 Agent 生态</title>
+  <style>
+    :root{--bg:#f7f1e7;--paper:#fffdf8;--ink:#3d342c;--muted:#786d62;--line:#1b1713;--accent:#c46e4d;--accent-soft:#efd1bd;--blue:#244a9c;--blue-soft:#e9f0ff;--shadow:7px 7px 0 rgba(17,17,17,.10)}
+    *{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:linear-gradient(180deg,#f7f1e7 0%,#f4efe8 100%);color:var(--ink);font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:13px;line-height:1.7}
+    .page{width:min(1080px,calc(100% - 24px));margin:0 auto;padding:24px 0 80px}
+    .hero{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);padding:20px;margin-bottom:16px;border-radius:4px}
+    .kicker{font:700 11px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
+    h1{font-family:Georgia,serif;font-size:clamp(22px,4vw,44px);line-height:1.08;letter-spacing:-.02em;color:var(--ink);margin:0 0 12px}
+    .subtitle{font-size:14px;line-height:1.65;color:#3f3932;max-width:62ch}
+    .hero-meta{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+    .chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1.5px solid var(--line);background:#fff;font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .chip.accent{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+    .banner{background:linear-gradient(135deg,var(--accent) 0%,#9a5a3a);color:#fff;border:2px solid var(--line);box-shadow:var(--shadow);padding:16px 20px;margin-bottom:16px;border-radius:4px}
+    .banner .quote{font-family:Georgia,serif;font-size:20px;line-height:1.2;font-weight:700;margin-bottom:8px}
+    .banner .note{font-size:12.5px;line-height:1.6;color:#f6ede4}
+    .section{margin-bottom:16px}
+    .section-title{font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1.5px solid var(--line);padding-bottom:6px;margin-bottom:12px}
+    .content-grid{min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card{min-width:0;background:var(--paper);border:1.5px solid var(--line);padding:14px;border-radius:4px;box-shadow:4px 4px 0 rgba(17,17,17,.08)}
+    .card h3{font-family:Georgia,serif;font-size:15px;margin:0 0 8px;color:var(--ink)}
+    .card ul{margin:0;padding-left:16px}
+    .card li{margin-bottom:5px;font-size:12.5px;line-height:1.55}
+    .arch{background:var(--paper);border:1.5px solid var(--line);border-radius:4px;overflow:visible;margin-bottom:16px}
+    .arch-head{background:var(--ink);color:#fff;font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:9px 14px;letter-spacing:.04em}
+    .arch-body{min-width:0;display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+    .arch-item{min-width:0;overflow-wrap:anywhere;padding:14px;border-right:1px solid var(--line);min-width:0}
+    .arch-item:last-child{border-right:none}
+    .arch-item h4{font-size:12px;font-weight:700;margin:0 0 6px;color:var(--accent)}
+    .arch-item p{margin:0;font-size:12px;line-height:1.55;color:#555}
+    .vs-table{width:100%;border:1.5px solid var(--line);border-collapse:collapse;background:var(--paper);border-radius:4px;overflow:visible;margin-bottom:16px}
+    .vs-table th{background:var(--ink);color:#fff;font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:9px 12px;text-align:left}
+    .vs-table td{padding:9px 12px;font-size:12.5px;border-bottom:1px solid var(--line);vertical-align:top}
+    .vs-table tr:last-child td{border-bottom:none}
+    .vs-table td:first-child{font-weight:700;color:var(--accent)}
+    .adopters{background:var(--blue-soft);border:1.5px solid var(--blue);padding:12px 16px;border-radius:4px;margin-bottom:16px}
+    .adopters .label{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+    .adopters-grid{display:flex;flex-wrap:wrap;gap:8px}
+    .adopter-chip{background:#fff;border:1.5px solid var(--blue);padding:4px 10px;font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue);border-radius:3px}
+    .sources{background:var(--paper);border:1.5px solid var(--line);padding:14px 16px;border-radius:4px;font-size:12px;color:var(--muted)}
+    .sources a{color:var(--blue)}
+    @media(max-width:640px){.hero{grid-template-columns:1fr}.content-grid,.arch-body{grid-template-columns:1fr}h1{font-size:24px}}
+  .table-scroll{display:block;width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 12px}.table-scroll table{min-width:680px;width:100%}.table-scroll th,.table-scroll td{white-space:normal;vertical-align:top}
+.mobile-table-cards{display:none}
+@media(max-width:640px){
+  .table-scroll{overflow:visible!important;margin-bottom:16px}
+  .table-scroll>table{display:none!important}
+  .mobile-table-cards{display:grid;gap:8px}
+  .mobile-row{background:var(--paper);border:1.5px solid var(--line);border-radius:4px;padding:10px 12px;box-shadow:3px 3px 0 rgba(17,17,17,.07)}
+  .mobile-row-title{font:700 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);margin-bottom:6px;letter-spacing:.03em}
+  .mobile-row-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .mobile-cell{min-width:0;font-size:11.5px;line-height:1.45;overflow-wrap:anywhere}
+  .mobile-cell-label{font:700 9px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);margin-bottom:2px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero">
+    <div class="kicker">Agent 拆解 · 技术协议</div>
+    <h1>MCP 协议拆解：<br>为什么它可能重塑 Agent 生态</h1>
+    <p class="subtitle">Model Context Protocol（MCP）是由 Anthropic 主导的 Agent 工具调用开放标准。它试图做一件简单却极难的事：让任何 AI Agent 能用任何工具，像 USB 统一设备连接那样统一 AI 工具生态。</p>
+    <div class="hero-meta">
+      <span class="chip">🔌 开放协议</span>
+      <span class="chip">🛠 工具调用</span>
+      <span class="chip accent">📣 Anthropic 主导</span>
+    </div>
+  </div>
+
+  <div class="banner">
+    <div class="quote">"USB 让硬件设备互联互通；MCP 让 AI Agent 互联互通。"</div>
+    <div class="note">这是 Anthropic 对 MCP 的愿景。如果成功，MCP 将解决 Agent 生态最核心的碎片化问题：每个 Agent 平台各自定义自己的工具接口，互不兼容。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">▌协议架构：三组件模型</div>
+    <div class="arch">
+      <div class="arch-head">MCP 架构 · JSON-RPC 2.0 over stdio / HTTP+SSE</div>
+      <div class="arch-body">
+        <div class="arch-item">
+          <h4>🖥️ 主机 Host</h4>
+          <p>AI 应用本身，如 Claude Desktop、Cursor IDE、Zed。Host 负责发起请求、管理上下文、呈现结果。</p>
+        </div>
+        <div class="arch-item">
+          <h4>🔌 客户端 Client</h4>
+          <p>嵌入在 Host 内的 MCP 客户端，与每个连接的 Server 维持 1:1 连接。协议规定标准化的请求/响应格式。</p>
+        </div>
+        <div class="arch-item">
+          <h4>🧩 服务器 Server</h4>
+          <p>工具/数据提供方，独立运行进程。Server 向 Client 声明自己的能力（tools、resources、prompts），实现完全的解耦。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">▌核心能力：三个接口</div>
+    <div class="content-grid">
+      <div class="card">
+        <h3>🛠 Tools（工具）</h3>
+        <ul>
+          <li>Agent 可调用的外部操作</li>
+          <li>Server 定义工具名称、参数 schema</li>
+          <li>Host 执行并返回结果给 Agent</li>
+          <li>例：GitHub Server 提供 create_issue、list_repos</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>📄 Resources（资源）</h3>
+        <ul>
+          <li>Agent 可读取的数据和文件</li>
+          <li>类比"本地文件系统"的 URI 寻址</li>
+          <li>Server 控制哪些资源可暴露</li>
+          <li>例：GitHub Server 暴露 repo 内容、issue 列表</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>💬 Prompts（提示模板）</h3>
+        <ul>
+          <li>预定义的提示词模板</li>
+          <li>可携带动态参数复用</li>
+          <li>实现提示的集中管理与版本化</li>
+          <li>例："代码审查模板"、"周报生成模板"</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">▌对比：MCP vs 竞品方案</div>
+    <div class="table-scroll"><table class="vs-table">
+      <thead>
+        <tr><th>维度</th><th>OpenAI Tool Use</th><th>LangChain Adapters</th><th>MCP（本文）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>协议性质</td><td>专有（API绑定）</td><td>社区适配层</td><td>开放标准（W3C-style）</td></tr>
+        <tr><td>跨平台</td><td>仅 OpenAI 模型</td><td>需适配器转换</td><td>任何 MCP 客户端可用任何 Server</td></tr>
+        <tr><td>工具发现</td><td>手动注册</td><td>动态加载</td><td>Server 声明 → 自动发现</td></tr>
+        <tr><td>生态支持</td><td>OpenAI 官方</td><td>LangChain 生态</td><td>Cursor、Claude Desktop、Zed、Linear 等</td></tr>
+        <tr><td>注册中心</td><td>无</td><td>LangChain Hub</td><td>modelcontextprotocol.github.io/servers</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="adopters">
+    <div class="label">✓ 已有生态支持（不完全列表）</div>
+    <div class="adopters-grid">
+      <span class="adopter-chip">Cursor</span>
+      <span class="adopter-chip">Claude Desktop</span>
+      <span class="adopter-chip">Zed</span>
+      <span class="adopter-chip">Sourcegraph</span>
+      <span class="adopter-chip">Linear</span>
+      <span class="adopter-chip">Pabby</span>
+      <span class="adopter-chip">GitHub</span>
+      <span class="adopter-chip">Google</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">▌为什么重要：三个意义</div>
+    <div class="content-grid">
+      <div class="card">
+        <h3>🔓 打破生态锁定</h3>
+        <ul>
+          <li>当前：换 Agent 平台必须重新配置所有工具</li>
+          <li>MCP 后：同一套工具 Server 可被任何 MCP Agent 使用</li>
+          <li>用户可自由选择 Agent，工具不会被绑架</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🧱 工具市场可能性</h3>
+        <ul>
+          <li>Server 即"工具的 npm"</li>
+          <li>开发者发布 Server，全网复用</li>
+          <li>工具质量竞争取代平台绑定</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>📈 Anthropic 的战略</h3>
+        <ul>
+          <li>MCP = Anthropic 的"USB 标准"</li>
+          <li>通过协议定义权获取生态影响力</li>
+          <li>不靠模型独家性，而靠协议互操作性</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="sources">
+    <strong>来源</strong>：MCP 规范 <a href="https://github.com/modelcontextprotocol/specification">GitHub modelcontextprotocol/specification</a> · Anthropic 官方博客 · modelcontextprotocol.github.io/servers
+  </div>
+
+</div>
+
+<script>
+(function(){
+  document.querySelectorAll('.table-scroll > table').forEach(function(table){
+    var headers=[].slice.call(table.querySelectorAll('thead th')).map(function(x){return x.textContent.trim()});
+    var rows=[].slice.call(table.querySelectorAll('tbody tr'));
+    if(!headers.length || !rows.length) return;
+    var box=document.createElement('div'); box.className='mobile-table-cards';
+    rows.forEach(function(row){
+      var cells=[].slice.call(row.children); if(!cells.length) return;
+      var card=document.createElement('div'); card.className='mobile-row';
+      var title=document.createElement('div'); title.className='mobile-row-title'; title.textContent=cells[0].textContent.trim(); card.appendChild(title);
+      var grid=document.createElement('div'); grid.className='mobile-row-grid';
+      cells.slice(1).forEach(function(cell,i){
+        var item=document.createElement('div'); item.className='mobile-cell';
+        var label=document.createElement('div'); label.className='mobile-cell-label'; label.textContent=headers[i+1] || '';
+        item.appendChild(label); item.appendChild(document.createTextNode(cell.textContent.trim())); grid.appendChild(item);
+      });
+      card.appendChild(grid); box.appendChild(card);
+    });
+    table.parentElement.appendChild(box);
+  });
+})();
+</script>
+</body>
+</html>
