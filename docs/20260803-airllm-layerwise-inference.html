@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AirLLM：4GB显存跑2.8万亿参数模型</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ MATRIX + RISK ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">开源工具 · 本地推理</div>
+        <h1 class="demo-title">AirLLM：4GB显存跑 2.8万亿参数模型</h1>
+        <p class="subtitle">不量化、不蒸馏、不剪枝——通过分层推理（Layer-wise Inference）与按专家加载（Per-Expert Streaming），把显存需求与模型总参数量解耦。Kimi K3 在 3.72GB 显存中稳定运行。</p>
+        <div class="badge-row">
+          <span class="badge red">Kimi K3 · 3.72GB</span>
+          <span class="badge blue">分层推理</span>
+          <span class="badge">MoE 按专家加载</span>
+          <span class="badge dark">消费级 GPU</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge ink">作者 Gavin Li</span>
+          <span class="badge ink">github.com/lyogavin/airllm</span>
+          <span class="badge ink">MIT 开源</span>
+        </div>
+        <div class="alert">
+          <strong>核心逻辑：显存瓶颈不在模型大小，而在「一次加载多少」</strong>
+          <p>推理时显存只保留当前一层的权重，用完即释放，下一层从磁盘动态加载。MoE 模型进一步按专家流式加载——每次只把 token 真正路由到的专家调入显存。</p>
+          <div class="mini-row">
+            <span class="mini-tag">分层推理</span>
+            <span class="mini-tag">Per-Expert Streaming</span>
+            <span class="mini-tag">预取 v2.5</span>
+            <span class="mini-tag">块级量化可选</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">LAYER-WISE INFERENCE</div>
+          <h3>显存中始终只有一层</h3>
+          <p>传统推理把全模型塞进显存；AirLLM 让权重按层进出磁盘——第 N 层算完即释放，第 N+1 层再加载。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>一句话：</b>不把模型变小，而是改变模型的加载方式。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">按层拆分权重</div></div>
+            <div class="flow-item red"><div class="t">Step 2</div><div class="c">第 N 层用完即释放</div></div>
+            <div class="flow-item dark"><div class="t">Step 3</div><div class="c">动态加载第 N+1 层</div></div>
+            <div class="flow-item blue"><div class="t">v2.5</div><div class="c">异步预取下一层 ≈ +10%</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+    <div class="overview">
+      <div class="overview-sentence">显存需求由「单层参数大小」决定，而非「模型总参数量」——这是 AirLLM 与量化/蒸馏路线的本质区别。</div>
+      <div class="overview-body">
+        <p>传统大模型推理对显存的要求遵循简单逻辑：参数越多，显存越大。Llama 3.1 405B 全精度加载需超过 800GB 显存，即便 INT4 量化也需约 60–80GB，将绝大多数个人用户和研究机构拒之门外。AirLLM 作者 Gavin Li（高辉）从另一角度切入：显存瓶颈的本质不在于模型有多大，而在于一次把多少参数加载进显存。结合 MoE 稀疏架构「每个 token 只激活少数专家」的特性，AirLLM 实现了参数规模与显存需求的解耦——2.8 万亿参数的 Kimi K3，单卡 3.72GB 即可推理。</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">CORE MECHANISM</div>
+          <h2>两大核心机制：分层推理 + 按专家加载</h2>
+          <p>AirLLM 不依赖量化、蒸馏或模型剪枝，是原汁原味模型权重的推理结果。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">机制 1</span><span class="tag dark">Layer-wise</span></div>
+          <h3>分层权重拆分</h3>
+          <p>首次加载时，把 Hugging Face 格式的模型按层拆分为独立权重文件，写入缓存目录。拆分后的单层权重远小于完整模型。</p>
+          <ul><li>按层独立存储</li><li>单层权重 ≪ 完整模型</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">机制 2</span><span class="tag dark">Dynamic Load</span></div>
+          <h3>动态按需加载</h3>
+          <p>推理以前馈方式逐层处理 token。第 N 层完成计算后权重立即释放，第 N+1 层从磁盘加载，任意时刻显存只保留一层参数。</p>
+          <ul><li>算完即释放</li><li>磁盘 ⇄ 显存流转</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">机制 3</span><span class="tag blue">Per-Expert</span></div>
+          <h3>按专家加载（MoE）</h3>
+          <p>对 MoE 模型，每次只把 token 真正路由到的专家调入显存，而非整个层。稀疏激活使单次推理调用参数仅占总量的极小部分。</p>
+          <ul><li>只加载激活专家</li><li>稀疏 MoE 架构红利</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">VRAM MATRIX</div>
+          <h2>代表性模型显存占用对照</h2>
+          <p>全部为未量化权重推理。显存需求与参数量不再线性相关——MoE 模型尤甚。</p>
+        </div>
+      </div>
+      <div style="border:2px solid var(--line);background:#fff;overflow:hidden;margin-bottom:12px">
+        <div style="background:var(--ink);color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em">模型显存占用（无量化）</span>
+          <span style="font-size:11px;color:var(--blue)">GPU VRAM</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin:0">
+          <tr style="background:var(--soft-ink)">
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">模型</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">总参数量</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">显存需求</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">架构</th>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">Kimi K3</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">2.8万亿</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--red);font-weight:800">3.72GB</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">MoE</td>
+          </tr>
+          <tr style="background:var(--soft-blue)">
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">DeepSeek-V3</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">6710亿</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">~12GB</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">MoE</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">Llama 3.1 405B</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">4050亿</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">~8GB</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">Dense</td>
+          </tr>
+          <tr style="background:var(--soft-red)">
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">Qwen3-235B</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">2350亿</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">~3GB</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">MoE</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">Llama 3 70B</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">700亿</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">~4GB</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">Dense</td>
+          </tr>
+          <tr style="background:var(--soft-blue)">
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">Qwen3-30B</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">300亿</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">~1–3GB</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">MoE</td>
+          </tr>
+        </table>
+      </div>
+      <div class="quote-block"><b>反直觉结论：</b>参数规模不再直接等于显存需求。Kimi K3 参数量是 Llama 3 8B 的千倍以上，实测 VRAM 3.72GB 反而更低——因为 8B 是 Dense 全激活，K3 是稀疏 MoE。</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">IMPLEMENTATION</div>
+          <h2>技术实现：分层加载 + 预取并行</h2>
+          <p>磁盘 I/O 成为新瓶颈后，AirLLM 用预取把等待时间藏进计算时间。</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">拆分</span></div>
+          <h3>分层权重拆分</h3>
+          <p>Hugging Face 格式模型按层拆为独立权重文件写入缓存，单层权重远小于完整模型。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">加载</span></div>
+          <h3>动态按需加载</h3>
+          <p>第 N 层算完即释放，第 N+1 层从磁盘加载；任意时刻显存只保留一层参数。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">预取</span></div>
+          <h3>预取机制（v2.5）</h3>
+          <p>当前层计算时异步预加载下一层，I/O 与计算重叠，实测约 10% 速度提升。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">可选</span></div>
+          <h3>块级量化</h3>
+          <p>4bit/8bit 压缩存储阶段权重而非激活值，几乎不损失精度，进一步减少数据搬运。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="label b">KIMI K3 NOTES</div>
+          <h2>Kimi K3 专项：实践中的关键细节</h2>
+          <p>2.8 万亿参数开源模型的运行环境有若干特殊要求，官方文档专门标注。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">依赖</span><span class="tag dark">必装</span></div>
+          <h3>额外依赖</h3>
+          <p>必须安装：<code>pip install compressed-tensors flash-attn</code>。K3 模型代码强制要求 Flash Attention，无论是否显式请求。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">版本</span></div>
+          <h3>CUDA / Transformers 限制</h3>
+          <p>flash-attn 当前仅提供 CUDA 12 预编译 wheel，CUDA 13 用户需源码编译或切换环境。K3 remote code 在 transformers 5.x 下无法加载，需 4.56.x。</p>
+        </article>
+      </div>
+      <div style="border:2px solid var(--line);background:#fff;overflow:hidden;margin-top:12px">
+        <div style="background:var(--ink);color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em">实测数据</span>
+          <span style="font-size:11px;color:var(--blue)">RTX 6000 Ada</span>
+        </div>
+        <div style="padding:12px;font-size:14px;line-height:1.66;color:#222">
+          单张 NVIDIA RTX 6000 Ada（48GB 显存）端到端实测：Kimi K3 的 VRAM 占用稳定在 <b style="color:var(--red)">3.72GB</b>——比参数量仅为其千分之一的 Llama 3 8B 还要低。
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">CODE</div>
+          <h2>一行加载任意大模型</h2>
+          <p>核心接口统一为 <code>AutoModel.from_pretrained()</code>，适配主流架构。</p>
+        </div>
+      </div>
+      <div style="background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;margin-bottom:12px;overflow-x:auto">
+        <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px">// Python · AirLLM</div>
+        <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap"><span style="color:#888">from airllm import AutoModel</span>
+<span style="color:#1f63ff">model</span> = AutoModel.from_pretrained(<span style="color:#e8c200">"Qwen/Qwen3-32B"</span>)
+<span style="color:#888"># Kimi K3</span>
+<span style="color:#888"># model = AutoModel.from_pretrained("moonshotai/Kimi-K3")</span>
+<span style="color:#888"># DeepSeek-V3</span>
+<span style="color:#888"># model = AutoModel.from_pretrained("deepseek-ai/DeepSeek-V3")</span>
+input_text = [<span style="color:#e8c200">'What is the capital of United States?'</span>]
+input_tokens = model.tokenizer(input_text, return_tensors=<span style="color:#e8c200">"pt"</span>, return_attention_mask=False, truncation=True, max_length=128, padding=False)
+generation_output = model.generate(input_tokens[<span style="color:#e8c200">'input_ids'</span>].cuda(), max_new_tokens=20, use_cache=True, return_dict_in_generate=True)
+print(model.tokenizer.decode(generation_output.sequences[0]))</pre>
+      </div>
+      <div class="quote-block"><b>覆盖架构：</b>Llama、Qwen、DeepSeek、Mistral、Phi、Gemma、ChatGLM、Baichuan、InternLM 等主流架构均已覆盖。</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">06</div>
+        <div class="section-meta">
+          <div class="label b">SECURITY VIEW</div>
+          <h2>对安全行业的启示</h2>
+          <p>从蓝队视角审视，AirLLM 带来两个层面的思考。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="blue">
+          <div class="n">1</div>
+          <h4>本地化推理的安全价值</h4>
+          <p>大模型可在消费级硬件本地运行，金融、医疗、政府等数据敏感行业无需上传第三方 API 即可获得强大推理能力；私有化部署门槛大幅降低，数据泄露风险减少。</p>
+        </article>
+        <article class="risk" data-accent="red">
+          <div class="n">2</div>
+          <h4>威胁检测的新战场</h4>
+          <p>恶意软件作者可能利用本地大模型自动化生成钓鱼邮件、恶意代码或社会工程攻击。安全团队需为 AI 辅助攻击（AI-Assisted Attack）新范式准备检测规则与响应预案。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">3</div>
+          <h4>边界提示</h4>
+          <p>本地推理解决「显存」与「隐私」，但速度、吞吐与多用户并发仍受磁盘 I/O 约束；生产环境需按场景权衡本地 vs 云端。</p>
+        </article>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">来源：黑白之道《4GB显存运行2.8万亿参数K3模型：AirLLM实现大模型"平民化"推理》（Blake Chen / 华盟网原创） · 项目主页 github.com/lyogavin/airllm · 信息卡由 AG雷达整理，2026-08-03</p>
+  </main>
+</body>
+</html>
