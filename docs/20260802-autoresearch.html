@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutoResearch：让 Agent 自主循环改代码、自动验证、自动回滚</title>
+  <style>
+:root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111111;--muted:#5f5950;--line:#111111;--red:#d80018;--blue:#1f63ff;--soft-red:#fde9eb;--soft-blue:#e8f1ff;--soft-ink:#f7f6f2;--shadow:8px 8px 0 rgba(17,17,17,.12)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{color:var(--ink);line-height:1.58;background:linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),var(--bg);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";color:var(--red);font-size:10.5px}
+h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+.subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+.badge-row{display:flex;flex-wrap:wrap;gap:6px}
+.badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+.badge.red{background:var(--red);color:#fff}
+.badge.blue{background:var(--blue);color:#fff}
+.badge.dark{background:#111;color:#fff}
+.alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+.alert strong{display:block;font-size:13.5px;line-height:1.35}
+.alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+.hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+.hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+.panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+.panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+.flow{display:grid;gap:8px}
+.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+.flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+.flow-item.red .c{color:var(--red)}
+.flow-item.blue .c{color:var(--blue)}
+.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+.overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+.overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+.overview-body{font-size:12.5px;line-height:1.65;color:#333}
+.overview-body p{margin:0}
+.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+.section-no.b{background:var(--blue)}
+.section-no.k{background:#111}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+.section-meta .label.b{color:var(--blue)}
+.section-meta .label.k{color:#111}
+.section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+.section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+.grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+.card,.mini{padding:14px}
+.card{display:grid;gap:10px}
+.card h3,.mini h4{margin:0;letter-spacing:-.02em}
+.card h3{font-size:17px;line-height:1.16}
+.card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+.card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+.card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+.tag.red{background:var(--soft-red)}
+.tag.blue{background:var(--soft-blue)}
+.tag.dark{background:#111;color:#fff}
+.matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.matrix .mini{display:grid;gap:8px}
+.mini h4{font-size:15px;line-height:1.2}
+.mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.mini .red{color:var(--red)}
+.mini .blue{color:var(--blue)}
+.mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+.risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+.risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+.risk[data-accent="red"]{--accent:var(--red)}
+.risk[data-accent="blue"]{--accent:var(--blue)}
+.risk[data-accent="dark"]{--accent:#111}
+.risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+.risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+.risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+.quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+.quote-block b{color:#111}
+.rule{height:3px;background:#111;margin:8px 0 0}
+.source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+.cmd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.cmd-grid .mini{padding:10px;display:grid;gap:4px}
+.cmd-grid .mini .cmd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;font-weight:900;color:var(--red)}
+.cmd-grid .mini .what{font-size:13px;color:#333}
+@media(max-width:1080px){.hero{grid-template-columns:1fr}.hero-copy{border-right:0;border-bottom:3px solid var(--line)}.grid-4,.matrix,.risk-grid,.cmd-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.page{width:min(100% - 16px,1040px);padding:10px 0 60px}.hero{display:flex;flex-direction:column}.hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}.grid-4,.grid-3,.grid-2,.matrix,.risk-grid,.cmd-grid{grid-template-columns:1fr}.section-head{grid-template-columns:1fr;gap:10px}.section-no{width:72px;height:72px;font-size:28px}.card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">AGENT LOOP · KARPATHY-INSPIRED</div>
+        <h1 class="demo-title">AutoResearch：让 Agent 自主循环改代码、自动验证、自动回滚</h1>
+        <p class="subtitle">把 Karpathy autoresearch 思路搬到 Claude Code / OpenCode / Codex：给定目标 + 量化指标，Agent 循环改代码 → 跑验证 → 效果好留下，差了自动 git revert。</p>
+        <div class="badge-row">
+          <span class="badge">Open Source</span>
+          <span class="badge">MIT License</span>
+          <span class="badge dark">5623 ⭐</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge">⭐⭐⭐⭐⭐</span>
+          <span class="badge blue">v2.2.1</span>
+          <span class="badge red">14 命令 · 9 安全钩子</span>
+        </div>
+        <div class="alert">
+          <strong>推荐等级：⭐⭐⭐⭐⭐（5/5）</strong>
+          <p>适合有可量化指标的开发任务（测试覆盖 / 性能 / 错误清零 / 安全审计）；不适合纯主观审美或无验证函数的任务</p>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">THE LOOP</div>
+          <h3>Modify → Verify → Keep/Discard</h3>
+          <p>每次只改一处 → git commit → 跑测试 → 改善就留，差了 git revert。失败自动回滚，进步自动叠加。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>核心思想：</b>You don't need AGI. You need a goal, a metric, and a loop that never quits.</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">设置 Goal + Metric</div></div>
+            <div class="flow-item"><div class="t">Step 2</div><div class="c">git commit 当前状态</div></div>
+            <div class="flow-item red"><div class="t">Step 3</div><div class="c">跑验证 · 改善则留</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <div class="overview">
+      <div class="overview-sentence">Karpathy autoresearch 思路的 Agent 化通用版：CLI 启动 → Agent 接管 → 你睡觉它跑实验。</div>
+      <div class="overview-body">
+        <p>AutoResearch（uditgoenka/autoresearch）是把 Karpathy 原版 autoresearch（630 行 Python 脚本，一晚跑 100 轮 ML 调优实验）的核心原则——「一个指标 + 受限范围 + 快速验证 + 自动回滚 + git 作为记忆」——泛化到任何可量化任务的 Claude Code / OpenCode / Codex Skill。v2.1 架构大改后 token 消耗减少 95%（每次调用 5–8K tokens），14 个子命令 + 9 个安全钩子。</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">PROJECT IDENTITY</div>
+          <h2>项目身份</h2>
+          <p>GitHub · 许可证 · 版本 · 话题 · 关联</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <article class="mini">
+          <div class="lead">GitHub</div>
+          <h4><a href="https://github.com/uditgoenka/autoresearch" style="color:var(--blue)">uditgoenka/autoresearch</a></h4>
+          <p><b style="color:var(--red);font-size:16px">5623 ⭐</b> · 426 forks</p>
+        </article>
+        <article class="mini">
+          <div class="lead">许可证</div>
+          <h4>MIT License</h4>
+          <p>可商用，开源免费</p>
+        </article>
+        <article class="mini">
+          <div class="lead">版本</div>
+          <h4>v2.2.1</h4>
+          <p>2026-08-02 最新更新</p>
+        </article>
+        <article class="mini">
+          <div class="lead">基于</div>
+          <h4>Karpathy autoresearch</h4>
+          <p><a href="https://github.com/karpathy/autoresearch" style="color:var(--blue)">karpathy/autoresearch</a></p>
+        </article>
+      </div>
+      <div style="margin-top:12px">
+        <div style="font-size:11px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Topics</div>
+        <div class="mini-row">
+          <span class="mini-tag">ai</span>
+          <span class="mini-tag">autonomous-agent</span>
+          <span class="mini-tag">autoresearch</span>
+          <span class="mini-tag">claude</span>
+          <span class="mini-tag">claude-code</span>
+          <span class="mini-tag">iteration</span>
+          <span class="mini-tag">karpathy</span>
+          <span class="mini-tag">productivity</span>
+          <span class="mini-tag">skill</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">THE LOOP</div>
+          <h2>核心循环机制</h2>
+          <p>8 步迭代 + 8 条铁律</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">执行流程</span></div>
+          <h3>每次迭代 8 步</h3>
+          <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.72;color:#222">
+            <li>复盘当前状态 + git 历史 + 结果日志</li>
+            <li>基于成功 / 失败 / 未尝试的组合，挑下一次改动</li>
+            <li>做<b>一次</b>聚焦改动</li>
+            <li>git commit（验证前先存档）</li>
+            <li>跑机械验证（测试 / 基准 / 评分）</li>
+            <li><b>改善则留，变差则 git revert</b></li>
+            <li>记录结果到 TSV 日志</li>
+            <li>重复直到达到迭代次数或目标</li>
+          </ol>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">8 条铁律</span></div>
+          <h3>Setup 阶段的硬约束</h3>
+          <ul>
+            <li><b>默认有界</b>：每条命令有默认迭代上限，无限模式需 opt-in</li>
+            <li><b>先读后写</b>：改前必须理解完整上下文</li>
+            <li><b>一次一改</b>：原子改动，坏了就知道为什么</li>
+            <li><b>仅机械验证</b>：拒绝主观「看起来不错」</li>
+            <li><b>自动回滚</b>：失败立刻 revert</li>
+            <li><b>简洁优先</b>：同等效果 + 更少代码 = 保留</li>
+            <li><b>Git 是记忆</b>：用 <code>experiment:</code> 前缀 commit，agent 每次迭代前读 git log</li>
+            <li><b>卡住时多想</b>：重读、合并接近解、尝试激进改动</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">COMMANDS</div>
+          <h2>14 条子命令</h2>
+          <p>经典 loop · Orchestrator 自动编排 · 专项任务</p>
+        </div>
+      </div>
+      <div class="cmd-grid">
+        <article class="mini"><div class="cmd">/autoresearch</div><div class="what">经典循环：modify → verify → keep/discard（25 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch &lt;goal&gt;</div><div class="what">v2.2 Orchestrator：自由目标 → 自动选管线 → 跑到达成</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:plan</div><div class="what">把目标转成已校验的配置</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:debug</div><div class="what">假设驱动的 bug 狩猎（15 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:fix</div><div class="what">错误逐个清零（20 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:security</div><div class="what">STRIDE + OWASP 红队审计（15 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:ship</div><div class="what">8 阶段出货流水线</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:scenario</div><div class="what">12 维度生成边界用例（20 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:predict</div><div class="what">5 个专家 persona 辩论</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:learn</div><div class="what">侦察 → 生成文档 → 校验 → 修复（10 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:reason</div><div class="what">对抗辩论 + 盲判（8 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:probe</div><div class="what">8 个 persona 拷问需求（15 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:improve</div><div class="what">ICP 研究 + 发现改进 + 生成 PRDs（15 轮）</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:evals</div><div class="what">分析迭代结果：趋势 / 平台期</div></article>
+        <article class="mini"><div class="cmd">/autoresearch:regression</div><div class="what">稳定性门禁：baseline vs candidate</div></article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="label b">HOOKS · SAFETY</div>
+          <h2>9 条安全钩子</h2>
+          <p>v2.1.1 默认开启，保护每次会话</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">保护</span></div>
+          <h3>上下文 / 隐私 / 危险命令</h3>
+          <ul>
+            <li><b>scout-block</b>：拦截 node_modules / .git 灌入上下文</li>
+            <li><b>privacy-block</b>：拦截 .env / SSH key / 凭据被读</li>
+            <li><b>dangerous-cmd-block</b>：拦截 force-push / rm -rf / reset --hard</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">上下文注入</span></div>
+          <h3>跨压缩 / 子智能体</h3>
+          <ul>
+            <li><b>iteration-context</b>：压缩后注入最近 TSV 数据</li>
+            <li><b>subagent-context</b>：子智能体感知当前 loop 状态</li>
+            <li><b>dev-rules-reminder</b>：注入计划路径 + 代码规范</li>
+            <li><b>session-init</b>：会话开始时建立项目上下文</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">门禁 / 通知</span></div>
+          <h3>门禁 + 通知</h3>
+          <ul>
+            <li><b>simplify-gate</b>：400 行警告 / 800 行拦截出货</li>
+            <li><b>stop-notify</b>：会话结束终端通知 + 可选 Webhook</li>
+            <li>用 <code>.ckignore</code> 自定义拦截目录</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">COMPARISON</div>
+          <h2>横向对比</h2>
+          <p>AutoResearch vs Aider / SWE-Agent / Karpathy 原版</p>
+        </div>
+      </div>
+      <div style="border:2px solid var(--line);background:#fff;overflow:hidden;margin-bottom:12px">
+        <div style="background:var(--ink);color:#fff;padding:8px 12px;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em">Agent 自主迭代框架对比</div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:580px">
+          <tr style="background:var(--soft-ink)">
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-weight:900;font-size:10.8px;text-transform:uppercase;color:var(--muted)">维度</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-weight:900;font-size:10.8px;text-transform:uppercase;color:var(--muted)">AutoResearch</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-weight:900;font-size:10.8px;text-transform:uppercase;color:var(--muted)">Aider</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-weight:900;font-size:10.8px;text-transform:uppercase;color:var(--muted)">SWE-Agent</th>
+            <th style="padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-weight:900;font-size:10.8px;text-transform:uppercase;color:var(--muted)">Karpathy 原版</th>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">Agent 平台</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--blue);font-weight:800">Claude / OpenCode / Codex</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">多模型 CLI</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">独立 Python</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">独立 Python 脚本</td>
+          </tr>
+          <tr style="background:var(--soft-blue)">
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">自动迭代</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--blue);font-weight:800">✅ 25 轮默认 + 无限制</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">❌ 单次会话</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">⚠️ 单任务</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--blue);font-weight:800">✅ 100 轮/夜</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">自动回滚</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--blue);font-weight:800">✅ git revert</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">❌</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">⚠️ 手动</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--blue);font-weight:800">✅ 实验归档</td>
+          </tr>
+          <tr style="background:var(--soft-red)">
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">机械验证</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--blue);font-weight:800">✅ 测试 / 基准 / 评分</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">⚠️ 仅测试</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--blue);font-weight:800">✅ 测试</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--blue);font-weight:800">✅ 指标</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">适用场景</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">任意可量化任务</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">代码重构</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">GitHub Issue 修复</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">ML 调优</td>
+          </tr>
+          <tr style="background:var(--soft-ink)">
+            <td style="padding:8px 12px;border:1.5px solid var(--line);font-weight:800">⭐</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line);color:var(--red);font-weight:900">5623</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">~36k</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">~16k</td>
+            <td style="padding:8px 12px;border:1.5px solid var(--line)">~30k</td>
+          </tr>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">06</div>
+        <div class="section-meta">
+          <div class="label b">SETUP</div>
+          <h2>安装与启动</h2>
+          <p>Claude Code · OpenCode · Codex 三平台</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">Claude Code</span></div>
+          <h3>Claude Code 安装</h3>
+          <div style="background:#111;color:#e8e8e8;border:2px solid var(--line);padding:10px;margin-top:8px;overflow-x:auto">
+            <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap"><span style="color:#888"># 添加 marketplace 后 /install</span>
+/plugin marketplace add uditgoenka/autoresearch
+/install autoresearch
+
+<span style="color:#888"># 或直接调用</span>
+/autoresearch
+Goal: 提升测试覆盖率到 95%
+Metric: 覆盖率 ≥ 0.95
+Iterations: 25</pre>
+          </div>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">OpenCode</span></div>
+          <h3>OpenCode 安装</h3>
+          <div style="background:#111;color:#e8e8e8;border:2px solid var(--line);padding:10px;margin-top:8px;overflow-x:auto">
+            <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap"><span style="color:#888"># OpenCode 用下划线命名</span>
+/autoresearch_plan
+/autoresearch_debug
+/autoresearch_fix
+/autoresearch_security
+
+<span style="color:#888"># 14 条命令全部可用</span></pre>
+          </div>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">Codex</span></div>
+          <h3>OpenAI Codex 安装</h3>
+          <div style="background:#111;color:#e8e8e8;border:2px solid var(--line);padding:10px;margin-top:8px;overflow-x:auto">
+            <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap"><span style="color:#888"># Codex 用 mention 语法</span>
+$autoresearch
+
+<span style="color:#888"># 子命令是关键词</span>
+$autoresearch debug
+$autoresearch plan
+$autoresearch fix</pre>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">07</div>
+        <div class="section-meta">
+          <div class="label">RISK · LIMITS</div>
+          <h2>风险与边界</h2>
+          <p>量化指标任务：起飞；主观审美任务：失灵</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="blue">
+          <div class="n">1</div>
+          <h4>机械验证必要</h4>
+          <p>必须有可执行的测试 / 基准 / 评分函数。「让代码更好看」「让产品更好用」这类主观目标会失败——agent 无法量化。</p>
+        </article>
+        <article class="risk" data-accent="red">
+          <div class="n">2</div>
+          <h4>成本不可控</h4>
+          <p>25 轮默认 + 无 opt-in 上限意味着 agent 可能跑一整夜。需用 <code>Iterations: N</code> 或 <code>--chain</code> 限制；token 成本按调用次数累加。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">3</div>
+          <h4>Git 状态强依赖</h4>
+          <p>回滚机制基于 git，必须是 git 仓库且工作区干净。子智能体调用上下文会注入 loop 状态，需要协作约定避免冲突。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">08</div>
+        <div class="section-meta">
+          <div class="label b">SOURCES</div>
+          <h2>来源</h2>
+          <p>GitHub · 官网 · 原版 · X 推广</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">GitHub</span></div>
+          <h3>uditgoenka/autoresearch</h3>
+          <p>5623 ⭐ · MIT · v2.2.1</p>
+          <p style="font-size:12px;margin-top:6px"><a href="https://github.com/uditgoenka/autoresearch" style="color:var(--blue)">github.com/uditgoenka/autoresearch</a></p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">官网</span></div>
+          <h3>udit.co</h3>
+          <p>项目主页 + 文档</p>
+          <p style="font-size:12px;margin-top:6px"><a href="https://udit.co/projects/autoresearch" style="color:var(--blue)">udit.co/projects/autoresearch</a></p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">原版</span></div>
+          <h3>Karpathy autoresearch</h3>
+          <p>原始 ML 调优脚本</p>
+          <p style="font-size:12px;margin-top:6px"><a href="https://github.com/karpathy/autoresearch" style="color:var(--blue)">github.com/karpathy/autoresearch</a></p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag">X 推广</span></div>
+          <h3>GitHubDaily</h3>
+          <p>2026-08-02 中文技术推广</p>
+          <p style="font-size:12px;margin-top:6px"><a href="https://x.com/i/status/2083492943521010021" style="color:var(--blue)">x.com/i/status/2083492943521010021</a></p>
+        </article>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">来源：GitHub README（uditgoenka/autoresearch v2.2.1，master 分支，2026-08-02）、udit.co 项目页、Karpathy 原版 autoresearch、X 推广帖（GitHubDaily）</p>
+  </main>
+</body>
+</html>
