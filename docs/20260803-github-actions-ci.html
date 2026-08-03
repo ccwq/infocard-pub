@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Actions CI 自动化：Matrix·缓存·权限·OIDC · 信息卡</title>
+<link rel="stylesheet" href="../theme/blue.css">
+</head>
+<body>
+<div class="page-wrapper">
+<div class="hero">
+  <div class="hero-kicker"><span class="badge">CI/CD</span><span class="badge-version">GitHub 原生</span></div>
+  <h1 class="hero-title">GitHub Actions CI</h1>
+  <p class="hero-subtitle">Matrix 构建 · 依赖缓存 · 最小权限 · OIDC 云认证<br>GitHub 原生 CI/CD，从零到生产级流水线</p>
+  <div class="hero-meta">
+    <span class="meta-item"><span class="meta-label">文档</span><a href="https://docs.github.com/actions" target="_blank">docs.github.com/actions</a></span>
+    <span class="meta-item"><span class="meta-label">Marketplace</span><a href="https://github.com/marketplace?type=actions" target="_blank">22,000+ Actions</a></span>
+    <span class="meta-item"><span class="meta-label">价格</span>免费（2000 min/月）</span>
+  </div>
+</div>
+
+<section class="section">
+  <div class="section-header"><div class="section-number">01</div><h2 class="section-title">核心概念速查</h2></div>
+  <div class="content-card">
+    <p class="lead">GitHub Actions 是 GitHub 内置的 CI/CD 引擎，通过 <code>.github/workflows/</code> 目录下的 YAML 文件定义流水线。</p>
+    <div class="two-col">
+      <div class="col-block"><h3>术语表</h3><ul class="icon-list"><li><strong>Workflow</strong>：完整流水线（YAML 文件）</li><li><strong>Job</strong>：流水线中的一个步骤组</li><li><strong>Step</strong>：Job 内的具体操作</li><li><strong>Action</strong>：可复用的 Step</li><li><strong>Runner</strong>：执行 Job 的机器</li></ul></div>
+      <div class="col-block">
+        <div class="code-block small-code"><span class="code-keyword">name</span>: CI
+<span class="code-keyword">on</span>: [push, pull_request]
+<span class="code-keyword">jobs</span>:
+  build:
+    <span class="code-keyword">runs-on</span>: ubuntu-latest
+    <span class="code-keyword">steps</span>:
+      - <span class="code-keyword">uses</span>: actions/checkout@v4
+      - <span class="code-keyword">run</span>: npm ci && npm test</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt-bg">
+  <div class="section-header"><div class="section-number">02</div><h2 class="section-title">Matrix：一次定义，多版本并行</h2></div>
+  <div class="content-card">
+    <p>Matrix 策略让你用一行配置生成 N×M 个并行 Job，覆盖多版本、多 OS、多依赖组合。</p>
+    <div class="code-block"><span class="code-keyword">jobs</span>:
+  test:
+    <span class="code-keyword">runs-on</span>: ubuntu-latest
+    <span class="code-keyword">strategy</span>:
+      <span class="code-keyword">matrix</span>:
+        node-version: [<span class="code-num">18</span>, <span class="code-num">20</span>, <span class="code-num">22</span>]
+        <span class="code-keyword">os</span>: [ubuntu-latest, windows-latest, macos-latest]
+        exclude:
+          - <span class="code-keyword">os</span>: windows-latest
+            node-version: <span class="code-num">22</span>
+    <span class="code-keyword">steps</span>:
+      - <span class="code-keyword">uses</span>: actions/setup-node@v4
+        <span class="code-keyword">with</span>: node-version: <span class="code-string">${{ matrix.node-version }}</span>
+      - <span class="code-keyword">run</span>: npm ci && npm test</div>
+    <div class="callout callout-info"><strong>最大并行数：</strong>免费版 5 Job；Pro 10 Job；Team 15 Job；Enterprise 180 Job。</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-header"><div class="section-number">03</div><h2 class="section-title">依赖缓存：提速 3-10 倍</h2></div>
+  <div class="content-card">
+    <table class="data-table"><thead><tr><th>生态</th><th>推荐 Action</th><th>缓存 key</th></tr></thead><tbody>
+<tr><td>npm / Node.js</td><td><code>actions/setup-node@v4</code></td><td><code>node_modules-${{ hashFiles('**/package-lock.json') }}</code></td></tr>
+<tr><td>pip / Python</td><td><code>actions/cache@v4</code></td><td><code>pip-${{ hashFiles('**/requirements.txt') }}</code></td></tr>
+<tr><td>Go</td><td><code>actions/setup-go@v5</code></td><td><code>go-${{ hashFiles('**/go.sum') }}</code></td></tr>
+<tr><td>Java / Maven</td><td><code>actions/cache@v4</code></td><td><code>maven-${{ hashFiles('**/pom.xml') }}</code></td></tr>
+    </tbody></table>
+    <div class="code-block"><span class="code-comment"># 通用缓存</span>
+- <span class="code-keyword">uses</span>: actions/cache@v4
+  <span class="code-keyword">with</span>:
+    path: ~/.npm
+    key: ${{ runner.os }}-deps-${{ hashFiles('**/package-lock.json') }}
+    restore-keys: ${{ runner.os }}-deps-</div>
+  </div>
+</section>
+
+<section class="section alt-bg">
+  <div class="section-header"><div class="section-number">04</div><h2 class="section-title">GITHUB_TOKEN：最小权限原则</h2></div>
+  <div class="content-card">
+    <p>每个 Workflow 自动获得 <code>GITHUB_TOKEN</code>，默认权限最小化，需要显式申请。</p>
+    <div class="code-block"><span class="code-comment"># Job 级别权限（推荐）</span>
+<span class="code-keyword">jobs</span>:
+  build:
+    <span class="code-keyword">permissions</span>:
+      contents: read        <span class="code-comment"># 读取仓库代码</span>
+      pull-requests: write  <span class="code-comment"># 写 PR 评论</span>
+      id-token: write       <span class="code-comment"># OIDC 令牌</span>
+    <span class="code-keyword">runs-on</span>: ubuntu-latest
+    <span class="code-keyword">steps</span>:
+      - <span class="code-keyword">uses</span>: actions/checkout@v4</div>
+    <div class="callout callout-warning"><strong>危险配置：</strong><code>permissions: write-all</code> 意味着 Workflow 可以推送代码到任何分支，引入供应链安全风险。</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-header"><div class="section-number">05</div><h2 class="section-title">OIDC：无需存储云 Secret</h2></div>
+  <div class="content-card">
+    <p>OIDC（OpenID Connect）让你<strong>完全不存储 AWS/GCP/Azure 密钥</strong>，每次 Workflow 运行动态换取临时凭证。</p>
+    <div class="highlight-box"><div class="highlight-label">对比</div><p><strong>传统：</strong>创建 AWS_ACCESS_KEY → 存入 GitHub Secret → 密钥长期有效<br><strong>OIDC：</strong>配置 IAM 信任策略 → Workflow 请求 JWT → 云端验证 → 自动获取临时凭证（数小时内失效）</p></div>
+    <div class="code-block"><span class="code-comment"># AWS OIDC 示例</span>
+- <span class="code-keyword">id-token</span>: write
+  <span class="code-keyword">permissions</span>: contents: read
+
+- <span class="code-keyword">uses</span>: aws-actions/configure-aws-credentials@v4
+  <span class="code-keyword">with</span>:
+    role-to-assume: arn:aws:iam::123456789:role/github-actions-role
+    aws-region: ap-northeast-1
+<span class="code-comment"># 之后即可直接调用 AWS CLI，无需任何 Secret</span>
+- <span class="code-keyword">run</span>: aws s3 sync ./dist s3://my-bucket/</div>
+  </div>
+</section>
+
+<section class="section alt-bg">
+  <div class="section-header"><div class="section-number">06</div><h2 class="section-title">Concurrency 与常见失败</h2></div>
+  <div class="content-card">
+    <h3>Concurrency：取消冗余 Run</h3>
+    <div class="code-block"><span class="code-comment"># 同一 PR 只保留最新 run，自动取消旧 run</span>
+<span class="code-keyword">concurrency</span>:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: <span class="code-builtin">true</span>
+
+<span class="code-comment"># 团队分组：同分支队列执行，不取消</span>
+<span class="code-keyword">concurrency</span>:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: <span class="code-builtin">false</span></div>
+    <h3>常见失败模式</h3>
+    <table class="data-table"><thead><tr><th>错误</th><th>原因</th><th>解决</th></tr></thead><tbody>
+<tr><td><code>Resource not accessible</code></td><td>permissions 不足</td><td>在 job.permissions 声明</td></tr>
+<tr><td><code>Cache not found</code></td><td>cache key 不匹配</td><td>检查 hashFiles 路径</td></tr>
+<tr><td><code>Secret not found</code></td><td>未配置 Secrets</td><td>Settings → Secrets and variables</td></tr>
+<tr><td><code>Runner 不响应</code></td><td>超时（默认 360 分钟）</td><td>添加 timeout-minutes</td></tr>
+    </tbody></table>
+  </div>
+</section>
+
+<div class="risk-section">
+  <div class="risk-header">⚠️ 安全注意事项</div>
+  <div class="risk-grid">
+    <div class="risk-card"><div class="risk-title">🔑 Secret 管理</div><div class="risk-desc">永远不要把 Secret 写入 Workflow 文件或日志。使用 ${{ secrets.SECRET_NAME }}。</div></div>
+    <div class="risk-card"><div class="risk-title">🏴‍☠️ 供应链攻击</div><div class="risk-desc">避免用未审核的 Actions；用版本号 pin 而非 @master。</div></div>
+    <div class="risk-card"><div class="risk-title">⏱️ 自托管 Runner</div><div class="risk-desc">无超时限制，需要配置触发条件避免滥用。</div></div>
+  </div>
+</div>
+
+<div class="page-footer"><div class="footer-left"><span>GitHub Actions CI · Native CI/CD Pipeline</span></div><div class="footer-right"><span>生成日期：2026-08-03</span></div></div>
+</div>
+</body>
+</html>
