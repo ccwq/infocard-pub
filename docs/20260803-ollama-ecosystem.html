@@ -1,245 +1,229 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ollama 生态全解：模型管理·API·生态工具矩阵 · 信息卡</title>
 <style>
-:root{
-      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
-      --red:#c8102e; --soft-red:#fff5f6;
-      --line:#0a0a0a;
-      --shadow:6px 6px 0 rgba(10,10,10,.10);
-    }
-    *{box-sizing:border-box;margin:0;padding:0}
-    html,body{margin:0;overflow-x:hidden}
-    body{
-      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
-      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
-    }
-    img{display:block;max-width:100%}
-    a{color:inherit;text-decoration:none}
-    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+:root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#0a0a0a;--red:#c8102e;--soft-red:#fff5f6;--line:#0a0a0a;--shadow:6px 6px 0 rgba(10,10,10,.10)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 
-    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+/* redswiss: .page wrapper */
+.page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
 
-    /* === 顶栏：fact_store 风格 diagonal red-black hero + 右侧 meta pill === */
-    .topbar{
-      display:grid;grid-template-columns:1.28fr .72fr;
-      border-bottom:3px solid var(--line);
-      margin-bottom:14px;
-      overflow:hidden;
-    }
-    .topbar-hero{
-      padding:18px 18px 14px;
-      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
-      color:#fff;
-    }
-    /* === topbar-meta: 2行结构 + 字号分层 === */
-    .topbar-meta{
-      padding:14px;
-      border-left:3px solid var(--line);
-      display:grid;
-      grid-template-rows:auto auto;
-      gap:0;
-      align-content:start;
-      background:#f6f1f1;
-    }
-    .meta-row-high{
-      display:grid;
-      grid-template-columns:1.4fr 1fr;
-      gap:5px;
-      padding-bottom:6px;
-      border-bottom:2px solid var(--line);
-      margin-bottom:5px;
-    }
-    .meta-row-low{
-      display:grid;
-      grid-template-columns:1.2fr 1fr 0.8fr;
-      gap:5px;
-    }
-    .meta-pill-lg{
-      border:2px solid var(--line);
-      padding:7px 9px 5px;
-      background:#fff;
-      font-weight:900;
-      font-size:14px;
-      line-height:1.1;
-    }
-    .meta-pill-lg .sub{
-      display:block;
-      font-size:9px;
-      font-weight:700;
-      text-transform:uppercase;
-      letter-spacing:.06em;
-      color:#888;
-      margin-top:2px;
-    }
-    .meta-pill-md{
-      border:2px solid var(--line);
-      border-left:4px solid var(--red);
-      padding:4px 7px 3px;
-      background:#fff;
-      font-weight:800;
-      font-size:11.5px;
-      line-height:1.25;
-    }
-    .meta-pill-md .sub{
-      display:block;
-      font-size:8.5px;
-      font-weight:700;
-      text-transform:uppercase;
-      letter-spacing:.06em;
-      color:#888;
-      margin-top:1px;
-    }
-    .meta-pill-sm{
-      border:2px solid var(--line);
-      border-left:4px solid #666;
-      padding:3px 7px 3px;
-      background:#fff;
-      font-weight:700;
-      font-size:11px;
-      color:#555;
-      line-height:1.3;
-    }
-    .meta-pill-sm .sub{
-      display:block;
-      font-size:8px;
-      font-weight:700;
-      text-transform:uppercase;
-      letter-spacing:.06em;
-      color:#aaa;
-      margin-top:1px;
-    }
-    @media(max-width:720px){
-      .topbar{grid-template-columns:1fr}
-      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
-      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
-      .overview{padding:10px 0}
-      .overview-sentence{font-size:13px}
-      .overview-body{font-size:12px}
-    }
-      display:inline-block;border:2px solid #fff;padding:4px 8px;
-      font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;
-    }
-    h1.demo-title{
-      margin:10px 0 6px;
-      font-size:clamp(20px,3.2vw,38px);font-weight:800;
-      letter-spacing:-.03em;line-height:1.05;
-    }
-    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
-    .meta-pill{border:2px solid var(--line);padding:6px 10px;background:#fff;font-weight:700;font-size:11.5px}
-    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+/* redswiss: topbar diagonal hero */
+.topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:14px;overflow:hidden}
+.topbar-hero{padding:18px 18px 14px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+.kicker{display:inline-block;border:2px solid #fff;padding:4px 8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px}
+h1.demo-title{margin:10px 0 6px;font-size:clamp(20px,3.2vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.05}
+.sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+.meta-pill{border:2px solid var(--line);padding:6px 10px;background:#fff;font-weight:700;font-size:11.5px}
+.tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
 
-    /* === overview：一句话概述 + 正文缩略 === */
-    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
-    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
-    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
-    .overview-body p{margin:0}
+/* redswiss: topbar-meta pill grid */
+.topbar-meta{padding:14px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto;gap:0;align-content:start;background:#f6f1f1}
+.meta-row-high{display:grid;grid-template-columns:1.4fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+.meta-row-low{display:grid;grid-template-columns:1.2fr 1fr 0.8fr;gap:5px}
+.meta-pill-lg{border:2px solid var(--line);padding:7px 9px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1}
+.meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+.meta-pill-md{border:2px solid var(--line);border-left:4px solid var(--red);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25}
+.meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+.meta-pill-sm{border:2px solid var(--line);border-left:4px solid #666;padding:3px 7px 3px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3}
+.meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
 
-    /* === stats：红黑网格 === */
-    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
-    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
-    .stat:last-child{border-right:none}
-    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
-    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+/* redswiss: overview */
+.overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+.overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+.overview-body{font-size:12.5px;line-height:1.65;color:#333}
+.overview-body p{margin:0}
 
-    /* === pills：红/黑为主，无蓝黄绿 === */
-    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
-    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
-    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
-    .pill.dark{background:var(--ink);color:#fff}
-    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+/* redswiss: stats */
+.stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+.stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+.stat:last-child{border-right:none}
+.stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+.stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
 
-    /* === section：红头黑框 dense grid === */
-    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
-    .sec-head{
-      background:var(--ink);color:#fff;padding:7px 12px;
-      display:flex;justify-content:space-between;align-items:center;
-    }
-    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
-    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
-    .sec-body{padding:10px 12px}
+/* redswiss: pills */
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+.pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+.pill.dark{background:var(--ink);color:#fff}
+.pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
 
-    h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
-    p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+/* redswiss: section */
+.section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+.sec-head{background:var(--ink);color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+.sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+.sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.sec-body{padding:10px 12px}
 
-    /* === tags：红色为主 === */
-    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
-    .tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
+h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
 
-    /* === grid-2/3：纯红黑 grid === */
-    .grid-2,.grid-3{display:grid;gap:10px;margin-bottom:10px}
-    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
-    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
-    .card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
-    .card p{font-size:12px;margin:0;color:#444;line-height:1.62}
-    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+/* redswiss: tags */
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
 
-    /* === table：红黑高密度 === */
-    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
-    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
-    th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
-    tr:nth-child(even) td{background:#faf8f4}
-    .check{color:var(--red);font-weight:900;font-size:13px}
-    .cross{color:var(--ink);font-weight:900;font-size:13px}
+/* redswiss: grid-2/3 */
+.grid-2,.grid-3{display:grid;gap:10px;margin-bottom:10px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
 
-    /* === flow：红箭头 === */
-    .flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
-    .flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
-    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
-    .flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+/* redswiss: card */
+.card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+.card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+.card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+.card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
 
-    /* === btn：红/黑 === */
-    .btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
-    .btn.red{background:var(--red);border-color:var(--red)}
-    .btn.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+/* redswiss: table */
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+tr:nth-child(even) td{background:#faf8f4}
+.check{color:var(--red);font-weight:900;font-size:13px}
+.cross{color:var(--ink);font-weight:900;font-size:13px}
 
-    /* === rule === */
-    .rule{height:3px;background:var(--ink);margin:10px 0}
-    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+/* redswiss: flow */
+.flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
+.flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+.flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+.flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
 
-    /* === Responsive === */
-    @media (max-width:720px){
-      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
-      .grid-3,.grid-2{grid-template-columns:1fr}
-      .stats{flex-direction:column}
-      .stat{border-right:0;border-bottom:2px solid var(--line)}
-      .stat:last-child{border-bottom:0}
-      .card{padding-left:12px;padding-right:12px}
-      .topbar{grid-template-columns:1fr}
-      .topbar-meta{border-left:0;border-top:3px solid var(--line)}
-      h1.demo-title{font-size:clamp(18px,6vw,28px)}
-    }
+/* redswiss: btn */
+.btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+.btn.red{background:var(--red);border-color:var(--red)}
+.btn.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+/* redswiss: rule */
+.rule{height:3px;background:var(--ink);margin:10px 0}
+.source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+
+/* === EXTENSIONS for ollama-specific classes === */
+/* code block with syntax highlighting */
+.code-block{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:12px 14px;margin-bottom:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.72;white-space:pre-wrap;overflow-x:auto}
+.code-comment{color:#666}
+.code-keyword{color:#c8102e}
+.code-string{color:#8fba6b}
+.highlight-box{border:2px solid var(--red);background:var(--soft-red);padding:10px 12px;margin:10px 0}
+.highlight-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+.callout{border:2px solid var(--line);background:#fff;padding:10px 12px;margin-bottom:10px}
+.callout-info{border-color:#555}
+.callout-warning{border-color:var(--red);background:var(--soft-red);border-left:4px solid var(--red)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.col-block h3{font-size:13px;font-weight:800;margin:0 0 8px;letter-spacing:-.01em}
+.icon-list{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+.icon-list li{font-size:12px;line-height:1.55;color:#333}
+.icon-list strong{color:var(--ink)}
+
+/* redswiss: risk section */
+.risk-section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow)}
+.risk-header{background:var(--red);color:#fff;padding:7px 12px;font-weight:900;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.risk-card{border-right:2px solid var(--line);padding:12px;background:#fff}
+.risk-card:last-child{border-right:none}
+.risk-title{font-size:12.5px;font-weight:900;margin-bottom:6px;color:var(--ink)}
+.risk-desc{font-size:12px;line-height:1.6;color:#444}
+
+/* footer */
+.page-footer{border-top:3px solid var(--line);padding:10px 0;margin-top:14px;display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:#666;flex-wrap:wrap}
+
+/* responsive */
+@media(max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+  .grid-3,.grid-2,.risk-grid{grid-template-columns:1fr}
+  .stats{flex-direction:column}
+  .stat{border-right:0;border-bottom:2px solid var(--line)}
+  .stat:last-child{border-bottom:0}
+  .topbar{grid-template-columns:1fr}
+  .topbar-meta{border-left:0;border-top:3px solid var(--line)}
+  .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+  h1.demo-title{font-size:clamp(18px,6vw,28px)}
+  .two-col{grid-template-columns:1fr}
+  .risk-card{border-right:0;border-bottom:2px solid var(--line)}
+  .risk-card:last-child{border-bottom:0}
+  .page-footer{flex-direction:column;gap:6px;text-align:center}
+}
 </style>
 </head>
 <body>
-<div class="page-wrapper">
-<div class="hero">
-  <div class="hero-kicker"><span class="badge">Local LLM</span><span class="badge-version">v0.32.5</span></div>
-  <h1 class="hero-title">Ollama 生态全解</h1>
-  <p class="hero-subtitle">开源大模型本地部署 · OpenAI 兼容 API · 100+ 模型生态</p>
-  <div class="hero-meta">
-    <span class="meta-item"><span class="meta-label">官网</span><a href="https://ollama.com" target="_blank">ollama.com</a></span>
-    <span class="meta-item"><span class="meta-label">GitHub</span><a href="https://github.com/ollama/ollama" target="_blank">ollama/ollama</a> ⭐ 177k</span>
-    <span class="meta-item"><span class="meta-label">安装</span>curl | sh · brew · docker</span>
+<main class="page">
+
+<!-- TOPBAR: redswiss diagonal hero -->
+<header class="topbar">
+  <div class="topbar-hero">
+    <div class="kicker">LOCAL LLM · v0.32.5</div>
+    <h1 class="demo-title">Ollama 生态全解</h1>
+    <p class="sub-line">开源大模型本地部署 · OpenAI 兼容 API · 100+ 模型生态</p>
+    <div class="tagline">ollama/ollama ⭐ 177k</div>
   </div>
+  <div class="topbar-meta">
+    <div class="meta-row-high">
+      <div class="meta-pill-lg">177k<span class="sub">GitHub Stars</span></div>
+      <div class="meta-pill-lg">100%<span class="sub">离线运行</span></div>
+    </div>
+    <div class="meta-row-low">
+      <div class="meta-pill-md">100+<span class="sub">开源模型</span></div>
+      <div class="meta-pill-md">MIT<span class="sub">许可证</span></div>
+      <div class="meta-pill-sm">REDSWISS<span class="sub">红黑</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat"><strong>177k</strong><span>GitHub Stars</span></div>
+  <div class="stat"><strong>100+</strong><span>开源模型</span></div>
+  <div class="stat"><strong>OpenAI</strong><span>兼容 API</span></div>
+  <div class="stat"><strong>MIT</strong><span>许可证</span></div>
+  <div class="stat"><strong>macOS</strong><span>ARM64 GPU</span></div>
+  <div class="stat"><strong>Linux</strong><span>NVIDIA ROCm</span></div>
 </div>
 
+<!-- PILLS -->
+<div class="pills">
+  <span class="pill red">Local LLM</span>
+  <span class="pill dark">OpenAI 兼容</span>
+  <span class="pill">Modelfile</span>
+  <span class="pill soft">REST API</span>
+  <span class="pill">GGUF 支持</span>
+  <span class="pill">Docker 部署</span>
+</div>
+
+<!-- SEC 01: 一句话定位 -->
 <section class="section">
-  <div class="section-header"><div class="section-number">01</div><h2 class="section-title">一句话定位</h2></div>
-  <div class="content-card">
-    <div class="lead-block"><p class="lead">Ollama 是目前最简的开源大模型本地部署工具：一行命令拉起模型，REST API 即开即用，数据完全留在本地。</p></div>
-    <div class="highlight-box"><div class="highlight-label">v0.32.5 (2026-07-27)</div><p>最新版本支持 macOS ARM64 GPU 加速、Linux AMD/NVIDIA ROCm、Windows WSL2，原生支持 llama.cpp 后端，内存管理优化。</p></div>
+  <div class="sec-head">
+    <span class="num">01</span>
+    <span class="label">一句话定位</span>
+  </div>
+  <div class="sec-body">
+    <p class="overview-sentence">Ollama 是目前最简的开源大模型本地部署工具：一行命令拉起模型，REST API 即开即用，数据完全留在本地。</p>
+    <div class="highlight-box">
+      <div class="highlight-label">v0.32.5 (2026-07-27)</div>
+      <p>最新版本支持 macOS ARM64 GPU 加速、Linux AMD/NVIDIA ROCm、Windows WSL2，原生支持 llama.cpp 后端，内存管理优化。</p>
+    </div>
+    <div class="tags">
+      <span class="tag">macOS</span><span class="tag">Linux</span><span class="tag">Windows WSL2</span><span class="tag">Docker</span>
+      <span class="tag">API</span><span class="tag">Modelfile</span><span class="tag">GGUF</span>
+    </div>
   </div>
 </section>
 
-<section class="section alt-bg">
-  <div class="section-header"><div class="section-number">02</div><h2 class="section-title">模型库：100+ 开源模型</h2></div>
-  <div class="content-card">
-    <table class="data-table"><thead><tr><th>模型族</th><th>代表版本</th><th>特点</th></tr></thead><tbody>
+<!-- SEC 02: 模型库 -->
+<section class="section">
+  <div class="sec-head">
+    <span class="num">02</span>
+    <span class="label">模型库：100+ 开源模型</span>
+  </div>
+  <div class="sec-body">
+    <table>
+      <thead><tr><th>模型族</th><th>代表版本</th><th>特点</th></tr></thead>
+      <tbody>
 <tr><td><strong>Llama 3.1</strong></td><td>8B / 70B / 405B</td><td>Mozilla 许可，支持长上下文</td></tr>
 <tr><td><strong>Llama 3.2</strong></td><td>1B / 3B</td><td>超轻量，边缘设备友好</td></tr>
 <tr><td><strong>Mistral</strong></td><td>Mistral 7B, Nemo 12B</td><td>Apache 许可，高效平衡</td></tr>
@@ -251,14 +235,19 @@
 <tr><td><strong>Command R+</strong></td><td>R+ 104B</td><td>Cohere RAG 专用</td></tr>
 <tr><td><strong>Llava</strong></td><td>1.5 / 1.6</td><td>多模态，图文理解</td></tr>
 <tr><td><strong>SmolLM</strong></td><td>135M / 360M / 1.7B</td><td>极小模型，即插即用</td></tr>
-    </tbody></table>
-    <div class="callout callout-info">完整列表见 <a href="https://ollama.com/library" target="_blank">ollama.com/library</a>，支持自定义 Modelfile 导入任意 GGUF。</div>
+      </tbody>
+    </table>
+    <p class="source-note">完整列表见 <a href="https://ollama.com/library">ollama.com/library</a>，支持自定义 Modelfile 导入任意 GGUF。</p>
   </div>
 </section>
 
+<!-- SEC 03: API -->
 <section class="section">
-  <div class="section-header"><div class="section-number">03</div><h2 class="section-title">API：OpenAI 兼容 + 原生</h2></div>
-  <div class="content-card">
+  <div class="sec-head">
+    <span class="num">03</span>
+    <span class="label">API：OpenAI 兼容 + 原生</span>
+  </div>
+  <div class="sec-body">
     <h3>OpenAI 兼容端点（推荐）</h3>
     <div class="code-block"><span class="code-comment"># 基础对话</span>
 curl http://localhost:11434/v1/chat/completions \
@@ -269,6 +258,7 @@ curl http://localhost:11434/v1/chat/completions \
 <span class="code-keyword">from</span> openai <span class="code-keyword">import</span> OpenAI
 client = OpenAI(base_url=<span class="code-string">"http://localhost:11434/v1"</span>, api_key=<span class="code-string">"ollama"</span>)
 resp = client.chat.completions.create(model=<span class="code-string">"llama3.1"</span>, messages=[{"role":"user","content":"Hi"}])</div>
+
     <h3>原生 API</h3>
     <div class="code-block"><span class="code-comment">curl http://localhost:11434/api/generate -d '{"model":"llama3.1","prompt":"Why is sky blue?","stream":false}'</span>
 <span class="code-comment">curl http://localhost:11434/api/chat -d '{"model":"llama3.1","messages":[{"role":"user","content":"Hi"}]}'</span>
@@ -276,9 +266,13 @@ resp = client.chat.completions.create(model=<span class="code-string">"llama3.1"
   </div>
 </section>
 
-<section class="section alt-bg">
-  <div class="section-header"><div class="section-number">04</div><h2 class="section-title">Modelfile 与横向对比</h2></div>
-  <div class="content-card">
+<!-- SEC 04: Modelfile 与横向对比 -->
+<section class="section">
+  <div class="sec-head">
+    <span class="num">04</span>
+    <span class="label">Modelfile 与横向对比</span>
+  </div>
+  <div class="sec-body">
     <h3>Modelfile 自定义</h3>
     <div class="code-block"><span class="code-comment"># Modelfile 示例：中文助手</span>
 FROM llama3.1
@@ -287,34 +281,53 @@ PARAMETER temperature 0.7
 PARAMETER num_ctx 8192
 <span class="code-comment"># ollama create my-chinese -f Modelfile</span>
 <span class="code-comment"># ollama run my-chinese</span></div>
+
     <h3>横向对比</h3>
-    <table class="data-table"><thead><tr><th>维度</th><th>Ollama</th><th>LM Studio</th><th>llama.cpp</th></tr></thead><tbody>
+    <table>
+      <thead><tr><th>维度</th><th>Ollama</th><th>LM Studio</th><th>llama.cpp</th></tr></thead>
+      <tbody>
 <tr><td>上手难度</td><td>⭐⭐ 一键命令</td><td>⭐⭐⭐ GUI 友好</td><td>⭐⭐⭐⭐ CLI 需编译</td></tr>
-<tr><td>API 兼容</td><td>✅ OpenAI 兼容</td><td>✅ OpenAI 兼容</td><td>❌ 需额外封装</td></tr>
-<tr><td>模型管理</td><td>✅ 内置库</td><td>✅ GUI 搜索</td><td>❌ 手动下载 GGUF</td></tr>
+<tr><td>API 兼容</td><td><span class="check">✅</span> OpenAI 兼容</td><td><span class="check">✅</span> OpenAI 兼容</td><td><span class="cross">❌</span> 需额外封装</td></tr>
+<tr><td>模型管理</td><td><span class="check">✅</span> 内置库</td><td><span class="check">✅</span> GUI 搜索</td><td><span class="cross">❌</span> 手动下载 GGUF</td></tr>
 <tr><td>适用场景</td><td>开发者快速原型 / 生产 API</td><td>非技术用户本地探索</td><td>深度定制 / 嵌入项目</td></tr>
-    </tbody></table>
-    <div class="highlight-box"><div class="highlight-label">选型结论</div><p>快速上手 / 有 API 需求 → Ollama。<br>非技术用户 / 可视化探索 → LM Studio。<br>需要深度定制 → llama.cpp。</p></div>
+      </tbody>
+    </table>
+
+    <div class="highlight-box">
+      <div class="highlight-label">选型结论</div>
+      <p>快速上手 / 有 API 需求 → <strong>Ollama</strong>。<br>非技术用户 / 可视化探索 → LM Studio。<br>需要深度定制 → llama.cpp。</p>
+    </div>
   </div>
 </section>
 
+<!-- SEC 05: 生态工具矩阵 -->
 <section class="section">
-  <div class="section-header"><div class="section-number">05</div><h2 class="section-title">生态工具矩阵</h2></div>
-  <div class="content-card">
+  <div class="sec-head">
+    <span class="num">05</span>
+    <span class="label">生态工具矩阵</span>
+  </div>
+  <div class="sec-body">
     <div class="two-col">
-      <div class="col-block"><h3>UI 工具</h3><ul class="icon-list">
-<li>✅ <strong>Open WebUI</strong>：类 ChatGPT Web UI，多用户、对话管理</li>
-<li>✅ <strong>Enchanted</strong>：macOS 原生应用</li>
-<li>✅ <strong>AnythingLLM</strong>：本地 RAG 知识库</li>
-<li>✅ <strong>continue.dev</strong>：VSCode JetBrains 插件</li>
-      </ul></div>
-      <div class="col-block"><h3>开发者工具</h3><ul class="icon-list">
-<li>✅ <strong>Promptfoo</strong>：LLM 评测</li>
-<li>✅ <strong>Maxivrob</strong>：Ollama + MCP</li>
-<li>✅ Docker / Kubernetes 官方镜像</li>
-<li>✅ Ollama Deploy：企业级托管</li>
-      </ul></div>
+      <div class="col-block">
+        <h3>UI 工具</h3>
+        <ul class="icon-list">
+          <li><span class="check">✅</span> <strong>Open WebUI</strong>：类 ChatGPT Web UI，多用户、对话管理</li>
+          <li><span class="check">✅</span> <strong>Enchanted</strong>：macOS 原生应用</li>
+          <li><span class="check">✅</span> <strong>AnythingLLM</strong>：本地 RAG 知识库</li>
+          <li><span class="check">✅</span> <strong>continue.dev</strong>：VSCode / JetBrains 插件</li>
+        </ul>
+      </div>
+      <div class="col-block">
+        <h3>开发者工具</h3>
+        <ul class="icon-list">
+          <li><span class="check">✅</span> <strong>Promptfoo</strong>：LLM 评测</li>
+          <li><span class="check">✅</span> <strong>Maxivrob</strong>：Ollama + MCP</li>
+          <li><span class="check">✅</span> Docker / Kubernetes 官方镜像</li>
+          <li><span class="check">✅</span> Ollama Deploy：企业级托管</li>
+        </ul>
+      </div>
     </div>
+
     <div class="callout callout-warning">
       <strong>Error: could not connect to ollama app</strong> → macOS：确保菜单栏应用运行。服务模式：<code>OLLAMA_HOST=0.0.0.0 ollama serve</code><br>
       <strong>Error: CUDA out of memory</strong> → 用更小量化版本：<code>ollama pull llama3.1:8b-instruct-q4_K_M</code>
@@ -322,16 +335,33 @@ PARAMETER num_ctx 8192
   </div>
 </section>
 
+<!-- RISK: 注意事项 -->
 <div class="risk-section">
   <div class="risk-header">⚠️ 注意事项</div>
   <div class="risk-grid">
-    <div class="risk-card"><div class="risk-title">⚡ 性能上限</div><div class="risk-desc">本地推理速度取决于硬件，7B 模型在 Mac M3 上约 30-50 tok/s，405B 模型需要专业工作站。</div></div>
-    <div class="risk-card"><div class="risk-title">🔒 隐私边界</div><div class="risk-desc">Ollama 默认仅本地运行，但 <code>OLLAMA_HOST=0.0.0.0</code> 会暴露到网络，需配合防火墙。</div></div>
-    <div class="risk-card"><div class="risk-title">📦 模型许可</div><div class="risk-desc">Llama 3.x 使用 Mozilla Public License 2.0；Qwen 2.5 使用 Apache 2.0。</div></div>
+    <div class="risk-card">
+      <div class="risk-title">⚡ 性能上限</div>
+      <div class="risk-desc">本地推理速度取决于硬件，7B 模型在 Mac M3 上约 30-50 tok/s，405B 模型需要专业工作站。</div>
+    </div>
+    <div class="risk-card">
+      <div class="risk-title">🔒 隐私边界</div>
+      <div class="risk-desc">Ollama 默认仅本地运行，但 <code>OLLAMA_HOST=0.0.0.0</code> 会暴露到网络，需配合防火墙。</div>
+    </div>
+    <div class="risk-card">
+      <div class="risk-title">📦 模型许可</div>
+      <div class="risk-desc">Llama 3.x 使用 Mozilla Public License 2.0；Qwen 2.5 使用 Apache 2.0。</div>
+    </div>
   </div>
 </div>
 
-<div class="page-footer"><div class="footer-left"><span>Ollama · Local LLM Made Simple</span></div><div class="footer-right"><span>生成日期：2026-08-03 · v0.32.5</span></div></div>
+<div class="rule"></div>
+<p class="source-note">infocard-redswiss-style · ollama.com · ollama/ollama ⭐ 177k · v0.32.5 · Local LLM Made Simple</p>
+
+<div class="page-footer">
+  <span>Ollama · Local LLM Made Simple</span>
+  <span>生成日期：2026-08-04 · v0.32.5</span>
 </div>
+
+</main>
 </body>
 </html>
