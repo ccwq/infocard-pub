@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flowix：Agent 时代的本地记忆中枢</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);--grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 10px 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);background:rgba(88,195,255,.08);border:1px solid rgba(88,195,255,.22);border-radius:6px;padding:3px 10px;display:inline-block}
+    .title{font-size:clamp(34px,5.6vw,76px);font-weight:900;line-height:1.08;letter-spacing:-.03em;color:#fff;margin:0}
+    .subtitle{font-size:16px;line-height:1.5;color:var(--muted);margin:0;max-width:560px}
+    .badge-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--muted)}
+    .badge.green{background:rgba(45,179,106,.12);border-color:rgba(45,179,106,.3);color:var(--green)}
+    .badge.cyan{background:rgba(88,195,255,.12);border-color:rgba(88,195,255,.3);color:var(--cyan)}
+    .badge.blue{background:rgba(74,120,255,.12);border-color:rgba(74,120,255,.3);color:var(--blue)}
+    .hero-visual{background:var(--panel);border-radius:16px;border:1px solid var(--line);overflow:hidden;display:flex;flex-direction:column;min-width:0}
+    .hero-visual img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block}
+    .hero-caption{padding:12px 14px;font-size:11px;color:var(--muted);line-height:1.5;border-top:1px solid var(--line)}
+    .section{margin-bottom:18px}
+    .section-no{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:var(--cyan);color:#0c1020;font-size:11px;font-weight:900;margin-right:8px;flex-shrink:0}
+    .section-head{display:flex;align-items:center;margin-bottom:12px}
+    .section-head h2{font-size:18px;font-weight:800;letter-spacing:-.02em;color:#fff;margin:0}
+    .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    .card{background:var(--panel);border-radius:12px;border:1px solid var(--line);padding:14px 16px;box-shadow:var(--shadow)}
+    .card h3{font-size:13px;font-weight:800;color:var(--cyan);margin:0 0 8px;letter-spacing:-.01em}
+    .card p{font-size:13px;line-height:1.55;color:var(--muted);margin:0}
+    .card .value{font-size:28px;font-weight:900;color:#fff;letter-spacing:-.03em;margin-bottom:6px}
+    .card .unit{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px}
+    .card .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-bottom:6px}
+    .tag-ts{background:rgba(74,120,255,.15);color:#8faaff;border:1px solid rgba(74,120,255,.3)}
+    .tag-rust{background:rgba(45,179,106,.15);color:var(--green);border:1px solid rgba(45,179,106,.3)}
+    .tag-cli{background:rgba(88,195,255,.15);color:var(--cyan);border:1px solid rgba(88,195,255,.3)}
+    .tag-mcp{background:rgba(132,89,255,.15);color:var(--purple);border:1px solid rgba(132,89,255,.3)}
+    .tag-open{background:rgba(45,179,106,.12);color:var(--green);border:1px solid rgba(45,179,106,.3)}
+    .tag-markdown{background:rgba(244,200,76,.12);color:var(--yellow);border:1px solid rgba(244,200,76,.3)}
+    .comp-table{width:100%;border-collapse:collapse;font-size:13px}
+    .comp-table th{background:var(--panel);padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+    .comp-table td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--ink);vertical-align:top}
+    .comp-table tr:last-child td{border-bottom:none}
+    .comp-table .check{color:var(--green);font-weight:700}
+    .comp-table .cross{color:rgba(255,100,100,.5)}
+    .comp-table .highlight{background:rgba(88,195,255,.05)}
+    .shell{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .shell-item{background:var(--panel);border-radius:12px;border:1px solid var(--line);padding:14px}
+    .shell-item h3{font-size:13px;font-weight:800;color:#fff;margin:0 0 10px;display:flex;align-items:center;gap:6px}
+    .shell-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .shell-item p{font-size:12.5px;line-height:1.55;color:var(--muted);margin:0}
+    .flow-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:stretch}
+    .flow-step{flex:0 0 auto;min-width:160px;background:var(--panel);border-radius:10px;border:1px solid var(--line);padding:12px 14px;text-align:center;position:relative}
+    .flow-step::after{content:"→";position:absolute;right:-18px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:16px;font-weight:700}
+    .flow-step:last-child::after{display:none}
+    .flow-step .step-no{font-size:10px;font-weight:900;color:var(--cyan);margin-bottom:6px}
+    .flow-step .step-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:4px}
+    .flow-step .step-desc{font-size:11px;color:var(--muted);line-height:1.4}
+    .graph-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .node{background:var(--panel);border-radius:10px;border:1px solid var(--line);padding:12px;text-align:center}
+    .node .node-icon{font-size:22px;margin-bottom:6px}
+    .node .node-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:4px}
+    .node .node-desc{font-size:11px;color:var(--muted);line-height:1.4}
+    .risk{background:rgba(255,90,90,.06);border:1px solid rgba(255,90,90,.2);border-radius:12px;padding:14px 16px}
+    .risk h3{font-size:13px;font-weight:800;color:#ff8080;margin:0 0 8px}
+    .risk p{font-size:12.5px;color:rgba(255,130,130,.8);margin:0;line-height:1.5}
+    .verdict{background:rgba(45,179,106,.07);border:1px solid rgba(45,179,106,.22);border-radius:12px;padding:14px 16px}
+    .verdict h3{font-size:13px;font-weight:800;color:var(--green);margin:0 0 8px}
+    .verdict p{font-size:12.5px;color:rgba(45,179,106,.85);margin:0;line-height:1.5}
+    .footer{padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .footer a{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid var(--line);color:var(--ink);transition:border-color .2s,background .2s}
+    .footer a:hover{border-color:var(--cyan);background:rgba(88,195,255,.06)}
+    .footer .meta{font-size:11px;color:var(--muted)}
+    .anchor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+    .anchor-item{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:var(--panel);border-radius:8px;border:1px solid var(--line)}
+    .anchor-item .anchor-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+    .anchor-item .anchor-text{font-size:12.5px;color:var(--ink);line-height:1.5}
+    .anchor-item .anchor-text strong{display:block;color:#fff;font-weight:700;margin-bottom:2px}
+    @media(max-width:760px){
+      .hero{grid-template-columns:1fr}
+      .shell{grid-template-columns:1fr}
+      .graph-flow{grid-template-columns:1fr 1fr}
+      .comp-table{font-size:12px}
+      .card-grid{grid-template-columns:1fr}
+      .flow-row{overflow-x:auto;-webkit-overflow-scrolling:touch}
+      .footer{flex-direction:column;align-items:flex-start}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="hero-bar"></div>
+
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker">Agent 记忆基础设施</div>
+      <h1 class="title">Flowix：Agent 时代的本地记忆中枢</h1>
+      <p class="subtitle">把需求、研究、决策和项目背景写成 Markdown，多个 Agent 可持续读取和更新，MIT 协议开源。</p>
+      <div class="badge-row">
+        <span class="badge green">MIT</span>
+        <span class="badge cyan">MCP + CLI</span>
+        <span class="badge">TypeScript</span>
+        <span class="badge">本地优先</span>
+        <span class="badge">多 Agent 共享</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <img src="https://raw.githubusercontent.com/text2future/flowix/main/docs/images/app-icon.png" alt="Flowix" onerror="this.style.display='none'">
+      <div class="hero-caption">
+        <strong style="color:#fff;font-size:12px">Flowix</strong><br>
+        @text2future · AI超元域 推文推荐
+      </div>
+    </div>
+  </div>
+
+  <!-- §01 项目概览 -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">01</span>
+      <h2>项目概览</h2>
+    </div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="value">218</div>
+        <div class="unit">GitHub Stars</div>
+        <p>截至 2026-08-05，text2future/flowix 获得 218 颗星标，33 个 Fork</p>
+      </div>
+      <div class="card">
+        <div class="value">v1.1.11</div>
+        <div class="unit">最新版本</div>
+        <p>Tauri 桌面端（Electron-free）+ 移动端 + MCP Server + CLI，TypeScript 主栈</p>
+      </div>
+      <div class="card">
+        <div class="value">2026-05-25</div>
+        <div class="unit">首次提交</div>
+        <p>由 text2future 组织维护，推送到活跃（最后更新：2026-08-04）</p>
+      </div>
+      <div class="card">
+        <div class="value">MIT</div>
+        <div class="unit">开源协议</div>
+        <p>完全开源，数据本地存储，用户完全掌控，无云服务绑定</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- §02 核心能力 -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">02</span>
+      <h2>核心能力</h2>
+    </div>
+    <div class="shell">
+      <div class="shell-item">
+        <h3><span class="dot" style="background:var(--cyan)"></span>Markdown 本地存储</h3>
+        <p>笔记保存为普通 .md 文件，可用任意编辑器打开和编辑。无专有格式，无云服务依赖，数据完全自主掌控。</p>
+      </div>
+      <div class="shell-item">
+        <h3><span class="dot" style="background:var(--green)"></span>多 Agent 共享上下文</h3>
+        <p>Codex、Claude Code、OpenCode、Hermes 等多个 Agent 连接到同一套笔记，共享背景、决策和结果，无需每次从零开始。</p>
+      </div>
+      <div class="shell-item">
+        <h3><span class="dot" style="background:var(--blue)"></span>MCP + CLI 双协议</h3>
+        <p>通过 MCP（Model Context Protocol）Server 连接主流 AI 编码工具，或通过 CLI 脚本直接调用。</p>
+      </div>
+      <div class="shell-item">
+        <h3><span class="dot" style="background:var(--purple)"></span>Agent 结果写回笔记</h3>
+        <p>Agent 执行结果可直接写回 Markdown，保持上下文持久化。下次调用时 Agent 自动获得完整历史。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- §03 技术架构 -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">03</span>
+      <h2>技术架构</h2>
+    </div>
+    <div class="graph-flow">
+      <div class="node">
+        <div class="node-icon">📝</div>
+        <div class="node-title">Markdown 笔记</div>
+        <div class="node-desc">本地 .md 文件，支持任意编辑器</div>
+      </div>
+      <div class="node">
+        <div class="node-icon">🔌</div>
+        <div class="node-title">MCP Server</div>
+        <div class="node-desc">上下文路由，按需注入笔记片段</div>
+      </div>
+      <div class="node">
+        <div class="node-icon">🤖</div>
+        <div class="node-title">AI Agent</div>
+        <div class="node-desc">Codex / Claude Code / OpenCode / Hermes</div>
+      </div>
+      <div class="node">
+        <div class="node-icon">↩️</div>
+        <div class="node-title">写回笔记</div>
+        <div class="node-desc">Agent 结果持久化，下次继续</div>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>组件</th>
+            <th>技术栈</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>桌面端</strong></td>
+            <td><span class="tag tag-ts">TypeScript</span> <span class="tag tag-rust">Tauri</span></td>
+            <td>轻量 Electron-free 桌面应用，支持 macOS / Windows</td>
+          </tr>
+          <tr class="highlight">
+            <td><strong>MCP Server</strong></td>
+            <td><span class="tag tag-mcp">MCP</span> <span class="tag tag-ts">TypeScript</span></td>
+            <td>标准 MCP 协议，接入主流 Agent 工具</td>
+          </tr>
+          <tr>
+            <td><strong>CLI 工具</strong></td>
+            <td><span class="tag tag-cli">CLI</span></td>
+            <td>独立命令行工具，Shell 脚本可调用</td>
+          </tr>
+          <tr>
+            <td><strong>移动端</strong></td>
+            <td><span class="tag tag-ts">TypeScript</span> <span class="tag tag-rust">Tauri</span></td>
+            <td>Tauri Mobile，iOS / Android 跨平台</td>
+          </tr>
+          <tr>
+            <td><strong>笔记格式</strong></td>
+            <td><span class="tag tag-markdown">Markdown</span></td>
+            <td>纯文本，版本控制友好，任意编辑器可用</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- §04 Agent 工作流 -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">04</span>
+      <h2>Agent 工作流</h2>
+    </div>
+    <div class="flow-row">
+      <div class="flow-step">
+        <div class="step-no">STEP 1</div>
+        <div class="step-title">人类编写笔记</div>
+        <div class="step-desc">记录任务背景、参考资料、目标和约束</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-no">STEP 2</div>
+        <div class="step-title">Agent 读取上下文</div>
+        <div class="step-desc">通过 MCP 注入笔记片段到 Agent 上下文</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-no">STEP 3</div>
+        <div class="step-title">Agent 执行任务</div>
+        <div class="step-desc">Codex / Claude Code / OpenCode / Hermes 工作</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-no">STEP 4</div>
+        <div class="step-title">结果写回笔记</div>
+        <div class="step-desc">执行结果追加到同一 Markdown，持续积累</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-no">STEP 5</div>
+        <div class="step-title">下次继续</div>
+        <div class="step-desc">新 Agent 启动时自动获得完整历史上下文</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- §05 竞品对比 -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">05</span>
+      <h2>竞品对比</h2>
+    </div>
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>特性</th>
+          <th>Flowix</th>
+          <th>通用笔记（Notion/飞书）</th>
+          <th>纯文件管理</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>本地存储</td>
+          <td class="check">✅</td>
+          <td class="cross">❌ 云端</td>
+          <td class="check">✅</td>
+        </tr>
+        <tr>
+          <td>MCP 协议支持</td>
+          <td class="check">✅</td>
+          <td class="cross">❌</td>
+          <td class="cross">❌</td>
+        </tr>
+        <tr>
+          <td>多 Agent 共享</td>
+          <td class="check">✅</td>
+          <td class="cross">❌</td>
+          <td class="cross">❌</td>
+        </tr>
+        <tr>
+          <td>Agent 结果写回</td>
+          <td class="check">✅</td>
+          <td class="cross">❌</td>
+          <td class="cross">❌</td>
+        </tr>
+        <tr>
+          <td>Agent 感知上下文注入</td>
+          <td class="check">✅</td>
+          <td class="cross">❌</td>
+          <td class="cross">❌</td>
+        </tr>
+        <tr>
+          <td>版本控制友好</td>
+          <td class="check">✅ Markdown</td>
+          <td class="cross">❌ 专有格式</td>
+          <td class="check">✅</td>
+        </tr>
+        <tr>
+          <td>MIT 开源</td>
+          <td class="check">✅</td>
+          <td class="cross">❌ 商业闭源</td>
+          <td class="cross">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- §06 快速开始 -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">06</span>
+      <h2>快速开始</h2>
+    </div>
+    <div class="anchor-list">
+      <div class="anchor-item">
+        <span class="anchor-icon">⬇️</span>
+        <span class="anchor-text"><strong>下载安装</strong>从 <a href="https://flowix-memo.com/" style="color:var(--cyan)">flowix-memo.com</a> 下载桌面客户端</span>
+      </div>
+      <div class="anchor-item">
+        <span class="anchor-icon">📁</span>
+        <span class="anchor-text"><strong>创建笔记本</strong>新建本地文件夹或注册已有文件夹为笔记本</span>
+      </div>
+      <div class="anchor-item">
+        <span class="anchor-icon">✍️</span>
+        <span class="anchor-text"><strong>编写背景</strong>在文档中记录任务背景、参考资料、目标与约束</span>
+      </div>
+      <div class="anchor-item">
+        <span class="anchor-icon">🔌</span>
+        <span class="anchor-text"><strong>连接 Agent</strong>通过 MCP 或 CLI 连接 Codex / Claude Code / OpenCode / Hermes</span>
+      </div>
+      <div class="anchor-item">
+        <span class="anchor-icon">💻</span>
+        <span class="anchor-text"><strong>本地开发</strong><code style="background:var(--panel-2);padding:2px 6px;border-radius:4px;font-size:11px">git clone &amp;&amp; npm install &amp;&amp; npm run dev</code></span>
+      </div>
+      <div class="anchor-item">
+        <span class="anchor-icon">📚</span>
+        <span class="anchor-text"><strong>查看文档</strong><a href="https://flowix-memo.com/docs/" style="color:var(--cyan)">flowix-memo.com/docs</a></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- §07 判断 -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-no">07</span>
+      <h2>判断</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="verdict">
+        <h3>✅ 核心价值</h3>
+        <p>Flowix 填补了"AI 笔记"与"Agent 记忆系统"之间的空白。它不是又一个 Markdown 编辑器，而是第一个把本地 Markdown 文件真正变成 Agent 可持续工作上下文的工具。</p>
+      </div>
+      <div class="verdict">
+        <h3>✅ 差异化定位</h3>
+        <p>Notion、飞书解决的是人类协作；Flowix 解决的是 Agent 记忆。与其让 Agent 每次从"失忆"开始，不如让它从你已有的笔记中恢复上下文。</p>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div class="risk">
+        <h3>⚠️ 适用边界</h3>
+        <p>Flowix 最适合的场景：单人多 Agent、长期项目背景积累、需要跨会话持续推进的工作流。如果只需要简单的人类笔记，Notion/飞书更成熟；如果已有自定义 Agent 记忆系统，Flowix 可能与现有方案重叠。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <a href="https://github.com/text2future/flowix" target="_blank">
+      <span style="font-size:14px">⬡</span> GitHub · text2future/flowix
+    </a>
+    <a href="https://flowix-memo.com/" target="_blank">
+      <span style="font-size:14px">⬡</span> flowix-memo.com
+    </a>
+    <span class="meta">
+      来源：X @AI超元域 · 2026-08-04 · 7059 阅读 · 70 点赞 · 9 转发
+      <span style="color:var(--line);margin:0 4px">|</span>
+      推文 ID：2084624961596281336
+    </span>
+  </div>
+</div>
+</body>
+</html>
