@@ -575,10 +575,7 @@
                 <span class="strip-sub">PUBLIC INDEX</span>
               </div>
               <div class="strip-center">{{ totalCount }} CARDS / {{ categoryCount }} CATEGORIES / {{ latestTimeLabel }}</div>
-              <div class="strip-right">
-                <a class="theme-link" href="./themes.html" aria-label="打开信息卡主题页">主题卡</a>
-                <span>INDEXED / FILTERABLE / CHRONOLOGICAL</span>
-              </div>
+              <div class="strip-right">INDEXED / FILTERABLE / CHRONOLOGICAL</div>
             </div>
 
               <div class="poster-band compact">
@@ -600,6 +597,7 @@
                       <span class="poster-stat-value">{{ totalCountLabel }}</span>
                     </div>
                   </div>
+                  <a class="theme-link" href="./themes.html" aria-label="打开信息卡主题页">主题卡 ↗</a>
                 </div>
               </div>
             </section>
