@@ -1,5 +1,6 @@
 (() => {
   const { createApp, ref, computed, onMounted, nextTick } = Vue;
+  const { MODES: SORT_MODES, normalizeMode: normalizeSortMode, sortCardsByMode } = window.InfocardHomeSortMode;
 
   const BATCH_SIZE = 12;
   const SESSION_KEY = 'infocard_archive_state';
@@ -198,6 +199,7 @@
       const loadError = ref('');
       const allCards = ref([]);
       const searchQuery = ref('');
+      const sortMode = ref(SORT_MODES.PUBLISHED);
       const selectedFacets = ref({
         topics: [], tech_stack: [], tool_types: [], stages: [], interaction: [], content_type: [], source: [], style: [], risk: []
       });
@@ -211,13 +213,8 @@
 
       const totalCount = computed(() => allCards.value.length);
 
-      const normalizedCards = computed(() => allCards.value
-        .map((card, order) => normalizeCard(card, order))
-        .sort((a, b) => {
-          if ((b.__time?.ts || 0) !== (a.__time?.ts || 0)) return (b.__time?.ts || 0) - (a.__time?.ts || 0);
-          if ((b.__time?.rawTs || 0) !== (a.__time?.rawTs || 0)) return (b.__time?.rawTs || 0) - (a.__time?.rawTs || 0);
-          return String(a.__title).localeCompare(String(b.__title), 'zh-Hans-CN');
-        }));
+      const normalizedCards = computed(() => sortCardsByMode(allCards.value, sortMode.value)
+        .map((card, order) => normalizeCard(card, order)));
 
       const totalCountLabel = computed(() => String(totalCount.value).padStart(2, '0'));
 
@@ -264,7 +261,9 @@
       const shownCount = computed(() => filteredCards.value.length);
       const renderedCount = computed(() => visibleCards.value.length);
       const hasMore = computed(() => renderedCount.value < shownCount.value);
-      const countLineText = computed(() => `共 ${totalCount.value} 张信息卡 · 命中 ${shownCount.value} 张 · 已渲染 ${renderedCount.value} 张 · 严格时间降序`);
+      const sortModeLabel = computed(() => sortMode.value === SORT_MODES.UPDATED ? '修改日期' : '首发日期');
+      const sortToggleLabel = computed(() => sortMode.value === SORT_MODES.UPDATED ? '按首发日期' : '按修改日期');
+      const countLineText = computed(() => `共 ${totalCount.value} 张信息卡 · 命中 ${shownCount.value} 张 · 已渲染 ${renderedCount.value} 张 · 严格${sortModeLabel.value}降序`);
       const listProgressText = computed(() => hasMore.value ? `loaded ${renderedCount.value}/${shownCount.value}` : `loaded all ${renderedCount.value}`);
       const loadingNoteText = computed(() => {
         if (loadError.value) return '';
@@ -314,6 +313,14 @@
 
       const onSearchInput = (event) => {
         searchQuery.value = event.target.value;
+        resetVisibleCount();
+        nextTick(() => {
+          ensureAutoFill();
+        });
+      };
+
+      const toggleSortMode = () => {
+        sortMode.value = sortMode.value === SORT_MODES.UPDATED ? SORT_MODES.PUBLISHED : SORT_MODES.UPDATED;
         resetVisibleCount();
         nextTick(() => {
           ensureAutoFill();
@@ -439,6 +446,7 @@
         if (typeof saved.visibleCount === 'number') visibleCount.value = saved.visibleCount;
         if (saved.selectedFacets && typeof saved.selectedFacets === 'object') selectedFacets.value = saved.selectedFacets;
         if (typeof saved.searchQuery === 'string') searchQuery.value = saved.searchQuery;
+        sortMode.value = normalizeSortMode(saved.sortMode);
         if (typeof saved.scrollTop === 'number') scrollTop.value = saved.scrollTop;
         return Array.isArray(saved.cards) && saved.cards.length > 0;
       };
@@ -452,6 +460,7 @@
           visibleCount: visibleCount.value,
           selectedFacets: JSON.parse(JSON.stringify(selectedFacets.value)),
           searchQuery: searchQuery.value,
+          sortMode: sortMode.value,
           scrollTop: scrollTop.value
         });
       };
@@ -502,7 +511,7 @@
       });
 
       // Watch state changes and persist
-      Vue.watch([allCards, version, filteredCards, selectedFacets, searchQuery, visibleCount], async () => {
+      Vue.watch([allCards, version, filteredCards, selectedFacets, searchQuery, sortMode, visibleCount], async () => {
         await nextTick();
         ensureAutoFill();
         setupObserver();
@@ -521,6 +530,9 @@
         renderedCount,
         hasMore,
         searchQuery,
+        sortMode,
+        sortModeLabel,
+        sortToggleLabel,
         selectedFacets,
         filterDrawerOpen,
         isMobileViewport,
@@ -542,6 +554,7 @@
         sentinelRef,
         activeFacetClass,
         onSearchInput,
+        toggleSortMode,
         toggleFacetValue,
         openFilterDrawer,
         closeFilterDrawer,
@@ -620,10 +633,20 @@
                 </button>
               </template>
             </div>
-            <button type="button" class="filter-trigger" @click="openFilterDrawer">
-              筛选
-              <span v-if="activeFilterCount">{{ activeFilterCount }}</span>
-            </button>
+            <div class="filter-controls" aria-label="筛选和排序控制">
+              <button
+                type="button"
+                class="sort-trigger"
+                :aria-pressed="sortMode === 'updated' ? 'true' : 'false'"
+                @click="toggleSortMode"
+              >
+                {{ sortToggleLabel }}
+              </button>
+              <button type="button" class="filter-trigger" @click="openFilterDrawer">
+                筛选
+                <span v-if="activeFilterCount">{{ activeFilterCount }}</span>
+              </button>
+            </div>
           </section>
 
           <div
