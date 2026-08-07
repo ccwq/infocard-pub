@@ -579,6 +579,7 @@
             </div>
 
               <div class="poster-band compact">
+                <a class="theme-link" href="./themes.html" aria-label="打开信息卡主题页">主题卡 ↗</a>
                 <div class="poster-title-zone compact">
                   <div class="poster-index">01 / ARCHIVE POSTER</div>
                   <h1>INFOCARD<br>ARCHIVE</h1>
@@ -597,7 +598,6 @@
                       <span class="poster-stat-value">{{ totalCountLabel }}</span>
                     </div>
                   </div>
-                  <a class="theme-link" href="./themes.html" aria-label="打开信息卡主题页">主题卡 ↗</a>
                 </div>
               </div>
             </section>
