@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>versenilvis/IRIS — TTY 里的 IntelliSense，Fig 之后的开源 shell 实时补全</title>
+<style>
+:root{
+  --bg:#f5f2ec;
+  --paper:#fffdf9;
+  --ink:#0a0a0a;
+  --red:#c8102e;
+  --soft-red:#fff5f6;
+  --line:#0a0a0a;
+  --shadow:6px 6px 0 rgba(10,10,10,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 96px}
+
+.topbar{
+  display:flex;justify-content:space-between;align-items:flex-end;
+  border-bottom:3px solid var(--line);padding-bottom:8px;margin-bottom:14px;
+}
+.topbar-left{display:grid;gap:6px}
+.badge{
+  display:inline-block;padding:2px 8px;
+  border:1.5px solid var(--line);background:var(--ink);color:#fff;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+}
+h1.demo-title{font-size:clamp(22px,3.8vw,42px);font-weight:800;margin:4px 0 0;letter-spacing:-.04em;line-height:.96}
+.meta{font-size:12px;color:#666;margin-top:6px;line-height:1.55}
+.tagline{
+  display:inline-block;padding:3px 8px;
+  border:2px solid var(--red);background:var(--soft-red);color:var(--red);
+  font-size:10.8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px;
+}
+
+.stats{
+  display:flex;flex-wrap:wrap;
+  border:2px solid var(--line);margin-bottom:14px;
+  overflow:hidden;box-shadow:var(--shadow);
+}
+.stat{
+  flex:1;min-width:60px;padding:10px 12px 8px;
+  border-right:2px solid var(--line);text-align:center;background:#fff;
+}
+.stat:last-child{border-right:none}
+.stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+.stat span{font-size:12px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:4px;display:block}
+
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+.pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+.pill.dark{background:var(--ink);color:#fff}
+.pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+.section{
+  border:2px solid var(--line);margin-bottom:10px;
+  overflow:hidden;background:var(--paper);box-shadow:var(--shadow);
+}
+.sec-head{
+  background:var(--ink);color:#fff;padding:7px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+.sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.sec-body{padding:12px 14px 14px}
+
+h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
+
+.grid-2,.grid-3,.grid-4{display:grid;gap:10px;margin-bottom:10px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+.card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+.card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+.card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+.card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+.card ul{margin:0;padding-left:14px}
+.card li{margin:3px 0;font-size:12px;color:#333;line-height:1.6}
+
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+tr:nth-child(even) td{background:#faf8f4}
+.check{color:var(--red);font-weight:900;font-size:13px}
+.cross{color:var(--ink);font-weight:900;font-size:13px}
+
+.flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
+.flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+.flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+.flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+
+.btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+.btn.red{background:var(--red);border-color:var(--red)}
+.btn.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+pre.code-block{
+  background:#1a1a1a;color:#f5f2ec;padding:10px 12px;border:2px solid var(--line);
+  font-size:11.5px;line-height:1.65;overflow-x:auto;border-radius:0;margin:6px 0;
+}
+
+.rule{height:3px;background:var(--ink);margin:10px 0}
+.source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+.footer{margin-top:10px;text-align:center;color:#666;font-size:12px;line-height:1.68}
+.footer a{color:var(--red);font-weight:800}
+.save-btn{
+  position:fixed;right:18px;bottom:18px;z-index:999;
+  border:2px solid var(--line);border-radius:8px;
+  padding:9px 14px;
+  background:linear-gradient(135deg,var(--red) 0%,#a00a22 100%);
+  color:#fff;font-weight:900;letter-spacing:.04em;
+  box-shadow:5px 5px 0 rgba(10,10,10,.2);cursor:pointer;font-size:12px;
+}
+.save-btn:disabled{opacity:.75;cursor:progress}
+
+@media(max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 96px}
+  .grid-4,.grid-3,.grid-2{grid-template-columns:1fr}
+  .stats{flex-direction:column}
+  .stat{border-right:0;border-bottom:2px solid var(--line)}
+  .stat:last-child{border-bottom:0}
+  .card{padding-left:12px;padding-right:12px}
+  .save-btn{position:static;display:block;margin:14px 0 0 auto;border-radius:0;box-shadow:4px 4px 0 rgba(10,10,10,.16)}
+  h1.demo-title{font-size:clamp(20px,9vw,36px)}
+  pre.code-block{font-size:11px}
+  table{font-size:11.5px}
+  th,td{padding:6px 8px}
+}
+@media(print){.save-btn{display:none}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="badge">GITHUB · SHELL TOOL · OPEN SOURCE</div>
+      <h1 class="demo-title">versenilvis/IRIS<br>TTY 里的 IntelliSense，Fig 之后的开源替代</h1>
+      <div class="meta">Intelligent Real-time Input Suggestion · 1,050 ★ · 32 forks · BSD Zero Clause (0BSD) · beta · 2026-04-06 创建</div>
+      <div class="tagline">⌨️  Native Go · TTY-only · No GUI · No telemetry</div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><strong>1,050</strong><span>Stars</span></div>
+    <div class="stat"><strong>32</strong><span>Forks</span></div>
+    <div class="stat"><strong>beta</strong><span>状态</span></div>
+    <div class="stat"><strong>Linux/macOS</strong><span>支持平台</span></div>
+  </div>
+
+  <div class="pills">
+    <span class="pill red">shell</span>
+    <span class="pill dark">autocompletion</span>
+    <span class="pill">TTY native</span>
+    <span class="pill red">Fig 替代</span>
+    <span class="pill">AI suggestion</span>
+    <span class="pill dark">native Go</span>
+    <span class="pill">zsh / bash / fish</span>
+    <span class="pill red">SSH 友好</span>
+    <span class="pill">tmux</span>
+    <span class="pill soft">⚠️ 不支持 Windows</span>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">01</span> · <span class="label">它解决什么</span></div>
+    </div>
+    <div class="sec-body">
+      <h3>把代码编辑器里的 IntelliSense 体验搬到 TTY，让 shell 输入有实时建议菜单</h3>
+      <p>IRIS = Intelligent Real-time Input Suggestion。它不是按 Tab 才补全的传统 shell 插件，而是原生运行在 TTY 上的单个 Go 二进制：</p>
+      <ul style="margin:6px 0 10px 18px;color:#333;font-size:12.5px;line-height:1.7">
+        <li><strong>实时补全菜单</strong>：敲 <code>git che</code> 时弹出候选（<code>checkout</code>、<code>cherry-pick</code> 等），无需先按 Tab</li>
+        <li><strong>本地 / SSH / Tmux 全场景可用</strong>：直接挂在 TTY 之上，远程服务器和 Linux 虚拟终端都跑得动</li>
+        <li><strong>单文件本地 Go 二进制</strong>：不依赖 Electron、不开 GUI、不带后台守护进程、不上报任何遥测</li>
+        <li><strong>本地 AI 补全（可选）</strong>：接 Groq 云端或本地 Ollama，按 debounce 节流，不阻塞主线程</li>
+      </ul>
+      <p style="font-size:11.5px;color:#666;margin:0">⚠️ README 仍标记为 beta，Windows 当前不在支持列表。</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">02</span> · <span class="label">Fig 的继任者</span></div>
+    </div>
+    <div class="sec-body">
+      <p>2024 年 9 月，Fig 官方停止维护，并入 Amazon Q Developer（需云登录、绑定 AWS）。IRIS 自定位为 Fig 的开源、轻量、零遥测继任者。</p>
+      <table>
+        <thead>
+          <tr><th>维度</th><th>IRIS</th><th>Fig</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>平台</td><td>Linux + macOS</td><td>仅 macOS</td></tr>
+          <tr><td>引擎</td><td>Native Go（直挂 TTY）</td><td>Electron 桌面 App</td></tr>
+          <tr><td>启动开销</td><td>接近零</td><td>低（Electron runtime）</td></tr>
+          <tr><td>UI</td><td>行内 inline overlay</td><td>GUI 弹出框</td></tr>
+          <tr><td>远程 SSH</td><td>TTY 原生、便携</td><td>绑定 macOS GUI</td></tr>
+          <tr><td>Tmux / Linux VT</td><td><span class="check">✓</span></td><td>有限 / 不支持</td></tr>
+          <tr><td>账号 / 遥测</td><td>无</td><td>有</td></tr>
+          <tr><td>许可证</td><td>0BSD（极宽松）</td><td>闭源</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">03</span> · <span class="label">补全来源（README 原文）</span></div>
+    </div>
+    <div class="sec-body">
+      <p>IRIS 不是简单把 shell 内置补全再贴一层 UI。它会主动索引这几类来源，按你的实时输入给出候选：</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">A · Built-in spec</div>
+          <h4>内置命令规格库</h4>
+          <p>对常见命令（git、docker、kubectl、npm…）自带补全规格，按参数位置给出候选项。</p>
+        </div>
+        <div class="card">
+          <div class="lead">B · Shell history</div>
+          <h4>shell 历史记录</h4>
+          <p>你过去敲过的命令会被索引，前缀匹配时直接列出来；切换到 <code>history</code> 模式只显示历史。</p>
+        </div>
+        <div class="card">
+          <div class="lead">C · Aliases</div>
+          <h4>shell alias</h4>
+          <p>自动索引你的 alias，敲别名时也能给出对应真实命令的展开建议。</p>
+        </div>
+        <div class="card">
+          <div class="lead">D · Files &amp; Directories</div>
+          <h4>文件 / 路径</h4>
+          <p>路径前缀匹配继续补目录和文件；可在 UI 里关掉隐藏文件。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">E · Git 分支感知</div>
+          <h4>当前仓库的 git 状态</h4>
+          <p>区分当前分支与远端/已合并分支，自动去重；可关掉跨分支污染。</p>
+        </div>
+        <div class="card">
+          <div class="lead">F · AI suggestion（可选）</div>
+          <h4>OpenAI-compatible provider</h4>
+          <p>接 Groq（默认 llama-3.3-70b-versatile）或本地 Ollama（默认 qwen2.5-coder），按 debounce 触发。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">04</span> · <span class="label">安装方式（按场景挑）</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">Homebrew</div>
+          <h4>macOS / Linux（最省事）</h4>
+          <pre class="code-block">brew install versenilvis/iris/iris</pre>
+          <p>装完会自动跑 <code>iris setup</code>，把 shell 集成代码注入对应 rc 文件。</p>
+        </div>
+        <div class="card">
+          <div class="lead">官方安装脚本</div>
+          <h4>无 brew 环境的通用方式</h4>
+          <pre class="code-block">curl -sSL https://raw.githubusercontent.com/versenilvis/iris/main/scripts/install.sh | sh</pre>
+          <p>脚本会按 <code>uname</code> 选 <code>darwin_amd64/arm64</code> 或 <code>linux_amd64/arm64</code> 拉 release tarball；优先装 <code>/usr/local/bin</code>，无权限则落 <code>~/.local/bin</code>。</p>
+        </div>
+        <div class="card">
+          <div class="lead">Go install</div>
+          <h4>已经装 Go 1.24+ 的开发者</h4>
+          <pre class="code-block">go install github.com/versenilvis/iris/cmd/iris@latest</pre>
+        </div>
+        <div class="card">
+          <div class="lead">包管理器（按发行版）</div>
+          <h4>Arch / Debian / Fedora / Nix / asdf / aqua</h4>
+          <pre class="code-block">yay  -S iris-autocomplete        # Arch
+dpkg -i iris_linux_amd64.deb    # Debian/Ubuntu
+rpm  -i iris_linux_amd64.rpm    # Fedora/RHEL
+nix profile add github:versenilvis/iris   # Nix</pre>
+          <p>asdf 走 <code>asdf plugin add iris https://github.com/versenilvis/asdf-iris.git</code>。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">05</span> · <span class="label">Shell 集成（极薄）</span></div>
+    </div>
+    <div class="sec-body">
+      <p>安装脚本会往 rc 文件里加一行；如果你重置过 rc，手动补这一行即可：</p>
+      <pre class="code-block"># zsh  ~/.zshrc
+eval "$(iris init zsh)"
+
+# bash ~/.bashrc
+eval "$(iris init bash)"
+
+# fish ~/.config/fish/config.fish
+iris init fish | source</pre>
+      <p style="font-size:11.5px;color:#666;margin:8px 0 0">⚠️ README 警告：同时跑 zsh-autosuggestions / zsh-autocomplete / atuin / flyline 这类补全插件会和 IRIS 抢键位与视觉，建议在装 IRIS 之前先关掉它们。</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">06</span> · <span class="label">关键键位（默认）</span></div>
+    </div>
+    <div class="sec-body">
+      <table>
+        <thead>
+          <tr><th>快捷键</th><th>行为</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Shift+Tab</strong></td><td>显示 / 隐藏建议菜单</td></tr>
+          <tr><td><strong>Tab</strong></td><td>接受当前选中建议</td></tr>
+          <tr><td><strong>→</strong></td><td>接受 ghost text（淡色预测文字）</td></tr>
+          <tr><td><strong>↑ / ↓</strong></td><td>候选条目上下移动；空 prompt 时浏览历史</td></tr>
+          <tr><td><strong>Ctrl/⌘+R</strong></td><td>在 <code>spec</code> ↔ <code>history</code> 模式之间切换</td></tr>
+          <tr><td><strong>Esc</strong></td><td>临时隐藏菜单（下次按键再恢复）</td></tr>
+          <tr><td><strong>Enter</strong></td><td>关闭菜单并把当前命令送给 shell 执行</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">07</span> · <span class="label">AI 补全怎么接（可选）</span></div>
+    </div>
+    <div class="sec-body">
+      <p>在 <code>~/.config/iris/config.toml</code> 里开启：</p>
+      <pre class="code-block">[ai]
+enabled = true
+provider = "groq"     # 或 "ollama"
+debounce_ms = 400
+
+[ai.providers.groq]
+endpoint = "https://api.groq.com/openai/v1/chat/completions"
+api_key_env = "GROQ_API_KEY"     # 推荐用环境变量，别明文写
+model = "llama-3.3-70b-versatile"
+timeout_ms = 3000
+
+[ai.providers.ollama]
+endpoint = "http://localhost:11434/v1/chat/completions"
+model = "qwen2.5-coder"
+timeout_ms = 5000</pre>
+      <p>两点原则：① key 走 <code>api_key_env</code> 而不是 <code>api_key</code>；② debounce 在 400ms 量级，避免每敲一个键都打 API。</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">08</span> · <span class="label">边界 &amp; 注意事项</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">⚠️ 已知边界</div>
+          <h4>beta 阶段 + 仅 Unix 系</h4>
+          <ul>
+            <li>当前 README 标记为 <strong>beta</strong>，不排除破坏性变更</li>
+            <li>Windows 不支持（README 明示）</li>
+            <li>需要 ANSI 颜色支持的终端模拟器</li>
+            <li>已有 <strong>14 个 open issues</strong>，动手前先扫一遍</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="lead">🔒 隐私边界</div>
+          <h4>debug 模式会记录你敲的所有内容</h4>
+          <ul>
+            <li>默认 <code>debug=false</code>，不要长期开</li>
+            <li>调试日志写在 <code>~/.iris/crash.log</code></li>
+            <li>crash 时自动落盘，可用 <code>iris crash-log</code> 定位</li>
+            <li>AI provider 走你自己的 key，不上传到 IRIS 项目</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <div><span class="num">09</span> · <span class="label">一句话评估</span></div>
+    </div>
+    <div class="sec-body">
+      <div class="flow">
+        <div class="flow-item red">Fig 停服</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">开源替代</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item red">TTY 原生</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">SSH/Tmux 友好</div>
+      </div>
+      <p>IRIS 的最大价值不是"又多了一个补全工具"，而是把 Fig 那种 GUI 级 IntelliSense 体验重新拉回 TTY：单 Go 二进制、零遥测、跨平台 shell、SSH/Tmux 通吃。如果你在远程服务器、Tmux 窗格或者不想装 GUI 的工作流里频繁敲长命令，它值得先在容器里试一下，再决定要不要常驻。</p>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+  <p class="source-note">infocard-redswiss-style · 单开源 CLI 工具卡 · 信息源：versenilvis/IRIS README / install.sh / GitHub API · 数据日期：2026-08-08</p>
+  <p class="footer">versenilvis/IRIS · <a href="https://github.com/versenilvis/IRIS">GitHub</a> · 0BSD License · 本地 / SSH 友好</p>
+</main>
+
+<button class="save-btn" id="saveBtn" type="button">保存 PNG</button>
+<script>
+(function(){
+  var btn=document.getElementById('saveBtn');
+  var fname='20260808-iris-shell-autocomplete.png';
+  async function exportPng(){
+    btn.disabled=true;
+    var old=btn.textContent;btn.textContent='导出中…';
+    try{
+      var[{default:html2canvas}]=await Promise.all([
+        import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')
+      ]);
+      var canvas=await html2canvas(document.body,{
+        backgroundColor:'#f5f2ec',scale:2,useCORS:true,
+        scrollY:-window.scrollY,
+        windowWidth:document.documentElement.clientWidth,
+        windowHeight:document.documentElement.clientHeight
+      });
+      var link=document.createElement('a');
+      link.download=fname;link.href=canvas.toDataURL('image/png');link.click();
+      btn.textContent='已保存';
+      setTimeout(function(){btn.textContent=old},1200);
+    }catch(e){console.error(e);alert('PNG 导出失败，请查看控制台。');}
+    finally{btn.disabled=false;}
+  }
+  btn.addEventListener('click',exportPng);
+})();
+</script>
+</body>
+</html>
