@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>herdr：Agent 感知的终端工作区管理器</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ MATRIX + RISK ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ CODE ============ */
+    .codeblock{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;margin-bottom:12px;overflow-x:auto}
+    .codeblock .cap{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px}
+    .codeblock pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap}
+
+    /* ============ TABLE ============ */
+    .tblwrap{border:2px solid var(--line);background:#fff;overflow:hidden;margin-bottom:12px}
+    .tblhead{background:var(--ink);color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center}
+    .tblhead span{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+    .tblhead .ico{font-size:11px;color:var(--blue)}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;margin:0}
+    th,td{padding:8px 12px;border:1.5px solid var(--line);text-align:left;vertical-align:top}
+    th{font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--soft-ink)}
+    td code{font-size:11.5px;background:var(--soft-ink);border:1px solid #ddd;padding:1px 5px;border-radius:4px}
+
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px;margin-bottom:12px}
+    .footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+    .footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+    .footer-block .foot{font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block,.codeblock{padding-left:12px;padding-right:12px}
+      .tblwrap{overflow-x:auto}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">开发者工具 · 终端工作区</div>
+        <h1 class="demo-title">herdr：Agent 感知的终端工作区管理器</h1>
+        <p class="subtitle">为 AI 编程代理设计的终端复用工具：在同一个工作区里并排运行 Claude Code / Codex / OpenCode，自动识别每个 pane 里的 Agent 状态（working / blocked / done / idle），让"多 Agent 协作"从脚本拼接到可视化工作台。</p>
+        <div class="badge-row">
+          <span class="badge red">开源 CLI</span>
+          <span class="badge blue">Agent 检测</span>
+          <span class="badge">Workspace 编排</span>
+          <span class="badge dark">tmux 进化版</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge ink">GitHub ≈ 27k stars</span>
+          <span class="badge ink">500+ 社区插件</span>
+          <span class="badge ink">YC 项目</span>
+          <span class="badge ink">Windows Beta</span>
+        </div>
+        <div class="alert">
+          <strong>核心定位：不是又一个 tmux，而是"认识 Agent"的终端工作区</strong>
+          <p>普通终端复用器只知道 pane 里有个进程；herdr 能识别 pane 里跑的是哪个 Agent、处于什么状态，并把多 Agent 的工作区状态聚合到一个界面。安装、配置、极简工作流与检测机制都在下面。</p>
+          <div class="mini-row">
+            <span class="mini-tag">workspace</span>
+            <span class="mini-tag">tab / pane</span>
+            <span class="mini-tag">状态聚合</span>
+            <span class="mini-tag">lifecycle hooks</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">QUICK START</div>
+          <h3>60 秒跑起来</h3>
+          <p>一条命令安装，起一个 workspace，在 pane 里跑 Agent，剩下的交给状态聚合。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>一句话：</b>把"同时跑几个 AI 编码 Agent"变成可管理的终端工作台。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">curl -fsSL https://herdr.dev/install.sh | sh</div></div>
+            <div class="flow-item red"><div class="t">Step 2</div><div class="c">herdr 启动工作区</div></div>
+            <div class="flow-item dark"><div class="t">Step 3</div><div class="c">pane 里跑 claude / codex / opencode</div></div>
+            <div class="flow-item blue"><div class="t">Step 4</div><div class="c">Agent 状态自动聚合</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">POSITIONING</div>
+          <h2>它解决什么问题</h2>
+          <p>多 Agent 并行开发时，终端窗口一多就失去秩序；herdr 把"窗口管理"升级为"工作区 + Agent 状态管理"。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">是什么</span><span class="tag blue">定位</span></div>
+          <h3>Agent 感知型工作区管理器</h3>
+          <p>在终端复用（tmux/screen 类能力）之上，增加对 AI 编程代理的语义识别：知道每个 pane 在跑什么 Agent、处于什么状态。</p>
+          <ul><li>workspace / tab / pane 三级结构</li><li>pane 是真实终端进程载体</li><li>状态：working / blocked / done / idle</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">不是什么</span><span class="tag dark">边界</span></div>
+          <h3>不是普通终端复用器</h3>
+          <p>如果只是分屏、跳转、持久会话，tmux 已经够用。herdr 的差异在"Agent 语义层"：状态检测、生命周期 hooks、多 Agent 协作界面。</p>
+          <ul><li>不是 tmux 皮肤</li><li>不是 CI / 任务调度器</li><li>Agent 状态≠进程是否存活</li></ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">适用</span><span class="tag red">场景</span></div>
+          <h3>谁最需要它</h3>
+          <p>同时跑多个 AI 编码代理的开发者、需要"一项目一工作区"的团队、想在终端里可视化多 Agent 进度的用户。</p>
+          <ul><li>Claude Code + Codex 并行改代码</li><li>前端 / 后端 Agent 分工同一仓库</li><li>长任务 detach 后继续跑</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">INSTALL</div>
+          <h2>安装与更新</h2>
+          <p>官方文档提供脚本、包管理器与手工二进制三种路径；Windows 为 Beta 支持。</p>
+        </div>
+      </div>
+      <div class="codeblock">
+        <div class="cap">// Linux / macOS（官方脚本）</div>
+        <pre>curl -fsSL https://herdr.dev/install.sh | sh</pre>
+      </div>
+      <div class="codeblock">
+        <div class="cap">// Windows（Beta，PowerShell）</div>
+        <pre>powershell -ExecutionPolicy Bypass -c "irm https://herdr.dev/install.ps1 | iex"</pre>
+      </div>
+      <div class="codeblock">
+        <div class="cap">// 包管理器</div>
+        <pre>brew install herdr
+mise use -g herdr
+nix run github:herdrdev/herdr/v0.x.y</pre>
+      </div>
+      <div class="grid-4" style="margin-bottom:12px">
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Linux x86_64</div>
+          <div style="font-size:14px;font-weight:900">herdr-linux-x86_64</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Linux aarch64</div>
+          <div style="font-size:14px;font-weight:900">herdr-linux-aarch64</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">macOS</div>
+          <div style="font-size:14px;font-weight:900">herdr-macos-x86_64 / aarch64</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Windows (Beta)</div>
+          <div style="font-size:14px;font-weight:900">herdr-windows-x86_64.zip</div>
+        </div>
+      </div>
+      <div class="quote-block">
+        <b>更新：</b>直接运行 <code>herdr update</code>，官方脚本安装的版本支持自更新。
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">QUICK WORKFLOW</div>
+          <h2>极简工作流：5 步跑通</h2>
+          <p>从安装到多 Agent 并行，最小可用路径。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="codeblock" style="margin-bottom:0">
+          <div class="cap">// 第 1–2 步：启动 + 跑 Agent</div>
+          <pre>herdr                          # 进入工作区
+# 在一个 pane 里运行任意受支持的 Agent
+claude                         # 或 codex / opencode</pre>
+        </div>
+        <div class="codeblock" style="margin-bottom:0">
+          <div class="cap">// 第 3 步：pane 操作快捷键</div>
+          <pre>Ctrl+b v   垂直分屏
+Ctrl+b -   水平分屏
+Ctrl+b c   新建 pane
+Ctrl+b w   切换 workspace
+Ctrl+b q   退出当前 pane</pre>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="codeblock" style="margin-bottom:0">
+          <div class="cap">// 第 4–5 步：后台与停止</div>
+          <pre># detach 后任务继续跑，重进即可恢复
+herdr
+
+# 停止会话 / 重载配置
+herdr server stop
+herdr server reload-config</pre>
+        </div>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">建议</span><span class="tag dark">约定</span></div>
+          <h3>一项目一 workspace</h3>
+          <p>官方推荐按项目划分 workspace：每个项目一个工作区，内部用 tab / pane 组织不同 Agent 或任务。</p>
+          <ul><li>workspace = 项目边界</li><li>tab = 任务组</li><li>pane = 单个终端进程（Agent）</li><li>session = 可 detach 的持久会话</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">AGENT DETECTION</div>
+          <h2>Agent 检测与协作机制</h2>
+          <p>这是 herdr 与普通终端复用器的核心差异：如何认出 Agent、如何报告状态。</p>
+        </div>
+      </div>
+      <div class="tblwrap">
+        <div class="tblhead"><span>支持的 Agent（官方列表）</span><span class="ico">↔</span></div>
+        <table>
+          <tr>
+            <th>Agent</th>
+            <th>支持状态</th>
+            <th>说明</th>
+          </tr>
+          <tr>
+            <td><code>claude</code> / Claude Code</td>
+            <td>✅ 完整</td>
+            <td>首选场景，状态检测成熟</td>
+          </tr>
+          <tr>
+            <td><code>codex</code> / OpenAI Codex</td>
+            <td>✅ 完整</td>
+            <td>并行编码主力</td>
+          </tr>
+          <tr>
+            <td><code>opencode</code></td>
+            <td>✅ 完整</td>
+            <td>开源 Agent</td>
+          </tr>
+          <tr>
+            <td>Cursor Agent CLI</td>
+            <td>✅ 完整</td>
+            <td>Cursor 命令行形态</td>
+          </tr>
+          <tr>
+            <td>Hermes Agent</td>
+            <td>✅ 完整</td>
+            <td>本工作流同族</td>
+          </tr>
+          <tr>
+            <td>Grok CLI</td>
+            <td>✅ 完整</td>
+            <td>xAI 命令行</td>
+          </tr>
+          <tr>
+            <td>Gemini CLI / Cline</td>
+            <td>⚠️ 部分验证</td>
+            <td>官方提及但覆盖有限</td>
+          </tr>
+        </table>
+      </div>
+      <div class="matrix">
+        <article class="mini">
+          <div class="lead">01 / 状态</div>
+          <h4>working</h4>
+          <p class="quote-line">Agent 正在执行任务</p>
+          <p>前台进程 + 输出特征联合判断。</p>
+        </article>
+        <article class="mini">
+          <div class="lead blue">02 / 状态</div>
+          <h4>blocked</h4>
+          <p class="quote-line">Agent 卡住 / 等待输入</p>
+          <p>需要人类介入的信号。</p>
+        </article>
+        <article class="mini">
+          <div class="lead red">03 / 状态</div>
+          <h4>done / idle</h4>
+          <p class="quote-line">任务结束或空闲</p>
+          <p>用于工作区总览排序。</p>
+        </article>
+        <article class="mini">
+          <div class="lead">04 / 来源</div>
+          <h4>检测层级</h4>
+          <p class="quote-line">foreground process</p>
+          <p>screen manifest + lifecycle hooks / plugin 三层。</p>
+        </article>
+      </div>
+      <div class="quote-block" style="margin-top:12px">
+        <b>检测机制：</b>herdr 通过<b>前台进程识别</b>判断 pane 里跑的是什么；<b>screen manifest</b> 描述工作区结构；<b>lifecycle hooks / 插件</b> 上报 Agent 生命周期事件。外层 wrapper 或嵌套 tmux 会干扰识别，官方建议直接裸跑 Agent。
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">CONFIG</div>
+          <h2>配置与常用命令</h2>
+          <p>配置为 TOML 格式，按平台落在标准配置目录；修改后热重载。</p>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:12px">
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Linux / macOS</div>
+          <div style="font-size:13.5px;font-weight:900;word-break:break-all">~/.config/herdr/config.toml</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:10px 12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Windows</div>
+          <div style="font-size:13.5px;font-weight:900;word-break:break-all">%APPDATA%\herdr\config.toml</div>
+        </div>
+      </div>
+      <div class="tblwrap">
+        <div class="tblhead"><span>常用命令速查</span><span class="ico">⌘</span></div>
+        <table>
+          <tr>
+            <th>命令</th>
+            <th>作用</th>
+          </tr>
+          <tr>
+            <td><code>herdr</code></td>
+            <td>进入/恢复工作区</td>
+          </tr>
+          <tr>
+            <td><code>herdr update</code></td>
+            <td>自更新</td>
+          </tr>
+          <tr>
+            <td><code>herdr server stop</code></td>
+            <td>停止会话服务</td>
+          </tr>
+          <tr>
+            <td><code>herdr server reload-config</code></td>
+            <td>热重载配置</td>
+          </tr>
+          <tr>
+            <td><code>Ctrl+b v / - / c / w / q</code></td>
+            <td>分屏 / 新建 / 切换 / 退出</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">06</div>
+        <div class="section-meta">
+          <div class="label k">LIMITS &amp; RISKS</div>
+          <h2>限制与注意点</h2>
+          <p>上手前值得知道的边界。</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="red">
+          <div class="n">1</div>
+          <h4>Windows 仍为 Beta</h4>
+          <p>官方将 Windows 标为 Beta 支持，生产环境优先 Linux/macOS；部分 Agent 状态检测在 Windows 上表现可能不完整。</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">2</div>
+          <h4>外层 wrapper / 嵌套 tmux</h4>
+          <p>在 tmux 里再套 herdr，或给 Agent 包一层 wrapper 脚本，会干扰前台进程识别与状态检测。建议直接裸跑 Agent。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">3</div>
+          <h4>规模数字随时间变化</h4>
+          <p>GitHub stars、插件数与下载量为抓取时快照（约 25k–27k stars、500+ 插件、340k downloads），发布时以仓库实时数据为准。</p>
+        </article>
+      </div>
+      <div class="footer-block" style="margin-top:14px">
+        <h3>收口：什么情况下选 herdr</h3>
+        <p>当你同时在终端里跑多个 AI 编码 Agent、需要"一项目一工作区"的结构化编排、并想一眼看到每个 Agent 是 working 还是 blocked 时，herdr 是 tmux 的语义升级版。</p>
+        <ul>
+          <li>核心价值：Agent 状态聚合 + 工作区编排，不是单纯终端复用</li>
+          <li>上手成本：一条命令安装，5 步跑通，配置是单文件 TOML</li>
+          <li>边界：Windows Beta、嵌套终端影响识别、生态数字随时间变化</li>
+        </ul>
+        <div class="foot">来源：herdr 官方文档（herdr.dev/docs/install · concepts · agents · configuration）、GitHub herdr-cli/herdr、YC 项目页；抓取时间 2026-08-11。</div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">infocard-hardblue-style · herdr 终端工作区管理器 · 2026-08-11</p>
+  </main>
+</body>
+</html>
