@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Qwen-MM-Plugins · 多模态 Agent 工具层</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+    .tag.green{background:#d4edda;color:#155724}
+    .tag.orange{background:#fff3cd;color:#856404}
+
+    /* ============ MATRIX + RISK ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ PRICING TABLE ============ */
+    .price-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:0}
+    .price-table th{background:var(--ink);color:#fff;padding:8px 10px;border:1.5px solid var(--line);text-align:left;font-size:10.5px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+    .price-table td{padding:8px 10px;border:1.5px solid var(--line);vertical-align:top}
+    .price-table tr:nth-child(even) td{background:var(--soft-ink)}
+    .price-table .model{font-weight:900;color:var(--blue);font-size:12px}
+    .price-table .price{font-weight:900;color:var(--red);font-size:12px}
+    .price-table .free{font-weight:900;color:#155724;background:#d4edda}
+    .price-table .note{font-size:11px;color:var(--muted)}
+
+    /* ============ CODE BLOCK ============ */
+    pre{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto;font-size:12px;line-height:1.72;white-space:pre-wrap;margin:0}
+    .pre-label{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+      .price-table{font-size:11px}
+      pre{font-size:11px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">Agent 工具层 · Apache 2.0</div>
+        <h1 class="demo-title">Qwen-MM-Plugins</h1>
+        <p class="subtitle">让任意 Agent 运行时原生具备多模态感知能力。Skill（告诉模型"有哪些工具"）+ MCP Server（运行时）双组件，可插入 Claude Code / Codex / Gemini CLI 等 6+ 种 Agent 框架。</p>
+        <div class="badge-row">
+          <span class="badge red">⭐ 1,444 Stars</span>
+          <span class="badge blue">9 大能力</span>
+          <span class="badge dark">Apache 2.0</span>
+          <span class="badge">2026-07-29 创建</span>
+          <span class="badge ink">v0.x · 活跃维护</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge ink">Claude Code</span>
+          <span class="badge ink">Codex</span>
+          <span class="badge ink">Qwen Code</span>
+          <span class="badge ink">Gemini CLI</span>
+          <span class="badge ink">OpenClaw</span>
+          <span class="badge ink">opencode</span>
+        </div>
+        <div class="alert">
+          <strong>不是另一个 Agent 框架，而是跨框架的多模态工具层</strong>
+          <p>本地文件读取（免费）→ 云端视觉/语音理解（DashScope API）→ Blender / FreeCAD 3D 集成，层层解耦，按需安装。</p>
+          <div class="mini-row">
+            <span class="mini-tag">Skill</span>
+            <span class="mini-tag">MCP Server</span>
+            <span class="mini-tag">FastMCP</span>
+            <span class="mini-tag">uvx</span>
+            <span class="mini-tag">DashScope</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">ARCHITECTURE</div>
+          <h3>三层解耦架构</h3>
+          <p>Agent 框架 × 工具层 × 云/本地 API，完全解耦，按需组合。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>核心价值：</b>把 Qwen 的多模态能力打包成"可插拔插件"，兼容任意 Agent 运行时。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Layer 1</div><div class="c">Agent 运行时</div></div>
+            <div class="flow-item dark"><div class="t">Layer 2</div><div class="c">Skill + MCP Server</div></div>
+            <div class="flow-item"><div class="t">Layer 3</div><div class="c">DashScope / Serper / 本地</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <!-- ============ 01 CAPABILITIES ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">CAPABILITIES</div>
+          <h2>9 大能力模块速览</h2>
+          <p>每个 Capability = 1 个 Skill（必须）+ 1 个 MCP Server（除 edu-agent 外均为可选）。分组说明：完全免费 / 按量付费 / 需额外配置。</p>
+        </div>
+      </div>
+
+      <!-- 免费组 -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#155724;background:#d4edda;border:2px solid #28a745;padding:6px 10px;display:inline-flex;align-items:center;gap:6px;margin-bottom:8px">
+          ✓ 完全免费 · 无需 API Key
+        </div>
+      </div>
+      <div class="grid-3" style="margin-bottom:14px">
+        <article class="card">
+          <div class="tagrow"><span class="tag green">core</span><span class="tag">必装</span></div>
+          <h3>本地文件读取</h3>
+          <p>图像 / 视频 / PDF / Office / CSV / 代码 / SVG / DrawIO / 3D / GIS / Notebook / LaTeX，ffmpeg 自动抽帧，动态分辨率缩放至 VL patch 网格。</p>
+          <ul>
+            <li>read_image · 动态分辨率图像</li>
+            <li>read_video · FPS+分辨率抽帧</li>
+            <li>visualize · 通用文件可视化</li>
+            <li>crop / draw_bbox · 裁剪与标注</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag green">blender</span></div>
+          <h3>Blender 3D 建模</h3>
+          <p>薄客户端驱动正在运行的 Blender，22 个工具，无需 Blender 在本进程内。首次调用时可选自动拉起。</p>
+          <ul>
+            <li>几何体创建 / 网格编辑</li>
+            <li>PBR 材质分配</li>
+            <li>Key Light / 环境光</li>
+            <li>Cycles 高质量渲染</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag green">freecad</span></div>
+          <h3>FreeCAD 参数化 CAD</h3>
+          <p>薄客户端驱动正在运行的 FreeCAD，14 个工具。草图、拉伸、旋转、属性编辑、STEP/STL 互转、FEM 有限元分析。</p>
+          <ul>
+            <li>草图 + 拉伸 + 旋转</li>
+            <li>STEP / STL 格式互转</li>
+            <li>有限元分析 (FEM)</li>
+          </ul>
+        </article>
+      </div>
+
+      <!-- DashScope API 组 -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);background:var(--soft-blue);border:2px solid var(--blue);padding:6px 10px;display:inline-flex;align-items:center;gap:6px;margin-bottom:8px">
+          ☁ DashScope API · 按量计费（¥2~36/M token）
+        </div>
+      </div>
+      <div class="grid-3" style="margin-bottom:14px">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">api</span><span class="tag">vision_chat</span></div>
+          <h3>视觉对话</h3>
+          <p>图片/视频输入，多轮视觉对话。默认 qwen3.7-plus（¥2/M 输入）。</p>
+          <ul>
+            <li>vision_chat · 多模态 VL</li>
+            <li>ocr · 文字识别</li>
+            <li>grounding · 目标检测 + bbox</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">omni-av</span><span class="tag orange">2026-08-10 新增</span></div>
+          <h3>Omni 音视频理解</h3>
+          <p>基于 Qwen-Omni 系列，ASR + 时序字幕 + 事件定位 + 音乐标签。按 token 分模态计费（见费用章节）。</p>
+          <ul>
+            <li>transcribe_audio · ASR</li>
+            <li>temporal_captioning · 时序字幕</li>
+            <li>event_counting · 事件计数</li>
+            <li>music_tagging · 音乐标签</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">video-memory</span></div>
+          <h3>长视频记忆</h3>
+          <p>分层语义图记忆构建，2 小时课程/会议自动建索引，支持自然语言问答。</p>
+          <ul>
+            <li>build_memory · 首次自动建图</li>
+            <li>query_memory · 记忆问答</li>
+          </ul>
+        </article>
+      </div>
+
+      <!-- 其他 -->
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag orange">search</span><span class="tag">Serper API</span></div>
+          <h3>网页与图搜</h3>
+          <p>调用 Serper Google 搜索 API，$0.30~1.00/1K 次。免费 2,500 次试用。</p>
+          <ul>
+            <li>web_search · 网页搜索</li>
+            <li>web_extractor · 正文抓取</li>
+            <li>image_search · 以图搜图</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag orange">video-edit</span><span class="tag">百炼 API</span></div>
+          <h3>视频剪辑与生成</h3>
+          <p>Agent 引导的视频剪切/拼接，调用百炼生图/文生视频 API（¥0.6~1/秒）。</p>
+          <ul>
+            <li>视频剪辑工作流</li>
+            <li>qwen-image-3.0 生图</li>
+            <li>wan3.0-video 文生视频</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag">edu-agent</span><span class="tag">纯 Skill</span></div>
+          <h3>教育视频生成</h3>
+          <p>无 MCP Server，纯提示词工程。数学/科学题 → 中文讲解视频 + 交互页面。</p>
+          <ul>
+            <li>题目截图 → 分步讲解</li>
+            <li>生成旁白 + 动画</li>
+            <li>交互式演示页面</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ 02 PRICING (DETAILED) ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">PRICING · 费用详解</div>
+          <h2>费用矩阵：DashScope + Serper + 免费额度</h2>
+          <p>所有 MCP 工具调用本身不收费，按输入 token 计 DashScope 模型费。中国内地（北京）价最低，国际区约高 56%。</p>
+        </div>
+      </div>
+
+      <!-- 核心说明 -->
+      <div class="alert" style="background:var(--soft-blue);border-color:var(--blue);color:var(--blue);margin-bottom:14px">
+        <strong style="color:var(--blue)">⚠ 关键计费逻辑</strong>
+        <p style="color:#1a3a7a">MCP 工具调用本身不收工具费。Function calling 和 MCP 协议免费——工具描述按输入 token 计 DashScope 模型费。内置联网搜索 ¥4/1K 次（走百炼 Agent 通道，非本项目）。</p>
+        <div class="mini-row">
+          <span class="mini-tag" style="background:var(--blue)">模型按量</span>
+          <span class="mini-tag" style="background:var(--blue)">MCP 免费</span>
+          <span class="mini-tag" style="background:var(--blue)">北京最便宜</span>
+        </div>
+      </div>
+
+      <!-- VL 模型定价表 -->
+      <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">表1 · 视觉理解（Vision）— 图像 token 换算：1024×1024 图 ≈ 256 token</div>
+      <table class="price-table" style="margin-bottom:14px">
+        <thead>
+          <tr>
+            <th style="width:22%">模型</th>
+            <th style="width:15%">输入量级</th>
+            <th style="width:20%">输入价（/M token）</th>
+            <th style="width:20%">输出价（/M token）</th>
+            <th style="width:23%">备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="model">qwen3.7-max</td>
+            <td>0–1M</td>
+            <td class="price">¥12（限时5折≈¥6）</td>
+            <td class="price">¥36（限时5折≈¥18）</td>
+            <td class="note">含视觉，上下文 1M</td>
+          </tr>
+          <tr>
+            <td class="model">qwen3.7-plus ★</td>
+            <td>≤256K<br>256K–1M</td>
+            <td class="price">¥2（限时8折≈¥1.6）<br>¥6（限时≈¥4.8）</td>
+            <td class="price">¥8（限时≈¥6.4）<br>¥24（限时≈¥19.2）</td>
+            <td class="note">vision_chat 默认主力模型</td>
+          </tr>
+          <tr>
+            <td class="model">qwen3.7-flash</td>
+            <td>≤32K</td>
+            <td class="price">¥0.2</td>
+            <td class="price">¥0.8</td>
+            <td class="note">低价快速，适合简单任务</td>
+          </tr>
+          <tr>
+            <td class="model">qwen3-vl-plus</td>
+            <td>≤32K</td>
+            <td class="price">¥1</td>
+            <td class="price">¥10</td>
+            <td class="note">专用 VL（ocr / grounding 默认）</td>
+          </tr>
+          <tr>
+            <td class="model">qwen3-vl-flash</td>
+            <td>≤32K</td>
+            <td class="price">¥0.15</td>
+            <td class="price">¥1.5</td>
+            <td class="note">★ 最便宜 VL，OCR 首选</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 实际费用举例 -->
+      <div style="background:#fff;border:2px solid var(--line);padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">💡 实际费用举例</div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+          <div style="border:2px solid var(--line);padding:10px">
+            <div style="font-size:11px;color:var(--muted);font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">OCR · 1 张图</div>
+            <div style="font-size:22px;font-weight:950;color:var(--blue);line-height:1">¥0.00036</div>
+            <div style="font-size:11px;color:var(--muted)">1024×1024 图 + 100 token 文本</div>
+          </div>
+          <div style="border:2px solid var(--line);padding:10px">
+            <div style="font-size:11px;color:var(--muted);font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">ASR · 1 小时会议</div>
+            <div style="font-size:22px;font-weight:950;color:var(--blue);line-height:1">¥0.79</div>
+            <div style="font-size:11px;color:var(--muted)">qwen3-asr-flash ¥0.00022/秒</div>
+          </div>
+          <div style="border:2px solid var(--line);padding:10px">
+            <div style="font-size:11px;color:var(--muted);font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Omni · 1 小时音频</div>
+            <div style="font-size:22px;font-weight:950;color:var(--red);line-height:1">¥1.34</div>
+            <div style="font-size:11px;color:var(--muted)">qwen3.5-omni-plus，25,200 audio token</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 其他模型定价 -->
+      <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">表2 · 图像生成 · 视频生成 · Omni 特殊计费</div>
+      <table class="price-table" style="margin-bottom:14px">
+        <thead>
+          <tr>
+            <th style="width:30%">能力</th>
+            <th style="width:25%">模型</th>
+            <th style="width:20%">单价</th>
+            <th style="width:25%">备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>图像生成</b></td>
+            <td class="model">qwen-image-3.0-pro</td>
+            <td class="price">¥0.27/张（1K）<br>¥0.52/张（2K）</td>
+            <td class="note">输入 ¥0.02 + 输出 ¥0.25/0.5</td>
+          </tr>
+          <tr>
+            <td><b>图像生成</b></td>
+            <td class="model">qwen-image-3.0</td>
+            <td class="price">¥0.20/张</td>
+            <td class="note">1K/2K 同价</td>
+          </tr>
+          <tr>
+            <td><b>视频生成</b></td>
+            <td class="model">wan3.0-video</td>
+            <td class="price">¥0.6/秒（720P）<br>¥1/秒（1080P）</td>
+            <td class="note">按秒计费，成本高</td>
+          </tr>
+          <tr>
+            <td><b>Omni 音频</b></td>
+            <td class="model">qwen3.5-omni-flash</td>
+            <td class="price">¥18/M audio token</td>
+            <td class="note">≈ 12.5 token/秒</td>
+          </tr>
+          <tr>
+            <td><b>Omni 音频</b></td>
+            <td class="model">qwen3.5-omni-plus</td>
+            <td class="price">¥53/M audio token</td>
+            <td class="note">高质量版</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 免费额度 -->
+      <div style="border:2px solid var(--line);background:#fff;padding:14px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--red);margin-bottom:8px">★ DashScope 新用户免费额度</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr) 2fr;gap:10px;align-items:center">
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:900">额度</div>
+            <div style="font-size:18px;font-weight:950;color:var(--red)">100万 token/模型</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:900">有效期</div>
+            <div style="font-size:18px;font-weight:950;color:var(--red)">开通后 90 天</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:900">区域限制</div>
+            <div style="font-size:13px;font-weight:800;color:var(--red)">仅新加坡节点 ★<br><span style="font-size:12px;font-weight:400">北京 ❌ 美东 Virginia ❌</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Serper -->
+      <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">表3 · Serper API 定价（search Capability）</div>
+      <table class="price-table">
+        <thead>
+          <tr>
+            <th>套餐</th>
+            <th>价格</th>
+            <th>查询量</th>
+            <th>单价</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>免费试用</b></td>
+            <td class="price free">$0</td>
+            <td class="free">2,500 次</td>
+            <td>—</td>
+            <td class="note">一次性额度，无需信用卡</td>
+          </tr>
+          <tr>
+            <td>Starter</td>
+            <td>$50</td>
+            <td>50,000 次</td>
+            <td class="price">$1.00/1K</td>
+            <td class="note">6 个月有效</td>
+          </tr>
+          <tr>
+            <td>Standard</td>
+            <td>$375</td>
+            <td>500,000 次</td>
+            <td class="price">$0.75/1K</td>
+            <td class="note">≈ $60/月</td>
+          </tr>
+          <tr>
+            <td>Scale</td>
+            <td>$1,250</td>
+            <td>2,500,000 次</td>
+            <td class="price">$0.50/1K</td>
+            <td class="note">大批量场景</td>
+          </tr>
+          <tr>
+            <td colspan="5" style="background:var(--soft-blue);font-size:11px;text-align:center">
+              Serper vs SerpAPI：$1.00/1K vs $25.00/1K（起始）→ <b style="color:var(--blue)">25 倍价差</b> · 默认 10 条结果 = 1 credit
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 月费用估算 -->
+      <div style="margin-top:14px">
+        <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">月费用估算对照</div>
+        <div class="matrix">
+          <div class="mini">
+            <div class="lead">轻度</div>
+            <h4>纯本地读取</h4>
+            <p class="quote-line" style="border-left-color:#28a745">¥0 / 月</p>
+            <p style="font-size:12px">core + blender + freecad</p>
+          </div>
+          <div class="mini">
+            <div class="lead blue">中度</div>
+            <h4>OCR + grounding</h4>
+            <p class="quote-line">¥50–200 / 月</p>
+            <p style="font-size:12px">qwen3-vl-flash（¥0.15/M）</p>
+          </div>
+          <div class="mini">
+            <div class="lead red">深度</div>
+            <h4>vision chat</h4>
+            <p class="quote-line" style="border-left-color:var(--red)">¥500–2000 / 月</p>
+            <p style="font-size:12px">qwen3.7-plus（¥2/M 输入）</p>
+          </div>
+          <div class="mini">
+            <div class="lead">含搜索</div>
+            <h4>Serper 叠加</h4>
+            <p class="quote-line" style="border-left-color:#856404">+ $60 / 月</p>
+            <p style="font-size:12px">Standard 套餐，500K 次/6月</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 03 TECH STACK ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">TECH STACK</div>
+          <h2>技术栈与架构</h2>
+          <p>Python 3.10+ · uvx 包管理 · FastMCP 框架 · DashScope OpenAI 兼容 API · MCP 协议。配置统一写入 ~/.qwen-mm-plugins/config。</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <div class="mini">
+          <div class="lead">包管理</div>
+          <h4>uvx</h4>
+          <p>首次运行自动安装依赖，无需手动 pip。astral.sh/uv。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">MCP 框架</div>
+          <h4>FastMCP</h4>
+          <p>工具自动注册，MCP Server 托管，零配置暴露工具。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">Agent 协议</div>
+          <h4>MCP + Skill</h4>
+          <p>Skill 告诉模型"有哪些工具"，MCP Server 执行工具。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">配置</div>
+          <h4>~/.qwen-mm-plugins/config</h4>
+          <p>KEY=VALUE 格式，GUI 和终端共享，一次配置全局生效。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">系统工具</div>
+          <h4>ffmpeg（必须）</h4>
+          <p>视频抽帧、时长检测、格式转换。libreoffice（Office）。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">可选工具</div>
+          <h4>Blender / FreeCAD</h4>
+          <p>薄客户端，无需在本进程内。QWEN_MM_AUTOLAUNCH=1 自动拉起。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">Python 分发</div>
+          <h4>pyproject.toml</h4>
+          <p>单一分发 qwen-mm-plugins，含 extras/entries 点对点安装。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">自托管</div>
+          <h4>SAM3 GPU Server</h4>
+          <p>CUDA + PyTorch，segmentation 专用，有运维成本。</p>
+        </div>
+      </div>
+
+      <!-- 安装命令 -->
+      <div style="margin-top:14px">
+        <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">安装命令</div>
+        <pre><span style="color:#888"># 1. 安装 uv（必须）</span>
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+<span style="color:#888"># 2. 安装 ffmpeg（必须）</span>
+apt install ffmpeg   <span style="color:#888"># Linux</span>
+brew install ffmpeg  <span style="color:#888"># macOS</span>
+
+<span style="color:#888"># 3. 一键安装 Qwen-MM-Plugins</span>
+curl -fsSL https://raw.githubusercontent.com/QwenLM/Qwen-MM-Plugins/main/install.sh | bash
+
+<span style="color:#888"># 4. 配置 API Key</span>
+<span style="color:#888"># 获取：https://console.bailian.console.aliyun.com/</span>
+export DASHSCOPE_API_KEY="sk-xxxxxxxx"   <span style="color:#888"># 视觉/语音</span>
+export SERPER_API_KEY="xxxxxxxx"         <span style="color:#888"># 搜索（可选）</span>
+
+<span style="color:#888"># 5. 验证安装</span>
+bash install.sh verify
+
+<span style="color:#888"># 6. Claude Code 中使用示例</span>
+<span style="color:#888"># @dashboard.png 读取这个截图中的所有数字</span>
+<span style="color:#888"># @report.pdf 总结第3页内容</span>
+<span style="color:#888"># @meeting.mp4 转录并标注说话人</span></pre>
+      </div>
+    </section>
+
+    <!-- ============ 04 USE CASES ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="label b">USE CASES</div>
+          <h2>适用场景与最佳配置</h2>
+          <p>按场景推荐 Capability 组合，区分"推荐"与"不推荐"边界。</p>
+        </div>
+      </div>
+
+      <!-- 推荐 -->
+      <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#155724;margin-bottom:8px">✓ 最佳适配场景</div>
+      <div class="grid-2" style="margin-bottom:14px">
+        <article class="card">
+          <div class="tagrow"><span class="tag green">AI 编程 Agent 增强</span></div>
+          <h3>Claude Code / Codex 读取设计稿</h3>
+          <p>让 Agent 读截图、Figma 导出图、报错界面、UI 设计稿，自动提取数字、文字、布局信息。</p>
+          <ul>
+            <li>core（本地读取）+ api（vision_chat）</li>
+            <li>典型场景：UI 验收、截图分析</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag green">隐私敏感文件</span></div>
+          <h3>本地处理不上云</h3>
+          <p>财务报表、医疗影像、内部文档，用 core 本地读取，完全不调用云端 API，零费用。</p>
+          <ul>
+            <li>仅 core 能力，无需任何 API Key</li>
+            <li>适合金融、医疗、法律场景</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">3D / CAD 自动化</span></div>
+          <h3>Blender + FreeCAD 集成</h3>
+          <p>Agent 驱动 Blender 做自动化建模、材质分配、渲染；或 FreeCAD 做参数化 CAD、FEM 分析。</p>
+          <ul>
+            <li>blender：22 个工具，支持 Cycles 渲染</li>
+            <li>freecad：草图→拉伸→STEP/STL 导出</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">长视频理解</span></div>
+          <h3>video-memory 分层记忆</h3>
+          <p>2 小时课程/会议自动建分层语义图，用自然语言问答记忆内容。首次构建调用 DashScope。</p>
+          <ul>
+            <li>build_memory：首次自动建索引</li>
+            <li>query_memory：自然语言记忆问答</li>
+          </ul>
+        </article>
+      </div>
+
+      <!-- 竞品对比 -->
+      <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--red);margin-bottom:8px">✗ 不推荐场景</div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="red">
+          <div class="n">1</div>
+          <h4>需要最强推理深度</h4>
+          <p>Claude Sonnet 4.6 配 extended thinking 更适合复杂图像分析。Qwen-VL 在 benchmark 验证上不如竞品。</p>
+        </article>
+        <article class="risk" data-accent="red">
+          <div class="n">2</div>
+          <h4>依赖 OpenAI 生态</h4>
+          <p>GPT-4o + OpenAI 生态更成熟，Qwen-MM-Plugins 依赖阿里云，供应商锁定是风险。</p>
+        </article>
+        <article class="risk" data-accent="red">
+          <div class="n">3</div>
+          <h4>需要 SLA 生产环境</h4>
+          <p>v0.x 阶段，无正式 Release Tag，无生产验证。稳定性未经大规模验证。</p>
+        </article>
+      </div>
+
+      <!-- 竞品对比表 -->
+      <div style="margin-top:14px">
+        <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">表4 · 同类多模态 Agent 工具横向对比</div>
+        <table class="price-table">
+          <thead>
+            <tr>
+              <th>维度</th>
+              <th>Qwen-MM-Plugins</th>
+              <th>GPT-4o Vision</th>
+              <th>Claude Sonnet 4.6</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>定位</b></td>
+              <td>工具层（可插拔）</td>
+              <td>单一模型 API</td>
+              <td>单一模型 API</td>
+            </tr>
+            <tr>
+              <td><b>输入价</b></td>
+              <td class="price">¥2~12/M</td>
+              <td>¥18/M（$2.5）</td>
+              <td>¥22/M（$3）</td>
+            </tr>
+            <tr>
+              <td><b>Agent 兼容性</b></td>
+              <td style="color:#155724;font-weight:900">✓ 6+ 种框架</td>
+              <td>✗ 绑定 OpenAI</td>
+              <td>✗ 绑定 Anthropic</td>
+            </tr>
+            <tr>
+              <td><b>本地读取</b></td>
+              <td style="color:#155724;font-weight:900">✓ 完全免费</td>
+              <td>✗ 全上传</td>
+              <td>✗ 全上传</td>
+            </tr>
+            <tr>
+              <td><b>开源</b></td>
+              <td style="color:#155724;font-weight:900">✓ Apache 2.0</td>
+              <td>✗</td>
+              <td>✗</td>
+            </tr>
+            <tr>
+              <td><b>3D / CAD</b></td>
+              <td style="color:#155724;font-weight:900">✓ Blender + FreeCAD</td>
+              <td>✗</td>
+              <td>✗</td>
+            </tr>
+            <tr>
+              <td><b>中国访问</b></td>
+              <td style="color:#155724;font-weight:900">✓ 无限制</td>
+              <td>需网络方案</td>
+              <td>需网络方案</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 05 UPDATE STATUS ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">UPDATE · 更新状态</div>
+          <h2>最近活跃记录</h2>
+          <p>2026-07-29 创建，2026-08-10 最新 commit，持续高频率维护。Cookbook 文档已完善，v0.x 无正式 Release。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <div class="mini">
+          <div class="lead red">2026-08-10</div>
+          <h4>Omni-AV 新增</h4>
+          <p>Omni 音视频理解，含 ASR / 时序字幕 / 事件计数 / 音乐标签。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">2026-08-09</div>
+          <h4>完整 Cookbook</h4>
+          <p>各 Capability Cookbook 文档合并，各能力使用说明完整。</p>
+        </div>
+        <div class="mini">
+          <div class="lead blue">2026-08-04</div>
+          <h4>跨平台可靠性</h4>
+          <p>Codex 图像 token 估算支持，跨平台兼容性修复。</p>
+        </div>
+        <div class="mini">
+          <div class="lead">2026-07-29</div>
+          <h4>仓库创建</h4>
+          <p>⭐ 1,444 · Fork 68 · Apache 2.0 · Qwen 团队官方维护。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">
+      信息源：GitHub README.md · 各 Capability Cookbook · 阿里云百炼计费页 · Serper.dev
+      <br>调研时间：2026-08-12 · Qwen 团队官方维护（Apache 2.0）
+      <br>⚠ v0.x 阶段，生产环境使用前请评估稳定性
+    </p>
+  </main>
+</body>
+</html>
