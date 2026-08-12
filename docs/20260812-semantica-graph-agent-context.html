@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Semantica：图原生基础设施让 AI Agent 决策可追溯</title>
+  <style>
+    :root{
+      --bg:#070b14;--surface:#0d1525;--glass:#0f1e38;
+      --border:rgba(80,140,255,.18);--border-bright:rgba(80,140,255,.4);
+      --blue:#4d8ef0;--blue-bright:#7eb5ff;--blue-dim:#2a5baa;
+      --green:#10b981;--yellow:#fbbf24;--red:#f87171;--purple:#a78bfa;--orange:#fb923c;
+      --text:#e2eaf8;--text-dim:#7a90b8;--text-bright:#f0f6ff;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--text);font-size:12.5px;line-height:1.65;
+    }
+    a{color:var(--blue);text-decoration:none}
+    .page{width:min(1060px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === TWEET CARD === */
+    .tweet-card{
+      background:var(--glass);border:1px solid var(--border-bright);
+      border-radius:14px;overflow:hidden;margin-bottom:14px;
+    }
+    .tweet-header{
+      display:flex;align-items:center;gap:11px;
+      padding:12px 16px;border-bottom:1px solid var(--border);
+    }
+    .avatar{
+      width:42px;height:42px;border-radius:50%;
+      background:linear-gradient(135deg,#4d8ef0,#a78bfa);
+      display:flex;align-items:center;justify-content:center;
+      font-size:18px;font-weight:900;color:#fff;flex-shrink:0;
+      overflow:hidden;
+    }
+    .avatar img{width:100%;height:100%;object-fit:cover}
+    .author-info{flex:1}
+    .author-name{font:900 13px/1.2 "Inter",system-ui,sans-serif;color:var(--text-bright)}
+    .author-handle{font:700 11px/1.3 ui-monospace,monospace;color:var(--text-dim);margin-top:2px}
+    .x-logo{font:900 13px/1 ui-monospace;color:var(--blue-bright)}
+    .tweet-body{padding:14px 16px}
+    .tweet-text{font-size:13px;line-height:1.8;color:var(--text-bright)}
+    .tweet-footer{
+      padding:8px 16px;border-top:1px solid var(--border);
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .tweet-url{font:700 11px/1.3 ui-monospace,monospace;color:var(--blue-dim)}
+    .tweet-date{font:700 11px/1.3 ui-monospace,monospace;color:var(--text-dim)}
+
+    /* === TOPBAR === */
+    .topbar{
+      display:grid;grid-template-columns:1.2fr .8fr;
+      border:1px solid var(--border-bright);border-radius:14px;overflow:hidden;
+      margin-bottom:14px;
+      box-shadow:0 0 40px rgba(77,142,240,.12),0 0 80px rgba(77,142,240,.06);
+    }
+    .hero{
+      padding:26px 24px 22px;
+      background:linear-gradient(135deg,#0d1e3a 0%,#11254a 45%,#0a1835 100%);
+      position:relative;overflow:hidden;
+    }
+    .hero::before{
+      content:'';position:absolute;top:-60px;right:-60px;
+      width:260px;height:260px;
+      background:radial-gradient(circle,rgba(77,142,240,.25),transparent 65%);
+      border-radius:50%;
+    }
+    .hero::after{
+      content:'';position:absolute;bottom:-40px;left:30%;
+      width:180px;height:180px;
+      background:radial-gradient(circle,rgba(167,139,250,.15),transparent 65%);
+      border-radius:50%;
+    }
+    .hero-content{position:relative;z-index:1}
+    .badge-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+    .badge{
+      display:inline-flex;align-items:center;gap:5px;
+      border:1px solid var(--border-bright);border-radius:999px;
+      padding:4px 11px;font-size:10.5px;font-weight:750;
+      background:rgba(77,142,240,.08);color:var(--blue-bright);
+    }
+    .badge.red{background:rgba(248,113,113,.08);color:var(--red);border-color:rgba(248,113,113,.3)}
+    .badge.green{background:rgba(16,185,129,.08);color:var(--green);border-color:rgba(16,185,129,.3)}
+    .badge.yellow{background:rgba(251,191,36,.08);color:var(--yellow);border-color:rgba(251,191,36,.3)}
+    .badge.orange{background:rgba(251,146,60,.08);color:var(--orange);border-color:rgba(251,146,60,.3)}
+    .hero-title{
+      font-size:clamp(32px,6vw,60px);font-weight:950;letter-spacing:-.05em;
+      line-height:.92;margin-bottom:10px;
+      background:linear-gradient(135deg,#7eb5ff 0%,#4d8ef0 50%,#a78bfa 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .hero-sub{font-size:clamp(12px,1.4vw,15px);line-height:1.55;color:rgba(180,210,255,.8);max-width:520px}
+    .hero-meta{font:750 11px/1.4 ui-monospace,monospace;color:var(--blue-dim);margin-top:10px}
+    .hero-meta span{color:var(--blue-bright)}
+    .meta-panel{
+      padding:18px 16px;
+      background:linear-gradient(180deg,#0a1428,#081020);
+      border-left:1px solid var(--border-bright);
+    }
+    .meta-row{
+      display:flex;justify-content:space-between;align-items:flex-start;
+      padding:8px 0;border-bottom:1px solid rgba(80,140,255,.08);
+    }
+    .meta-row:last-child{border-bottom:none}
+    .meta-label{font:700 10px/1.3 ui-monospace,monospace;color:var(--text-dim);flex-shrink:0;width:70px}
+    .meta-value{font:700 11px/1.4 ui-monospace,monospace;color:var(--text-bright);text-align:right}
+    .meta-value.green{color:var(--green)}
+    .meta-value.blue{color:var(--blue-bright)}
+    .meta-value.yellow{color:var(--yellow)}
+    .meta-value.orange{color:var(--orange)}
+    .meta-value.red{color:var(--red)}
+
+    /* === SECTIONS === */
+    .section{margin-bottom:16px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    .section-head{
+      display:flex;align-items:center;gap:10px;
+      padding:10px 16px;
+      background:var(--glass);
+      border-bottom:1px solid var(--border);
+    }
+    .sec-no{
+      width:34px;height:34px;
+      display:flex;align-items:center;justify-content:center;
+      background:var(--blue);color:#fff;
+      font-size:13px;font-weight:900;
+      border-radius:8px;flex-shrink:0;
+      box-shadow:0 2px 8px rgba(77,142,240,.4);
+    }
+    .sec-no.purple{background:var(--purple)}
+    .sec-no.green{background:var(--green)}
+    .sec-no.yellow{background:var(--yellow);color:#000}
+    .sec-no.orange{background:var(--orange)}
+    .sec-no.red{background:var(--red)}
+    .section-title{font:850 13px/1.3 "Inter",system-ui,sans-serif;color:var(--text-bright)}
+    .section-body{padding:14px 16px;background:var(--surface)}
+
+    /* === FEAT GRID === */
+    .feat-grid{
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;
+    }
+    .feat-card{
+      background:var(--glass);border:1px solid var(--border);
+      border-radius:9px;padding:10px 12px;
+    }
+    .feat-label{font:700 10px/1.3 ui-monospace,monospace;color:var(--text-dim);margin-bottom:4px}
+    .feat-value{font:700 12px/1.4 "Inter",system-ui,sans-serif;color:var(--text-bright)}
+
+    /* === COMPARISON TABLE === */
+    .comp-table{width:100%;border-collapse:collapse;font-size:11.5px}
+    .comp-table th{
+      background:var(--glass);color:var(--blue-bright);
+      font:800 11px/1.3 ui-monospace,monospace;text-align:left;
+      padding:8px 10px;border:1px solid var(--border);
+    }
+    .comp-table td{
+      padding:7px 10px;border:1px solid var(--border);
+      color:var(--text-dim);vertical-align:top;
+    }
+    .comp-table td:first-child{color:var(--text-bright);font-weight:700}
+    .comp-table tr:hover td{background:rgba(77,142,240,.04)}
+    .tag{
+      display:inline-block;
+      background:rgba(77,142,240,.12);color:var(--blue-bright);
+      border:1px solid rgba(77,140,255,.25);
+      border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;
+    }
+    .tag.green{background:rgba(16,185,129,.1);color:var(--green);border-color:rgba(16,185,129,.25)}
+    .tag.red{background:rgba(248,113,113,.1);color:var(--red);border-color:rgba(248,113,113,.25)}
+    .tag.yellow{background:rgba(251,191,36,.1);color:var(--yellow);border-color:rgba(251,191,36,.25)}
+    .tag.orange{background:rgba(251,146,60,.1);color:var(--orange);border-color:rgba(251,146,60,.25)}
+
+    /* === PIPELINE === */
+    .pipeline{
+      display:flex;flex-wrap:wrap;align-items:center;gap:4px;
+    }
+    .pipe-step{
+      background:var(--glass);border:1px solid var(--border-bright);
+      border-radius:7px;padding:5px 9px;
+      font:700 10px/1.3 ui-monospace,monospace;color:var(--blue-bright);
+    }
+    .pipe-arrow{color:var(--text-dim);font-size:14px}
+
+    /* === QUOTE === */
+    .quote{
+      border-left:3px solid var(--blue);
+      padding:10px 14px;
+      background:rgba(77,142,240,.05);
+      border-radius:0 8px 8px 0;
+      font-size:12.5px;line-height:1.75;color:var(--text-bright);
+    }
+
+    /* === CTA === */
+    .cta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .cta{
+      display:inline-flex;align-items:center;gap:6px;
+      background:var(--blue);color:#fff;font-size:12px;font-weight:700;
+      padding:8px 16px;border-radius:8px;
+      box-shadow:0 4px 16px rgba(77,142,240,.35);
+    }
+    .cta.github{
+      background:rgba(255,255,255,.08);color:var(--text-bright);
+      border:1px solid var(--border-bright);
+      box-shadow:none;
+    }
+    .cta:hover{filter:brightness(1.1)}
+
+    /* === INTEGRATION GRID === */
+    .int-grid{
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;
+    }
+    .int-chip{
+      display:flex;align-items:center;justify-content:center;
+      background:var(--glass);border:1px solid var(--border);
+      border-radius:7px;padding:7px 6px;
+      font:700 10px/1.3 ui-monospace,monospace;color:var(--text-bright);
+      text-align:center;
+    }
+    .int-chip.mcp{color:var(--green);border-color:rgba(16,185,129,.3)}
+    .int-chip.agent{color:var(--purple);border-color:rgba(167,139,250,.3)}
+
+    /* === CODE BLOCK === */
+    .code-block{
+      background:#060c18;border:1px solid var(--border);
+      border-radius:8px;padding:12px 14px;
+      font:700 11px/1.6 ui-monospace,monospace;color:#c9d8f0;
+      overflow-x:auto;white-space:pre;
+    }
+    .code-block .c{color:#4a6a8a}
+    .code-block .k{color:#a78bfa}
+    .code-block .s{color:#10b981}
+
+    /* === MOBILE === */
+    @media(max-width:680px){
+      .topbar{grid-template-columns:1fr}
+      .meta-panel{border-left:none;border-top:1px solid var(--border-bright)}
+      .feat-grid{grid-template-columns:1fr}
+      .int-grid{grid-template-columns:repeat(3,1fr)}
+      .comp-table{font-size:10.5px}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- SOURCE TWEET -->
+  <div class="tweet-card">
+    <div class="tweet-header">
+      <div class="avatar">
+        <img src="https://pbs.twimg.com/profile_images/1952530172210798592/hlpFMq65_200x200.jpg" alt="AI超元域" referrerpolicy="no-referrer">
+      </div>
+      <div class="author-info">
+        <div class="author-name">AI超元域</div>
+        <div class="author-handle">@AISuperDomain · 2026-08-12</div>
+      </div>
+      <div class="x-logo">𝕏</div>
+    </div>
+    <div class="tweet-body">
+      <div class="tweet-text">
+发现一个很有意思的开源项目：Semantica，可以理解成给 AI Agent 加上一层"可追溯的大脑"。<br><br>
+它不是普通 RAG，而是把企业数据、Agent 决策、实体关系和因果链构造成 Context Graph / Knowledge Graph，支持知识抽取、冲突检测、实体去重、规则推理、决策追踪和完整 Provenance。<br><br>
+最特别的是：AI 为什么做出某个决定、依据是什么、影响了什么，都可以沿图谱回溯，而不是只剩一条黑盒日志。<br><br>
+支持 Neo4j、Neptune、RDF、向量数据库、MCP、Databricks、Snowflake 等，而且开源、自托管。<br><br>
+很适合金融、医疗、政府等对 AI 可解释性和审计要求高的场景。<br><br>
+<a href="https://github.com/semantica-agi/semantica" target="_blank">github.com/semantica-agi/semantica</a>
+      </div>
+    </div>
+    <div class="tweet-footer">
+      <span class="tweet-url">x.com/AISuperDomain/status/2087332137372676304</span>
+      <span class="tweet-date">7,971 浏览 · 126 ❤️ · 19 ↩ · 168 🔖</span>
+    </div>
+  </div>
+
+  <!-- TOPBAR: HERO + META -->
+  <div class="topbar">
+    <div class="hero">
+      <div class="hero-content">
+        <div class="badge-row">
+          <span class="badge green">⭐ 5.3k Stars</span>
+          <span class="badge">MIT License</span>
+          <span class="badge yellow">Python ≥3.8</span>
+          <span class="badge orange">MCP Server</span>
+          <span class="badge purple">v0.6.5</span>
+        </div>
+        <h1 class="hero-title">Semantica</h1>
+        <p class="hero-sub">图原生基础设施 · AI Agent 决策可追溯层 · 企业级 Context Graph</p>
+        <div class="hero-meta">
+          <span>github.com/semantica-agi/semantica</span> ·
+          Updated 2026-08-12 · Created 2025-06-25
+        </div>
+      </div>
+    </div>
+    <div class="meta-panel">
+      <div class="meta-row">
+        <span class="meta-label">⭐ Stars</span>
+        <span class="meta-value green">5,356</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Forks</span>
+        <span class="meta-value">586</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">语言</span>
+        <span class="meta-value blue">Python</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">协议</span>
+        <span class="meta-value green">MIT</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">版本</span>
+        <span class="meta-value">0.6.5</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">场景</span>
+        <span class="meta-value orange">AI 可解释性</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">定位</span>
+        <span class="meta-value">Context Graph</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: CORE IDEA -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no">1</div>
+      <div class="section-title">核心定位：不是普通 RAG，是"可追溯的大脑"</div>
+    </div>
+    <div class="section-body">
+      <div class="quote">
+        "给 AI Agent 加上一层'可追溯的大脑'——不是普通 RAG，而是把企业数据、Agent 决策、实体关系和因果链构造成 Context Graph / Knowledge Graph。"<br>
+        <span style="color:var(--text-dim);font-size:11px">— @AISuperDomain，2026-08-12</span>
+      </div>
+      <div style="margin-top:12px">
+        <div class="feat-grid">
+          <div class="feat-card">
+            <div class="feat-label">本质</div>
+            <div class="feat-value">Context Graph + Knowledge Graph + Provenance</div>
+          </div>
+          <div class="feat-card">
+            <div class="feat-label">差异化</div>
+            <div class="feat-value">决策可回溯，因果链完整记录</div>
+          </div>
+          <div class="feat-card">
+            <div class="feat-label">适用场景</div>
+            <div class="feat-value">金融 / 医疗 / 政府（高审计要求）</div>
+          </div>
+          <div class="feat-card">
+            <div class="feat-label">部署方式</div>
+            <div class="feat-value">开源 · 自托管 · 无供应商锁定</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: ARCHITECTURE PIPELINE -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no purple">2</div>
+      <div class="section-title">端到端流水线（每个模块独立可导入）</div>
+    </div>
+    <div class="section-body">
+      <div class="pipeline" style="margin-bottom:12px">
+        <div class="pipe-step">Sources</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Ingest</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Parse</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Normalize</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Split</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Extract</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Conflict<br>Detection</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Dedup</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Knowledge<br>Graph</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Ontology</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Reasoning</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Provenance</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Decision</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Enriched KG</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Vector+Graph<br>Store</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">Export/Visual</div>
+      </div>
+      <div class="feat-grid">
+        <div class="feat-card">
+          <div class="feat-label">Ingest</div>
+          <div class="feat-value">文件 / Web / 数据库 / Kafka / Git / Email / MCP / Databricks / Snowflake / Google Drive</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">Parse → Normalize → Split</div>
+          <div class="feat-value">文档解析、文本/实体/日期标准化、GraphRAG 原生 entity-aware chunking</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">Extract</div>
+          <div class="feat-value">NER · 关系抽取 · 事件检测 · 三元组生成 · 共指消解</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">Conflict Detection</div>
+          <div class="feat-value">冲突事实在被合并前被标记并解决（不静默覆盖）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: WHY SEMANTICA vs RAG -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no green">3</div>
+      <div class="section-title">为什么 Semantica vs 普通 RAG / LLM Memory</div>
+    </div>
+    <div class="section-body">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>Vector DB + RAG</th>
+            <th>Plain LLM Memory</th>
+            <th>Semantica ✅</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Recall 方法</td>
+            <td>Embedding 相似性</td>
+            <td>Token 窗口</td>
+            <td>图遍历 + 语义搜索</td>
+          </tr>
+          <tr>
+            <td>决策历史</td>
+            <td><span class="tag red">不存储</span></td>
+            <td><span class="tag red">不存储</span></td>
+            <td><span class="tag green">一等公民可查询</span></td>
+          </tr>
+          <tr>
+            <td>Provenance</td>
+            <td><span class="tag red">无</span></td>
+            <td><span class="tag red">无</span></td>
+            <td><span class="tag green">W3C PROV-O，来源链接</span></td>
+          </tr>
+          <tr>
+            <td>推理能力</td>
+            <td><span class="tag red">无</span></td>
+            <td><span class="tag red">黑盒</span></td>
+            <td><span class="tag green">前向链 / Rete / Datalog / SPARQL</span></td>
+          </tr>
+          <tr>
+            <td>冲突检测</td>
+            <td><span class="tag red">静默覆盖</span></td>
+            <td><span class="tag red">静默覆盖</span></td>
+            <td><span class="tag green">检测 · 标记 · 解决</span></td>
+          </tr>
+          <tr>
+            <td>时间旅行</td>
+            <td><span class="tag red">否</span></td>
+            <td><span class="tag red">否</span></td>
+            <td><span class="tag green">时点图快照 + Allen 区间代数</span></td>
+          </tr>
+          <tr>
+            <td>合规导出</td>
+            <td><span class="tag red">无</span></td>
+            <td><span class="tag red">无</span></td>
+            <td><span class="tag green">PROV-O / SHACL / OWL / RDF</span></td>
+          </tr>
+          <tr>
+            <td>策略执行</td>
+            <td><span class="tag red">无</span></td>
+            <td><span class="tag red">无</span></td>
+            <td><span class="tag green">内置规则引擎 + SHACL</span></td>
+          </tr>
+          <tr>
+            <td>多 Agent 上下文</td>
+            <td>各 Agent 独立</td>
+            <td>各 Agent 独立</td>
+            <td><span class="tag green">共享单一智能层</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECTION 4: CAPABILITIES -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no yellow">4</div>
+      <div class="section-title">核心能力一览</div>
+    </div>
+    <div class="section-body">
+      <div class="feat-grid">
+        <div class="feat-card">
+          <div class="feat-label">Context Graphs</div>
+          <div class="feat-value">实体/决策/关系可查询图，含因果链接</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">Decision Intelligence</div>
+          <div class="feat-value">record_decision / trace_decision_chain / find_similar_decisions</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">Temporal Intelligence</div>
+          <div class="feat-value">时点快照 + Allen 区间代数（13种关系）</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">Semantic Extraction</div>
+          <div class="feat-value">NER · 关系抽取 · 事件检测 · 三元组 · 共指消解</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">Reasoning Engines</div>
+          <div class="feat-value">前向链 / Rete / 演绎 / 归纳 / SPARQL / Datalog（可解释输出）</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">GraphRAG Chunking</div>
+          <div class="feat-value">Entity-aware · Relation-aware · 图感知混合索引</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">AI Governance</div>
+          <div class="feat-value">SHACL 约束 · 冲突检测 · 合规规则 · OWL 生成 · SKOS 可视化编辑器</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-label">Full Auditability</div>
+          <div class="feat-value">W3C PROV-O provenance，导出 JSON / CSV / RDF</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: INSTALLATION -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no orange">5</div>
+      <div class="section-title">安装方式</div>
+    </div>
+    <div class="section-body">
+      <div class="code-block"><span class="c"># 核心包</span>
+<span class="k">pip</span> install semantica
+
+<span class="c"># 完整包（含所有集成）</span>
+<span class="k">pip</span> install <span class="s">"semantica[all]"</span>
+
+<span class="c"># 按需安装</span>
+<span class="k">pip</span> install <span class="s">"semantica[agno]"</span>             <span class="c"># Agno 多 Agent 集成</span>
+<span class="k">pip</span> install <span class="s">"semantica[llm-litellm]"</span>     <span class="c"># OpenAI/Anthropic/Gemini/Mistral/Llama...</span>
+<span class="k">pip</span> install <span class="s">"semantica[graph-neo4j]"</span>       <span class="c"># Neo4j 图存储 (LPG)</span>
+<span class="k">pip</span> install <span class="s">"semantica[graph-falkordb]"</span>    <span class="c"># FalkorDB</span>
+<span class="k">pip</span> install <span class="s">"semantica[graph-amazon-neptune]"</span><span class="c"># AWS Neptune</span>
+<span class="k">pip</span> install <span class="s">"semantica[vector-qdrant]"</span>      <span class="c"># Qdrant 向量库</span>
+<span class="k">pip</span> install <span class="s">"semantica[vector-chromadb]"</span>    <span class="c"># ChromaDB</span></div>
+      <div style="margin-top:10px">
+        <div class="code-block"><span class="c"># MCP Server 快速接入（30秒）</span>
+<span class="k">semantica</span>-mcp
+<span class="c"># 或</span>
+python -m <span class="k">semantica.mcp_server</span>
+
+<span class="c"># Claude Desktop / Windsurf / Cline / VS Code 配置 JSON:</span>
+<span class="s">{
+  "mcpServers": {
+    "semantica": { "command": "python", "args": ["-m", "semantica.mcp_server"] }
+  }
+}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: INTEGRATIONS -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no red">6</div>
+      <div class="section-title">集成生态</div>
+    </div>
+    <div class="section-body">
+      <div style="margin-bottom:10px;font-weight:700;font-size:11px;color:var(--text-dim)">原生插件包（编辑器 / IDE / Agent）</div>
+      <div class="int-grid">
+        <div class="int-chip agent">Claude Code</div>
+        <div class="int-chip agent">Cursor</div>
+        <div class="int-chip agent">Codex</div>
+        <div class="int-chip agent">Windsurf</div>
+        <div class="int-chip agent">Cline</div>
+        <div class="int-chip agent">Continue</div>
+        <div class="int-chip agent">VS Code</div>
+        <div class="int-chip agent">OpenClaw</div>
+        <div class="int-chip agent">Agno</div>
+      </div>
+      <div style="margin:10px 0 8px;font-weight:700;font-size:11px;color:var(--text-dim)">MCP 客户端 · REST API · LLM Provider</div>
+      <div class="int-grid">
+        <div class="int-chip mcp">Claude Desktop</div>
+        <div class="int-chip mcp">Windsurf MCP</div>
+        <div class="int-chip mcp">Cline MCP</div>
+        <div class="int-chip mcp">VS Code MCP</div>
+        <div class="int-chip mcp">REST API</div>
+        <div class="int-chip mcp">OpenAI</div>
+        <div class="int-chip mcp">Anthropic</div>
+        <div class="int-chip mcp">Gemini</div>
+        <div class="int-chip mcp">Mistral</div>
+        <div class="int-chip mcp">Llama</div>
+        <div class="int-chip mcp">DeepSeek</div>
+        <div class="int-chip mcp">Ollama</div>
+      </div>
+      <div style="margin:10px 0 8px;font-weight:700;font-size:11px;color:var(--text-dim)">存储后端</div>
+      <div class="int-grid">
+        <div class="int-chip">Neo4j</div>
+        <div class="int-chip">FalkorDB</div>
+        <div class="int-chip">Apache AGE</div>
+        <div class="int-chip">AWS Neptune</div>
+        <div class="int-chip">Oxigraph RDF</div>
+        <div class="int-chip">Qdrant</div>
+        <div class="int-chip">ChromaDB</div>
+        <div class="int-chip">Databricks</div>
+        <div class="int-chip">Snowflake</div>
+        <div class="int-chip">Elasticsearch</div>
+        <div class="int-chip">Kafka / Kinesis</div>
+        <div class="int-chip">Google Drive</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 7: PERFORMANCE -->
+  <div class="section">
+    <div class="section-head">
+      <div class="sec-no">7</div>
+      <div class="section-title">性能基准（v0.5.0，118,000 节点生产图）</div>
+    </div>
+    <div class="section-body">
+      <table class="comp-table">
+        <thead>
+          <tr><th>操作</th><th>优化前</th><th>优化后</th><th>提升</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>节点搜索（118k 节点）</td>
+            <td>24 ms</td>
+            <td>0.004 ms</td>
+            <td><span class="tag green">6,000×</span></td>
+          </tr>
+          <tr>
+            <td>Embedding 缓存命中</td>
+            <td>冷加载</td>
+            <td>基于修订版的缓存</td>
+            <td><span class="tag green">10× 吞吐</span></td>
+          </tr>
+          <tr>
+            <td>语义去重</td>
+            <td>baseline</td>
+            <td>优化候选生成</td>
+            <td><span class="tag green">6.98×</span></td>
+          </tr>
+          <tr>
+            <td>候选生成</td>
+            <td>baseline</td>
+            <td>blocking 策略</td>
+            <td><span class="tag yellow">63.6% 更快</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin-top:8px;font-size:10.5px;color:var(--text-dim)">
+        测试环境：AMD EPYC，64 GB RAM。数据来自 CHANGELOG.md 历史记录，非自动化测试断言。
+      </p>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="section">
+    <div class="section-body" style="text-align:center;padding:20px">
+      <div style="font-size:13px;font-weight:850;color:var(--text-bright);margin-bottom:8px">立即体验 Semantica</div>
+      <div class="cta-row" style="justify-content:center">
+        <a class="cta" href="https://github.com/semantica-agi/semantica" target="_blank">
+          ↗ GitHub 仓库
+        </a>
+        <a class="cta github" href="https://getsemantica.ai" target="_blank">
+          🌐 官网 getsemantica.ai
+        </a>
+      </div>
+      <div style="margin-top:10px;font-size:10.5px;color:var(--text-dim)">
+        pip install "semantica[all]" · MCP Server 30 秒接入 · MIT 开源
+      </div>
+    </div>
+  </div>
+
+</main>
+</body>
+</html>
