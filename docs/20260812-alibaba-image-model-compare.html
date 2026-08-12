@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>阿里图像模型选型图谱：Qwen-Image vs Wan vs Z-Image</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);--cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--red:#ff6b6b;--shadow:0 18px 42px rgba(0,0,0,.34);}
+    *{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);background:linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);min-height:100vh}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:48px 0 72px}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08),0 16px 30px rgba(74,120,255,.18);margin:0 10px 14px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(38px,7vw,70px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;font-size:clamp(14px,2vw,18px);line-height:1.55;color:#e8eefc}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.red{border-color:rgba(255,107,107,.35);background:rgba(255,107,107,.12);color:#ff9999}
+    .pill.purple{border-color:rgba(132,89,255,.32);background:rgba(132,89,255,.12);color:#e8d8ff}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;padding:14px;display:grid;gap:10px}
+    .vs-badge{text-align:center;padding:8px;background:rgba(132,89,255,.12);border:1.5px solid rgba(132,89,255,.28);border-radius:14px;font-size:12px;font-weight:900;color:var(--purple)}
+    .mini-card{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:14px;padding:10px 10px 8px;display:grid;gap:6px}
+    .mini-card .lbl{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .val{font-size:13px;font-weight:900;line-height:1.2;color:#fff}
+    .mini-card .desc{font-size:11px;line-height:1.45;color:#c9d4f7}
+    .model-map{background:rgba(9,12,22,.6);border:1.5px solid rgba(255,255,255,.1);border-radius:18px;padding:16px;margin-bottom:14px}
+    .model-map h3{font-size:13px;font-weight:900;color:#fff;margin:0 0 12px;letter-spacing:-.01em}
+    .map-tree{font-size:12.5px;line-height:1.9;color:#c5d2f7}
+    .map-tree b{color:#fff;font-weight:900}
+    .map-tree .qwen{color:#58c3ff}
+    .map-tree .wan{color:#f4c84c}
+    .map-tree .z{color:#2db36a}
+    .map-leaf{padding-left:16px;border-left:1.5px solid rgba(255,255,255,.1);margin-left:8px}
+    .table-wrap{overflow-x:auto;margin-bottom:14px;border:1.5px solid rgba(255,255,255,.1);border-radius:18px}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    th{background:rgba(255,255,255,.06);color:var(--muted);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:10px 12px;border-bottom:1.5px solid rgba(255,255,255,.1);text-align:left}
+    td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+    td strong{font-weight:900}
+    .t-qwen strong{color:var(--cyan)}
+    .t-wan strong{color:var(--yellow)}
+    .t-zimg strong{color:var(--green)}
+    .cell-yes{color:var(--green);font-weight:800}
+    .cell-no{color:var(--red);font-weight:800}
+    .cell-ok{color:var(--yellow);font-weight:700}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+    .card{background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.1);border-radius:18px;padding:14px;min-width:0}
+    .card h3{font-size:13px;font-weight:900;margin:0 0 8px;letter-spacing:-.01em;color:#fff}
+    .card p{font-size:12px;margin:0 0 6px;color:#c5d2f7;line-height:1.65}
+    .card ul{margin:4px 0 0;padding-left:16px;font-size:12px;color:#c5d2f7;line-height:1.7}
+    .card li{margin-bottom:3px}
+    .card-cyan{border-color:rgba(88,195,255,.3)}
+    .card-cyan h3{color:var(--cyan)}
+    .card-yellow{border-color:rgba(244,200,76,.3)}
+    .card-yellow h3{color:var(--yellow)}
+    .card-green{border-color:rgba(45,179,106,.3)}
+    .card-green h3{color:var(--green)}
+    .decision{background:rgba(9,12,22,.6);border:1.5px solid rgba(255,255,255,.1);border-radius:18px;padding:14px;margin-bottom:14px}
+    .decision h3{font-size:13px;font-weight:900;color:#fff;margin:0 0 10px}
+    .d-step{display:grid;grid-template-columns:28px 1fr 80px;gap:10px;align-items:center;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:6px}
+    .d-q{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--blue);color:#fff;font-size:12px;font-weight:900;flex-shrink:0}
+    .d-txt{font-size:12.5px;color:#e8eefc}
+    .d-ans{font-size:12px;font-weight:800;padding:4px 8px;border-radius:999px;text-align:center}
+    .d-ans.yes{background:rgba(45,179,106,.18);color:var(--green)}
+    .d-ans.no{background:rgba(244,200,76,.18);color:var(--yellow)}
+    .d-ans.gate{background:rgba(88,195,255,.18);color:var(--cyan)}
+    .note-card{background:rgba(244,200,76,.06);border:1.5px solid rgba(244,200,76,.22);border-radius:14px;padding:12px 14px;margin-bottom:14px}
+    .note-card h3{font-size:12.5px;font-weight:800;color:var(--yellow);margin:0 0 6px}
+    .note-card p{font-size:12px;color:#e8eefc;margin:0;line-height:1.65}
+    .warning-card{background:rgba(255,107,107,.06);border:1.5px solid rgba(255,107,107,.22);border-radius:14px;padding:12px 14px;margin-bottom:14px}
+    .warning-card h3{font-size:12.5px;font-weight:800;color:var(--red);margin:0 0 6px}
+    .warning-card p{font-size:12px;color:#e8eefc;margin:0;line-height:1.65}
+    .scene-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .scene-item{display:grid;grid-template-columns:28px 1fr 90px;gap:8px;align-items:center;padding:9px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px}
+    .scene-num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:rgba(74,120,255,.2);color:var(--blue);font-size:12px;font-weight:900;flex-shrink:0}
+    .scene-txt{font-size:12px;color:#e8eefc;line-height:1.4}
+    .scene-ans{font-size:11px;font-weight:800;padding:3px 6px;border-radius:999px;text-align:center;white-space:nowrap}
+    .scene-ans.cyan{background:rgba(88,195,255,.18);color:var(--cyan)}
+    .scene-ans.yel{background:rgba(244,200,76,.18);color:var(--yellow)}
+    .scene-ans.grn{background:rgba(45,179,106,.18);color:var(--green)}
+    .bottom-line{background:rgba(45,179,106,.08);border:1.5px solid rgba(45,179,106,.28);border-radius:16px;padding:12px 14px;text-align:center}
+    .bottom-line strong{font-size:13px;font-weight:900;color:var(--green)}
+    .bottom-line p{font-size:12px;color:#c5d2f7;margin:4px 0 0;line-height:1.55}
+    .rule{height:1px;background:rgba(255,255,255,.08);margin:14px 0}
+    .src{margin-top:16px;text-align:center;font:800 11px/1.4 ui-monospace;color:#5a6a9a}
+    .badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.05em}
+    .badge-cyan{background:rgba(88,195,255,.15);color:var(--cyan)}
+    .badge-yellow{background:rgba(244,200,76,.15);color:var(--yellow)}
+    .badge-green{background:rgba(45,179,106,.15);color:var(--green)}
+    @media(max-width:760px){.hero{grid-template-columns:1fr}.hero-visual{display:none}.grid-3{grid-template-columns:1fr}.table-wrap{font-size:11px}.scene-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main class="page">
+  <div class="hero-bar"></div>
+  <div class="hero">
+    <div class="hero-copy">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <span class="kicker">Image Generation · Model Selection · Alibaba Cloud</span>
+        <span class="source">阿里云百炼 · Qwen · Wan · Tongyi-MAI<br>2026年7月更新</span>
+      </div>
+      <h1 class="title">阿里图像模型<br>选型图谱</h1>
+      <p class="subtitle">Qwen-Image 3.0 vs Wan 2.7 vs Z-Image-Turbo — 三条技术路线、真实能力边界与场景选型</p>
+      <div class="pill-row" style="margin-top:4px">
+        <span class="pill cyan">内容理解型</span>
+        <span class="pill yellow">商业控制型</span>
+        <span class="pill green">效率生图型</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="vs-badge">三条路线 · 2026年7月旗舰</div>
+      <div class="mini-card">
+        <span class="lbl">Qwen-Image 3.0 Pro</span>
+        <span class="val">qwen-image-3.0-pro</span>
+        <span class="desc">复杂内容生成 · 文字排版 · 语义编辑</span>
+      </div>
+      <div class="mini-card">
+        <span class="lbl">Wan 2.7 Image Pro</span>
+        <span class="val">wan2.7-image-pro</span>
+        <span class="desc">9图参考 · bbox精准编辑 · 连续组图 · 品牌色</span>
+      </div>
+      <div class="mini-card">
+        <span class="lbl">Z-Image-Turbo</span>
+        <span class="val">z-image-turbo</span>
+        <span class="desc">快速生图 · 低成本 · 开源可本地部署</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模型地图 -->
+  <div class="model-map">
+    <h3>📍 模型地图 — 三条独立技术路线</h3>
+    <div class="map-tree">
+      <b>Alibaba / 阿里图像生成</b><br>
+      <div class="map-leaf">
+        <span class="qwen"><b>├─ Qwen-Image（Qwen 路线）</b></span><br>
+        <div class="map-leaf">
+          ├─ <b>qwen-image-3.0-pro</b> ← 当前云端旗舰<br>
+          │　　生图+编辑统一模型 · 复杂语义 · 文字排版 · 小字 · 密集版面<br>
+          ├─ qwen-image-edit / qwen-image-2.0 ← 历史遗留，优先用3.0<br>
+          └─ 开源：Qwen-Image-2512 / Qwen-Image-Edit-2511 / <b>Qwen-Image-Layered</b><br>
+        </div>
+        <span class="wan"><b>├─ Wan / 万相（视觉生成路线）</b></span><br>
+        <div class="map-leaf">
+          ├─ <b>wan2.7-image-pro</b> ← 当前云端图像旗舰<br>
+          │　　9图参考 · bbox精准编辑 · 连续12图 · Color Palette · 4K<br>
+          └─ Wan Video ← Wan 最著名的另一条线（T2V / I2V / Video Edit）<br>
+        </div>
+        <span class="z"><b>└─ Z-Image（Tongyi-MAI 路线）</b></span><br>
+        <div class="map-leaf">
+          ├─ <b>z-image-turbo</b> ← 当前最成熟·云端主力<br>
+          │　　8-step蒸馏 · 快10倍 · 价1/5 · 写实/人像/产品图<br>
+          ├─ z-image ← 标准版<br>
+          └─ z-image-edit / z-image-omni ← <span style="color:var(--red)">To be released，暂不可用</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 核心能力对比表 -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>能力维度</th>
+          <th class="t-qwen">Qwen-Image 3.0 Pro</th>
+          <th class="t-wan">Wan 2.7 Image Pro</th>
+          <th class="t-zimg">Z-Image-Turbo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>文生图 T2I</td>
+          <td class="cell-yes">✅</td>
+          <td class="cell-yes">✅</td>
+          <td class="cell-yes">✅</td>
+        </tr>
+        <tr>
+          <td>图生图 I2I</td>
+          <td class="cell-yes">✅</td>
+          <td class="cell-yes">✅</td>
+          <td class="cell-no">❌ 当前仅Text输入</td>
+        </tr>
+        <tr>
+          <td>指令修图（语义）</td>
+          <td class="cell-yes">✅ 强</td>
+          <td class="cell-yes">✅ 强</td>
+          <td class="cell-no">❌</td>
+        </tr>
+        <tr>
+          <td>参考图数量上限</td>
+          <td><strong>1–3 张</strong></td>
+          <td><strong>最多 9 张</strong></td>
+          <td>❌</td>
+        </tr>
+        <tr>
+          <td>精准区域编辑（bbox）</td>
+          <td>语义指令为主</td>
+          <td><strong>✅ bbox 坐标框选</strong></td>
+          <td>❌</td>
+        </tr>
+        <tr>
+          <td>连续组图</td>
+          <td>普通多结果</td>
+          <td><strong>✅ 最多 12 张 sequential</strong></td>
+          <td>❌</td>
+        </tr>
+        <tr>
+          <td>角色/IP 一致性</td>
+          <td>有</td>
+          <td><strong>重点能力</strong></td>
+          <td>非重点</td>
+        </tr>
+        <tr>
+          <td>品牌色控制</td>
+          <td>普通 Prompt</td>
+          <td><strong>✅ Color Palette 3–10 HEX</strong></td>
+          <td>普通 Prompt</td>
+        </tr>
+        <tr>
+          <td>复杂中文文字</td>
+          <td><strong>非常强</strong></td>
+          <td>强</td>
+          <td>强</td>
+        </tr>
+        <tr>
+          <td>密集排版/小字（~10px）</td>
+          <td><strong>核心优势</strong></td>
+          <td>可以</td>
+          <td>非重点</td>
+        </tr>
+        <tr>
+          <td>最高分辨率</td>
+          <td>~2K</td>
+          <td><strong>文生图最高 4K</strong></td>
+          <td>2K</td>
+        </tr>
+        <tr>
+          <td>单次输出上限</td>
+          <td>最多 6 图</td>
+          <td>最多 4 图</td>
+          <td>固定 1 图</td>
+        </tr>
+        <tr>
+          <td>速度/成本</td>
+          <td>中高</td>
+          <td>中高</td>
+          <td><strong>明显占优（快10倍/价1/5）</strong></td>
+        </tr>
+        <tr>
+          <td>云端编辑 API</td>
+          <td class="cell-yes">✅</td>
+          <td class="cell-yes">✅</td>
+          <td class="cell-no">❌ 仅生图</td>
+        </tr>
+        <tr>
+          <td>开源/本地部署</td>
+          <td>部分开源</td>
+          <td>部分开源</td>
+          <td><strong>✅ 6B 可本地跑</strong></td>
+        </tr>
+        <tr>
+          <td>当前定位</td>
+          <td>内容·版面·编辑</td>
+          <td>控制·一致性·商业</td>
+          <td>快速·低价·生图</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Gate-first 快速筛选 -->
+  <div class="decision">
+    <h3>🚪 Gate-first 快速筛选</h3>
+    <div class="d-step">
+      <div class="d-q">1</div>
+      <div class="d-txt">只需要生成图片，不需要编辑？</div>
+      <div class="d-ans gate">Z-Image-Turbo 候选 ✅</div>
+    </div>
+    <div class="d-step">
+      <div class="d-q">2</div>
+      <div class="d-txt">需要编辑功能？ → 先排除 Z-Image-Turbo</div>
+      <div class="d-ans gate">Qwen / Wan 对比</div>
+    </div>
+    <div class="d-step">
+      <div class="d-q">3</div>
+      <div class="d-txt">需要复杂文字、排版、语义理解？</div>
+      <div class="d-ans yes">Qwen-Image 3.0 Pro ✅</div>
+    </div>
+    <div class="d-step">
+      <div class="d-q">4</div>
+      <div class="d-txt">需要多图参考、bbox、连续组图、品牌色、4K？</div>
+      <div class="d-ans yes">Wan 2.7 Image Pro ✅</div>
+    </div>
+    <div class="d-step">
+      <div class="d-q">5</div>
+      <div class="d-txt">需要开源本地部署或大量低成本出图？</div>
+      <div class="d-ans yes">Z-Image-Turbo ✅</div>
+    </div>
+  </div>
+
+  <!-- 场景选型 -->
+  <div class="scene-grid">
+    <div style="grid-column:1/-1;background:rgba(9,12,22,.5);border:1.5px solid rgba(255,255,255,.1);border-radius:14px;padding:12px 14px;margin-bottom:4px">
+      <b style="font-size:13px;color:#fff">🎯 场景选型（生图）</b>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">1</div>
+      <div class="scene-txt">普通写实照片 / 大批量</div>
+      <div class="scene-ans grn">Z-Image-Turbo</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">2</div>
+      <div class="scene-txt">中文海报 / 小文字 / 密集排版</div>
+      <div class="scene-ans cyan">Qwen-Image 3.0</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">3</div>
+      <div class="scene-txt">菜单 / 试卷 / 报纸 / UI mockup</div>
+      <div class="scene-ans cyan">Qwen-Image 3.0</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">4</div>
+      <div class="scene-txt">品牌 KV / 指定品牌色</div>
+      <div class="scene-ans yel">Wan 2.7</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">5</div>
+      <div class="scene-txt">电商商品图基础生成</div>
+      <div class="scene-ans grn">Z-Image-Turbo</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">6</div>
+      <div class="scene-txt">4K 原生输出</div>
+      <div class="scene-ans yel">Wan 2.7</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">7</div>
+      <div class="scene-txt">连续漫画 / 故事板 / 品牌系列</div>
+      <div class="scene-ans yel">Wan 2.7</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">8</div>
+      <div class="scene-txt">人物连续多图（IP一致性）</div>
+      <div class="scene-ans yel">Wan 2.7</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">9</div>
+      <div class="scene-txt">多参考图融合（≥4张）</div>
+      <div class="scene-ans yel">Wan 2.7</div>
+    </div>
+    <div class="scene-item">
+      <div class="scene-num">10</div>
+      <div class="scene-txt">本地开源 / 低成本自部署</div>
+      <div class="scene-ans grn">Z-Image-Turbo</div>
+    </div>
+  </div>
+
+  <!-- 修图对比 -->
+  <div class="decision" style="margin-bottom:14px">
+    <h3>✏️ 修图能力对比（Qwen vs Wan，排除 Z-Image）</h3>
+    <div class="table-wrap" style="margin-bottom:0;border:none">
+      <table>
+        <thead>
+          <tr>
+            <th>修图需求</th>
+            <th class="t-qwen">Qwen-Image 3.0</th>
+            <th class="t-wan">Wan 2.7</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>"把猫变成狗" 语义编辑</td>
+            <td class="cell-yes">★★★★★</td>
+            <td class="cell-ok">★★★★☆</td>
+          </tr>
+          <tr>
+            <td>修改海报文字</td>
+            <td class="cell-yes">★★★★★</td>
+            <td class="cell-ok">★★★★☆</td>
+          </tr>
+          <tr>
+            <td>复杂内容重构</td>
+            <td class="cell-yes">★★★★★</td>
+            <td class="cell-ok">★★★★☆</td>
+          </tr>
+          <tr>
+            <td>多张参考图融合（≥4张）</td>
+            <td class="cell-ok">★★★★☆</td>
+            <td class="cell-yes">★★★★★</td>
+          </tr>
+          <tr>
+            <td>指定某一区域精准编辑</td>
+            <td class="cell-ok">★★★★☆</td>
+            <td class="cell-yes">★★★★★ <b>bbox</b></td>
+          </tr>
+          <tr>
+            <td>人物/IP 一致性多图</td>
+            <td class="cell-ok">★★★★☆</td>
+            <td class="cell-yes">★★★★★</td>
+          </tr>
+          <tr>
+            <td>品牌色严格控制</td>
+            <td class="cell-ok">★★★☆☆</td>
+            <td class="cell-yes">★★★★★ <b>Palette</b></td>
+          </tr>
+          <tr>
+            <td>连续系列图片</td>
+            <td class="cell-ok">★★★☆☆</td>
+            <td class="cell-yes">★★★★★ <b>sequential</b></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 三句话总结 -->
+  <div class="grid-3">
+    <div class="card card-cyan">
+      <h3>Qwen-Image 3.0 Pro</h3>
+      <p>「内容理解型」</p>
+      <ul>
+        <li>我<strong>到底要画什么</strong>、文字和内容要正确</li>
+        <li>复杂语义理解 · 密集文字排版 · 小字</li>
+        <li>海报/菜单/试卷/UI/信息图</li>
+        <li>语义编辑（"把X改成Y"）</li>
+        <li>图生图 1–3 张参考</li>
+      </ul>
+      <p style="margin-top:8px;color:var(--cyan);font-weight:800;font-size:12px">默认综合首选</p>
+    </div>
+    <div class="card card-yellow">
+      <h3>Wan 2.7 Image Pro</h3>
+      <p>「商业控制型」</p>
+      <ul>
+        <li>我要<strong>怎么控制</strong>这一整套视觉作品</li>
+        <li>9图参考融合 · bbox精准区域编辑</li>
+        <li>连续12图 sequential · Color Palette</li>
+        <li>4K 最高分辨率 · 品牌 KV</li>
+        <li>IP/角色一致性系列 · 故事板</li>
+      </ul>
+      <p style="margin-top:8px;color:var(--yellow);font-weight:800;font-size:12px">商业视觉首选</p>
+    </div>
+    <div class="card card-green">
+      <h3>Z-Image-Turbo</h3>
+      <p>「效率生图型」</p>
+      <ul>
+        <li>我只想<strong>快速便宜地把图画出来</strong></li>
+        <li>8-step 蒸馏 · 快10倍 · 价约1/5</li>
+        <li>写实 · 人像 · 产品图</li>
+        <li>6B 开源可本地部署</li>
+        <li>仅文生图 · 无编辑功能</li>
+      </ul>
+      <p style="margin-top:8px;color:var(--green);font-weight:800;font-size:12px">纯生图性价比首选</p>
+    </div>
+  </div>
+
+  <!-- 重要坑 -->
+  <div class="warning-card">
+    <h3>⚠️ 重要坑：历史模型未退场，别被模型名绕晕</h3>
+    <p>百炼当前模型目录同时存在：qwen-image / qwen-image-plus / qwen-image-max / qwen-image-2.0 / wan2.1 / wan2.5 / wan2.6 / wan2.7 等大量版本共存。<strong>很多是版本兼容和老 API 遗留</strong>，新项目优先用当前旗舰（3.0 / 2.7 / Turbo）。Z-Image-Edit 官方 GitHub 标注"To be released"，当前云端接口<strong>不支持修图</strong>。</p>
+  </div>
+
+  <div class="note-card">
+    <h3>📌 置信度说明</h3>
+    <p>功能边界：<span class="badge badge-cyan">高</span>（基于百炼官方API文档）；产品定位：<span class="badge badge-yellow">高</span>（基于阿里官方选型表）；绝对画质高低：<span class="badge badge-green">中</span>（未做同Prompt L3实测，主观"谁更漂亮"不在本卡范围）。</p>
+  </div>
+
+  <div class="bottom-line">
+    <strong>三句话记型：Qwen=内容要对 · Wan=流程要控 · Z=快便宜出图</strong>
+    <p>来源：阿里云百炼官方文档（2026-07）+ 阿里官方选型表 + Tongyi-MAI GitHub · 主页：help.aliyun.com</p>
+  </div>
+</main>
+</body>
+</html>
