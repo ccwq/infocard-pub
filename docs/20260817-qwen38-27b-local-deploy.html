@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Qwen3.8-27B 本地部署决策手册</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+
+    /* === overview：一句话概述 + 正文缩略 === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ MATRIX + RISK ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+    }
+
+    /* Qwen3.8 card implementation: hardblue responsive overrides */
+    h1.demo-title{line-height:1.16;letter-spacing:-.025em}
+    .qwen-table-wrap{overflow-x:auto;border:3px solid var(--line);background:#fff}
+    .qwen-table{width:100%;min-width:720px;border-collapse:collapse;font-size:12px}
+    .qwen-table th,.qwen-table td{border:1.5px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}
+    .qwen-table th{background:#111;color:#fff;font-weight:900}
+    .qwen-table tr:nth-child(even){background:var(--soft-blue)}
+    .mobile-cards{display:none}
+    .code{background:#111;color:#eee;border:3px solid var(--line);padding:14px;overflow:auto;font:12px/1.7 ui-monospace,monospace;white-space:pre-wrap}
+    .code .k{color:#6ea8ff}.code .v{color:#f4d35e}.code .c{color:#888}
+    .source-note{font-size:11px!important}
+    @media(max-width:720px){
+      .hero{grid-template-columns:1fr}.hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .section-head{grid-template-columns:58px 1fr;gap:10px}.section-no{width:58px;height:58px;font-size:22px}
+      .grid-2,.grid-3,.grid-4,.risk-grid,.matrix{grid-template-columns:1fr!important}
+      .qwen-table-wrap{margin-right:0}.mobile-cards{display:grid;gap:8px;margin-top:10px}.mobile-cards .card{border:2px solid var(--line);padding:10px;background:#fff}
+      .qwen-table-wrap+.mobile-cards{display:grid}.qwen-table-wrap{display:none}
+      h1.demo-title{font-size:clamp(28px,8.4vw,40px);line-height:1.28}
+      .code{font-size:11px}
+    }
+</style>
+</head>
+<body>
+  <main class="page">
+  <section class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-copy">
+      <div class="kicker">MODEL DEPLOYMENT / DECISION MANUAL</div>
+      <h1 class="demo-title">Qwen3.8-27B<br><span style="color:var(--blue)">本地部署决策手册</span></h1>
+      <p class="subtitle">面向本地 Agent、代码辅助与多模态工作流的 27B dense 模型。重点不是“参数越大越好”，而是把显存、上下文、后端与证据边界拆开决策。</p>
+      <div class="badge-row"><span class="badge blue">27B dense</span><span class="badge red">Vision encoder</span><span class="badge dark">Apache-2.0</span><span class="badge">262k context</span></div>
+      <div class="alert"><strong>一句话结论：适合有 24GB+ GPU、需要图像/视频理解与长上下文的本地开发者。</strong><p>不建议把“约 1M 上下文”“速度”“显存”当作无条件承诺：官方模型卡给出能力与格式，统一吞吐/显存表尚未形成。</p><div class="mini-row"><span class="mini-tag">L1 官方事实</span><span class="mini-tag">L2 条件化实测</span><span class="mini-tag">L3 社区体验不等于排名</span></div></div>
+    </div>
+    <div class="hero-visual"><div class="panel-top"><span class="eyebrow">OPERATING POINT</span><h3>先选运行点，再选量化</h3><p>24GB 起步看 Q4；48GB 级别优先 BF16/FP8；长上下文会额外吞噬 KV cache。</p></div><div class="panel-body"><div class="flow"><div class="flow-item blue"><div class="t">01 / hardware</div><div class="c">显存 ≥ 24GB？先验证 Q4/Q5</div></div><div class="flow-item red"><div class="t">02 / modality</div><div class="c">需要图像/视频？确认后端支持 vision</div></div><div class="flow-item dark"><div class="t">03 / context</div><div class="c">长上下文从 32k 起测，不要直接拉满</div></div></div></div></div>
+  </section>
+
+  <section class="section"><div class="overview"><div class="overview-sentence">这是一张“部署决策卡”，不是未经条件化的跑分榜。</div><div class="overview-body"><p>官方 Qwen3.8-27B 模型卡确认：27B dense、带 vision encoder，支持图像/视频理解，原生上下文 262,144 tokens，Apache-2.0，并提供 BF16/FP8 方向。以下把已确认事实、可执行流程、未知项和社区线索分层。</p></div></div><div class="section-head"><div class="section-no">01</div><div class="section-meta"><div class="label">IDENTITY · EVIDENCE BOUNDARY</div><h2>模型身份与证据边界</h2><p>把“模型能力”“推理后端能力”“社区体验”分开，避免把工具特性写成模型特性。</p></div></div><div class="risk-grid"><article class="risk" data-accent="blue"><div class="n">L1</div><h4>已确认</h4><p>27B dense；vision encoder；图像/视频理解；262144 context；Apache-2.0；官方 BF16/FP8。</p></article><article class="risk" data-accent="red"><div class="n">边界</div><h4>不能直接推出</h4><p>没有统一显存/吞吐表；Qwen3.6 部署文档不能无条件移植到 Qwen3.8。</p></article><article class="risk" data-accent="dark"><div class="n">L3</div><h4>社区线索</h4><p>Smartpig Article 快照只作为体验/数字线索；未把其数字升级为官方性能结论。</p></article></div></section>
+
+  <section class="section"><div class="section-head"><div class="section-no b">02</div><div class="section-meta"><div class="label">MATRIX · MEMORY IS CONDITIONAL</div><h2>量化与硬件：先做容量预算</h2><p>文件大小只是起点；权重、KV cache、运行时开销与并发共同决定可用显存。</p></div></div><div class="qwen-table-wrap"><table class="qwen-table"><thead><tr><th>运行点</th><th>优先格式</th><th>容量判断</th><th>适用任务</th><th>警告</th></tr></thead><tbody><tr><td>24GB GPU</td><td>Q4 / 低上下文</td><td>先留出运行时与 KV</td><td>文本、代码、短视觉输入</td><td>不要直接承诺 262k</td></tr><tr><td>48GB 级别</td><td>Q5 / FP8</td><td>更宽松的上下文预算</td><td>多模态 Agent、长文档</td><td>仍需按后端实测</td></tr><tr><td>80GB 级别</td><td>BF16 / FP8</td><td>适合服务化试验</td><td>高质量、多并发探索</td><td>吞吐随 batch 变化</td></tr></tbody></table></div><div class="mobile-cards"><article class="card"><h3>24GB GPU · Q4</h3><p>低上下文起步，文本/代码/短视觉输入；必须保留 KV 与运行时余量。</p></article><article class="card"><h3>48GB · Q5 / FP8</h3><p>适合多模态 Agent 与长文档探索，但仍要按后端实测。</p></article><article class="card"><h3>80GB · BF16 / FP8</h3><p>可做服务化试验；并发、batch 与上下文仍会改变吞吐。</p></article></div></section>
+
+  <section class="section"><div class="section-head"><div class="section-no">03</div><div class="section-meta"><div class="label">WINDOWS · FAST VALIDATION</div><h2>Windows：先验证，再服务化</h2><p>桌面用户优先 LM Studio；需要可控参数时切 llama.cpp。以下命令仅作卡内说明，不在本机执行。</p></div></div><div class="grid-2"><article class="card"><div class="tagrow"><span class="tag blue">LM Studio</span><span class="tag dark">GUI</span></div><h3>适合快速确认模型是否可用</h3><p>下载与硬件匹配的量化文件 → 设置 GPU offload → 从 8k/32k 测试 → 再逐步增加上下文 → 打开 OpenAI-compatible API。</p><ul><li>健康检查：GET /v1/models</li><li>图像输入：确认客户端与后端均支持 vision</li><li>OOM：先降上下文，再降量化</li></ul></article><article class="card"><div class="tagrow"><span class="tag red">llama.cpp</span><span class="tag dark">可控</span></div><h3>适合参数与日志透明</h3><div class="code"><span class="c"># 示例：按实际文件与后端调整</span>
+<span class="k">llama-server</span> -m <span class="v">./Qwen3.8-27B-Q4_K_M.gguf</span> \
+  -c <span class="v">32768</span> -ngl <span class="v">999</span> --host <span class="v">0.0.0.0</span> --port <span class="v">8080</span></div></article></div></section>
+
+  <section class="section"><div class="section-head"><div class="section-no b">04</div><div class="section-meta"><div class="label">LINUX · SERVICE PATH</div><h2>Linux：CUDA / ROCm / CPU 分流</h2><p>Linux 更适合可重复服务，但“能启动”不等于“有可靠吞吐”。</p></div></div><div class="matrix"><article class="mini"><div class="lead blue">CUDA</div><h4>vLLM / llama.cpp</h4><p>先核对驱动、CUDA、显存，再确认 vision 与量化格式的后端支持。</p></article><article class="mini"><div class="lead red">ROCm</div><h4>按后端兼容矩阵走</h4><p>不要把 CUDA 参数原样复制；先做单请求、短上下文健康检查。</p></article><article class="mini"><div class="lead">CPU</div><h4>可用但不作速度承诺</h4><p>优先低量化、较短上下文；服务化前记录首 token 与 tokens/s。</p></article></div><div class="code"><span class="c"># 健康检查与日志观察（示意）</span>
+<span class="k">curl</span> http://127.0.0.1:8000/v1/models
+<span class="k">nvidia-smi</span>
+<span class="k">journalctl</span> -u qwen38.service -f</div></section>
+
+  <section class="section"><div class="section-head"><div class="section-no k">05</div><div class="section-meta"><div class="label">DECISION · UNKNOWN SCOPE</div><h2>最终决策：按约束选，不按想象选</h2><p>把推荐写成条件句，保留未知项。</p></div></div><div class="qwen-table-wrap"><table class="qwen-table"><thead><tr><th>你的约束</th><th>建议路径</th><th>不推荐条件</th></tr></thead><tbody><tr><td>24GB、个人开发</td><td>Q4 + LM Studio/llama.cpp，32k 起测</td><td>要求满上下文、稳定多并发</td></tr><tr><td>48GB+、多模态 Agent</td><td>FP8/Q5，先做 vision 与 KV 压力测试</td><td>没有后端 vision 支持</td></tr><tr><td>服务化、高并发</td><td>Linux + 明确 benchmark 条件</td><td>只有社区数字、无硬件/后端/上下文</td></tr></tbody></table></div><div class="mobile-cards"><article class="card"><h3>24GB · 个人开发</h3><p>Q4 + LM Studio/llama.cpp，32k 起测；不适合满上下文稳定多并发。</p></article><article class="card"><h3>48GB+ · 多模态 Agent</h3><p>FP8/Q5，先测 vision 与 KV；没有后端 vision 支持就不推荐。</p></article><article class="card"><h3>服务化 · 高并发</h3><p>Linux + 明确 benchmark 条件；社区数字不能替代可复现实测。</p></article></div></section>
+
+  <section class="section"><div class="section-head"><div class="section-no">06</div><div class="section-meta"><div class="label">SOURCES · RELEASE NOTE</div><h2>来源、更新时间与未知项</h2><p>本卡只保留已知事实与可执行边界。</p></div></div><div class="grid-2"><article class="card"><h3>一手来源</h3><ul><li><a href="https://huggingface.co/Qwen/Qwen3.8-27B"><strong>Qwen/Qwen3.8-27B · Hugging Face</strong></a>：模型身份、架构、模态、上下文、许可证、官方格式。</li><li>官方 Qwen 文档：仅用于核对通用工具边界，不把 Qwen3.6 参数无条件迁移。</li></ul></article><article class="card"><h3>明确未知</h3><ul><li>统一显存与吞吐表：未形成可比的官方基准。</li><li>约 1M 上下文：条件性扩展，不能写成默认能力。</li><li>社区数字：保留为 L3 线索，不进入排名。</li></ul></article></div><div class="footer-block" style="border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:8px;margin-top:14px"><h3>收口</h3><p>先验证后端，再扩大上下文；先记录条件，再谈速度。发布日：2026-08-17。</p><div class="source-note">Evidence layers: L1 official · L2 reproducible conditional test · L3 community experience · L4 unverified claim.</div></div></section>
+</main>
+</body>
+</html>
