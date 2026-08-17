@@ -1,0 +1,229 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenBB：把多市场数据接到同一条分析工作流</title><style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === 顶栏：fact_store 风格 diagonal red-black hero + 右侧 meta pill === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    /* === topbar-meta: 2行结构 + 字号分层 === */
+    .topbar-meta{
+      padding:14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 0.8fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);
+      padding:7px 9px 5px;
+      background:#fff;
+      font-weight:900;
+      font-size:14px;
+      line-height:1.1;
+    }
+    .meta-pill-lg .sub{
+      display:block;
+      font-size:9px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:2px;
+    }
+    .meta-pill-md{
+      border:2px solid var(--line);
+      border-left:4px solid var(--red);
+      padding:4px 7px 3px;
+      background:#fff;
+      font-weight:800;
+      font-size:11.5px;
+      line-height:1.25;
+    }
+    .meta-pill-md .sub{
+      display:block;
+      font-size:8.5px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:1px;
+    }
+    .meta-pill-sm{
+      border:2px solid var(--line);
+      border-left:4px solid #666;
+      padding:3px 7px 3px;
+      background:#fff;
+      font-weight:700;
+      font-size:11px;
+      color:#555;
+      line-height:1.3;
+    }
+    .meta-pill-sm .sub{
+      display:block;
+      font-size:8px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#aaa;
+      margin-top:1px;
+    }
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .overview{padding:10px 0}
+      .overview-sentence{font-size:13px}
+      .overview-body{font-size:12px}
+    }
+      display:inline-block;border:2px solid #fff;padding:4px 8px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;
+    }
+    h1.demo-title{
+      margin:10px 0 6px;
+      font-size:clamp(20px,3.2vw,38px);font-weight:800;
+      letter-spacing:-.03em;line-height:1.05;
+    }
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .meta-pill{border:2px solid var(--line);padding:6px 10px;background:#fff;font-weight:700;font-size:11.5px}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+
+    /* === overview：一句话概述 + 正文缩略 === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* === stats：红黑网格 === */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* === pills：红/黑为主，无蓝黄绿 === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === section：红头黑框 dense grid === */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{
+      background:var(--ink);color:#fff;padding:7px 12px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:10px 12px}
+
+    h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+    p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+
+    /* === tags：红色为主 === */
+    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
+
+    /* === grid-2/3：纯红黑 grid === */
+    .grid-2,.grid-3{display:grid;gap:10px;margin-bottom:10px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+    .card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+
+    /* === table：红黑高密度 === */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+    th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    tr:nth-child(even) td{background:#faf8f4}
+    .check{color:var(--red);font-weight:900;font-size:13px}
+    .cross{color:var(--ink);font-weight:900;font-size:13px}
+
+    /* === flow：红箭头 === */
+    .flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
+    .flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+
+    /* === btn：红/黑 === */
+    .btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+    .btn.red{background:var(--red);border-color:var(--red)}
+    .btn.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === rule === */
+    .rule{height:3px;background:var(--ink);margin:10px 0}
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+
+    /* === Responsive === */
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .grid-3,.grid-2{grid-template-columns:1fr}
+      .stats{flex-direction:column}
+      .stat{border-right:0;border-bottom:2px solid var(--line)}
+      .stat:last-child{border-bottom:0}
+      .card{padding-left:12px;padding-right:12px}
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:0;border-top:3px solid var(--line)}
+      h1.demo-title{font-size:clamp(18px,6vw,28px)}
+    }
+  
+/* OpenBB release overrides: readable text, platform-workbench layout */
+body{font-size:13px}.page{max-width:1040px}.demo-title{line-height:1.14;letter-spacing:-.02em;font-size:clamp(34px,5.6vw,72px)}
+.kicker,.tagline,.sub-line,.sec-head,.stat span,.pill,.label,.eyebrow{font-size:11.5px!important}
+.section{margin-bottom:14px}.sec-body{padding:14px}.sec-body p{line-height:1.65}.feature-grid,.domain-grid,.route-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.feature,.domain,.route{border:2px solid var(--line);padding:11px;background:#fff}.feature h3,.domain h3,.route h3{font-size:14px;margin-bottom:4px}.feature p,.domain p,.route p{font-size:12px;color:#444;line-height:1.5}.feature b,.domain b,.route b{color:var(--red)}.code{background:#0a0a0a;color:#eee;border:2px solid #0a0a0a;padding:12px;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}.warning{background:#fff5f6;border:2px solid var(--red);padding:11px;line-height:1.6}.source{font-size:11.5px;color:#555;line-height:1.55}.table-wrap{overflow-x:auto;border:2px solid var(--line)}table{border-collapse:collapse;width:100%;min-width:680px;background:#fff;font-size:12px}th,td{border:1px solid #aaa;padding:8px;text-align:left;vertical-align:top}th{background:#0a0a0a;color:#fff}td:first-child{font-weight:800;color:var(--red)}.footer-note{border-top:3px solid var(--line);padding-top:12px;font-size:11.5px;color:#555}
+@media(max-width:720px){.page{width:min(100% - 16px,1040px);padding-top:10px}.topbar{grid-template-columns:1fr}.topbar-meta{border-left:0;border-top:3px solid var(--line)}.feature-grid,.domain-grid,.route-grid{grid-template-columns:1fr}.stats{display:grid;grid-template-columns:repeat(2,1fr)}.stat{border-right:2px solid var(--line);border-bottom:2px solid var(--line)}.stat:nth-child(2n){border-right:0}.sec-body{padding:11px}.demo-title{font-size:clamp(30px,9vw,42px);line-height:1.28}.table-wrap{max-width:100%}}
+</style></head><body><main class="page">
+<header class="topbar"><div class="topbar-hero"><div class="kicker">OPEN DATA PLATFORM · FINANCE / AI</div><h1 class="demo-title">OpenBB<br>数据工作台</h1><p class="sub-line">把 equity、宏观、新闻与量化工具接进同一套 Python / API 工作流。</p><div class="tagline">Platform / ODP v4.7.0 · AGPLv3</div></div><div class="topbar-meta"><div class="meta-row-high"><div class="meta-pill-lg">71,882<span class="sub">GitHub stars · snapshot</span></div><div class="meta-pill-lg">4.7.0<span class="sub">Platform / ODP</span></div></div><div class="meta-row-low"><div class="meta-pill-md">7,402<span class="sub">Forks</span></div><div class="meta-pill-md">Python<span class="sub">主要语言</span></div><div class="meta-pill-sm">AGPLv3<span class="sub">许可证</span></div></div></div></header>
+<div class="stats"><div class="stat"><strong>10+</strong><span>数据域</span></div><div class="stat"><strong>4</strong><span>接入面</span></div><div class="stat"><strong>v4.7.0</strong><span>ODP</span></div><div class="stat"><strong>1.0.2</strong><span>Desktop</span></div></div>
+<section class="section"><div class="sec-head"><span class="num">01</span><span class="label">它是什么 · 不是什么</span></div><div class="sec-body"><div class="feature-grid"><article class="feature"><h3><b>统一入口</b></h3><p>官方定位是 Open Data Platform：面向分析师、量化、数据工程师与 AI agent 的数据访问和分析层。</p></article><article class="feature"><h3><b>不是数据供应商</b></h3><p>OpenBB 连接多类 provider；具体覆盖、授权、限流与价格取决于各数据源，平台不保证所有数据免费。</p></article><article class="feature"><h3><b>不是投资建议</b></h3><p>它提供检索、转换与分析工具，不替你验证数据质量，也不对交易结果负责。</p></article></div></div></section>
+<section class="section"><div class="sec-head"><span class="num">02</span><span class="label">多数据域 · 一张地图</span></div><div class="sec-body"><div class="domain-grid"><article class="domain"><h3>市场</h3><p><b>equity</b> · ETF · index · options · fixed income · commodity · forex · crypto</p></article><article class="domain"><h3>宏观与监管</h3><p><b>economy</b> · FRED · IMF · SEC：宏观指标、公告与监管文件。</p></article><article class="domain"><h3>研究工具</h3><p><b>news</b> · technical · quantitative：从新闻检索到技术与量化分析。</p></article></div><p class="source" style="margin-top:10px">能力范围按官方项目资料整理；具体 endpoint 与 provider 可用性应以当前文档和各 provider 条款为准。</p></div></section>
+<section class="section"><div class="sec-head"><span class="num">03</span><span class="label">从代码到工作台 · 四个接入面</span></div><div class="sec-body"><div class="route-grid"><article class="route"><h3>Python SDK</h3><p>安装包后通过 <code>from openbb import obb</code> 调用统一入口。</p></article><article class="route"><h3>Workspace / Excel</h3><p>面向研究与表格用户的工作台体验；不要把它误读成 provider 的数据授权。</p></article><article class="route"><h3>MCP / REST API</h3><p>给 AI agent 或服务端接入；API 进程可用 <code>openbb-api</code> / <code>openbb-platform-api</code>。</p></article></div><div class="code" style="margin-top:10px">pip install openbb
+from openbb import obb
+# 扩展：pip install "openbb[all]"
+# 服务端：openbb-api / openbb-platform-api</div></div></section>
+<section class="section"><div class="sec-head"><span class="num">04</span><span class="label">边界先看清 · 再接数据</span></div><div class="sec-body"><div class="warning"><strong>关键成本不是 pip install。</strong><br>不同 provider 可能要求独立 API key、注册、特定协议或付费订阅；免费层、商业使用权、历史数据深度、速率限制和再分发边界都要单独核对。OpenBB 是集成与分析平台，不承诺每个数据源免费可用。</div><div class="table-wrap" style="margin-top:11px"><table><thead><tr><th>层级</th><th>你得到什么</th><th>你仍要负责什么</th></tr></thead><tbody><tr><td>OpenBB 平台</td><td>统一 Python / API / 工作台入口</td><td>版本兼容、部署与安全</td></tr><tr><td>Provider</td><td>行情、宏观、新闻或文件数据</td><td>key、协议、费用、限流、授权</td></tr><tr><td>你的研究流</td><td>筛选、指标、量化或 agent 调用</td><td>数据质量、回测偏差、投资判断</td></tr></tbody></table></div></div></section>
+<section class="section"><div class="sec-head"><span class="num">05</span><span class="label">适合谁 · 先做什么</span></div><div class="sec-body"><div class="feature-grid"><article class="feature"><h3>分析师</h3><p>先选 1–2 个 provider，验证字段、时间粒度和授权，再把研究动作固化。</p></article><article class="feature"><h3>量化 / 数据工程</h3><p>先做 provider 对照与缓存策略，确认异常、限流、重试和数据血缘。</p></article><article class="feature"><h3>AI agent</h3><p>先收窄 MCP / REST 工具面与权限，避免让 agent 直接触碰未审计的数据源。</p></article></div></div></section>
+<section class="section"><div class="sec-head"><span class="num">06</span><span class="label">来源与版本锚点</span></div><div class="sec-body"><p class="source">官方仓库：<a href="https://github.com/OpenBB-finance/OpenBB">github.com/OpenBB-finance/OpenBB</a><br>安装与 API 入口：官方 README / 文档。项目许可证：README 与 LICENSE 为 <strong>AGPLv3</strong>；GitHub license 字段显示 Other。版本锚点：Platform / ODP v4.7.0（2026-03-09），ODP Desktop v1.0.2。GitHub stars/forks 为动态快照，卡内记录 71,882 / 7,402，不代表永久值。<br>X 仅作 L3 快照：<a href="https://x.com/i/status/2088667493682569720">Amto / XAMTO_AI</a>，快照 71 likes · 24 retweets · 7 replies · 5,850 views · 101 bookmarks。</p></div></section>
+<div class="footer-note">主题决策：redswiss。形态：多数据域平台 / 数据集成工作台。结构签名：<code>hero → stats → domain-grid → route-grid → warning/table → source</code>；主题 token：<code>--red #c8102e · --ink #0a0a0a · --bg #f5f2ec</code>。研究结论：未发现同项目卡，新建。</div>
+</main></body></html>
