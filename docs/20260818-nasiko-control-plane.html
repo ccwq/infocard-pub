@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>Nasiko：开发者控制面——单进程接管 A2A 代理路由、ACL、密钥与可观测性</title>
+<style>
+:root{
+  --bg:#f6f4ef;
+  --paper:#fffdf8;
+  --ink:#111111;
+  --muted:#5f5950;
+  --line:#111111;
+  --red:#d80018;
+  --blue:#1f63ff;
+  --soft-red:#fde9eb;
+  --soft-blue:#e8f1ff;
+  --soft-ink:#f7f6f2;
+  --shadow:8px 8px 0 rgba(17,17,17,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  color:var(--ink);line-height:1.58;
+  background:
+    linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+    linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+    radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+    radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+    var(--bg);
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 88px}
+
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-copy{padding:22px;border-right:3px solid var(--line);display:grid;gap:14px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:6px 10px;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";color:var(--red);font-size:11px}
+h1.demo-title{margin:0;max-width:820px;font-size:clamp(26px,4vw,46px);line-height:.98;letter-spacing:-.05em}
+.subtitle{color:var(--muted);font-size:14px;line-height:1.6}
+.badge-row{display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:inline-flex;align-items:center;min-height:33px;padding:6px 10px;border:2px solid var(--line);background:#fff;font-size:12.1px;font-weight:850}
+.badge.red{background:var(--red);color:#fff}
+.badge.blue{background:var(--blue);color:#fff}
+.badge.dark{background:#111;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+.stat .k{display:block;margin-bottom:6px;font-size:10.8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.stat .v{display:block;font-size:13.5px;line-height:1.34;font-weight:900}
+.alert{border:3px solid var(--line);background:#111;color:#fff;padding:15px;display:grid;gap:10px}
+.alert strong{display:block;font-size:15px;line-height:1.35}
+.alert p{margin:0;font-size:14px;line-height:1.68;color:#f0ebe0!important}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+.hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+.hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+.panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+.panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+.flow{display:grid;gap:8px}
+.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+.flow-item::after{content:"→";position:absolute;right:-17px;top:50%;transform:translateY(-50%);color:var(--blue);font-size:15px;font-weight:900}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+.flow-item.red .c{color:var(--red)}
+.flow-item.blue .c{color:var(--blue)}
+.flow-item.dark .c{color:#111}
+
+.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+.section-no.b{background:var(--blue)}
+.section-no.k{background:#111}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+.section-meta .label.b{color:var(--blue)}
+.section-meta .label.k{color:#111}
+.section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+.section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+.grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card,.mini{border:2px solid var(--line);background:#fff;min-width:0;padding:14px}
+.card{display:grid;gap:10px}
+.card h3,.mini h4{margin:0;letter-spacing:-.02em}
+.card h3{font-size:17px;line-height:1.16}
+.card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+.card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+.card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+.tag.red{background:var(--soft-red)}
+.tag.blue{background:var(--soft-blue)}
+.tag.dark{background:#111;color:#fff}
+
+.matrix{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.matrix .mini{display:grid;gap:8px}
+.mini h4{font-size:15px;line-height:1.2}
+.mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.mini .red{color:var(--red)}
+.mini .blue{color:var(--blue)}
+.mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+
+.risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+.risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+.risk[data-accent="red"]{--accent:var(--red)}
+.risk[data-accent="blue"]{--accent:var(--blue)}
+.risk[data-accent="dark"]{--accent:#111}
+.risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+
+.cmd{border:2px solid var(--line);background:#1a1a1a;color:#e8e4d9;padding:14px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre}
+.cmd .prompt{color:#888}
+.cmd .cmd-name{color:#79b8ff}
+.cmd .comment{color:#6a737d}
+.cmd .key{color:#f97583}
+.cmd .value{color:#9ecbff}
+
+.narrow-col{display:grid;grid-template-columns:1fr 2fr;gap:12px;align-items:start}
+.narrow-col .card h3{font-size:15px}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <span class="kicker">GitHub Trending · Control Plane · Open Source</span>
+    <h1 class="demo-title">Nasiko：单进程控制面<br>接管多 Agent 路由与安全</h1>
+    <p class="subtitle">A2A v1.0 代理 + MCP Gateway + LLM Router + OTel 全链路追踪。Rust 实现，Apache-2.0，4.9K ★。</p>
+    <div class="badge-row">
+      <span class="badge dark">Apache-2.0</span>
+      <span class="badge">Rust</span>
+      <span class="badge red">Control Plane</span>
+      <span class="badge blue">A2A Protocol</span>
+      <span class="badge">MCP Gateway</span>
+      <span class="badge">OTel 可观测</span>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <span class="k">GitHub Stars</span>
+        <span class="v red">4.9K ★</span>
+      </div>
+      <div class="stat">
+        <span class="k">Forks</span>
+        <span class="v">1.02K</span>
+      </div>
+      <div class="stat">
+        <span class="k">Open Issues</span>
+        <span class="v">89</span>
+      </div>
+      <div class="stat">
+        <span class="k">Created</span>
+        <span class="v">2026-02</span>
+      </div>
+    </div>
+    <div class="alert">
+      <strong>⚠ 与 X 文章叙事的边界</strong>
+      <p>monokern @x.com 的 X Article（2026-08-11）提出了 Single-Agent Control Plane Pattern 的三柱框架（Deterministic Signal Queue / Centralized Reasoning / Knowledge Graph），但该框架是通用架构叙事，<strong>不等同于 Nasiko 的具体实现</strong>。Nasiko 是"开发者控制面"，专注 A2A/MCP/LLM 路由；Knowledge Graph 控制面不在其内置功能范围内。</p>
+    </div>
+  </div>
+  <div class="hero-visual" style="border-top:3px solid var(--line)">
+    <div class="panel-top">
+      <span class="eyebrow">Core Design</span>
+      <h3>单进程控制面：every hop is a checkpoint</h3>
+      <p>Agent 从不暴露在公网；每条调用都经过 TLS 终止 → JWT 鉴权 → 限流 → ACL → 代理回源。</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote">NASIKO-SERVER = Auth + Route + Proxy + MCP + LLM Router + OTel + OCI Registry + Secrets + Flow Guards</div>
+      <div class="flow">
+        <div class="flow-item dark"><span class="t">INGRESS</span><span class="c">TLS 终止 · JWT 会话 · OIDC SSO</span></div>
+        <div class="flow-item blue"><span class="t">GATEWAY</span><span class="c">Rate Limit · ACL · 审计</span></div>
+        <div class="flow-item red"><span class="t">ROUTE / PROXY</span><span class="c">A2A 代理或 MCP/LLM 路由</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 01: WHAT IS IT -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no">01</div>
+    <div class="section-meta">
+      <span class="label">Section One</span>
+      <h2>它是什么</h2>
+      <p>Nasiko 是 Nasiko-Labs（GitHub: Nasiko-Labs）开源的<strong>单一控制面进程</strong>，面向 A2A 兼容的多 Agent 部署场景：一次部署，同时拥有代理路由、MCP 网关、LLM 密钥路由、可观测性和嵌入式镜像仓库。无需独立 gateway 或 sidecar 进程。</p>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>单进程控制面架构</h3>
+      <p>单一 nasiko-server 进程承担全部控制职责：TLS 终止、认证、代理路由、可观测性收集。agents 从不被公网访问——所有 agent-to-agent 调用都经 server 内部回环代理。</p>
+    </div>
+    <div class="card">
+      <h3>A2A v1.0 严格兼容</h3>
+      <p>硬编码 <code>A2A-Version: 1.0</code> header，向下不兼容 0.2.x / 0.3.0 版本。任何实现 A2A v1.0 协议的 Agent（Python / Rust / Go / TypeScript）均可接入，无需专有格式。</p>
+    </div>
+    <div class="card">
+      <h3>MCP Gateway</h3>
+      <p>单一永久 URL 为所有 agents 提供合并的、权限过滤后的 Composio toolkits 与自定义 MCP servers 视图，agent 无需持有凭证。</p>
+    </div>
+    <div class="card">
+      <h3>LLM Router（密钥保护）</h3>
+      <p>Agent 获得 <code>OPENAI_BASE_URL</code> + 短期身份令牌，真实 API key 在服务端解析。API key 永不暴露给 Agent 或日志。</p>
+    </div>
+    <div class="card">
+      <h3>Flow Guards（防循环）</h3>
+      <p>Redis 实现的 depth / fan-out / token budget / timeout / cycle detection 限流，防止失控 Agent 循环调用和资源耗尽。</p>
+    </div>
+    <div class="card">
+      <h3>OTel 全链路追踪</h3>
+      <p>每条 dispatch 和代理跳发出实时 OTel span，端到端追踪。Token 用量与成本从 <code>gen_ai.*</code> 属性自动采集。</p>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 02: ARCHITECTURE -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no b">02</div>
+    <div class="section-meta">
+      <span class="label b">Section Two</span>
+      <h2>核心架构组件</h2>
+      <p>nasiko-server 内部划分 10 个功能模块，共同构成单进程控制面。</p>
+    </div>
+  </div>
+  <div class="grid-3">
+    <div class="mini">
+      <h4>🔐 AUTH</h4>
+      <p class="lead">身份 · TLS · 限流</p>
+      <p>Session JWT + TLS + rate limit + ACL 共同鉴权每条请求。</p>
+    </div>
+    <div class="mini">
+      <h4>🔄 PROXY</h4>
+      <p class="lead">A2A 反向代理</p>
+      <p>通用 Agent 反向代理——绕过路由引擎，直接通过 server 内部回环转发 A2A 消息。</p>
+    </div>
+    <div class="mini">
+      <h4>🧭 ROUTE</h4>
+      <p class="lead">智能路由引擎</p>
+      <p>三阶段：embedding 相似度初筛 → 对话上下文重排 → LLM 终选。调用方无需了解 Agent 集群。</p>
+    </div>
+    <div class="mini">
+      <h4>🛠 MCP</h4>
+      <p class="lead">MCP 网关</p>
+      <p>tools/list + tools/call + OAuth，支持 Composio 与自定义 MCP server 合并视图。</p>
+    </div>
+    <div class="mini">
+      <h4>🤖 LLM</h4>
+      <p class="lead">LLM 路由</p>
+      <p>OPENAI_BASE_URL + 短期令牌，provider/key 在服务端解析，无 key 泄漏。</p>
+    </div>
+    <div class="mini">
+      <h4>📦 OCI</h4>
+      <p class="lead">嵌入式 OCI Registry</p>
+      <p>S3 后端 + 层去重，<code>nasiko push / deploy</code> 无需外部 registry。</p>
+    </div>
+    <div class="mini">
+      <h4>⏱ FLOW</h4>
+      <p class="lead">Flow Guards</p>
+      <p>depth / fan-out / token budget / timeout / cycle detection，Redis 状态后端。</p>
+    </div>
+    <div class="mini">
+      <h4>🔑 SECRETS</h4>
+      <p class="lead">密钥引擎</p>
+      <p>AES-256-GCM 静态加密，部署时注入，Postgres 持久化。</p>
+    </div>
+    <div class="mini">
+      <h4>🔌 OIDC</h4>
+      <p class="lead">OIDC 单点登录</p>
+      <p>企业级 SSO 支持，OIDC 客户端集成。</p>
+    </div>
+  </div>
+  <div style="margin-top:14px" class="card">
+    <h3>后端基础设施（Docker 运行时）</h3>
+    <div class="tagrow" style="margin-top:8px">
+      <span class="tag dark">Postgres（持久状态）</span>
+      <span class="tag dark">Redis（Flow Guards）</span>
+      <span class="tag blue">S3 / RustFS（OCI 镜像）</span>
+      <span class="tag blue">OTel Collector（追踪）</span>
+      <span class="tag">Tempo（分布式追踪）</span>
+      <span class="tag">Loki（日志聚合）</span>
+      <span class="tag">Docker Engine + Compose V2</span>
+      <span class="tag">Rust 1.85+（本地开发）</span>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 03: DEPLOY -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no">03</div>
+    <div class="section-meta">
+      <span class="label">Section Three</span>
+      <h2>快速部署（Docker，无需 Rust）</h2>
+      <p>Docker-only 路径只需 Docker Engine + Compose V2，三步启动完整 Nasiko 平台。</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Step 1：克隆并配置</h3>
+    <div class="cmd"><span class="comment"># 克隆仓库</span>
+<span class="cmd-name">git</span> clone https://github.com/Nasiko-Labs/nasiko.git
+<span class="cmd-name">cd</span> nasiko
+
+<span class="comment"># 复制环境变量模板</span>
+<span class="cmd-name">cp</span> .env.example .env
+
+<span class="comment"># 必填配置（编辑 .env）</span>
+<span class="key">OPENAI_API_KEY</span>=<span class="value">sk-...</span>       <span class="comment"># 路由引擎 + Agent 注入用</span>
+<span class="key">ADMIN_PASSWORD</span>=<span class="value">your-secure-password</span> <span class="comment"># Bootstrap 管理员密码</span></div>
+  </div>
+  <div style="margin-top:12px" class="card">
+    <h3>Step 2：启动完整平台</h3>
+    <div class="cmd"><span class="comment"># 启动全部组件（首次构建需几分钟）</span>
+<span class="cmd-name">docker</span> compose up -d
+
+<span class="comment"># 跟随 server 日志</span>
+<span class="cmd-name">docker</span> compose logs -f server
+
+<span class="comment"># 停止平台</span>
+<span class="cmd-name">docker</span> compose down</div>
+  </div>
+  <div style="margin-top:12px" class="card">
+    <h3>Step 3：访问 Dashboard</h3>
+    <div class="cmd"><span class="comment"># 打开 Dashboard</span>
+<span class="value">http://localhost:8080</span>
+
+<span class="comment"># 默认登录凭证（首次使用后立即修改）</span>
+<span class="key">Username</span>: <span class="value">admin</span>
+<span class="key">Password</span>: <span class="value">changeme</span> <span class="comment"># 或 ADMIN_PASSWORD 指定值</span></div>
+  </div>
+  <div style="margin-top:12px" class="grid-2">
+    <div class="card">
+      <h3>CLI 命令（Rust 路径）</h3>
+      <p>本地开发需要 Rust 1.85+：</p>
+      <div class="cmd" style="margin-top:8px"><span class="cmd-name">nasiko</span> new       <span class="comment"># 创建新 Agent</span>
+<span class="cmd-name">nasiko</span> run        <span class="comment"># 运行 Agent</span>
+<span class="cmd-name">nasiko</span> chat      <span class="comment"># 交互式 Chat</span>
+<span class="cmd-name">nasiko</span> deploy    <span class="comment"># 构建 + 推送 + 运行</span>
+<span class="cmd-name">nasiko</span> push      <span class="comment"># 推送到内置 OCI Registry</span></div>
+    </div>
+    <div class="card">
+      <h3>Bring Your Own Agent</h3>
+      <p>接入任意 A2A v1.0 兼容 Agent，无需专有格式：</p>
+      <div class="cmd" style="margin-top:8px"><span class="comment"># 通过 API 注册 Agent</span>
+<span class="cmd-name">curl</span> -X POST http://localhost:8080/api/v1/agents \
+  -H <span class="value">"Authorization: Bearer $TOKEN"</span> \
+  -H <span class="value">"Content-Type: application/json"</span> \
+  -d <span class="value">'{"name":"my-agent","a2a_url":"http://my-agent:8080"}'</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 04: X ARTICLE + PATTERN CONTEXT -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no b">04</div>
+    <div class="section-meta">
+      <span class="label b">Section Four</span>
+      <h2>X 帖子叙事：Multi-Agent Control Plane Pattern</h2>
+      <p>monokern @x.com（X Article，2026-08-11，4.8 万浏览）提出"分布式 multi-agent pipeline 失败 → 单 Agent 控制面替换"的架构叙事。Nasiko 是该模式的开源实现路径之一，但两者不等同。</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--blue);background:var(--soft-blue)">
+    <h3 style="color:var(--blue)">⚠ 证据分层边界（必读）</h3>
+    <ul style="font-size:13.5px">
+      <li><strong>Nasiko 官方事实</strong>（已核验）：README · LICENSE · GitHub API 元数据</li>
+      <li><strong>A2A 生态规范</strong>（已核验）：A2A protocol v1.0，Linux Foundation</li>
+      <li><strong>X 帖子叙事</strong>（仅作架构观点背景）："Single-Agent Control Plane Pattern"三柱框架、50+ turns / 30 minutes / 18% TRX drop 等案例数字——这些是 monokern 的观点，不是 Nasiko 项目的实际性能数据</li>
+      <li><strong>未核验</strong>：ZS Associates 商用 pharma 案例（公司未公开具体实现，无法一手核验）</li>
+    </ul>
+  </div>
+  <div style="margin-top:12px" class="grid-2">
+    <div class="card">
+      <h3>monokern X Article 三柱框架</h3>
+      <p>X Article 叙事（<strong>非 Nasiko 内置功能</strong>）：</p>
+      <ul>
+        <li><strong>Pillar 1 — Deterministic Signal Queue</strong>：统计异常检测脱离 LLM，用 SQL/Python window functions + Z-score 做前置过滤，LLM 只处理已确认的信号事件</li>
+        <li><strong>Pillar 2 — Centralized Reasoning</strong>：单一主 Agent 拥有端到端诊断生命周期；子 Agent 仅做隔离数据获取，不被授予判断权</li>
+        <li><strong>Pillar 3 — Knowledge Graph Control Plane</strong>：Domain expert 构建知识图谱，约束 Agent 推理路径，防止无效 SQL 和幻觉关联</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Nasiko 的实际实现范围</h3>
+      <p>Nasiko 专注<strong>Agent 运行时控制</strong>，不内置知识图谱推理：</p>
+      <ul>
+        <li>✅ A2A v1.0 代理路由（单进程 Proxy）</li>
+        <li>✅ MCP Gateway（工具聚合与鉴权）</li>
+        <li>✅ LLM Router（密钥保护与模型路由）</li>
+        <li>✅ Flow Guards（循环检测 + 限流）</li>
+        <li>✅ OTel 全链路追踪</li>
+        <li>✅ OCI 镜像管理</li>
+        <li>❌ Knowledge Graph 控制面（非内置，需外部实现）</li>
+        <li>❌ Deterministic Signal Queue（非内置）</li>
+      </ul>
+    </div>
+  </div>
+  <div style="margin-top:12px" class="card">
+    <h3>Bounded Investigation Loop（X 帖子叙事）</h3>
+    <div class="flow" style="margin-top:8px">
+      <div class="flow-item dark"><span class="t">STEP 1</span><span class="c">Neighborhood Discovery：从 KG 查询信号节点邻域</span></div>
+      <div class="flow-item blue"><span class="t">STEP 2</span><span class="c">Hypothesis via Edges：每条边 = 可操作假设路径</span></div>
+      <div class="flow-item red"><span class="t">STEP 3</span><span class="c">Data Verification：直接 SQL / API 检查底层数据证据</span></div>
+      <div class="flow-item dark"><span class="t">STEP 4</span><span class="c">Evaluate &amp; Traverse：符合阈值则深入，否则剪枝</span></div>
+      <div class="flow-item blue"><span class="t">STEP 5</span><span class="c">Termination：50+ 轮迭代，直到根因定位或路径耗尽</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 05: RISK -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no">05</div>
+    <div class="section-meta">
+      <span class="label">Section Five</span>
+      <h2>风险与限制</h2>
+    </div>
+  </div>
+  <div class="risk-grid">
+    <div class="risk" data-accent="red">
+      <div class="n">⚠</div>
+      <h4 style="margin:0;font-size:15px;letter-spacing:-.02em">A2A 版本硬性要求</h4>
+      <p style="margin:0;font-size:13px;color:#333;line-height:1.6">Nasiko 硬编码 A2A v1.0，向下不兼容旧版 agents（0.2.x / 0.3.0）。错误码 <code>-32009 VersionNotSupported</code> 会在不兼容时立即出现。</p>
+    </div>
+    <div class="risk" data-accent="red">
+      <div class="n">!</div>
+      <h4 style="margin:0;font-size:15px;letter-spacing:-.02em">基础设施依赖</h4>
+      <p style="margin:0;font-size:13px;color:#333;line-height:1.6">完整平台依赖 Postgres + Redis + S3 + OTel Collector + Tempo + Loki。自托管需额外运维工作，不适合轻量单 Agent 场景。</p>
+    </div>
+    <div class="risk" data-accent="blue">
+      <div class="n">89</div>
+      <h4 style="margin:0;font-size:15px;letter-spacing:-.02em">Open Issues</h4>
+      <p style="margin:0;font-size:13px;color:#333;line-height:1.6">截至 2026-08-17 仍有 89 个 open issues（GitHub API）。活跃开发中，部分 API 或有 breaking change。</p>
+    </div>
+    <div class="risk" data-accent="red">
+      <div class="n">📊</div>
+      <h4 style="margin:0;font-size:15px;letter-spacing:-.02em">缺少量化吞吐数据</h4>
+      <p style="margin:0;font-size:13px;color:#333;line-height:1.6">README 未提供 agent 并发数、延迟 P99 或 token 吞吐实测数据。生产部署前建议自行压测。</p>
+    </div>
+    <div class="risk" data-accent="dark">
+      <div class="n">🔑</div>
+      <h4 style="margin:0;font-size:15px;letter-spacing:-.02em">密钥注入机制</h4>
+      <p style="margin:0;font-size:13px;color:#333;line-height:1.6">Secrets 以 AES-256-GCM 加密存储，但密钥管理方案（部署时注入）需配合安全 CI/CD 流程，否则部署节点仍有泄漏风险。</p>
+    </div>
+    <div class="risk" data-accent="blue">
+      <div class="n">KG</div>
+      <h4 style="margin:0;font-size:15px;letter-spacing:-.02em">Knowledge Graph 非内置</h4>
+      <p style="margin:0;font-size:13px;color:#333;line-height:1.6">monokern X Article 的 KG 控制面模式不在 Nasiko 内置功能范围内。如需该能力，需在 Nasiko 之上自行集成 Neo4j / NetworkX 等图数据库。</p>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 06: REFERENCE -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no k">06</div>
+    <div class="section-meta">
+      <span class="label k">Section Six</span>
+      <h2>参考资料</h2>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>官方仓库与文档</h3>
+      <ul>
+        <li><a href="https://github.com/Nasiko-Labs/nasiko" style="color:var(--blue)">github.com/Nasiko-Labs/nasiko</a></li>
+        <li><a href="https://www.nasiko.com" style="color:var(--blue)">www.nasiko.com</a> — 官网</li>
+        <li><a href="https://docs.nasiko.com" style="color:var(--blue)">docs.nasiko.com</a> — 完整文档</li>
+        <li><a href="https://discord.com/invite/HmnfkTfjFv" style="color:var(--blue)">Discord 社区</a></li>
+        <li><a href="https://github.com/a2aproject/a2a-spec" style="color:var(--blue)">A2A Protocol v1.0 (Linux Foundation)</a></li>
+        <li><a href="https://github.com/Nasiko-Labs/nasiko/blob/main/LICENSE" style="color:var(--blue)">Apache-2.0 License</a></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>X 帖子来源（架构叙事）</h3>
+      <p style="margin-bottom:8px">monokern X Article：<em>Why Multi-Agent Pipelines Fail for Complex Analytics</em></p>
+      <ul>
+        <li><a href="https://x.com/monokern/status/2087241401649996149" style="color:var(--blue)">x.com/monokern/status/2087241401649996149</a></li>
+        <li>作者：@monokern（verified，3.6K 粉丝）</li>
+        <li>发布：2026-08-11，浏览 4.8 万，140 收藏</li>
+        <li>身份：Polymarket 交易 + AI 模型分析</li>
+      </ul>
+      <p style="margin-top:8px;font-size:12px;color:var(--muted)">⚠ 注意：此 X Article 为架构叙事背景，不是 Nasiko 官方文档。其中的 ZS Associates 案例与 Nasiko 项目无直接关联。</p>
+    </div>
+  </div>
+  <div style="margin-top:12px" class="card">
+    <h3>X 帖子三柱框架（证据边界说明）</h3>
+    <div class="narrow-col" style="margin-top:8px">
+      <div class="card">
+        <h3>属 X 帖子叙事</h3>
+        <ul style="font-size:13px">
+          <li>Deterministic Signal Queue</li>
+          <li>Knowledge Graph Control Plane</li>
+          <li>Bounded Investigation Loop</li>
+          <li>50+ turns / 30 min / 18% drop</li>
+          <li>ZS Associates 案例</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:var(--blue)">
+        <h3 style="color:var(--blue)">属 Nasiko 官方事实</h3>
+        <ul style="font-size:13px">
+          <li>A2A v1.0 Proxy（单进程）</li>
+          <li>MCP Gateway + LLM Router</li>
+          <li>Flow Guards（Redis）</li>
+          <li>OTel 全链路追踪</li>
+          <li>Embedded OCI Registry</li>
+          <li>4.9K ★ / Apache-2.0 / Rust</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:12px" class="tagrow">
+    <span class="tag dark">Nasiko</span>
+    <span class="tag dark">Developer Control Plane</span>
+    <span class="tag blue">A2A Protocol v1.0</span>
+    <span class="tag blue">MCP Gateway</span>
+    <span class="tag blue">LLM Router</span>
+    <span class="tag blue">Flow Guards</span>
+    <span class="tag">Single Process</span>
+    <span class="tag">Rust</span>
+    <span class="tag">Apache-2.0</span>
+    <span class="tag">OpenTelemetry</span>
+    <span class="tag">OCI Registry</span>
+    <span class="tag red">单进程控制面</span>
+    <span class="tag red">Multi-Agent</span>
+  </div>
+</div>
+
+</div><!-- .page -->
+</body>
+</html>
