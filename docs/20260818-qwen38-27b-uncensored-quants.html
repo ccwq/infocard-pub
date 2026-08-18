@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Qwen3.8-27B Uncensored 量化对照表</title>
+  <meta name="description" content="Qwen3.8-27B uncensored GGUF 量化版本显存占用与 perplexity 对照：IQ2_M ~ Q8_0，附 MTP 头保留状态、KL divergence 与拒绝率基准。">
+  <style>
+    :root{--bg:#080c18;--bg2:#0d1224;--panel:#111827;--panel2:#0a1020;--ink:#e8eef8;--muted:#8898b8;--cyan:#60d4f8;--blue:#5889ff;--purple:#9878ff;--green:#48e898;--red:#f86868;--shadow:0 16px 40px rgba(0,0,0,.35)}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1100px,calc(100% - 32px));margin:0 auto;padding:48px 0 72px}
+
+    .hero-bar{height:5px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));border-radius:999px;margin:0 0 24px;box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+
+    .hero{display:grid;grid-template-columns:1fr 320px;gap:20px;margin-bottom:24px;align-items:start}
+    .hero-copy{display:grid;gap:12px}
+    .kicker{font:800 11px/1 ui-monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+    h1{font-size:clamp(26px,4vw,46px);line-height:.95;letter-spacing:-.04em;font-weight:950;margin:0}
+    .subtitle{font-size:clamp(13px,1.6vw,16px);line-height:1.6;color:var(--muted);max-width:620px}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px}
+    .pill{padding:5px 11px;border-radius:999px;font-size:12px;font-weight:700;border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--ink)}
+    .pill.cyan{border-color:rgba(96,212,248,.3);color:var(--cyan);background:rgba(96,212,248,.08)}
+    .pill.green{border-color:rgba(72,232,152,.3);color:var(--green);background:rgba(72,232,152,.08)}
+    .pill.purple{border-color:rgba(152,120,255,.3);color:var(--purple);background:rgba(152,120,255,.08)}
+    .pill.red{border-color:rgba(248,104,104,.3);color:var(--red);background:rgba(248,104,104,.08)}
+
+    .hero-card{background:var(--panel);border:1.5px solid rgba(255,255,255,.10);border-radius:20px;padding:18px;box-shadow:var(--shadow);display:grid;gap:10px}
+    .hero-card h3{font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0}
+    .big{font-size:34px;font-weight:950;letter-spacing:-.03em}
+    .small{font:700 10px/1 ui-monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+    .strip{height:4px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--purple));margin-top:6px}
+
+    .quant-table{background:var(--panel);border:1.5px solid rgba(255,255,255,.10);border-radius:20px;overflow:hidden;margin-bottom:20px;box-shadow:var(--shadow)}
+    .quant-table table{width:100%;border-collapse:collapse;font-size:13px}
+    .quant-table th{padding:11px 14px;text-align:left;font:800 10.5px/1 ui-monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--bg2);border-bottom:1.5px solid rgba(255,255,255,.08)}
+    .quant-table td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+    .quant-table tr:last-child td{border-bottom:none}
+    .quant-table tr:hover td{background:rgba(255,255,255,.03)}
+    .badge{display:inline-block;padding:3px 8px;border-radius:999px;font:800 10px/1 ui-monospace;letter-spacing:.06em}
+    .badge.iq2{background:rgba(248,104,104,.15);border:1px solid rgba(248,104,104,.3);color:var(--red)}
+    .badge.iq4{background:rgba(96,212,248,.12);border:1px solid rgba(96,212,248,.25);color:var(--cyan)}
+    .badge.q4{background:rgba(88,137,255,.12);border:1px solid rgba(88,137,255,.25);color:var(--blue)}
+    .badge.q5{background:rgba(72,232,152,.10);border:1px solid rgba(72,232,152,.22);color:var(--green)}
+    .badge.q6{background:rgba(152,120,255,.12);border:1px solid rgba(152,120,255,.25);color:var(--purple)}
+    .badge.q8{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--ink)}
+    .delta{font:700 12px/1 ui-monospace}
+    .delta.ok{color:var(--green)}
+    .delta.warn{color:var(--cyan)}
+    .delta.bad{color:var(--red)}
+    .note-cell{font-size:11.5px;color:var(--muted);line-height:1.4}
+
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+    .panel{background:var(--panel);border:1.5px solid rgba(255,255,255,.10);border-radius:18px;padding:18px 20px;box-shadow:var(--shadow)}
+    .panel h2{font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+    .bench-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .bench-item{padding:8px 10px;background:var(--bg2);border-radius:10px;border:1px solid rgba(255,255,255,.06)}
+    .bench-item .label{font:700 9.5px/1 ui-monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+    .bench-item .val{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .bench-item .delta{font-size:10.5px;margin-top:1px}
+
+    .refusal-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+    .refusal-row:last-child{border-bottom:none}
+    .refusal-label{font-size:12.5px;color:var(--muted)}
+    .refusal-val{font:900 13px/1 ui-monospace}
+    .refusal-val.base{color:var(--red)}
+    .refusal-val.uncensored{color:var(--green)}
+
+    .cli-block{background:#080c18;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;font:700 11.5px/1.65 ui-monospace,Menlo,Consolas,monospace;color:#a8c8ff;white-space:pre-wrap;word-break:break-all;margin-top:10px}
+    .kw{color:#7dd3fc}.val{color:#86efac}.cmt{color:#555e70}
+
+    .warning{background:rgba(248,104,104,.08);border:1.5px solid rgba(248,104,104,.25);border-radius:14px;padding:12px 16px;font-size:12.5px;color:#f8a0a0;line-height:1.55}
+    .warning strong{display:block;margin-bottom:4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+
+    @media(max-width:800px){.hero,.two-col{grid-template-columns:1fr}.quant-table{overflow-x:auto}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero-bar"></div>
+
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker">GGUF Quantization Reference · Qwen3.8-27B Uncensored</div>
+      <h1>Qwen3.8-27B<br>量化显存对照</h1>
+      <p class="subtitle">JonathanColetti 发布的 GGUF 量化合集，包含 IQ2_M / IQ4_XS / Q4_K_M / Q5_K_M / Q6_K / Q8_0 全部版本，附 MTP 头保留状态与 perplexity 实测。</p>
+      <div class="pill-row">
+        <span class="pill cyan">IQ2_M · 10.6 GB</span>
+        <span class="pill green">Q5_K_M · 19.5 GB</span>
+        <span class="pill purple">Q6_K · 22.4 GB</span>
+        <span class="pill">Q8_0 · 29 GB</span>
+        <span class="pill red">⚠ IQ2_M PPL 退化</span>
+      </div>
+    </div>
+    <div class="hero-card">
+      <h3>基准测试</h3>
+      <div class="big">PPL<span style="color:var(--green)">+0.0016</span></div>
+      <div class="small">Q5_K_M vs f16 · Within noise</div>
+      <div class="strip"></div>
+      <div style="display:grid;gap:6px">
+        <div style="display:flex;justify-content:space-between"><span class="small">基准 f16 PPL</span><span style="font:900 12px/1 ui-monospace;color:var(--ink)">7.1557</span></div>
+        <div style="display:flex;justify-content:space-between"><span class="small">IQ2_M delta</span><span style="font:900 12px/1 ui-monospace;color:var(--red)">+0.7024 ⚠</span></div>
+        <div style="display:flex;justify-content:space-between"><span class="small">MTP 头</span><span style="font:900 12px/1 ui-monospace;color:var(--cyan)">全部保留 ✓</span></div>
+        <div style="display:flex;justify-content:space-between"><span class="small">拒绝率基准</span><span style="font:900 12px/1 ui-monospace;color:var(--green)">12/100</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quant-table">
+    <table>
+      <thead>
+        <tr>
+          <th>量化格式</th>
+          <th>文件大小</th>
+          <th>MTP</th>
+          <th>PPL (wikitext-2)</th>
+          <th>vs f16</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge iq2">IQ2_M</span></td>
+          <td style="font:900 13px/1 ui-monospace">10.6 GB</td>
+          <td style="color:var(--cyan);font-size:12px">✓</td>
+          <td style="font:700 12px/1 ui-monospace">7.8581</td>
+          <td><span class="delta bad">+0.7024 ⚠</span></td>
+          <td class="note-cell">约 2.8σ above baseline，能力退化明显。仅适合极度显存受限场景。</td>
+        </tr>
+        <tr>
+          <td><span class="badge iq4">IQ4_XS</span></td>
+          <td style="font:900 13px/1 ui-monospace">15.3 GB</td>
+          <td style="color:var(--cyan);font-size:12px">✓</td>
+          <td style="font:700 12px/1 ui-monospace">7.1583</td>
+          <td><span class="delta warn">+0.0026</span></td>
+          <td class="note-cell">Within noise · 推荐性价比之选</td>
+        </tr>
+        <tr>
+          <td><span class="badge q4">Q4_K_M</span></td>
+          <td style="font:900 13px/1 ui-monospace">16.8 GB</td>
+          <td style="color:var(--cyan);font-size:12px">✓</td>
+          <td style="font:700 12px/1 ui-monospace">7.1814</td>
+          <td><span class="delta warn">+0.0257</span></td>
+          <td class="note-cell">Within noise · 平衡之选</td>
+        </tr>
+        <tr>
+          <td><span class="badge q5">Q5_K_M</span></td>
+          <td style="font:900 13px/1 ui-monospace">19.5 GB</td>
+          <td style="color:var(--cyan);font-size:12px">✓</td>
+          <td style="font:700 12px/1 ui-monospace">7.1573</td>
+          <td><span class="delta ok">+0.0016</span></td>
+          <td class="note-cell">Best · 与 f16 最接近，强烈推荐</td>
+        </tr>
+        <tr>
+          <td><span class="badge q6">Q6_K</span></td>
+          <td style="font:900 13px/1 ui-monospace">22.4 GB</td>
+          <td style="color:var(--cyan);font-size:12px">✓</td>
+          <td style="font:700 12px/1 ui-monospace">7.1689</td>
+          <td><span class="delta warn">+0.0132</span></td>
+          <td class="note-cell">Within noise · Q5 质量/Q6 体积</td>
+        </tr>
+        <tr>
+          <td><span class="badge q8">Q8_0</span></td>
+          <td style="font:900 13px/1 ui-monospace">29.0 GB</td>
+          <td style="color:var(--cyan);font-size:12px">✓</td>
+          <td style="font:700 12px/1 ui-monospace">7.1764</td>
+          <td><span class="delta warn">+0.0207</span></td>
+          <td class="note-cell">Near-f16 · 高配之选</td>
+        </tr>
+        <tr style="background:rgba(255,255,255,.03)">
+          <td style="font:800 11px/1 ui-monospace;color:var(--muted)">F16 (基准)</td>
+          <td style="font:900 13px/1 ui-monospace;color:var(--muted)">54 GB</td>
+          <td style="color:var(--muted);font-size:12px">—</td>
+          <td style="font:700 12px/1 ui-monospace;color:var(--muted)">7.1557</td>
+          <td><span class="delta ok">baseline</span></td>
+          <td class="note-cell">未随附发布（54 GB）；实测 perplexity 基准</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <h2>Benchmark 对比（Uncensored vs Base）</h2>
+      <div class="bench-grid">
+        <div class="bench-item"><div class="label">MMLU</div><div class="val">83.3<sub style="font-size:9px;color:var(--muted)">/83.4</sub></div><div class="delta" style="color:var(--green)">Δ -0.2</div></div>
+        <div class="bench-item"><div class="label">ARC-C</div><div class="val">57.7<sub style="font-size:9px;color:var(--muted)">/58.9</sub></div><div class="delta" style="color:var(--red)">Δ -1.2</div></div>
+        <div class="bench-item"><div class="label">HellaSwag</div><div class="val">82.9<sub style="font-size:9px;color:var(--muted)">/82.8</sub></div><div class="delta" style="color:var(--green)">Δ +0.1</div></div>
+        <div class="bench-item"><div class="label">Winogrande</div><div class="val">75.3<sub style="font-size:9px;color:var(--muted)">/76.1</sub></div><div class="delta" style="color:var(--red)">Δ -0.8</div></div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.5">0-shot via lm-evaluation-harness bf16，所有 Δ 均在或接近标准误差范围内，uncensored 未造成明显能力退化。</p>
+    </div>
+
+    <div class="panel">
+      <h2>拒绝行为基准</h2>
+      <div class="refusal-row">
+        <span class="refusal-label">Base model（100 harmful prompts）</span>
+        <span class="refusal-val base">98/100</span>
+      </div>
+      <div class="refusal-row">
+        <span class="refusal-label">Uncensored（本版本）</span>
+        <span class="refusal-val uncensored">12/100</span>
+      </div>
+      <div class="refusal-row">
+        <span class="refusal-label">KL divergence vs base</span>
+        <span style="font:900 12px/1 ui-monospace;color:var(--cyan)">0.1191</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.5">Abliteration 后拒绝率从 98% 降至 12%，同时保持核心能力未见明显退化。</p>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:20px">
+    <h2>推荐启动命令（llama.cpp）</h2>
+    <div class="cli-block"><span class="cmt"># 推荐：Q4_K_M 融合版本（MTP 头内置）</span>
+llama-server -m Qwen3.8-27B-Uncensored-Q4_K_M.gguf \
+  --spec-type draft-mtp --spec-draft-n-max 2 \
+  -ngl 99 -c 8192
+
+<span class="cmt"># 无 MTP 分离版本（需显式指定 draft 文件）</span>
+llama-server -m Qwen3.8-27B-Uncensored-noMTP-Q4_K_M.gguf \
+  --spec-type draft-mtp \
+  --model-draft Qwen3.8-27B-Uncensored-draft-Q8_0.gguf \
+  -ngl 99 -c 8192</div>
+    <div class="warning" style="margin-top:12px">
+      <strong>⚠ 警告</strong>
+      IQ2_M（约 2-bit）已测出明显 perplexity 退化 (+0.7024, 约 2.8σ)，能力损失集中在推理与安全边界区域。2-bit 以下不做推荐。任何低于 IQ2_M 的量化预计会更严重。
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>资源链接</h2>
+    <div style="display:grid;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+        <span style="font-size:12.5px">JonathanColetti/Qwen3.8-27B-Uncensored-GGUF</span>
+        <a href="https://huggingface.co/JonathanColetti/Qwen3.8-27B-Uncensored-GGUF" style="color:var(--cyan);font:700 11px/1 ui-monospace">HF →</a>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+        <span style="font-size:12.5px">orcarouter/Qwen3.8-27B-Uncensored-FP8</span>
+        <a href="https://huggingface.co/orcarouter/Qwen3.8-27B-Uncensored-FP8" style="color:var(--cyan);font:700 11px/1 ui-monospace">HF →</a>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+        <span style="font-size:12.5px">X 推文来源：领哥LingGe (@shangdu2005)</span>
+        <a href="https://twitter.com/shangdu2005/status/2089291898276184127" style="color:var(--purple);font:700 11px/1 ui-monospace">X →</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
