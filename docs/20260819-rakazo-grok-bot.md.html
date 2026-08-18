@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rakazo：开源 Grok Bot 替代品，自带模型和沙盒</title>
+  <meta name="description" content="Rakazo 是用 TypeScript 构建的开源 Grok Bot 替代品，支持 Web + Electron + Expo 三端，每个 bot 有独立线程、记忆、沙盒和实时桌面，还能派生对等 bot 或 subagent。849 Stars，Apache 2.0。" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --red:#ff6b6b;
+      --orange:#ff9f43;
+      --teal:#2dd4bf;
+      --pink:#ff85c0;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:300px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(36px,6.5vw,78px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .pill.orange{border-color:rgba(255,159,67,.35);background:rgba(255,159,67,.12);color:#ffe8cc}
+    .pill.teal{border-color:rgba(45,212,191,.32);background:rgba(45,212,191,.12);color:#d0fff8}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:22px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)} .mini-icon.green{color:var(--green)} .mini-icon.yellow{color:var(--yellow)} .mini-icon.purple{color:var(--purple)} .mini-icon.orange{color:var(--orange)} .mini-icon.red{color:var(--red)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .shell{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}
+    .panel-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .panel-title{margin:0;font-size:17px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .panel-row{display:grid;gap:8px}
+    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
+    .feat .label{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .feat .value{font-size:12.5px;font-weight:800;line-height:1.3;color:#eef4ff}
+    .feat .note{font-size:11px;line-height:1.5;color:#8897c4}
+    .section{margin-bottom:14px}
+    .section-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .section-no{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(74,120,255,.28),rgba(88,195,255,.18));border:1.5px solid rgba(88,195,255,.28);box-shadow:0 8px 20px rgba(88,195,255,.14);font:950 18px/1 Georgia,"Times New Roman",serif;color:#fff;flex:0 0 auto}
+    .section-label{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .grid-card{padding:12px 14px;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:16px;display:grid;gap:6px}
+    .grid-card .gc-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;margin-bottom:2px}
+    .grid-card .gc-title{font-size:13px;font-weight:900;letter-spacing:-.01em;color:#fff}
+    .grid-card .gc-desc{font-size:11.5px;line-height:1.55;color:#8897c4}
+    .grid-card .gc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+    .grid-card .gc-tag{display:inline-flex;padding:2px 6px;border:1px solid rgba(255,255,255,.1);border-radius:999px;font:800 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#7a8ab8;background:rgba(255,255,255,.04)}
+    .stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:14px}
+    .stack-item{padding:10px 8px 8px;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;text-align:center;display:grid;gap:4px;align-content:start}
+    .stack-item .sk-name{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#fff;letter-spacing:.06em}
+    .stack-item .sk-role{font-size:10.5px;color:#7a8ab8;line-height:1.4}
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .cmp{min-width:0;border-radius:18px;padding:14px;display:grid;gap:10px}
+    .cmp.bad{background:rgba(255,107,107,.06);border:1.5px solid rgba(255,107,107,.2)}
+    .cmp.good{background:rgba(45,179,106,.06);border:1.5px solid rgba(45,179,106,.2)}
+    .cmp-head{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .cmp.bad .cmp-head{color:var(--red)} .cmp.good .cmp-head{color:var(--green)}
+    .cmp-item{font-size:12.5px;line-height:1.5;color:#c5d2f7;padding-left:14px;border-left:2px solid rgba(255,255,255,.1)}
+    .cmp.good .cmp-item{border-left-color:rgba(45,179,106,.4)} .cmp.bad .cmp-item{border-left-color:rgba(255,107,107,.3)}
+    .sandbox{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+    .sbx{padding:12px 14px;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:16px;display:grid;gap:6px}
+    .sbx .sbx-name{font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#fff;margin-bottom:2px}
+    .sbx .sbx-fit{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--cyan);margin-bottom:4px}
+    .sbx .sbx-desc{font-size:11.5px;line-height:1.55;color:#8897c4}
+    .code-block{background:#080b14;border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px 14px;margin-bottom:14px;box-shadow:0 8px 20px rgba(0,0,0,.22)}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--cyan);font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;color:#c9d4f7;white-space:pre-wrap}
+    .code-block .c{color:#5a6380}.code-block .k{color:#a8c5ff}.code-block .s{color:#7de3d6}.code-block .cm{color:#8897c4}.code-block .r{color:#ff9f43}
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1.5px solid rgba(255,255,255,.09);background:rgba(9,12,22,.42);border-radius:18px;padding:12px 14px 10px;margin-bottom:14px;box-shadow:var(--shadow)}
+    .footer .brand{font-weight:900;color:#fff;font-size:15px;letter-spacing:-.02em}
+    .footer .links{display:flex;flex-wrap:wrap;gap:6px}
+    .footer .link-item{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;font-size:11px}
+    .footer .meta{font:800 11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#5a6380;text-align:right}
+    .save{position:fixed;right:18px;bottom:18px;z-index:999;border:0;border-radius:10px;padding:.82rem 1rem;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 12px 28px rgba(74,120,255,.3);cursor:pointer}
+    @media(max-width:960px){.hero,.shell,.compare,.sandbox,.grid-3{grid-template-columns:1fr}.stack{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:720px){.page{width:min(100% - 14px,1180px);padding:12px 0 82px}.hero,.shell,.compare,.sandbox,.stack,.grid-3{grid-template-columns:1fr}h1{font-size:clamp(32px,10vw,58px)}.save{right:10px;bottom:10px;font-size:11.5px;padding:.72rem .88rem}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">ai agents / typescript / self-hosted / grok bot</span>
+          <span class="source">github.com/elie222/rakazo</span>
+        </div>
+        <h1 class="title">Rakazo</h1>
+        <p class="subtitle">开源 Grok Bot 替代品：自带模型和沙盒，本地跑通完整 AI 代理产品——每个 bot 拥有独立线程、实时 Linux 桌面、记忆和派生能力。</p>
+        <p class="subcn">解决 AI 代理产品绑死平台的核心痛点：模型、沙盒、数据全部自有。三端共享一个 API（Web + Electron + Expo），一条命令拉起全栈。</p>
+        <div class="pill-row">
+          <span class="pill yellow">849 ★</span>
+          <span class="pill green">TypeScript</span>
+          <span class="pill cyan">3 Client</span>
+          <span class="pill purple">Multi-Agent</span>
+          <span class="pill orange">Sandbox</span>
+          <span class="pill teal">Self-Hosted</span>
+        </div>
+        <div class="hero-note">
+          <strong>一句话结论</strong>
+          <p>Rakazo 把"云端 AI 代理"变成了"本地可控产品"：不受平台绑定，模型自选，数据私有，还能派生对等 bot 或 subagent 并行处理任务。</p>
+        </div>
+      </div>
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">RZ</div>
+          <div class="visual-meta">
+            <div class="big">849 Stars</div>
+            <div class="small">107 FORKS · Apache 2.0</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <div class="mini-card"><div class="mini-icon cyan"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div><div class="label">CLIENTS</div><div class="value">Web + Desktop + Mobile</div><div class="desc">React 19/Vite + Electron + Expo，共用 Hono + oRPC API</div></div>
+          <div class="mini-card"><div class="mini-icon green"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></div><div class="label">SANDBOX</div><div class="value">Docker / E2B / Daytona</div><div class="desc">Linux 桌面 + 浏览器，可接管操作，释放后 bot 继续运行</div></div>
+          <div class="mini-card"><div class="mini-icon purple"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div><div class="label">MULTI-AGENT</div><div class="value">Spawn + Subagent</div><div class="desc">Bot 能派生对等 bot（各有独立线程），也能在当前回合跑并行 subagent</div></div>
+          <div class="mini-card"><div class="mini-icon orange"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="label">STACK</div><div class="value">Postgres + Pi + Workers</div><div class="desc">Prisma + Graphile Worker + Pi + Better Auth，自托管一条命令</div></div>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <section class="shell">
+      <article class="panel">
+        <div class="panel-head"><div class="panel-kicker">核心定位</div><h3 class="panel-title">开源 Grok Bot 替代品</h3></div>
+        <div class="panel-row">
+          <div class="feat"><div class="label">解决的问题</div><div class="value">AI 代理产品通常绑死在官方托管环境</div><div class="note">模型、沙盒、数据全都要听平台。Rakazo 让你自带模型和沙盒，每个 bot 拥有独立线程、记忆、例行任务和历史。</div></div>
+          <div class="feat"><div class="label">上线数据</div><div class="value">4 天 849 Stars · 107 Forks · Apache 2.0</div><div class="note">作者 elie222，上线 4 天拿下近 600 Star，现已突破 849。</div></div>
+          <div class="feat"><div class="label">产品形态</div><div class="value">完整核心产品，不依赖控制面</div><div class="note">这个仓库本身就是完整产品，本地就能跑通全栈，不需要 Rakazo 云服务。</div></div>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><div class="panel-kicker">三端覆盖</div><h3 class="panel-title">Web + Electron + Expo，共用一个 API</h3></div>
+        <div class="panel-row">
+          <div class="feat"><div class="label">Web</div><div class="value">React 19 + Vite + Tailwind + Hono + oRPC</div><div class="note">主产品界面，带实时桌面查看器。</div></div>
+          <div class="feat"><div class="label">Electron</div><div class="value">桌面端，可切换"This Mac"本地运行</div><div class="note">部署所有者可选择让 bot 直接在 Mac 本地运行，不走 Docker。</div></div>
+          <div class="feat"><div class="label">Expo</div><div class="value">React Native 移动端</div><div class="note">与 Web / 桌面共享同一个后端 API。</div></div>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><div class="panel-kicker">Agent Runtime</div><h3 class="panel-title">Pi Runtime + 多沙盒支持</h3></div>
+        <div class="panel-row">
+          <div class="feat"><div class="label">Runtime</div><div class="value">Pi（内部模型编排层）+ 支持 OpenRouter</div><div class="note">支持 ChatGPT / Copilot / SuperGrok / xAI 登录，Claude 接入需要通过 Pi 的 localhost callback。</div></div>
+          <div class="feat"><div class="label">Sandbox</div><div class="value">Docker（默认）/ E2B / Daytona</div><div class="note">Linux 桌面带浏览器，模型可观察和控制系统。</div></div>
+          <div class="feat"><div class="label">隔离模式</div><div class="value">Workspace bot（共享 Team Computer）或 Private Computer</div><div class="note">Docker 默认隔离；E2B/Daytona 提供远程桌面，适合公网多用户部署。</div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">01</div><div><div class="section-label">三端技术栈</div></div></div>
+      <div class="grid-3">
+        <div class="grid-card">
+          <div class="gc-icon" style="background:rgba(88,195,255,.15);color:var(--cyan)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <div class="gc-title">Web（主产品）</div>
+          <div class="gc-desc">React 19 + Vite + Tailwind + Hono + oRPC，实时桌面查看器。</div>
+          <div class="gc-tags"><span class="gc-tag">React 19</span><span class="gc-tag">Vite</span><span class="gc-tag">Tailwind</span></div>
+        </div>
+        <div class="grid-card">
+          <div class="gc-icon" style="background:rgba(45,179,106,.15);color:var(--green)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          </div>
+          <div class="gc-title">Electron 桌面</div>
+          <div class="gc-desc">可选"This Mac"直接本地运行，不需要 Docker 容器。</div>
+          <div class="gc-tags"><span class="gc-tag">Electron</span><span class="gc-tag">This Mac</span></div>
+        </div>
+        <div class="grid-card">
+          <div class="gc-icon" style="background:rgba(244,200,76,.12);color:var(--yellow)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </div>
+          <div class="gc-title">Expo 移动端</div>
+          <div class="gc-desc">React Native 移动端，与 Web / 桌面共享同一个后端 API。</div>
+          <div class="gc-tags"><span class="gc-tag">Expo</span><span class="gc-tag">RN</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">02</div><div><div class="section-label">沙盒方案对比</div></div></div>
+      <div class="sandbox">
+        <div class="sbx" style="border-color:rgba(88,195,255,.2)">
+          <div class="sbx-name">Docker（默认）</div>
+          <div class="sbx-fit" style="color:var(--cyan)">本地快速 / 单机自托管</div>
+          <div class="sbx-desc">本机 Docker 容器作为 Linux 桌面，沙盒 supervisor 控制本地 Docker daemon，适合信任的单机环境。</div>
+        </div>
+        <div class="sbx" style="border-color:rgba(132,89,255,.2)">
+          <div class="sbx-name">E2B</div>
+          <div class="sbx-fit" style="color:var(--purple)">公网 / 多用户部署</div>
+          <div class="sbx-desc">E2B 远程桌面，通过 E2B SDK 提供隔离沙盒，需要 E2B_API_KEY，机器不保留数据主权。</div>
+        </div>
+        <div class="sbx" style="border-color:rgba(244,200,76,.2)">
+          <div class="sbx-name">Daytona</div>
+          <div class="sbx-fit" style="color:var(--yellow)">公网 / 多用户部署</div>
+          <div class="sbx-desc">Daytona 远程桌面，通过 Daytona SDK 提供隔离沙盒，需要 DAYTONA_API_KEY。</div>
+        </div>
+      </div>
+      <div class="hero-note" style="background:linear-gradient(135deg,rgba(45,179,106,.08),rgba(88,195,255,.06));border-color:rgba(45,179,106,.2)">
+        <strong>实时电脑桌面亮点</strong>
+        <p>bot 的沙盒是带浏览器的 Linux 桌面，你可以随时接管操作：登录网站、控制浏览器、操作文件。释放后 bot 保持会话继续干活，不会中断。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">03</div><div><div class="section-label">多代理能力</div></div></div>
+      <div class="compare">
+        <div class="cmp good">
+          <div class="cmp-head">Bot 派生能力</div>
+          <div class="cmp-item">每个 bot 有独立线程、记忆、例行任务和历史</div>
+          <div class="cmp-item">Bot 可以生成对等 bot（peer bot），各有独立线程和虚拟电脑</div>
+          <div class="cmp-item">对等 bot 之间可以协作，形成团队式工作流</div>
+        </div>
+        <div class="cmp good">
+          <div class="cmp-head">Subagent 能力</div>
+          <div class="cmp-item">在当前回合内跑短期 subagent，并行拆解任务</div>
+          <div class="cmp-item">子 agent 结果回到主 bot 回合，适合复杂查询分解</div>
+          <div class="cmp-item">不污染主 bot 线程，保持会话干净</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">04</div><div><div class="section-label">技术栈</div></div></div>
+      <div class="stack">
+        <div class="stack-item" style="border-color:rgba(88,195,255,.2)"><div class="sk-name" style="color:var(--cyan)">Hono + oRPC</div><div class="sk-role">API 框架</div></div>
+        <div class="stack-item" style="border-color:rgba(45,179,106,.2)"><div class="sk-name" style="color:var(--green)">Postgres</div><div class="sk-role">数据库</div></div>
+        <div class="stack-item" style="border-color:rgba(244,200,76,.2)"><div class="sk-name" style="color:var(--yellow)">Prisma</div><div class="sk-role">ORM</div></div>
+        <div class="stack-item" style="border-color:rgba(132,89,255,.2)"><div class="sk-name" style="color:var(--purple)">Graphile</div><div class="sk-role">Worker</div></div>
+        <div class="stack-item" style="border-color:rgba(255,159,67,.2)"><div class="sk-name" style="color:var(--orange)">Pi</div><div class="sk-role">Agent Runtime</div></div>
+        <div class="stack-item" style="border-color:rgba(255,107,107,.2)"><div class="sk-name" style="color:var(--red)">Better Auth</div><div class="sk-role">认证</div></div>
+        <div class="stack-item" style="border-color:rgba(88,195,255,.2)"><div class="sk-name" style="color:var(--cyan)">Composio</div><div class="sk-role">Plugin</div></div>
+        <div class="stack-item" style="border-color:rgba(45,212,191,.2)"><div class="sk-name" style="color:var(--teal)">Docker</div><div class="sk-role">Sandbox</div></div>
+        <div class="stack-item" style="border-color:rgba(245,158,11,.2)"><div class="sk-name" style="color:var(--pink)">Docker Compose</div><div class="sk-role">本地编排</div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">05</div><div><div class="section-label">本地运行</div></div></div>
+      <div class="code-block">
+        <div class="tag">setup commands</div>
+        <pre><span class="c"># 1) 复制环境变量</span>
+<span class="k">cp</span> <span class="s">.env.example</span> <span class="s">.env</span>
+
+<span class="c"># 2) 配置 .env（必填）</span>
+<span class="cm">BETTER_AUTH_SECRET=</span><span class="r">&lt;随机字符串&gt;</span>
+<span class="cm">ENCRYPTION_KEY=</span><span class="r">&lt;随机字符串&gt;</span>
+<span class="cm">OPENROUTER_API_KEY=</span><span class="r">&lt;你的 Key&gt;</span>
+<span class="c"># 或者在 UI 上直接粘贴 API key，跳过 .env 配置</span>
+
+<span class="c"># 3) 启动 Postgres（Docker）</span>
+<span class="k">docker compose</span> --env-file <span class="s">.env</span> \
+  -f <span class="s">infra/compose/docker-compose.yml</span> <span class="k">up</span> <span class="s">postgres -d</span>
+
+<span class="c"># 4) 安装依赖 + 初始化数据库</span>
+<span class="k">pnpm install && pnpm db:generate && pnpm db:migrate && pnpm sandbox:build</span>
+
+<span class="c"># 5) 启动全栈（API + Worker + Web + Supervisor）</span>
+<span class="k">pnpm dev</span>
+
+<span class="c"># 6) 打开产品</span>
+<span class="s">http://127.0.0.1:5173</span>
+
+<span class="c"># 健康检查</span>
+<span class="k">curl</span> <span class="s">http://127.0.0.1:3100/health</span></pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">06</div><div><div class="section-label">使用场景</div></div></div>
+      <div class="compare">
+        <div class="cmp good">
+          <div class="cmp-head">独立开发者</div>
+          <div class="cmp-item">自建 Grok Bot 级 AI 助手，不被云厂商绑定</div>
+          <div class="cmp-item">模型自选、数据私有、无平台抽成</div>
+          <div class="cmp-item">Electron 可切"This Mac"直接用本机算力</div>
+        </div>
+        <div class="cmp good">
+          <div class="cmp-head">自动化运营团队</div>
+          <div class="cmp-item">让 bot 每天跑例行任务：登录网站、操作浏览器、读写数据</div>
+          <div class="cmp-item">派生子代理并行处理多任务</div>
+          <div class="cmp-item">实时接管 + 释放后继续，不丢会话</div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>
+        <div class="brand">elie222 / rakazo</div>
+        <div class="links">
+          <span class="link-item">style: darkblue</span>
+          <span class="link-item">849 stars</span>
+          <span class="link-item">Apache 2.0</span>
+          <span class="link-item">TypeScript</span>
+        </div>
+      </div>
+      <div class="meta">849 Stars · 107 Forks · Apache 2.0 · 2026-08-19<br><button class="save" onclick="saveCardAsPng()">保存 PNG</button></div>
+    </footer>
+  </main>
+  <script>
+    function saveCardAsPng(){
+      const target=document.querySelector('.page');
+      html2canvas(target,{backgroundColor:'#0c1020',scale:2,useCORS:true,scrollY:-window.scrollY,windowWidth:document.documentElement.scrollWidth,windowHeight:document.documentElement.scrollHeight}).then(canvas=>{
+        const link=document.createElement('a');
+        link.download='rakazo-infocard.png';
+        link.href=canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+  </script>
+</body>
+</html>
