@@ -7,147 +7,189 @@
   <meta name="description" content="CLIProxyAPI 多渠道代理 Failover 故障排查复盘：HTTP 状态码如何被当作错误分类信号，422 为什么不触发接力，Streaming 场景下的特殊陷阱，以及 request-retry 不等于 HA 的核心认知。">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
-    :root{--bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);--cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--red:#ff6b6b;--orange:#ff9f43;--teal:#2dd4bf;--pink:#ff85c0;--shadow:0 18px 42px rgba(0,0,0,.34)}
+    :root{--black:#070707;--white:#fff;--paper:#fafafa;--red:#c8102e;--blue:#1b4fff;--green:#15803d;--muted:#555;--border:#e0e0e0;--ink:#111;--gray-bg:#f4f4f4;--tag-bg:#f0f0f0}
     *{box-sizing:border-box}
     html,body{margin:0;padding:0;overflow-x:hidden}
-    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(circle at 18% 10%,rgba(88,195,255,.16) 0 10%,transparent 11%),radial-gradient(circle at 86% 8%,rgba(132,89,255,.18) 0 9%,transparent 10%),radial-gradient(circle at 72% 72%,rgba(45,179,106,.10) 0 13%,transparent 14%),radial-gradient(circle at 18% 78%,rgba(244,200,76,.08) 0 11%,transparent 12%),linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%)}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--paper);color:var(--ink);font-size:13px}
     a{color:inherit;text-decoration:none}
     img{display:block;max-width:100%}
-    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
-    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
-    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
-    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
-    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
-    .source{max-width:300px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
-    .title{margin:0;font-size:clamp(34px,5.5vw,72px);line-height:.95;letter-spacing:-.06em;font-weight:950}
-    .subtitle{margin:0;font-size:clamp(14px,1.8vw,18px);line-height:1.55;color:#e8eefc}
-    .subcn{margin:0;font-size:clamp(12px,1.5vw,15px);line-height:1.65;color:#c5d2f7}
-    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
-    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
-    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
-    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
-    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
-    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
-    .pill.red{border-color:rgba(255,107,107,.32);background:rgba(255,107,107,.12);color:#ffd8d8}
-    .pill.orange{border-color:rgba(255,159,67,.35);background:rgba(255,159,67,.12);color:#ffe8cc}
-    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
-    .hero-note strong{font-size:14px;line-height:1.35}
-    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
-    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
-    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.36) 0 10%,transparent 11%),linear-gradient(135deg,var(--cyan) 0%,var(--blue) 34%,var(--purple) 68%,var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24),inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:22px;font-weight:950;letter-spacing:-.08em}
-    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
-    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
-    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
-    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
-    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
-    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
-    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
-    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
-    .mini-icon.cyan{color:var(--cyan)}.mini-icon.green{color:var(--green)}.mini-icon.yellow{color:var(--yellow)}.mini-icon.purple{color:var(--purple)}.mini-icon.red{color:var(--red)}.mini-icon.orange{color:var(--orange)}
-    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%,#53a3ff 22%,var(--purple) 54%,var(--green) 80%,var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 24px rgba(88,195,255,.16)}
-    .shell{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
-    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
-    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}
-    .panel-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
-    .panel-title{margin:0;font-size:17px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
-    .panel-row{display:grid;gap:8px}
-    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
-    .feat .label{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-    .feat .value{font-size:12.5px;font-weight:800;line-height:1.3;color:#eef4ff}
-    .feat .note{font-size:11px;line-height:1.5;color:#8897c4}
-    .section{margin-bottom:14px}
-    .section-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-    .section-no{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(74,120,255,.28),rgba(88,195,255,.18));border:1.5px solid rgba(88,195,255,.28);box-shadow:0 8px 20px rgba(88,195,255,.14);font:950 18px/1 Georgia,"Times New Roman",serif;color:#fff;flex:0 0 auto}
-    .section-label{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-    .table-wrap{background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px;overflow-x:auto;margin-bottom:14px}
-    table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:480px}
-    th{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 10px 5px;text-align:left;border-bottom:1px solid rgba(255,255,255,.1)}
-    td{padding:6px 10px 5px;text-align:left;line-height:1.4;color:#c5d2f7;border-bottom:1px solid rgba(255,255,255,.06)}
+    .page{width:min(1180px,100%);padding:0 0 80px}
+
+    /* === 黑头页眉 === */
+    header{background:var(--black);color:var(--white);padding:14px 18px 12px;border-bottom:3px solid var(--red)}
+    .header-inner{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+    .header-left{display:grid;gap:6px}
+    .header-tag{display:inline-block;padding:2px 8px;border:1.5px solid var(--white);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--white)}
+    .header-title{font-size:clamp(22px,3.5vw,38px);font-weight:700;letter-spacing:-.03em;line-height:1.05;color:var(--white);margin:0}
+    .header-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+    .header-badge{padding:2px 8px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:rgba(255,255,255,.7);border-radius:3px}
+    .header-right{text-align:right;font:800 11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:rgba(255,255,255,.45);flex-shrink:0}
+    .header-right .big{font-size:13px;font-weight:900;color:rgba(255,255,255,.7)}
+
+    /* === 红色引语块 === */
+    .mission{border-left:4px solid var(--red);padding:10px 18px;background:#fff5f6;margin:0}
+    .mission strong{font-size:14px;color:var(--red)}
+    .mission p{margin:4px 0 0;font-size:13px;line-height:1.65;color:#333}
+
+    /* === Hero 区 === */
+    .hero{padding:16px 18px 0;display:grid;grid-template-columns:1fr 280px;gap:14px;align-items:start}
+    .hero-left{min-width:0}
+    .hero-pills{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+    .pill{display:inline-flex;align-items:center;min-height:26px;padding:4px 10px;border:1.5px solid var(--black);font-size:11.5px;font-weight:700;background:var(--white)}
+    .pill.red{border-color:var(--red);color:var(--red);background:#fff5f6}
+    .pill.blue{border-color:var(--blue);color:var(--blue);background:#eef4ff}
+    .pill.green{border-color:var(--green);color:var(--green);background:#f0fdf4}
+    .hero-sub{margin:8px 0 0;font-size:14px;line-height:1.7;color:#333}
+    .hero-visual{min-width:0;background:var(--black);border-radius:0;padding:14px;display:grid;gap:10px}
+    .v-orb{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--red) 0%,#a90f27 100%);display:grid;place-items:center;color:#fff;font-size:18px;font-weight:950;letter-spacing:-.04em;box-shadow:0 6px 16px rgba(200,16,46,.3)}
+    .v-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .v-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 8px 7px;display:grid;gap:4px}
+    .v-card .label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45)}
+    .v-card .value{font-size:12px;font-weight:800;color:#fff;line-height:1.3}
+    .v-card .desc{font-size:10.5px;color:rgba(255,255,255,.5);line-height:1.4}
+    .v-strip{height:8px;border-radius:999px;background:linear-gradient(90deg,var(--red) 0%,#ff6b6b 40%,var(--blue) 70%,var(--green) 100%);opacity:.7}
+
+    /* === 章节通用 === */
+    .section{padding:14px 18px 0}
+    .sec-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
+    .sec-no{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;min-width:38px;background:var(--black);color:var(--red);font-size:15px;font-weight:950;border-radius:8px;flex-shrink:0}
+    .sec-label{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-top:4px}
+
+    /* === 流程图 === */
+    .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0;background:var(--gray-bg);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:12px;align-items:center}
+    .flow-node{min-width:0;background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:8px;text-align:center;font-size:11.5px;font-weight:700;line-height:1.4;color:var(--ink)}
+    .flow-node.red-node{border-color:var(--red);background:#fff5f6;color:var(--red)}
+    .flow-node.green-node{border-color:var(--green);background:#f0fdf4;color:var(--green)}
+    .flow-node.yellow-node{border-color:#b45309;background:#fef3c7;color:#b45309}
+    .flow-arrow{font-size:16px;color:var(--muted);padding:0 6px;text-align:center}
+
+    /* === 对比块 === */
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+    .cmp{min-width:0;border-radius:10px;padding:12px;display:grid;gap:8px}
+    .cmp.bad{background:#fff5f6;border:1.5px solid var(--red)}
+    .cmp.good{background:#f0fdf4;border:1.5px solid var(--green)}
+    .cmp.neutral{background:#eef4ff;border:1.5px solid var(--blue)}
+    .cmp-head{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase}
+    .cmp.bad .cmp-head{color:var(--red)}.cmp.good .cmp-head{color:var(--green)}.cmp.neutral .cmp-head{color:var(--blue)}
+    .cmp-item{font-size:12px;line-height:1.6;color:#333;padding-left:12px;border-left:2px solid var(--border)}
+    .cmp.good .cmp-item{border-left-color:var(--green)}.cmp.bad .cmp-item{border-left-color:var(--red)}.cmp.neutral .cmp-item{border-left-color:var(--blue)}
+
+    /* === 表格 === */
+    .table-wrap{background:var(--white);border:1.5px solid var(--border);border-radius:12px;padding:10px;overflow-x:auto;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;font-size:12px;min-width:480px}
+    th{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:5px 10px 4px;text-align:left;border-bottom:1.5px solid var(--border)}
+    td{padding:5px 10px 4px;text-align:left;line-height:1.45;color:#333;border-bottom:1px solid var(--border)}
     tr:last-child td{border-bottom:none}
-    td.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8c5ff;font-size:12px}
+    td.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--blue);font-size:11.5px}
     td.green{color:var(--green);font-weight:800}
     td.red{color:var(--red);font-weight:800}
-    td.yellow{color:var(--yellow);font-weight:800}
-    .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:18px;padding:12px;margin-bottom:14px;align-items:center}
-    .flow-node{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:10px;text-align:center;font-size:12px;font-weight:800;color:#eef4ff;line-height:1.4}
-    .flow-node.red-node{border-color:rgba(255,107,107,.35);background:rgba(255,107,107,.08);color:var(--red)}
-    .flow-node.green-node{border-color:rgba(45,179,106,.35);background:rgba(45,179,106,.08);color:var(--green)}
-    .flow-node.yellow-node{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.08);color:var(--yellow)}
-    .flow-arrow{font-size:18px;color:var(--muted);padding:0 8px;text-align:center}
-    .code-block{background:#080b14;border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px 14px;margin-bottom:14px;box-shadow:0 8px 20px rgba(0,0,0,.22)}
-    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--cyan);font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
-    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;color:#c9d4f7;white-space:pre-wrap}
-    .code-block .c{color:#5a6380}.code-block .k{color:#a8c5ff}.code-block .s{color:#7de3d6}.code-block .cm{color:#8897c4}.code-block .b{color:#ff9f9f}
-    .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-    .cmp{min-width:0;border-radius:18px;padding:14px;display:grid;gap:10px}
-    .cmp.bad{background:rgba(255,107,107,.06);border:1.5px solid rgba(255,107,107,.2)}
-    .cmp.good{background:rgba(45,179,106,.06);border:1.5px solid rgba(45,179,106,.2)}
-    .cmp.neutral{background:rgba(88,195,255,.06);border:1.5px solid rgba(88,195,255,.2)}
-    .cmp-head{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
-    .cmp.bad .cmp-head{color:var(--red)}.cmp.good .cmp-head{color:var(--green)}.cmp.neutral .cmp-head{color:var(--cyan)}
-    .cmp-item{font-size:12.5px;line-height:1.5;color:#c5d2f7;padding-left:14px;border-left:2px solid rgba(255,255,255,.1)}
-    .cmp.good .cmp-item{border-left-color:rgba(45,179,106,.4)}.cmp.bad .cmp-item{border-left-color:rgba(255,107,107,.3)}.cmp.neutral .cmp-item{border-left-color:rgba(88,195,255,.3)}
-    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1.5px solid rgba(255,255,255,.09);background:rgba(9,12,22,.42);border-radius:18px;padding:12px 14px 10px;margin-bottom:14px;box-shadow:var(--shadow)}
-    .footer .brand{font-weight:900;color:#fff;font-size:15px;letter-spacing:-.02em}
-    .footer .links{display:flex;flex-wrap:wrap;gap:6px}
-    .footer .link-item{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;font-size:11px}
-    .footer .meta{font:800 11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#5a6380;text-align:right}
-    .save{position:fixed;right:18px;bottom:18px;z-index:999;border:0;border-radius:10px;padding:.82rem 1rem;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 12px 28px rgba(74,120,255,.3);cursor:pointer}
+    td.yellow{color:#b45309;font-weight:800}
+
+    /* === 双栏 === */
+    .shell{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+    .panel{min-width:0;background:var(--white);border:1.5px solid var(--border);border-radius:12px;padding:10px;display:grid;gap:8px}
+    .panel-head{padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:2px}
+    .panel-kicker{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--red);margin-bottom:2px}
+    .panel-title{margin:0;font-size:14px;font-weight:800;line-height:1.2;letter-spacing:-.02em}
+    .feat{display:grid;gap:3px;padding:7px 8px 6px;background:var(--gray-bg);border:1px solid var(--border);border-radius:8px}
+    .feat .label{font:900 9.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .feat .value{font-size:12px;font-weight:700;line-height:1.4;color:var(--ink)}
+    .feat .note{font-size:11px;line-height:1.5;color:#666}
+
+    /* === 代码块 === */
+    .code-block{background:#0d0d0d;border:1.5px solid #2a2a2a;border-radius:12px;padding:10px 12px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+    .code-block .tag{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid var(--red);color:var(--red);font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.75;color:#d0d0d0;white-space:pre-wrap}
+    .code-block .c{color:#666}.code-block .k{color:#a8c5ff}.code-block .s{color:#7de3d6}.code-block .cm{color:#777}.code-block .b{color:#ff9f9f}
+
+    /* === Footer === */
+    footer{background:var(--black);color:var(--white);margin:16px 18px 0;border-radius:12px;padding:12px 14px 10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .footer .brand{font-weight:900;color:var(--white);font-size:13px}
+    .footer .links{display:flex;flex-wrap:wrap;gap:5px}
+    .footer .link-item{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);border-radius:4px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:rgba(255,255,255,.55);font-size:10.5px}
+    .footer .meta{font:800 10.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:rgba(255,255,255,.35);text-align:right}
+    .save{border:0;border-radius:7px;padding:.65rem .9rem;background:var(--red);color:#fff;font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.05em;cursor:pointer;margin-top:6px}
+
+    /* === 结论块 === */
+    .verdict{background:var(--black);color:var(--white);padding:12px 14px;margin:0 18px 14px;border-radius:10px}
+    .verdict .label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:4px}
+    .verdict p{font-size:13px;line-height:1.7;margin:0}
+
     @media(max-width:960px){.hero,.shell,.compare{grid-template-columns:1fr}.flow{grid-template-columns:1fr;gap:8px}.flow-arrow{transform:rotate(90deg)}}
-    @media(max-width:720px){.page{width:min(100% - 14px,1180px);padding:12px 0 82px}.hero,.shell,.compare{grid-template-columns:1fr}h1{font-size:clamp(32px,10vw,58px)}.save{right:10px;bottom:10px;font-size:11.5px;padding:.72rem .88rem}}
+    @media(max-width:720px){.page{padding:0 0 60px}.header-title{font-size:clamp(18px,6vw,30px)}.hero,.shell,.compare{grid-template-columns:1fr}.hero{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
   <main class="page">
-    <section class="hero">
-      <div class="hero-copy">
-        <div class="kicker-row">
-          <span class="kicker">CLIProxyAPI / Failover / 故障排查 / 复盘</span>
-          <span class="source">router-for-me/CLIProxyAPI</span>
-        </div>
-        <h1 class="title">多渠道代理<br>Failover 复盘</h1>
-        <p class="subtitle">CLIProxyAPI 多 Provider 聚合时，为什么配置了 round-robin 仍然不自动切换？422 为什么导致请求直接结束？</p>
-        <div class="pill-row">
-          <span class="pill yellow">HTTP 状态码 = 错误分类信号</span>
-          <span class="pill red">422 = Terminal Error</span>
-          <span class="pill green">429 = Quota / Suspend</span>
-          <span class="pill cyan">Streaming 特殊陷阱</span>
-          <span class="pill orange">request-retry ≠ HA</span>
-        </div>
-        <div class="hero-note">
-          <strong>核心结论</strong>
-          <p>CPA Failover 不是"任意失败就切换下一渠道"，而是先判断失败类型：credential/provider 故障才接力，request 本身错误（400/422 等）默认不接力。这意味着多 Provider 不等于任意错误下的高可用。</p>
-        </div>
-      </div>
-      <aside class="hero-visual">
-        <div class="visual-top">
-          <div class="orb">CPA</div>
-          <div class="visual-meta">
-            <div class="big">router-for-me</div>
-            <div class="small">CLIProxyAPI · v6.10</div>
+
+    <!-- 黑头页眉 -->
+    <header>
+      <div class="header-inner">
+        <div class="header-left">
+          <span class="header-tag">CLIProxyAPI / Failover / 故障排查 / 复盘</span>
+          <h1 class="header-title">多渠道代理 Failover 复盘</h1>
+          <div class="header-meta">
+            <span class="header-badge">router-for-me/CLIProxyAPI</span>
+            <span class="header-badge">v6.10</span>
+            <span class="header-badge">HTTP 状态码 = 错误分类信号</span>
           </div>
         </div>
-        <div class="visual-grid">
-          <div class="mini-card"><div class="mini-icon cyan"><svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.71 0 3.37.5 4.8 1.4"/></svg></div><div class="label">ROUND-ROBIN</div><div class="value">候选选择策略</div><div class="desc">只管第一次选谁</div></div>
-          <div class="mini-card"><div class="mini-icon red"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></div><div class="label">REQUEST-RETRY</div><div class="value">≠ 失败就重试</div><div class="desc">只对 Retry 类型生效</div></div>
-          <div class="mini-card"><div class="mini-icon green"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="label">FAILOVER POLICY</div><div class="value">Credential 故障才切换</div><div class="desc">Request 错误默认 STOP</div></div>
-          <div class="mini-card"><div class="mini-icon yellow"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="label">REPO</div><div class="value">router-for-me</div><div class="desc">GitHub 开源 · Go</div></div>
+        <div class="header-right">
+          <div class="big">CLIProxyAPI</div>
+          <div>多渠道代理</div>
+          <div>故障排查复盘</div>
         </div>
-        <div class="visual-strip"></div>
+      </div>
+    </header>
+
+    <!-- 红色引语块 -->
+    <div class="mission">
+      <strong>核心结论</strong>
+      <p>CPA Failover 不是"任意失败就切换下一渠道"，而是先判断失败类型：credential/provider 故障才接力，request 本身错误（400/422 等）默认不接力。这意味着多 Provider 不等于任意错误下的高可用。</p>
+    </div>
+
+    <!-- Hero 区 -->
+    <section class="hero">
+      <div class="hero-left">
+        <div class="hero-pills">
+          <span class="pill red">422 = Terminal Error</span>
+          <span class="pill blue">HTTP 状态码 = 错误分类信号</span>
+          <span class="pill green">429 = Quota / Suspend</span>
+          <span class="pill">Streaming 特殊陷阱</span>
+          <span class="pill">request-retry ≠ HA</span>
+        </div>
+        <p class="hero-sub">CLIProxyAPI 多 Provider 聚合时，为什么配置了 round-robin 仍然不自动切换？422 为什么导致请求直接结束？</p>
+      </div>
+      <aside class="hero-visual">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="v-orb">CPA</div>
+          <div style="text-align:right">
+            <div style="font-size:13px;font-weight:900;color:#fff">router-for-me</div>
+            <div style="font:800 10px/1.4 ui-monospace;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em">CLIProxyAPI · v6.10</div>
+          </div>
+        </div>
+        <div class="v-grid">
+          <div class="v-card"><div class="label">ROUND-ROBIN</div><div class="value">候选选择策略</div><div class="desc">只管第一次选谁</div></div>
+          <div class="v-card"><div class="label">FAILOVER POLICY</div><div class="value">Credential 故障才切换</div><div class="desc">Request 错误默认 STOP</div></div>
+          <div class="v-card"><div class="label">REQUEST-RETRY</div><div class="value">≠ 失败就重试</div><div class="desc">只对 Retry 类型生效</div></div>
+          <div class="v-card"><div class="label">REPO</div><div class="value">GitHub 开源 · Go</div><div class="desc">router-for-me</div></div>
+        </div>
+        <div class="v-strip"></div>
       </aside>
     </section>
 
-    <section class="section">
-      <div class="section-head"><div class="section-no">01</div><div><div class="section-label">故障现象 · 预期 vs 实际</div></div></div>
+    <!-- 01 故障现象 -->
+    <div class="section">
+      <div class="sec-head">
+        <div class="sec-no">01</div>
+        <div class="sec-label">故障现象 · 预期 vs 实际</div>
+      </div>
       <div class="flow">
-        <div class="flow-node green-node">选择 Provider A<br><span style="font-size:10px;color:#9fb0de;font-weight:400">gpt-5.6-terra</span></div>
+        <div class="flow-node green-node">选择 Provider A<br><span style="font-size:10px;color:#166534;font-weight:400">gpt-5.6-terra</span></div>
         <div class="flow-arrow">↓ ✗</div>
-        <div class="flow-node red-node">A 失败<br><span style="font-size:10px;color:#ff9f9f;font-weight:400">HTTP 422</span></div>
+        <div class="flow-node red-node">A 失败<br><span style="font-size:10px;color:var(--red);font-weight:400">HTTP 422</span></div>
         <div class="flow-arrow">≠</div>
-        <div class="flow-node red-node">请求结束<br><span style="font-size:10px;color:#ff9f9f;font-weight:400">未尝试 B/C</span></div>
+        <div class="flow-node red-node">请求结束<br><span style="font-size:10px;color:var(--red);font-weight:400">未尝试 B/C</span></div>
       </div>
       <div class="compare">
         <div class="cmp good">
@@ -161,10 +203,14 @@
           <div class="cmp-item">但 429 时：Codex OAuth 429 → xAI OAuth → 200（正常接力）</div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <section class="section">
-      <div class="section-head"><div class="section-no">02</div><div><div class="section-label">HTTP 状态码 = 错误分类信号</div></div></div>
+    <!-- 02 HTTP 状态码 -->
+    <div class="section">
+      <div class="sec-head">
+        <div class="sec-no">02</div>
+        <div class="sec-label">HTTP 状态码 = 错误分类信号</div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>HTTP 状态码</th><th>CPA 分类</th><th>是否可能接力</th><th>说明</th></tr></thead>
@@ -183,31 +229,35 @@
           </tbody>
         </table>
       </div>
-    </section>
+    </div>
 
-    <section class="section">
-      <div class="section-head"><div class="section-no">03</div><div><div class="section-label">Failover 决策树</div></div></div>
+    <!-- 03 Failover 决策树 -->
+    <div class="section">
+      <div class="sec-head">
+        <div class="sec-no">03</div>
+        <div class="sec-label">Failover 决策树</div>
+      </div>
       <div class="shell">
         <article class="panel">
           <div class="panel-head"><div class="panel-kicker">CPA 内部决策</div><h3 class="panel-title">失败发生时，CPA 如何决定是否接力？</h3></div>
-          <div class="panel-row">
-            <div class="feat"><div class="label">上游返回失败</div><div class="value">HTTP 状态码 + 响应 Body 被 CPA 分类</div><div class="note">关键：HTTP Code 同时承担"这是不是 Provider 故障"的信号</div></div>
-            <div class="feat"><div class="label">Credential / Provider 故障</div><div class="value">→ 标记 Cooldown → 选择下一个 Credential</div><div class="note">429/403/5xx 通常落入此类</div></div>
-            <div class="feat"><div class="label">Request 本身可能有问题</div><div class="value">→ 不要盲目重放 → STOP</div><div class="note">400/422/409/404 通常落入此类</div></div>
-          </div>
+          <div class="feat"><div class="label">上游返回失败</div><div class="value">HTTP 状态码 + 响应 Body 被 CPA 分类</div><div class="note">关键：HTTP Code 同时承担"这是不是 Provider 故障"的信号</div></div>
+          <div class="feat"><div class="label">Credential / Provider 故障</div><div class="value">→ 标记 Cooldown → 选择下一个 Credential</div><div class="note">429/403/5xx 通常落入此类</div></div>
+          <div class="feat"><div class="label">Request 本身可能有问题</div><div class="value">→ 不要盲目重放 → STOP</div><div class="note">400/422/409/404 通常落入此类</div></div>
         </article>
         <article class="panel">
           <div class="panel-head"><div class="panel-kicker">为什么会这样设计</div><h3 class="panel-title">盲目 Failover 对合法请求也可能全失败</h3></div>
-          <div class="panel-row">
-            <div class="feat"><div class="label">假设请求本身非法</div><div class="value">A(422) → B(422) → C(422) → D(422) → E(422)</div><div class="note">五个 Provider 全失败，延迟成倍，浪费资源</div></div>
-            <div class="feat"><div class="label">副作用风险</div><div class="value">重复 Tool Calling（Streaming 场景）、错误 cooldown 正常 Credential</div><div class="note">高并发场景下可能制造 retry storm</div></div>
-          </div>
+          <div class="feat"><div class="label">假设请求本身非法</div><div class="value">A(422) → B(422) → C(422) → D(422) → E(422)</div><div class="note">五个 Provider 全失败，延迟成倍，浪费资源</div></div>
+          <div class="feat"><div class="label">副作用风险</div><div class="value">重复 Tool Calling（Streaming 场景）、错误 cooldown 正常 Credential</div><div class="note">高并发场景下可能制造 retry storm</div></div>
         </article>
       </div>
-    </section>
+    </div>
 
-    <section class="section">
-      <div class="section-head"><div class="section-no">04</div><div><div class="section-label">422 根因 · Provider 兼容性问题</div></div></div>
+    <!-- 04 422 根因 -->
+    <div class="section">
+      <div class="sec-head">
+        <div class="sec-no">04</div>
+        <div class="sec-label">422 根因 · Provider 兼容性问题</div>
+      </div>
       <div class="code-block">
         <div class="tag">典型案例 · gpt-5.6-terra → xAI / grok-4.6</div>
         <pre><span class="c"># CPA 将 gpt-5.6-terra 映射为：</span>
@@ -236,30 +286,34 @@ data did not match any variant of untagged enum ModelInput</span>
           <div class="cmp-item">OpenAI-compatible 可能接住同一请求 → 应该 failover</div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <section class="section">
-      <div class="section-head"><div class="section-no">05</div><div><div class="section-label">Streaming 特殊陷阱</div></div></div>
+    <!-- 05 Streaming 陷阱 -->
+    <div class="section">
+      <div class="sec-head">
+        <div class="sec-no">05</div>
+        <div class="sec-label">Streaming 特殊陷阱</div>
+      </div>
       <div class="shell">
         <article class="panel">
           <div class="panel-head"><div class="panel-kicker">v6.8.55 旧版本 Bug</div><h3 class="panel-title">Streaming bootstrap 错误返回 nil 导致不切换</h3></div>
-          <div class="panel-row">
-            <div class="feat"><div class="label">问题</div><div class="value">executeStreamWithModelPool 在最后一个模型遇 bootstrap 错误时，将错误包装进 StreamChunk channel 并返回 (result, nil)</div><div class="note">nil error → caller 认为是成功 → 不旋转到下一个 Credential</div></div>
-            <div class="feat"><div class="label">触发条件</div><div class="value">空 Stream、context canceled、连接在发送任何数据前关闭</div><div class="note">issue #2189：Empty SSE / context canceled / Undefined error 均不触发 failover</div></div>
-          </div>
+          <div class="feat"><div class="label">问题</div><div class="value">executeStreamWithModelPool 在最后一个模型遇 bootstrap 错误时，将错误包装进 StreamChunk channel 并返回 (result, nil)</div><div class="note">nil error → caller 认为是成功 → 不旋转到下一个 Credential</div></div>
+          <div class="feat"><div class="label">触发条件</div><div class="value">空 Stream、context canceled、连接在发送任何数据前关闭</div><div class="note">issue #2189：Empty SSE / context canceled / Undefined error 均不触发 failover</div></div>
         </article>
         <article class="panel">
           <div class="panel-head"><div class="panel-kicker">v6.9.33+ 已修复</div><h3 class="panel-title">Streaming 透明 Failover 的合理限制</h3></div>
-          <div class="panel-row">
-            <div class="feat"><div class="label">第一个有效字节发给客户端前</div><div class="value">→ 可以安全重试</div><div class="note">bootstrap 阶段，客户端未收到任何数据</div></div>
-            <div class="feat"><div class="label">已向客户端输出后</div><div class="value">→ 原则上不能透明 Failover</div><div class="note">可能出现两个不同模型输出拼接，或重复 Tool Calling 副作用</div></div>
-          </div>
+          <div class="feat"><div class="label">第一个有效字节发给客户端前</div><div class="value">→ 可以安全重试</div><div class="note">bootstrap 阶段，客户端未收到任何数据</div></div>
+          <div class="feat"><div class="label">已向客户端输出后</div><div class="value">→ 原则上不能透明 Failover</div><div class="note">可能出现两个不同模型输出拼接，或重复 Tool Calling 副作用</div></div>
         </article>
       </div>
-    </section>
+    </div>
 
-    <section class="section">
-      <div class="section-head"><div class="section-no">06</div><div><div class="section-label">无 HTTP Code 的错误 · 分类盲区</div></div></div>
+    <!-- 06 无 HTTP Code 错误 -->
+    <div class="section">
+      <div class="sec-head">
+        <div class="sec-no">06</div>
+        <div class="sec-label">无 HTTP Code 的错误 · 分类盲区</div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>错误类型</th><th>HTTP Code</th><th>CPA 行为</th><th>备注</th></tr></thead>
@@ -285,10 +339,14 @@ data did not match any variant of untagged enum ModelInput</span>
           <div class="cmp-item">CPA 当前不提供这个语义保证</div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <section class="section">
-      <div class="section-head"><div class="section-no">07</div><div><div class="section-label">现有补救机制 · request-scoped-errors</div></div></div>
+    <!-- 07 补救机制 -->
+    <div class="section">
+      <div class="sec-head">
+        <div class="sec-no">07</div>
+        <div class="sec-label">现有补救机制 · request-scoped-errors</div>
+      </div>
       <div class="code-block">
         <div class="tag">YAML 配置示例</div>
         <pre><span class="c"># 针对特定 422 + Body 精确匹配才 continue（更安全）</span>
@@ -306,53 +364,64 @@ data did not match any variant of untagged enum ModelInput</span>
   <span class="k">- status:</span> <span class="s">422</span>
     <span class="k">action:</span> <span class="s">continue</span></pre>
       </div>
-    </section>
+    </div>
 
-    <section class="section">
-      <div class="section-head"><div class="section-no">08</div><div><div class="section-label">排查方法 · Debug 日志快速定位</div></div></div>
+    <!-- 08 排查方法 -->
+    <div class="section">
+      <div class="sec-head">
+        <div class="sec-no">08</div>
+        <div class="sec-label">排查方法 · Debug 日志快速定位</div>
+      </div>
       <div class="flow">
-        <div class="flow-node">A 失败<br><span style="font-size:10px;color:#9fb0de;font-weight:400">Use OAuth provider=A</span></div>
+        <div class="flow-node">A 失败<br><span style="font-size:10px;color:#666;font-weight:400">Use OAuth provider=A</span></div>
         <div class="flow-arrow">?</div>
         <div class="flow-node yellow-node">同 Request ID<br>出现 B？</div>
         <div class="flow-arrow"></div>
-        <div class="flow-node green-node">Failover 生效<br><span style="font-size:10px;color:#ddffe8;font-weight:400">Use OAuth provider=B</span></div>
+        <div class="flow-node green-node">Failover 生效<br><span style="font-size:10px;color:var(--green);font-weight:400">Use OAuth provider=B</span></div>
       </div>
       <div class="shell">
         <article class="panel">
           <div class="panel-head"><div class="panel-kicker">快速判断流程</div><h3 class="panel-title">围绕同一个 Request ID 检查日志</h3></div>
-          <div class="panel-row">
-            <div class="feat"><div class="label">A 失败后出现 B</div><div class="value">→ Failover 机制本身正常，问题在错误分类</div></div>
-            <div class="feat"><div class="label">A 失败后没有 B</div><div class="value">→ 检查 error status/type，判断是否进入 Retry 分类</div></div>
-            <div class="feat"><div class="label">不要只看客户端最终 Status</div><div class="value">→ 客户端 422 ≠ CPA 内部用于决定 Retry 的错误类型</div></div>
-          </div>
+          <div class="feat"><div class="label">A 失败后出现 B</div><div class="value">→ Failover 机制本身正常，问题在错误分类</div></div>
+          <div class="feat"><div class="label">A 失败后没有 B</div><div class="value">→ 检查 error status/type，判断是否进入 Retry 分类</div></div>
+          <div class="feat"><div class="label">不要只看客户端最终 Status</div><div class="value">→ 客户端 422 ≠ CPA 内部用于决定 Retry 的错误类型</div></div>
         </article>
         <article class="panel">
           <div class="panel-head"><div class="panel-kicker">错误初始排查动作</div><h3 class="panel-title">不要第一时间改配置</h3></div>
-          <div class="panel-row">
-            <div class="feat"><div class="label">不要改</div><div class="value">routing.strategy / request-retry 参数</div><div class="note">先确认 Failover 机制本身是否生效</div></div>
-            <div class="feat"><div class="label">先打开 Debug</div><div class="value">确认候选池里有几个 Provider</div><div class="note">确认问题在 Failover 机制还是错误分类</div></div>
-          </div>
+          <div class="feat"><div class="label">不要改</div><div class="value">routing.strategy / request-retry 参数</div><div class="note">先确认 Failover 机制本身是否生效</div></div>
+          <div class="feat"><div class="label">先打开 Debug</div><div class="value">确认候选池里有几个 Provider</div><div class="note">确认问题在 Failover 机制还是错误分类</div></div>
         </article>
       </div>
-    </section>
+    </div>
 
-    <footer class="footer">
+    <!-- 结论块 -->
+    <div class="verdict">
+      <div class="label">关键判断</div>
+      <p>CPA Failover 的核心逻辑：HTTP 状态码 = 错误分类信号。422/400/409/404 = Terminal，默认不接力。只有 429/403/5xx 才进入 Retry 路径。多 Provider 不等于高可用；真正 HA 需要候选池里还有 Provider 能完成请求。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
       <div>
         <div class="brand">CLIProxyAPI Failover 故障排查</div>
         <div class="links">
-          <span class="link-item">style: darkblue</span>
+          <span class="link-item">style: black-head</span>
           <span class="link-item">HTTP Code = 错误分类</span>
           <span class="link-item">422 = Terminal</span>
           <span class="link-item">router-for-me/CLIProxyAPI</span>
         </div>
       </div>
-      <div class="meta">作者：AG雷达 · 来源：故障排查复盘 · 2026-08-19<br><button class="save" onclick="saveCardAsPng()">保存 PNG</button></div>
+      <div class="meta">
+        作者：AG雷达 · 来源：故障排查复盘 · 2026-08-19<br>
+        <button class="save" onclick="saveCardAsPng()">保存 PNG</button>
+      </div>
     </footer>
+
   </main>
   <script>
     function saveCardAsPng(){
       const target=document.querySelector('.page');
-      html2canvas(target,{backgroundColor:'#0c1020',scale:2,useCORS:true,scrollY:-window.scrollY,windowWidth:document.documentElement.scrollWidth,windowHeight:document.documentElement.scrollHeight}).then(canvas=>{
+      html2canvas(target,{backgroundColor:'#fafafa',scale:2,useCORS:true,scrollY:-window.scrollY,windowWidth:document.documentElement.scrollWidth,windowHeight:document.documentElement.scrollHeight}).then(canvas=>{
         const link=document.createElement('a');
         link.download='cliproxyapi-failover-2026.png';
         link.href=canvas.toDataURL('image/png');
@@ -360,5 +429,6 @@ data did not match any variant of untagged enum ModelInput</span>
       });
     }
   </script>
+  <!-- 变更说明 2026-08-19: 主题从 darkblue 更改为 black-head（矩阵：investigation/conclusion-first → black-head），原始内容保留 -->
 </body>
 </html>
