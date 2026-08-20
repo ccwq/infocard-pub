@@ -103,10 +103,25 @@ test('rejects an allowlisted unmerged conflict without changing its unmerged ind
   assert.equal(git(root, ['ls-files', '-u', '-z']), before);
 });
 
-test('fails immediately without staging when an unrelated file is already staged', () => {
+/**
+ * Given：仓库中已有与本次信息卡无关的 staged 文件
+ * When：发布脚本按 bundle 精确暂存本次输出
+ * Then：既有 staged 文件保持不变，本次输出同时进入 index，并分别报告两类路径
+ * 防回归：避免为了发布信息卡而要求清空、重置或改写用户已有的 index 状态
+ */
+test('preserves unrelated staged files while staging only the publish allowlist', () => {
   const root = fixture(); const file = makeBundle(root); write(root, 'already-staged.txt'); git(root, ['add', 'already-staged.txt']);
   const result = run(root, ['--bundle', file, '--stage']);
-  assert.equal(result.status, 1); assert.equal(result.json.error, 'pre-existing staged files outside allowlist'); assert.deepEqual(result.json.unexpected_staged, ['already-staged.txt']); assert.deepEqual(staged(root), ['already-staged.txt']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.json.preexisting_staged, ['already-staged.txt']);
+  assert.deepEqual(result.json.unexpected_staged, []);
+  assert.deepEqual(result.json.staged_changes, [
+    'assets/img/boat/manifest.json',
+    'assets/img/boat/nested/image.png',
+    'docs/20260711-boat.html',
+    'docs/20260711-boat.html.meta.yaml',
+  ]);
+  assert.deepEqual(staged(root), ['already-staged.txt', ...result.json.staged_changes].sort());
 });
 
 test('handles multiple bundles and only permits generated index outputs when both are changed', () => {

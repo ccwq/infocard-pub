@@ -1,7 +1,7 @@
 ---
 name: infocard-publish-closeout
-description: Use when finishing an infocard publish and you need a deterministic closeout pass for residues, worktrees, wiki sync, and final cleanliness.
-version: 1.0.0
+description: Use when finishing an infocard publish to verify public delivery, retain the .docs authoring record, and report cleanup candidates without deleting them.
+version: 2.0.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -14,124 +14,104 @@ metadata:
 
 ## Overview
 
-This skill turns “the card is already published” into a stricter state: the target deliverable is done, and the workspace is clean enough that the next publish does not inherit residues from the previous one.
+This skill closes the Protocol v3 business lifecycle after promotion, build, public verification, and audit. It keeps the authoring record at .docs/<card>/, separates deliverables from residue, and reports cleanup candidates as a dry-run. It does not delete authoring material or operate alternate checkouts.
 
-Use this after an infocard has been built, verified, pushed, and checked on Pages, when you need to report leftover files, historical worktrees, stale branches, or other ambient debris. By default it reports publish worktrees and asks for the exact `del-rm` cleanup phrase; it does not delete them automatically.
-
-It is intentionally narrower than the main publishing skill:
-- `infocard-pub-publisher` handles build / push / verify.
-- `infocard-publish-closeout` handles what remains after publication.
+Use this after an infocard has been built, verified, pushed, and checked on Pages. The Publisher handles promotion, build, push, and public verification; this skill handles evidence, retained authoring material, and the final report.
 
 ## When to Use
 
 Use this skill when:
-- A publish is complete but `git status` is not clean.
-- Temporary worktrees or publishing directories still exist.
-- Untracked asset directories were left behind by a subagent or rescue pass.
-- You want to make sure “done” reports retained worktrees and the cleanup option clearly.
-- You want a final pass before reporting completion to the user.
 
-Do not use this skill for:
-- Initial research or card drafting.
-- The first build / verify / push sequence.
-- Pure wiki editing unrelated to publish residues.
+- A publish has reached a terminal Pages state and needs a final report.
+- A retained .docs/<card>/ authoring directory needs classification.
+- Untracked assets, scratch files, or stale generated files need a read-only residue review.
+- You need to verify that “done” includes public evidence and required gates.
+
+Do not use this skill for initial research, card drafting, promotion, the first build/verify/push sequence, or unrelated Wiki editing.
 
 ## Closeout Procedure
 
-### 0) No-publish / worktree-only variant
+### 1) Separate deliverable from retained material
 
-When the requested outcome is a committed draft in an isolated worktree rather than a public release:
-
-- Start the worktree from freshly fetched `origin/main`.
-- Do not run publish, push, Pages, or public-URL verification steps.
-- Reuse an existing main-repository `node_modules` only when needed; do not install dependencies for the draft task.
-- Run the repository build/verify/check-leak gates, then inspect the diff because build can rewrite generated `_index.yaml`, `index.html`, or timestamps.
-- Restore unrelated generated changes, remove temporary symlinks/helper files, stage only the requested card bundle, commit, and verify the final worktree is clean and ahead of `origin/main` without pushing.
-- Report the absolute worktree path, commit SHA, exact artifact paths, and actual command output summary.
-
-### 1) Separate deliverable from residue
 Write down two buckets:
-- **Target deliverable**: the card(s), wiki pages, and their commit(s).
-- **Ambient residue**: temporary worktrees, untracked asset folders, scratch files, backup exports, and unfinished local branches.
 
-Never treat residue as part of the deliverable.
+- **Target deliverable**: formal card artifacts, declared assets, generated indexes, Wiki pages when requested, and their commit IDs.
+- **Retained authoring record**: .docs/<card>/ source files, publish bundle, promotion manifest, authoring evidence, and any explicitly classified cleanup candidate.
+
+The retained authoring record is not part of the formal release unless a manifest entry explicitly promotes one of its files.
 
 ### 2) Verify the publish is truly complete
-Before cleanup, confirm the card is not only present locally but also actually published:
-- Public URL returns HTTP 200.
-- Required keywords appear on the page.
-- The local `dist/docs/<slug>.html` and public HTML both contain at least one newly added, release-specific content fingerprint; build exit code alone is insufficient.
-- `_index.yaml` contains the slug.
-- 390px mobile layout has no horizontal overflow.
-- Save button exports a real PNG, not print dialog behavior.
-- Wiki raw + concept/entity + index + log are written and pushed when the card is high value.
 
-### 3) Check the workspace and retained worktree inventory
-Run:
-```bash
-git status -sb
-npm run worktree:list -- --repo <repo>
-```
-Look for:
-- untracked `docs/assets/...` directories
-- unexpected modified files
-- fixed-root historical worktrees that are clean cleanup candidates
-- external, repo-local, dirty, active, or ownership-uncertain worktrees that must be retained
+Confirm the card is present locally and publicly:
 
-**Capacity guard:** enumerate every temporary worktree before a new publish run. A released card can leave a full repository copy plus `dist/`, so repeated worktrees multiply storage quickly. New publish worktrees belong under the cross-platform fixed root reported by `node scripts/infocard-worktree.js root`. After public verification, retain the worktree and report the historical WT list. If the user replies exactly `del-rm`, re-scan and remove only clean registered worktrees inside that fixed root. Never use `--force`; dirty or unregistered former-worktree directories are classified and reported unless ownership is proven.
+- formal public URL returns HTTP 200;
+- expected identity and release-specific content appear on the public page;
+- public _index.yaml contains the slug and exact formal path;
+- homepage/index entry contains the card identity;
+- local generated index and public HTML agree;
+- 390px mobile layout has no page-level horizontal overflow when mobile review is required;
+- save-button behavior exports a real PNG when the card exposes that control;
+- Wiki raw/concept/entity/index/log are written and pushed when the request requires Wiki.
 
-### 4) Report by default; clean only after del-rm
-Safely delete or archive leftover non-worktree artifacts that are not part of the publish bundle. Publish worktrees are retained by default.
+HTTP 200 alone is insufficient. Record the command, timestamp, status code, identity fingerprint, and visual disposition. If online screenshot delivery is required, report the real absolute PNG path.
 
-Typical removals:
-- scratch files in the run temp area
-- untracked asset subdirectories created during a failed or partial publish
-- fixed-root clean registered publish worktrees only after exact `del-rm` confirmation
+### 3) Re-run release gates as applicable
 
-Never delete a file that has not already been verified as residue. The phrase `del-rm` only authorizes cleanup of fixed-root infocard worktrees; it does not authorize deleting the primary repository, external worktrees, screenshots, bundle evidence, or ordinary temp files.
+If final content or metadata changed during audit, rerun:
 
-### 5) Recheck cleanliness
-After cleanup, repeat:
-```bash
-git status -sb
-```
-The expected result is either:
-- completely clean, or
-- only the explicitly intentional branch/worktree that you decided to keep.
+- npm run build
+- npm run verify
+- npm run fix-taxonomy
+- npm run verify-taxonomy
+- npm run check-leak
 
-### 6) Report with separation of concerns
-When you answer the user, separate:
-- what was published
-- historical worktrees and their cleanup status
-- what was cleaned only if a `del-rm` pass actually ran
-- what remains intentionally open, dirty, external, active, or ownership-uncertain
+Inspect the final diff and ensure generated artifacts are current. A changed formal card without regenerated indexes is not closed.
+
+### 4) Retain .docs and run a cleanup dry-run
+
+Retain the complete .docs/<card>/ directory and report:
+
+- path and card slug;
+- retained source, bundle, manifest, and evidence files;
+- manifest source-to-target mapping and hashes;
+- untracked or scratch paths classified as cleanup candidates;
+- paths that are intentionally retained or ownership-uncertain.
+
+Run the repository/project cleanup dry-run or equivalent read-only inventory command. The dry-run may list candidates and reasons, but it must not remove files. If no dry-run command exists, report “cleanup dry-run unavailable” and continue with the explicit inventory.
+
+Actual deletion requires a separate explicit cleanup command with separately scoped authorization. Do not infer deletion permission from publication completion.
+
+### 5) Final report
+
+Report in this order:
+
+1. card, route, Pages state, visual state, Wiki state, content commit, audit commit, and public URL;
+2. literal verification commands and their result (exit code/status);
+3. retained .docs path and manifest summary;
+4. cleanup dry-run candidates, retained paths, and ownership-uncertain paths;
+5. only the terminal exception, if any: blocked local gate, blocked integration, failed Pages verification, pending visual evidence, failed Wiki sync, or AUDIT_PENDING.
+
+Never report PUBLISHED_PENDING_VISUAL as a fully verified visual release. Never claim cleanup occurred when only a dry-run ran.
 
 ## Common Pitfalls
 
-1. **Calling publish “done” while the workspace is dirty.**
-   That hides the next failure behind the current success.
-
-2. **Deleting assets before confirming they are residue.**
-   Some untracked asset folders are still needed for the committed page.
-
-3. **Mixing old worktree state with current publish state.**
-   Always inspect `git worktree list` separately from the main repo.
-
-4. **Reporting only the target deliverable and omitting cleanup state.**
-   The user asked for a completed publish, not just a published URL.
-
-5. **Forgetting wiki closeout.**
-   For high-value infocards, wiki sync is part of completion, not an optional appendix.
+1. Calling publish done on HTTP 200 without release-specific identity/content evidence.
+2. Treating .docs authoring files as formal publication artifacts without a manifest entry.
+3. Deleting assets before proving they are not referenced by the formal card.
+4. Forgetting regenerated indexes after an audit-sidecar change.
+5. Treating mechanical DOM checks as visual PASS.
+6. Mixing retained authoring material with the formal deliverable in the final report.
 
 ## Verification Checklist
 
-- [ ] Published page returns HTTP 200
-- [ ] Required keywords are visible
-- [ ] `_index.yaml` contains the slug
-- [ ] 390px mobile layout has no horizontal overflow
-- [ ] Save button exports a real PNG
-- [ ] Wiki raw / concept / index / log are synced if required
-- [ ] `git status -sb` is clean or intentionally scoped
-- [ ] Historical worktrees are reported from `npm run worktree:list -- --repo <repo>`
-- [ ] If cleanup ran, it used exact `del-rm`, removed only clean fixed-root registered worktrees, and reported skipped entries
-- [ ] Final report clearly separates deliverable vs retained/cleaned worktrees
+- [ ] Formal published page returns HTTP 200
+- [ ] Expected identity and release-specific content are visible
+- [ ] Public _index.yaml contains the slug and exact path
+- [ ] Homepage/index entry is current
+- [ ] Mobile overflow and save-button checks pass when required
+- [ ] Wiki raw/concept/entity/index/log are synced when required
+- [ ] Metadata, taxonomy, leak, visual, and public gates are recorded
+- [ ] Literal verification commands and results are reported
+- [ ] .docs/<card>/ is retained and classified
+- [ ] Cleanup dry-run candidates are reported without deletion
+- [ ] No alternate checkout inventory or del-rm prompt is part of closeout

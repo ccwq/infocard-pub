@@ -158,9 +158,16 @@ function main(argv) {
     const unrelated = status.filter((entry) => !allow.has(entry.file)).map((entry) => entry.file).sort();
     const staged = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean);
     for (const file of staged) safeRelative(file, 'staged git path');
-    const unexpected = staged.filter((file) => !allow.has(file)).sort();
-    const base = { ok: unexpected.length === 0, stage, allowed_changes: allowedChanges, unrelated_changes: unrelated, unexpected_staged: unexpected, generated_index_changes: generated.sort() };
-    if (unexpected.length) return { code: 1, result: { ...base, error: 'pre-existing staged files outside allowlist' } };
+    const preexistingStaged = staged.filter((file) => !allow.has(file)).sort();
+    const base = {
+      ok: true,
+      stage,
+      allowed_changes: allowedChanges,
+      unrelated_changes: unrelated,
+      preexisting_staged: preexistingStaged,
+      unexpected_staged: [],
+      generated_index_changes: generated.sort(),
+    };
     if (!stage) return { code: 0, result: base };
     for (const file of allowedChanges) {
       const entry = status.find((candidate) => candidate.file === file);
@@ -169,10 +176,12 @@ function main(argv) {
     }
     const after = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean);
     for (const file of after) safeRelative(file, 'staged git path');
-    const afterUnexpected = after.filter((file) => !allow.has(file)).sort();
+    const afterUnexpected = after.filter((file) => !allow.has(file) && !preexistingStaged.includes(file)).sort();
     const expected = allowedChanges.slice().sort();
-    const actual = after.slice().sort();
-    if (afterUnexpected.length || JSON.stringify(actual) !== JSON.stringify(expected)) {
+    const actual = after.filter((file) => allow.has(file)).sort();
+    const expectedIndex = [...new Set([...preexistingStaged, ...expected])].sort();
+    if (afterUnexpected.length || JSON.stringify(actual) !== JSON.stringify(expected)
+        || JSON.stringify(after.slice().sort()) !== JSON.stringify(expectedIndex)) {
       return { code: 1, result: { ...base, ok: false, unexpected_staged: afterUnexpected, error: 'staged set does not exactly match changed allowlist' } };
     }
     return { code: 0, result: { ...base, staged_changes: actual } };
