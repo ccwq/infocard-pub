@@ -80,11 +80,11 @@ This keeps project-specific workflows separate from the global skill library and
 
 **Stale worktree path / pre-created branch:** if `git worktree add -b ...` fails because the directory already exists or the branch already exists, inspect both with `git worktree list --porcelain` and `git branch --list`. Move only the stale run directory aside, then attach the existing branch with `git worktree add <path> <existing-branch>`; do not delete or recreate the branch blindly.
 
-**Primary checkout HEAD is not `main`:** if the primary checkout's `HEAD` is a named branch (e.g. `infocard/20260804-qm-agent`) or detached, `git worktree add -b <branch> origin/main <path>` fails with `fatal: invalid reference: origin/main` or `fatal: invalid reference: /absolute/path`. This is because `origin/main` is not the current branch. **Correct pattern:**
+**Primary checkout HEAD is not `main`:** if the primary checkout's `HEAD` is a named branch (e.g. `infocard/20260804-qm-agent`) or detached, `git worktree add -b <branch> origin/main <path>` fails with `fatal: invalid reference: origin/main` or `fatal: invalid reference: /absolute/path`. This is because `origin/main` is not the current branch. New publish worktrees must still use the fixed path from `node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug>` under os.tmpdir()/infocard-worktree. **Correct pattern:**
 
 ```bash
 REPO="/home/ccwq/qbox/opendir/project/infocard-pub"
-WORKTREE="/home/ccwq/infocard-<slug>-wt"   # NOTE: /tmp may be on same disk as / — use /home/ccwq if space is tight
+WORKTREE="$(node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug> --plain)"
 SHA="<sha>"
 
 # Step 1: fetch the remote SHA
@@ -108,7 +108,7 @@ Key points:
 - `--detach` creates a worktree with no branch tracking — it does not matter what the primary checkout's HEAD is
 - `origin/main` must be fetched first; `rev-parse origin/main` fails if the ref hasn't been fetched
 - Push must use `HEAD:refs/heads/main` (not `<branch>:refs/heads/main`) because there is no named branch
-- `/tmp` may be on the same partition as `/` (e.g. 69G total, 80% used) — if the repo clone is large (~2,258 files), worktree creation can fail with "Could not write new index file" even though free space exists; use `/home/ccwq/<slug>-wt` instead
+- If the fixed temp root is low on space, stop at the capacity gate and request cleanup authorization; do not silently move the publish worktree to another directory.
 
 **Verified 2026-08-12**: Primary checkout at `infocard/20260804-qm-agent`, `origin/main` not locally available → `worktree add -b` failed. `--detach` + `fetch` + `HEAD:refs/heads/main` succeeded.
 
@@ -405,11 +405,11 @@ curl -sI --max-time 15 "https://ccwq.github.io/infocard-pub/docs/<slug>.html"
 # Expect: HTTP/2 200
 ```
 
-Cleanup:
+Retained worktree report:
 ```bash
-git worktree remove wt-<slug> --force
-git branch -d infocard/<slug>   # lowercase d avoids approval gate
+npm run worktree:list -- --repo <repo>
 ```
+Do not remove the worktree automatically. Tell the user: `如需清理可安全删除的历史 worktree，请回复：del-rm`. If the user replies exactly `del-rm`, re-scan and run `npm run worktree:cleanup -- --repo <repo> --confirm del-rm`; never use `--force`.
 
 ## Known pitfalls
 

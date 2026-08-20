@@ -88,7 +88,7 @@ The command emits one machine-readable JSON object. Exit `0` means valid; non-ze
 
 ## Release-worktree gate
 
-Before build, require `repository.root` in the runtime v3 bundle to be the absolute path of the exact dedicated publish worktree; reject relative roots. Run the repository gate from that directory:
+Before build, require `repository.root` in the runtime v3 bundle to be the absolute path of the exact dedicated publish worktree; reject relative roots and new publish roots outside the fixed temp/infocard-worktree directory reported by `node scripts/infocard-worktree.js root`. Run the repository gate from that directory:
 
 ```bash
 npm run verify:publish-local-gate -- --bundle <bundle> --phase prebuild
@@ -98,7 +98,7 @@ npm run verify:publish-local-gate -- --bundle <bundle> --phase postbuild
 
 The gate machine-checks the worktree identity; strict single-document sidecar form; required sidecar fields; bundle/sidecar identity consistency; and, after build, the target entry inside both `_index.yaml.cards` and the parsed `index.html` `home-index-data` payload. It checks slug, path, non-empty title, and non-empty description; arbitrary HTML text containing the slug does not pass. It is deliberately read-only and must block commit/push when it fails.
 
-Use `--phase pre-cdn` only after remote Git content has been verified. It repeats the local index proof so a public 404 cannot be prematurely blamed on CDN propagation. Use `--phase cleanup` before `git worktree remove`; it rejects a dirty worktree and does not perform deletion.
+Use `--phase pre-cdn` only after remote Git content has been verified. It repeats the local index proof so a public 404 cannot be prematurely blamed on CDN propagation. Use `--phase cleanup` to prove a retained worktree is clean enough to be a cleanup candidate; it rejects a dirty worktree and never performs deletion. Actual deletion requires an exact `del-rm` user reply and the `npm run worktree:cleanup -- --confirm del-rm` flow.
 
 ## Completion criterion
 

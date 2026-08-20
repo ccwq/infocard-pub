@@ -17,9 +17,10 @@ Use **separate atomic terminal calls** — never combine worktree creation, bund
 git fetch origin main --quiet
 BRANCH=infocard/<slug>
 git branch -f "$BRANCH" origin/main 2>/dev/null || true
-mkdir -p "$REPO/wt-<slug>"
-git -C "$REPO" worktree add "$REPO/wt-<slug>" "$BRANCH" --quiet
-echo "WORKTREE=$REPO/wt-<slug>"
+WORKTREE=$(node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug> --plain)
+mkdir -p "$WORKTREE"
+git -C "$REPO" worktree add "$WORKTREE" "$BRANCH" --quiet
+echo "WORKTREE=$WORKTREE"
 
 # Call 2: Write bundle (atomic — heredoc, no shell expansion)
 cat > "$BASE/publish-bundle.json" <<'BUNDLE'
@@ -92,3 +93,4 @@ When user requests multiple cards simultaneously: run Step 1 for all cards in pa
 ## Bundle Schema v3 for Light-Route
 
 Key fields: `route: "light"`, `asset_policy.mode: "empty"`, `repository.root` as absolute path, `author.allowlist` with exact output paths.
+For new runs, `repository.root` must be the fixed temp/infocard-worktree path returned by the infocard-worktree resolve CLI, not a repo-local `wt-*` path.

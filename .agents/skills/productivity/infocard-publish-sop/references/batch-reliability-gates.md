@@ -37,7 +37,7 @@
 ### 5. 容量与 worktree 生命周期
 
 - 建立 worktree 前和生成视觉资产前记录容量；低于 3 GB 时请求清理授权，禁止扩容式继续执行。
-- 发布处于终态后，先将非敏感审计证据保留在 worktree 外；确认 worktree 干净；执行 `git worktree remove <path>`。
+- 发布处于终态后，先将非敏感审计证据保留在 worktree 外；确认 worktree 干净；保留 worktree 并用 `npm run worktree:list -- --repo <repo>` 报告历史 WT。只有用户精确回复 `del-rm` 后，才重新扫描并运行 `npm run worktree:cleanup -- --repo <repo> --confirm del-rm`。
 - 分支仅在合并或确认废弃后删除；有未处理改动不能强制删除。
 
 ## 验收报告分层

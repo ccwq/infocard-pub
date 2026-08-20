@@ -6,7 +6,7 @@ Use for every newly authored or republished card after the runtime bundle has be
 
 ## Runtime contract
 
-`publish-bundle.json` must carry an absolute `repository.root`: the one dedicated publish worktree. It is runtime-only and never enters the source allowlist.
+`publish-bundle.json` must carry an absolute `repository.root`: the one dedicated publish worktree. For new publish runs it must be inside the fixed temp/infocard-worktree root returned by `node scripts/infocard-worktree.js root`. The only external-root exception is an explicit user-supplied recovery worktree declared with `repository.root_policy: "external-user-supplied"`; that exception is never eligible for del-rm cleanup. It is runtime-only and never enters the source allowlist.
 
 Run from that exact directory:
 
@@ -22,7 +22,7 @@ Before treating a public 404/missing entry as CDN propagation, first verify the 
 npm run verify:publish-local-gate -- --bundle <bundle> --phase pre-cdn
 ```
 
-Before removing the worktree:
+Before reporting cleanup readiness for the retained worktree:
 
 ```bash
 npm run verify:publish-local-gate -- --bundle <bundle> --phase cleanup
@@ -32,7 +32,7 @@ npm run verify:publish-local-gate -- --bundle <bundle> --phase cleanup
 
 - `prebuild`: process is in the declared Git worktree; sidecar is one YAML mapping; required fields are non-empty; identity fields agree with the bundle.
 - `postbuild` / `pre-cdn`: additionally, parsed `_index.yaml` has a target entry with matching `slug` and `path`, non-empty `title`/`desc`, and `index.html` contains the slug.
-- `cleanup`: `git status --porcelain` is empty. A failure preserves the worktree; never substitute `git worktree remove --force` without explicit authorization.
+- `cleanup`: `git status --porcelain` is empty. A failure preserves the worktree; a pass only means it is a safe cleanup candidate. Never remove it unless the user replies exactly `del-rm`, then re-scan and run `npm run worktree:cleanup -- --confirm del-rm` without `--force`.
 
 ## Repair discipline
 

@@ -30,7 +30,7 @@ Author 只能负责 HTML、sidecar 和卡片级检查；主线程仍必须执行
 
 ## 7. Worktree 终态清理
 
-每张卡或整批任务进入 published、published-pending-visual、blocked 或 cancelled 后，先保留必要的非敏感 run evidence，再确认 worktree 干净，执行 `git worktree remove <path>`。脏 worktree 不得强删；应先记录或处理残留。分支只有在已合并或确认废弃后删除。
+每张卡或整批任务进入 published、published-pending-visual、blocked 或 cancelled 后，先保留必要的非敏感 run evidence，再确认 worktree 干净并保留 worktree。用 `npm run worktree:list -- --repo <repo>` 报告历史 WT，并提示用户回复 `del-rm` 才清理。脏 worktree 不得强删；应先记录或处理残留。分支只有在已合并或确认废弃后删除。
 
 ## 8. 历史门禁噪声分层
 

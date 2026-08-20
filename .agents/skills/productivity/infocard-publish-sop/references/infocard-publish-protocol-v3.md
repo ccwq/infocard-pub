@@ -17,7 +17,7 @@ For a shared batch, the orchestrator must enforce these gates in order:
 5. **Artifact gate** — build begins only after every declared HTML/meta artifact exists and passes local structure/content checks. A pre-artifact build is invalid evidence and its generated index changes must be discarded or regenerated later.
 6. **Allowlist diff and log gate** — after the integration build, the candidate diff may contain only declared card artifacts, their declared assets, generated index files, and declared release-audit fields. Classify output as `BLOCKER`, `NEW_WARNING`, or `BASELINE_WARNING`; baseline noise cannot mask a batch blocker.
 7. **Visual capability and session gate** — preflight `agent-browser` executable, session support, preview reachability, and screenshot capability. If unavailable, mark visual verification `UNAVAILABLE` and never call static or HTTP checks visual pass. Otherwise visual work for each card uses its own `agent-browser --session <run-id>-<slug>`; close only that session's tabs at success, failure, or cancellation.
-8. **Public verification, recovery, and cleanup gate** — after push, first prove the remote content commit contains the HTML, sidecar, `_index.yaml`, and `index.html`; then rerun the local worktree/index gate at that commit; only then verify detail page, public index, and homepage with bounded backoff. Before exhaustion use `PUBLISHED_PENDING_CDN`, not failure or a repeat push. A failed first publish is repaired only in the same publish worktree, or in an explicitly recorded recovery worktree based on the remote release commit; it reruns every local gate before a repair commit. After verification and audit capture, preserve only non-secret evidence. Confirm `git status --porcelain` is empty, then remove the run worktree with `git worktree remove`; do not force-remove a dirty worktree.
+8. **Public verification, recovery, and retained-worktree gate** — after push, first prove the remote content commit contains the HTML, sidecar, `_index.yaml`, and `index.html`; then rerun the local worktree/index gate at that commit; only then verify detail page, public index, and homepage with bounded backoff. Before exhaustion use `PUBLISHED_PENDING_CDN`, not failure or a repeat push. A failed first publish is repaired only in the same publish worktree, or in an explicitly recorded recovery worktree based on the remote release commit; it reruns every local gate before a repair commit. After verification and audit capture, preserve only non-secret evidence, keep the worktree, report historical worktrees, and prompt the user to reply exactly `del-rm` for cleanup. Do not remove a publish worktree automatically.
 
 ## Route
 
@@ -95,6 +95,8 @@ Required shape:
 
 Absolute paths are allowed only in `repository.root` and run-local evidence fields. Publication artifact paths must be repository-relative and contained. Process files, screenshots, and `.tmp` paths are never in the source allowlist.
 
+For new publish runs, `repository.root` must be inside the cross-platform fixed root reported by `node scripts/infocard-worktree.js root`: `os.tmpdir()/infocard-worktree`. Use `node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug>` to create the path for the bundle. Existing user-supplied external worktrees are treated as explicit recovery inputs only when the bundle declares `repository.root_policy: "external-user-supplied"`; they are never moved or cleaned by this protocol.
+
 ## Required gates
 
 All routes run the repository's actual equivalents of:
@@ -126,7 +128,7 @@ The prebuild phase blocks if the command is not running inside that declared wor
 
 Before any public 404 or missing-entry result may be classified as CDN propagation, run `--phase pre-cdn` in the same worktree after confirming the remote content commit contains the declared HTML, sidecar, `_index.yaml`, and `index.html`. `HTTP 200` is never sufficient evidence of a current release. If the local/remote proof fails, repair the content in the same worktree (or an explicitly recorded recovery worktree) and rerun all local gates; do not repeat-push or label it `PUBLISHED_PENDING_CDN`.
 
-Before cleanup, run `npm run verify:publish-local-gate -- --bundle <bundle> --phase cleanup`. A dirty worktree is a hard cleanup block; preserve its path and recovery state, and never use `git worktree remove --force` without explicit user authorization.
+Before reporting cleanup readiness, run `npm run verify:publish-local-gate -- --bundle <bundle> --phase cleanup`. This phase proves only that the retained worktree is clean enough to be a safe candidate; it does not delete anything. A dirty worktree is a hard cleanup block; preserve its path and recovery state. Actual deletion requires the user to reply exactly `del-rm`, after which the agent must re-scan with `node scripts/infocard-worktree.js list --repo <repo>` and run `npm run worktree:cleanup -- --confirm del-rm`. The cleanup command removes only clean registered worktrees inside the fixed root and never uses `--force`.
 
 ## Visual evidence
 
@@ -140,7 +142,7 @@ Review desktop `1440×900` and mobile `390×844` after verifying the preview ide
 
 ## Isolation and integration
 
-Every publication gets a dedicated branch and worktree based on fresh `origin/main`.
+Every publication gets a dedicated branch and worktree based on fresh `origin/main`. New worktrees are created only under the fixed `os.tmpdir()/infocard-worktree` root resolved by `scripts/infocard-worktree.js`.
 
 For a multi-card batch, use one fresh integration/publish worktree and copy each card's source artifacts according to its bundle allowlist. Do not cherry-pick child commits that contain independently generated `_index.yaml`, `index.html`, or timestamps. Regenerate shared artifacts once in the integration worktree.
 
@@ -152,7 +154,7 @@ For a multi-card batch, use one fresh integration/publish worktree and copy each
 - The content commit stages exactly the bundle source allowlist plus generated index artifacts; do not use unreviewed `git add -A`.
 - Fetch immediately before push. If `origin/main` advanced, rebase once in the same worktree, regenerate generated artifacts, rerun affected gates, and retry once.
 - A second integration failure is `BLOCKED_AT_INTEGRATION`. Do not force-push or alter another worktree.
-- At a terminal state (`PUBLISHED`, `PUBLISHED_PENDING_VISUAL`, `BLOCKED_*`, or `CANCELLED`), copy only non-secret run evidence/audit outside the worktree, verify `git status --porcelain` is empty, then run `git worktree remove <path>`. Remove the dedicated branch only after merge or confirmed obsolescence. A dirty worktree is a cleanup blocker, never a reason to force-remove artifacts.
+- At a terminal state (`PUBLISHED`, `PUBLISHED_PENDING_VISUAL`, `BLOCKED_*`, or `CANCELLED`), copy only non-secret run evidence/audit outside the worktree, verify `git status --porcelain` for cleanup readiness, keep the worktree, and include the worktree path plus historical WT report in closeout. Remove worktrees only after the user replies exactly `del-rm`; remove the dedicated branch only after merge or confirmed obsolescence. A dirty worktree is a cleanup blocker, never a reason to force-remove artifacts.
 
 Network and Pages verification use one initial attempt plus three backoff retries. Public verification requires HTTP 200 plus the expected identity/new content in HTML and the correct slug/path in public `_index.yaml`; HTTP 200 alone is not evidence that CDN content is current.
 
