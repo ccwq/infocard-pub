@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AudioNotes — 本地音视频转 Markdown 笔记（FunASR + Ollama）</title>
+  <meta name="description" content="harry0703/AudioNotes：上传音视频，自动生成文字稿并整理为 Markdown 笔记，全程本地运行，不联网。支持 Docker / Python 3.12 部署，默认 qwen3.5:2b，2.3k GitHub Stars。" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--red:#ff6b6b;--shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box} html,body{margin:0;padding:0;overflow-x:hidden}
+    img{display:block;max-width:100%;height:auto}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(circle at 18% 10%,rgba(88,195,255,.16) 0 10%,transparent 11%),radial-gradient(circle at 86% 8%,rgba(132,89,255,.18) 0 9%,transparent 10%),radial-gradient(circle at 72% 72%,rgba(45,179,106,.10) 0 13%,transparent 14%),radial-gradient(circle at 18% 78%,rgba(244,200,76,.08) 0 11%,transparent 12%),linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%)}
+    a{color:inherit;text-decoration:none}.page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 42px}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(280px,.95fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;font:900 11.2px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .title{margin:0;font-size:clamp(40px,7vw,80px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.36) 0 10%,transparent 11%),linear-gradient(135deg,var(--cyan) 0%,var(--blue) 34%,var(--purple) 68%,var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24),inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:23px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11.2px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11.2px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.6px;line-height:1.45;color:#c9d4f7}
+
+    .screenshot{border-radius:16px;border:1.5px solid rgba(255,255,255,.09);background:#080b14;box-shadow:0 12px 26px rgba(0,0,0,.24);overflow:hidden;margin-bottom:14px}
+    .screenshot img{width:100%;object-fit:cover}
+    .screen-cap{font:800 11.2px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#9fb0de;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
+
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}
+    .panel-kicker{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
+    .feat .label{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .feat .value{font-size:12.5px;font-weight:800;line-height:1.3;color:#eef4ff}
+
+    .section{margin-bottom:14px}
+    .section-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .section-no{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(74,120,255,.28),rgba(88,195,255,.18));border:1.5px solid rgba(88,195,255,.28);box-shadow:0 8px 20px rgba(88,195,255,.14);font:950 18px/1 Georgia,"Times New Roman",serif;color:#fff;flex:0 0 auto}
+    .section-label{font:900 11.2px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+    .flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+    .phase{padding:12px 10px 10px;border-right:1px solid rgba(255,255,255,.1);display:grid;gap:6px;min-width:0}
+    .phase:last-child{border-right:none}
+    .phase .n{display:block;font:950 22px/1 Georgia,"Times New Roman",serif}
+    .phase .t{font:900 11.2px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .phase .d{font-size:11.4px;line-height:1.52;color:#9fb0de}
+    .phase:nth-child(1) .n{color:var(--cyan)}
+    .phase:nth-child(2) .n{color:var(--blue)}
+    .phase:nth-child(3) .n{color:var(--green)}
+    .phase:nth-child(4) .n{color:var(--yellow)}
+    .phase:nth-child(5) .n{color:var(--purple)}
+
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .card{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px;box-shadow:0 8px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:10px}
+    .card-kicker{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .card-title{margin:0;font-size:16px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .card-body{display:grid;gap:8px;flex:1}
+    .point{padding:7px 9px 6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;display:grid;gap:3px}
+    .point .t{font-size:12.2px;font-weight:800;line-height:1.3}
+    .point .d{font-size:11.6px;line-height:1.55;color:#9fb0de}
+
+    .code-block{background:#080b14;border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px 14px;margin-bottom:14px;box-shadow:0 8px 20px rgba(0,0,0,.22)}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--cyan);font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;color:#c9d4f7;white-space:pre-wrap;overflow-wrap:anywhere}
+
+    .gallery{display:grid;grid-template-columns:1.25fr .75fr;gap:12px;margin-bottom:14px}
+    .gallery-side{display:grid;gap:12px}
+
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .cmp{min-width:0;border-radius:18px;padding:14px;display:grid;gap:10px}
+    .cmp.bad{background:rgba(255,107,107,.08);border:1.5px solid rgba(255,107,107,.2)}
+    .cmp.good{background:rgba(45,179,106,.08);border:1.5px solid rgba(45,179,106,.2)}
+    .cmp-head{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .cmp.bad .cmp-head{color:var(--red)}
+    .cmp.good .cmp-head{color:var(--green)}
+    .cmp-body{display:grid;gap:7px}
+    .cmp-item{font-size:12.5px;line-height:1.5;color:#c5d2f7;padding-left:14px;border-left:2px solid rgba(255,255,255,.1)}
+    .cmp.good .cmp-item{border-left-color:rgba(45,179,106,.4)}
+    .cmp.bad .cmp-item{border-left-color:rgba(255,107,107,.3)}
+
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1.5px solid rgba(255,255,255,.09);background:rgba(9,12,22,.42);border-radius:18px;padding:12px 14px 10px;box-shadow:var(--shadow)}
+    .footer .brand{font-weight:900;color:#fff;font-size:15px;letter-spacing:-.02em}
+    .footer .links{display:flex;flex-wrap:wrap;gap:6px}
+    .footer .link-item{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4}
+    .footer .meta{font:800 11.2px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#6f7fad;text-align:right}
+
+    .x-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:18px;padding:12px 14px;margin-bottom:14px}
+    .x-item{text-align:center}
+    .x-item .n{font-size:26px;font-weight:950;color:#fff;line-height:1}
+    .x-item .l{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#6f7fad;text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
+    .x-item .a{font-size:11.5px;font-weight:800;color:var(--cyan);margin-top:6px}
+
+    @media(max-width:960px){.hero,.compare,.gallery{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,minmax(0,1fr))}.grid3{grid-template-columns:1fr 1fr}.footer{flex-direction:column}.footer .meta{text-align:left}}
+    @media(max-width:720px){
+      .grid3{grid-template-columns:1fr}
+      .page{width:min(100% - 14px,1180px);padding:12px 0 32px}
+      .hero,.flow,.grid3,.compare,.gallery{grid-template-columns:1fr}
+      .shell{display:none}
+      .title{font-size:clamp(36px,10vw,62px)}
+      .x-meta{grid-template-columns:1fr 1fr}
+      .footer{flex-direction:column}
+      .footer .link-item{font-size:11.2px}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker">harry0703/AudioNotes · GitHub Trending</span>
+      </div>
+      <h1 class="title">AudioNotes<br>本地 ASR 笔记</h1>
+      <p class="subtitle">把播客、网课、会议录音丢进去，直接出 Markdown 笔记，全程不联网。支持浏览器录音、领域热词修正、Docker 一键部署。</p>
+      <div class="pill-row">
+        <span class="pill cyan">FunASR 本地识别</span>
+        <span class="pill green">Ollama qwen3.5:2b</span>
+        <span class="pill yellow">全程本地运行</span>
+        <span class="pill">Docker / Python 3.12</span>
+        <span class="pill purple">MIT</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">📝</div>
+        <div class="visual-meta">
+          <span class="big" style="color:var(--cyan)">2,351</span>
+          <span class="small">GitHub Stars</span>
+          <span class="big" style="color:var(--green)">346</span>
+          <span class="small">Forks</span>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <div class="mini-card">
+          <div class="label">ASR 模型</div>
+          <div class="value">Fun-ASR-Nano-2512</div>
+          <div class="desc">约 2.15GB，首次自动下载</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">LLM 模型</div>
+          <div class="value">qwen3.5:2b</div>
+          <div class="desc">Ollama 本地运行</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">默认端口</div>
+          <div class="value">15433</div>
+          <div class="desc">仅本机访问</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">默认账号</div>
+          <div class="value">admin / admin</div>
+          <div class="desc">首次部署后记得改</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- X 帖子数据 -->
+  <div class="x-meta">
+    <div class="x-item"><div class="n">213</div><div class="l">Likes</div><div class="a">@Ryrenz</div></div>
+    <div class="x-item"><div class="n">49</div><div class="l">Reposts</div><div class="a">Ren · 2026-08-20</div></div>
+    <div class="x-item"><div class="n">7</div><div class="l">Replies</div><div class="a">GitHub 2.2k Stars</div></div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="flow">
+    <div class="phase"><span class="n">01</span><span class="t" style="color:var(--cyan)">上传</span><div class="d">音频、视频或浏览器录音</div></div>
+    <div class="phase"><span class="n">02</span><span class="t" style="color:var(--blue)">ASR</span><div class="d">FunASR 本地语音识别，生成文字稿</div></div>
+    <div class="phase"><span class="n">03</span><span class="t" style="color:var(--green)">LLM 整理</span><div class="d">qwen3.5:2b 整理为 Markdown 结构化笔记</div></div>
+    <div class="phase"><span class="n">04</span><span class="t" style="color:var(--yellow)">问答</span><div class="d">就笔记内容继续对话，对话历史保存</div></div>
+    <div class="phase"><span class="n">05</span><span class="t" style="color:var(--purple)">本地存储</span><div class="d">文字稿、笔记、对话历史全部保留本机</div></div>
+  </div>
+
+  <!-- Screenshots -->
+  <div class="gallery">
+    <div class="screenshot">
+      <img src="assets/img/20260821-audionotes-local-asr/demo1.jpg" alt="AudioNotes 音视频识别和整理界面" loading="lazy" />
+      <div class="screen-cap">音视频识别 → Markdown 笔记生成效果</div>
+    </div>
+    <div class="gallery-side">
+      <div class="screenshot" style="margin-bottom:12px">
+        <img src="assets/img/20260821-audionotes-local-asr/demo2.jpg" alt="AudioNotes 问答对话界面" loading="lazy" />
+        <div class="screen-cap">与笔记内容对话</div>
+      </div>
+      <div class="compare">
+        <div class="cmp good">
+          <div class="cmp-head">✓ AudioNotes</div>
+          <div class="cmp-body">
+            <div class="cmp-item">音视频全程本地处理</div>
+            <div class="cmp-item">文字稿/笔记不离本机</div>
+            <div class="cmp-item">网页默认仅本机访问</div>
+            <div class="cmp-item">公司会议可用</div>
+          </div>
+        </div>
+        <div class="cmp bad">
+          <div class="cmp-head">✗ 在线转写工具</div>
+          <div class="cmp-body">
+            <div class="cmp-item">音频需上传到第三方</div>
+            <div class="cmp-item">隐私数据暴露风险</div>
+            <div class="cmp-item">公司内网无法使用</div>
+            <div class="cmp-item">敏感内容受限</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 1: Features -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-label">Core Features · 核心功能</div>
+    </div>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-kicker" style="color:var(--cyan)">ASR · 语音识别</div>
+        <h2 class="card-title">FunASR 本地识别</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">FunAudioLLM/Fun-ASR-Nano-2512</div><div class="d">默认中文模型，约 2.15GB，首次使用自动下载</div></div>
+          <div class="point"><div class="t">多语言切换</div><div class="d">改为 Fun-ASR-MLT-Nano-2512 可识别更多语言</div></div>
+          <div class="point"><div class="t">浏览器录音</div><div class="d">无需上传文件，直接在网页录音</div></div>
+          <div class="point"><div class="t">领域热词</div><div class="d">专业名词可配热词修正转写准确率</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--green)">LLM · 笔记整理</div>
+        <h2 class="card-title">qwen3.5:2b 整理笔记</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">Markdown 结构化</div><div class="d">LLM 将文字稿整理为清晰的 Markdown 笔记</div></div>
+          <div class="point"><div class="t">保留原始文字稿</div><div class="d">整理后仍保留原始识别结果，可对照核实</div></div>
+          <div class="point"><div class="t">Ollama 本地运行</div><div class="d">qwen3.5:2b 在本机执行，无需联网调用 API</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--yellow)">Chat · 对话历史</div>
+        <h2 class="card-title">就内容继续问答</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">上下文关联</div><div class="d">可追问负责人、时间、结论等具体信息</div></div>
+          <div class="point"><div class="t">对话历史保存</div><div class="d">左侧历史记录可重新打开历史笔记</div></div>
+          <div class="point"><div class="t">隐私为本</div><div class="d">问答数据同样存在本机 storage 目录</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Deploy -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-no">02</div>
+      <div class="section-label">Deploy · 部署方式</div>
+    </div>
+    <div class="compare">
+      <div class="card">
+        <div class="card-kicker" style="color:var(--purple)">Docker · 推荐</div>
+        <h2 class="card-title">一条命令跑起来</h2>
+        <div class="card-body">
+          <div class="code-block">
+            <div class="tag">Docker 快速部署</div>
+            <pre>ollama pull qwen3.5:2b
+
+mkdir audionotes && cd audionotes
+curl -fsSL https://github.com/harry0703/AudioNotes/raw/main/docker-compose.yml -o docker-compose.yml
+curl -fsSL https://github.com/harry0703/AudioNotes/raw/main/.env.example -o .env
+docker compose up -d --remove-orphans</pre>
+          </div>
+          <div class="point"><div class="t">首次自动下载模型</div><div class="d">约 2.15GB，依赖网络速度</div></div>
+          <div class="point"><div class="t">默认账号 admin / admin</div><div class="d">部署后立即修改密码</div></div>
+          <div class="point"><div class="t">数据目录 audionotes/</div><div class="d">备份整个文件夹即可迁移</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--cyan)">Source · Python</div>
+        <h2 class="card-title">Python 3.12 源码</h2>
+        <div class="card-body">
+          <div class="code-block">
+            <div class="tag">源码启动</div>
+            <pre>git clone https://github.com/harry0703/AudioNotes.git
+cd AudioNotes
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+ollama pull qwen3.5:2b
+
+python -m chainlit run main.py --host 127.0.0.1 --port 15433</pre>
+          </div>
+          <div class="point"><div class="t">依赖 Python 3.12 + ffmpeg</div><div class="d">不需要数据库，自动创建 storage/</div></div>
+          <div class="point"><div class="t">端口 15433</div><div class="d">仅监听 127.0.0.1，不对外开放</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Privacy -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-no">03</div>
+      <div class="section-label">Privacy · 隐私与本地优先</div>
+    </div>
+    <div class="shell">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">数据保留</span></div>
+        <div class="feat"><div class="label">音视频文件</div><div class="value">保存在本机 audionotes/ 或 storage/</div></div>
+        <div class="feat"><div class="label">文字稿</div><div class="value">本机存储，不上传</div></div>
+        <div class="feat"><div class="label">Markdown 笔记</div><div class="value">本机存储，不上传</div></div>
+        <div class="feat"><div class="label">对话历史</div><div class="value">本机 storage/ 目录</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">网络隔离</span></div>
+        <div class="feat"><div class="label">ASR 识别</div><div class="value">FunASR 在本机执行</div></div>
+        <div class="feat"><div class="label">LLM 推理</div><div class="value">Ollama qwen3.5:2b 本地运行</div></div>
+        <div class="feat"><div class="label">第三方 API</div><div class="value">默认不调用任何第三方 AI 接口</div></div>
+        <div class="feat"><div class="label">Web 服务</div><div class="value">默认只监听 127.0.0.1</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">使用建议</span></div>
+        <div class="feat"><div class="label">首次安装</div><div class="value">需联网下载约 2.15GB 模型</div></div>
+        <div class="feat"><div class="label">日常使用</div><div class="value">不依赖任何网络服务</div></div>
+        <div class="feat"><div class="label">公司会议</div><div class="value">可安全处理内部敏感内容</div></div>
+        <div class="feat"><div class="label">备份迁移</div><div class="value">复制整个 audionotes/ 文件夹即可</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: GPU + FAQ -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-no">04</div>
+      <div class="section-label">GPU & FAQ · 加速与常见问题</div>
+    </div>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-kicker" style="color:var(--yellow)">GPU 加速</div>
+        <h2 class="card-title">NVIDIA 显卡加速</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">前提条件</div><div class="d">NVIDIA 驱动 + Container Toolkit 已安装</div></div>
+          <div class="code-block" style="margin:0">
+            <div class="tag">GPU 镜像</div>
+            <pre style="font-size:11px">docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build</pre>
+          </div>
+          <div class="point"><div class="t">内存建议</div><div class="d">至少 12GB，推荐 16GB；8GB 可能在长音频时中断</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--red)">FAQ</div>
+        <h2 class="card-title">常见问题</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">找不到模型</div><div class="d">执行 ollama pull qwen3.5:2b</div></div>
+          <div class="point"><div class="t">长音频中断</div><div class="d">增加 Docker Desktop 内存配额至 16GB</div></div>
+          <div class="point"><div class="t">页面无法打开</div><div class="d">确认 Docker Desktop 和 Ollama 均已启动</div></div>
+          <div class="point"><div class="t">多用户共用电脑</div><div class="d">修改 .env 中的 USERNAME 和 PASSWORD</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--green)">更新</div>
+        <h2 class="card-title">保持最新</h2>
+        <div class="card-body">
+          <div class="code-block" style="margin:0">
+            <div class="tag">Docker 更新</div>
+            <pre style="font-size:11px">docker compose pull
+docker compose up -d --remove-orphans</pre>
+          </div>
+          <div class="point"><div class="t">首次仍需联网</div><div class="d">下载镜像和 FunASR 模型</div></div>
+          <div class="point"><div class="t">数据不丢失</div><div class="d">audionotes/ 文件夹内的数据不受影响</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>
+      <div class="brand">harry0703/AudioNotes</div>
+      <div class="links">
+        <span class="link-item">⭐ 2,351 Stars</span>
+        <span class="link-item">🍴 346 Forks</span>
+        <span class="link-item">MIT License</span>
+        <span class="link-item">Python</span>
+        <span class="link-item">Docker</span>
+        <span class="link-item">FunASR</span>
+        <span class="link-item">Ollama</span>
+      </div>
+    </div>
+    <div class="meta">
+      <a href="https://github.com/harry0703/AudioNotes" style="color:var(--cyan)">github.com/harry0703/AudioNotes</a><br>
+      X: @Ryrenz · 213 ❤️ · 49 ↩ · 2026-08-20<br>
+      Card: 2026-08-21 · darkblue
+    </div>
+  </div>
+</main>
+<script>
+  const btn = document.createElement('button');
+  btn.textContent = '💾 SAVE PNG';
+  btn.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:10px 16px;background:linear-gradient(135deg,var(--cyan),var(--blue));color:#fff;font:900 12px/1 ui-monospace,monospace;border:0;border-radius:999px;cursor:pointer;box-shadow:0 8px 24px rgba(88,195,255,.3);z-index:9999';
+  btn.addEventListener('click',async()=>{
+    try{
+      const canvas = await html2canvas(document.body,{backgroundColor:'#0c1020',scale:1.5,useCORS:true});
+      const a=document.createElement('a');a.download='audionotes-card.png';a.href=canvas.toDataURL('image/png');a.click();
+    }catch(e){console.error(e)}
+  });
+  document.body.appendChild(btn);
+</script>
+</body>
+</html>
