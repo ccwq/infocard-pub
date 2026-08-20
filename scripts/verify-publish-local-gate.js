@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const yaml = require('../assets/home/vendor/js-yaml.min.js');
+const { fixedWorktreeRoot, isInsideFixedWorktreeRoot } = require('./lib/infocard-worktree');
 const { loadBundle, validateBundle } = require('./lib/publish-bundle');
 const { extractInjectedIndexData } = require('./index-build-lib');
 
@@ -63,6 +64,13 @@ function verifyWorktree(bundle, cwd) {
   }
   const declared = path.resolve(bundle.repository.root);
   if (!fs.existsSync(declared)) return [error('repository.root', 'declared worktree does not exist')];
+  const rootPolicy = bundle.repository.root_policy || 'fixed-temp';
+  if (rootPolicy !== 'fixed-temp' && rootPolicy !== 'external-user-supplied') {
+    return [error('repository.root_policy', 'must be fixed-temp or external-user-supplied')];
+  }
+  if (rootPolicy === 'fixed-temp' && !isInsideFixedWorktreeRoot(declared)) {
+    return [error('repository.root', 'must be inside ' + fixedWorktreeRoot())];
+  }
   try {
     git(declared, ['rev-parse', '--is-inside-work-tree']);
   } catch (cause) {

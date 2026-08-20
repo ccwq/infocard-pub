@@ -77,8 +77,8 @@ Even though the card exists, updates need fresh research on the NEW content area
 
 ## Capacity and workflow
 
-- Worktree: same as create-from-scratch (`git worktree add /tmp/infocard-<slug>-update origin/main --detach`)
-- Build → verify → leak scan → mobile check → commit → push → public verification → audit commit → cleanup
+- Worktree: same as create-from-scratch, but the path must be returned by `node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug>-update` under the fixed temp/infocard-worktree root.
+- Build → verify → leak scan → mobile check → commit → push → public verification → audit commit → retained worktree report. Cleanup is only after exact `del-rm` user confirmation.
 - If the card has existing `release_audit`, patch the YAML (do not duplicate the block — update `published_commit` to new content SHA and add new `added_sections` entry)
 
 ## Pitfalls

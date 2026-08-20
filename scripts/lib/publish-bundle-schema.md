@@ -15,7 +15,8 @@ A publish bundle is a JSON object used to validate and scope one infocard publis
 | `keywords` | Non-empty array of non-empty strings. |
 | `wiki.raw_path` | Required relative path without `..` traversal. |
 | `wiki.knowledge_path` | Required relative path without `..` traversal. |
-| `repository.root` | Runtime-only absolute path of the one dedicated publish worktree. Required by `verify:publish-local-gate`; never a publication artifact. |
+| `repository.root` | Runtime-only absolute path of the one dedicated publish worktree. Required by `verify:publish-local-gate`; never a publication artifact. For new publish runs it must be inside the cross-platform fixed root reported by the infocard-worktree root CLI, namely os.tmpdir()/infocard-worktree. |
+| `repository.root_policy` | Optional runtime compatibility field. Omit or use `fixed-temp` for new runs. Use `external-user-supplied` only when the user explicitly provided an existing external recovery worktree; such worktrees are never cleaned by the del-rm flow. |
 
 Supported style identifiers are: `darkblue`, `redswiss`, `hardblue`, `main-style`, `darkgreen`, `graph-paper`, `handline`, `wood`, `black-head`, `pixelstack`, `q-style`, `paper-warm`, `white-purple`, and `color-material`.
 

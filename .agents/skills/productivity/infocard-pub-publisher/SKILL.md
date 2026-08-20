@@ -24,7 +24,7 @@ env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE -u GIT_ALTERNATE_OBJECT_DIRECT
 ```
 Run `git fsck --full --no-reflogs` in that controlled environment before staging. If it passes there, treat any failure under the inherited shell as environment contamination, not repository corruption. Do not repair or mutate the primary checkout; continue from a clean clone/worktree with the controlled environment.
 
-1. Fetch `origin/main`; create one branch and one worktree for the candidate card from the fresh remote base.
+1. Fetch `origin/main`; create one branch and one worktree for the candidate card from the fresh remote base. The worktree path must come from `node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug>` and therefore live under the cross-platform fixed `os.tmpdir()/infocard-worktree` root. Do not create repo-local `wt-*`, `/tmp/infocard-*`, clones, or copied repos for new publish runs.
 2. If live repository commands need local Node dependencies, symlink validated primary-repository `node_modules` into the worktree. If no local dependencies are needed, record that in the bundle. Never install Node dependencies in the worktree.
 3. Confirm that the frozen bundle artifact allowlist exists in the worktree and that no process artifact is included.
 
@@ -111,11 +111,19 @@ Completion criterion: the bundle contains public URLs, evidence timestamps, a te
 
 Completion criterion: the audit sidecar passes its independent gate and its audit-only commit is pushed, or the bundle truthfully records `AUDIT_PENDING` after a successful Pages release.
 
+## 6. Retain and report publish worktrees
+
+After the terminal Pages/audit state is recorded, do not automatically remove the publish worktree. Run `npm run worktree:list -- --repo <repo>` from the primary repository or equivalent repo root, report historical worktrees, and prompt the user exactly: `如需清理可安全删除的历史 worktree，请回复：del-rm`.
+
+If the user later replies exactly `del-rm`, re-run the inventory first, then run `npm run worktree:cleanup -- --repo <repo> --confirm del-rm`. The cleanup command may remove only clean registered worktrees inside the fixed temp/infocard-worktree root and must not use `--force`. Dirty, active, external, repo-local, unregistered, or ownership-uncertain directories are skipped and reported.
+
 ## Boundaries
 
 - Never install dependencies in a worktree.
 - Never stage files outside the bundle allowlist and generated index artifacts.
 - Never force-push, repair another worktree, or turn `VISUAL_PENDING` into visual PASS.
+- Never create new publish worktrees outside the fixed temp/infocard-worktree root.
+- Never remove publish worktrees unless the user replied exactly `del-rm` for this cleanup pass.
 - Never start Wiki automatically; it must be requested by the task.
 
 ## References

@@ -46,7 +46,8 @@ This is especially important when a subagent writes outside the repository or re
 cd ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
 git fetch origin main --quiet
 git branch -f infocard/<batch-slug>-YYYYMMDD origin/main
-git worktree add wt-<batch-slug>-YYYYMMDD infocard/<batch-slug>-YYYYMMDD --quiet
+WT=$(node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <batch-slug>-YYYYMMDD --plain)
+git worktree add "$WT" infocard/<batch-slug>-YYYYMMDD --quiet
 ```
 
 ## Social-to-repository research handoff
@@ -74,7 +75,7 @@ Each subagent must end by reporting:
 In the orchestrator:
 
 ```bash
-WT=~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub/wt-<batch-slug>-YYYYMMDD
+WT=<path returned by node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <batch-slug>-YYYYMMDD>
 cp /tmp/infocard-<slug1>.html $WT/docs/<slug1>.html
 cp /tmp/infocard-<slug2>.html $WT/docs/<slug2>.html
 
@@ -105,13 +106,14 @@ curl -sI https://ccwq.github.io/infocard-pub/docs/<slug2>.html | head -1
 
 Both must return `HTTP/2 200`.
 
-### Step 6 — Cleanup
+### Step 6 — Retained worktree report
 
 ```bash
 cd ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
-git worktree remove wt-<batch-slug>-YYYYMMDD --force
-git branch -D infocard/<batch-slug>-YYYYMMDD
+npm run worktree:list -- --repo .
 ```
+
+Do not remove the batch worktree automatically. Report historical worktrees and prompt the user: `如需清理可安全删除的历史 worktree，请回复：del-rm`. If the user replies exactly `del-rm`, re-scan and run `npm run worktree:cleanup -- --repo . --confirm del-rm`; never use `--force`.
 
 ## Pitfalls
 

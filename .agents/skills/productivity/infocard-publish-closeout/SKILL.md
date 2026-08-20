@@ -16,7 +16,7 @@ metadata:
 
 This skill turns “the card is already published” into a stricter state: the target deliverable is done, and the workspace is clean enough that the next publish does not inherit residues from the previous one.
 
-Use this after an infocard has been built, verified, pushed, and checked on Pages, when you still need to clear leftover files, temporary worktrees, stale branches, or other ambient debris.
+Use this after an infocard has been built, verified, pushed, and checked on Pages, when you need to report leftover files, historical worktrees, stale branches, or other ambient debris. By default it reports publish worktrees and asks for the exact `del-rm` cleanup phrase; it does not delete them automatically.
 
 It is intentionally narrower than the main publishing skill:
 - `infocard-pub-publisher` handles build / push / verify.
@@ -26,9 +26,9 @@ It is intentionally narrower than the main publishing skill:
 
 Use this skill when:
 - A publish is complete but `git status` is not clean.
-- Temporary worktrees or `/tmp` publishing directories still exist.
+- Temporary worktrees or publishing directories still exist.
 - Untracked asset directories were left behind by a subagent or rescue pass.
-- You want to make sure “done” means “done and cleaned”.
+- You want to make sure “done” reports retained worktrees and the cleanup option clearly.
 - You want a final pass before reporting completion to the user.
 
 Do not use this skill for:
@@ -66,28 +66,29 @@ Before cleanup, confirm the card is not only present locally but also actually p
 - Save button exports a real PNG, not print dialog behavior.
 - Wiki raw + concept/entity + index + log are written and pushed when the card is high value.
 
-### 3) Check the workspace
+### 3) Check the workspace and retained worktree inventory
 Run:
 ```bash
 git status -sb
-git worktree list
+npm run worktree:list -- --repo <repo>
 ```
 Look for:
 - untracked `docs/assets/...` directories
 - unexpected modified files
-- detached or behind worktrees that are no longer needed
+- fixed-root historical worktrees that are clean cleanup candidates
+- external, repo-local, dirty, active, or ownership-uncertain worktrees that must be retained
 
-**Capacity guard:** enumerate and size every temporary worktree before a new publish run. A released card can leave a full repository copy plus `dist/`, so repeated worktrees multiply storage quickly. After public verification, remove only worktrees that are clean and whose commits are reachable from the confirmed release branch. If an otherwise stale worktree has untracked residue, inspect and classify it before using `--force`. Do not leave an unregistered former-worktree directory behind: inspect its `git status`, preserve a patch if it holds unique work, then remove it only under explicit cleanup authorization.
+**Capacity guard:** enumerate every temporary worktree before a new publish run. A released card can leave a full repository copy plus `dist/`, so repeated worktrees multiply storage quickly. New publish worktrees belong under the cross-platform fixed root reported by `node scripts/infocard-worktree.js root`. After public verification, retain the worktree and report the historical WT list. If the user replies exactly `del-rm`, re-scan and remove only clean registered worktrees inside that fixed root. Never use `--force`; dirty or unregistered former-worktree directories are classified and reported unless ownership is proven.
 
-### 4) Remove only the residue
-Safely delete or archive leftover artifacts that are not part of the publish bundle.
+### 4) Report by default; clean only after del-rm
+Safely delete or archive leftover non-worktree artifacts that are not part of the publish bundle. Publish worktrees are retained by default.
 
 Typical removals:
-- scratch files in `/tmp`
+- scratch files in the run temp area
 - untracked asset subdirectories created during a failed or partial publish
-- obsolete temporary worktrees after verification
+- fixed-root clean registered publish worktrees only after exact `del-rm` confirmation
 
-Never delete a file that has not already been verified as residue.
+Never delete a file that has not already been verified as residue. The phrase `del-rm` only authorizes cleanup of fixed-root infocard worktrees; it does not authorize deleting the primary repository, external worktrees, screenshots, bundle evidence, or ordinary temp files.
 
 ### 5) Recheck cleanliness
 After cleanup, repeat:
@@ -101,8 +102,9 @@ The expected result is either:
 ### 6) Report with separation of concerns
 When you answer the user, separate:
 - what was published
-- what was cleaned
-- what remains intentionally open, if anything
+- historical worktrees and their cleanup status
+- what was cleaned only if a `del-rm` pass actually ran
+- what remains intentionally open, dirty, external, active, or ownership-uncertain
 
 ## Common Pitfalls
 
@@ -130,5 +132,6 @@ When you answer the user, separate:
 - [ ] Save button exports a real PNG
 - [ ] Wiki raw / concept / index / log are synced if required
 - [ ] `git status -sb` is clean or intentionally scoped
-- [ ] Temporary residue has been removed
-- [ ] Final report clearly separates deliverable vs cleanup
+- [ ] Historical worktrees are reported from `npm run worktree:list -- --repo <repo>`
+- [ ] If cleanup ran, it used exact `del-rm`, removed only clean fixed-root registered worktrees, and reported skipped entries
+- [ ] Final report clearly separates deliverable vs retained/cleaned worktrees
