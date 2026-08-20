@@ -110,8 +110,12 @@ Both must return `HTTP/2 200`.
 ### Step 6 — Retained worktree report
 
 ```bash
+<<<<<<< HEAD
 REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
 cd "$REPO_ROOT"
+=======
+cd ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
+>>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 npm run worktree:list -- --repo .
 ```
 

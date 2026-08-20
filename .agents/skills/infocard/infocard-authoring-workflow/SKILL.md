@@ -83,7 +83,11 @@ This keeps project-specific workflows separate from the global skill library and
 **Primary checkout HEAD is not `main`:** if the primary checkout's `HEAD` is a named branch (e.g. `infocard/20260804-qm-agent`) or detached, `git worktree add -b <branch> origin/main <path>` fails with `fatal: invalid reference: origin/main` or `fatal: invalid reference: /absolute/path`. This is because `origin/main` is not the current branch. New publish worktrees must still use the fixed path from `node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug>` under os.tmpdir()/infocard-worktree. **Correct pattern:**
 
 ```bash
+<<<<<<< HEAD
 REPO="$(git rev-parse --show-toplevel)" || exit 1
+=======
+REPO="/home/ccwq/qbox/opendir/project/infocard-pub"
+>>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 WORKTREE="$(node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug> --plain)"
 SHA="<sha>"
 

@@ -13,6 +13,7 @@ PUBLISHED | PUBLISHED_PENDING_VISUAL | BLOCKED_* | CANCELLED
 
 Authoring is repository-local and always uses the ignored directory \`<repo>/.docs/<card>/\`. Promotion is the only step that copies files into formal \`docs/\`, \`assets/\`, and generated root paths. The promotion manifest is the exact source-to-target allowlist; files not listed in it are not promoted. The \`.docs/<card>/\` directory is retained after closeout. Cleanup is a separate dry-run/reporting concern and never part of ordinary publication.
 
+<<<<<<< HEAD
 \`publish-bundle.json\` has \`schema_version: 3\` and is the runtime source of truth. A concise, non-secret immutable release summary is written after public verification to the existing card \`.meta.yaml\` under \`release_audit\`.
 
 ## Reliability gates
@@ -27,6 +28,16 @@ For a shared batch, the orchestrator enforces these gates in order:
 6. **Promotion allowlist gate** — the manifest is reviewed before copying. The promotion diff may contain only declared target card artifacts, declared assets, generated index files, and declared release-audit fields. Classify output as \`BLOCKER\`, \`NEW_WARNING\`, or \`BASELINE_WARNING\`.
 7. **Visual capability and session gate** — preflight the configured visual runner, session support, preview reachability, and screenshot capability. If unavailable, mark visual verification \`VISUAL_PENDING\`; static or HTTP checks never become a visual pass. Each card still uses its own named review session when the configured runner is available.
 8. **Public verification and audit gate** — after promotion and push, prove the remote commit contains the HTML, sidecar, generated index, and expected identity. Then verify detail page, public index, and homepage with bounded backoff. Capture the release audit only after public verification.
+=======
+1. **Capacity gate** — record free space before creating a worktree. Below 1 GB is `BLOCKED_AT_CAPACITY`; request cleanup authorization rather than deleting old worktrees or creating more output.
+2. **Incremental handoff and single-writer gate** — every Research/Author task writes a valid minimal handoff in its private run directory before enrichment. At timeout it returns that path, remaining gaps, and loses write authority. Only the orchestrator writes the integration worktree; before taking over a card it cancels or fences every task targeting that card. One target file has one writer at a time.
+3. **Bundle and fixture gate** — create, validate, and freeze the canonical schema-v3 bundle before Author starts. It must explicitly carry `hero_identity`, `required_sections`, claims, `min_claim_coverage`, business `slug`, source allowlist, and required boundaries; generate the verifier `facts.json` fixture from it before authoring. Missing or invalid input is `BLOCKED_AT_AUTHOR_INPUT`; Author must not create speculative artifacts.
+4. **Batch narrative gate** — before authoring is accepted, compare all cards for conflicting capability claims, safety boundaries, terminology, prohibited terms, source-display policy, and risk language. High-risk categories (`security`, `physical-system`, `external-side-effect`) require explicit `required_boundaries` in the bundle.
+5. **Artifact gate** — build begins only after every declared HTML/meta artifact exists and passes local structure/content checks. A pre-artifact build is invalid evidence and its generated index changes must be discarded or regenerated later.
+6. **Allowlist diff and log gate** — after the integration build, the candidate diff may contain only declared card artifacts, their declared assets, generated index files, and declared release-audit fields. Classify output as `BLOCKER`, `NEW_WARNING`, or `BASELINE_WARNING`; baseline noise cannot mask a batch blocker.
+7. **Visual capability and session gate** — preflight `agent-browser` executable, session support, preview reachability, and screenshot capability. If unavailable, mark visual verification `UNAVAILABLE` and never call static or HTTP checks visual pass. Otherwise visual work for each card uses its own `agent-browser --session <run-id>-<slug>`; close only that session's tabs at success, failure, or cancellation.
+8. **Public verification, recovery, and retained-worktree gate** — after push, first prove the remote content commit contains the HTML, sidecar, `_index.yaml`, and `index.html`; then rerun the local worktree/index gate at that commit; only then verify detail page, public index, and homepage with bounded backoff. Before exhaustion use `PUBLISHED_PENDING_CDN`, not failure or a repeat push. A failed first publish is repaired only in the same publish worktree, or in an explicitly recorded recovery worktree based on the remote release commit; it reruns every local gate before a repair commit. After verification and audit capture, preserve only non-secret evidence, keep the worktree, report historical worktrees, and prompt the user to reply exactly `del-rm` for cleanup. Do not remove a publish worktree automatically.
+>>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 
 ## Route
 
@@ -76,7 +87,13 @@ The bundle is stored at \`.docs/<card>/publish-bundle.json\`. It is process evid
 
 \`promotion-manifest.json\` is the authoritative exact copy list. Source paths are relative to \`.docs/<card>/\`; target paths are relative to the repository root and must be under \`docs/\` or \`assets/\`, except for generated \`_index.yaml\` and \`index.html\` owned by the repository build. No bundle, screenshot, process file, temporary file, or secret may appear in the manifest. Reject duplicate targets, path traversal, absolute paths, and undeclared files.
 
+<<<<<<< HEAD
 ## Required gates and literal command sequence
+=======
+For new publish runs, `repository.root` must be inside the cross-platform fixed root reported by `node scripts/infocard-worktree.js root`: `os.tmpdir()/infocard-worktree`. Use `node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug>` to create the path for the bundle. Existing user-supplied external worktrees are treated as explicit recovery inputs only when the bundle declares `repository.root_policy: "external-user-supplied"`; they are never moved or cleaned by this protocol.
+
+## Required gates
+>>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 
 All routes run the repository's actual equivalents of bundle/metadata structure, promotion manifest validation, build, repository verification, taxonomy verification, leak check, static content/local-assets checks, visual disposition, and cache-busting public checks for HTML, \`_index.yaml\`, and expected identity.
 
@@ -90,7 +107,15 @@ npm run verify-taxonomy
 npm run check-leak
 \`\`\`
 
+<<<<<<< HEAD
 A local structure/content failure gets one targeted repair and one complete rerun. A second failure is \`BLOCKED_AT_LOCAL_GATE\`. Before promotion, validate the sidecar as one YAML mapping with required fields \`slug\`, \`path\`, \`category\`, \`title\`, \`desc\`, \`date\`, \`updated\`, and \`tags\`; \`path\` must equal the manifest target. After promotion, verify \`_index.yaml.cards\` and \`index.html\`'s injected \`home-index-data\` contain the target slug, path, title, and description. A free-text slug occurrence never passes.
+=======
+The prebuild phase blocks if the command is not running inside that declared worktree, the sidecar is not a single YAML mapping document, required fields (`slug`, `path`, `category`, `title`, `desc`, `date`, `updated`, `tags`) are missing, or the sidecar does not match the bundle. The postbuild phase additionally parses both generated structures: `_index.yaml.cards` and `index.html`'s injected `home-index-data` JSON must each contain the target slug with the bundle path plus non-empty title/description. A free-text slug occurrence in HTML never passes this gate.
+
+Before any public 404 or missing-entry result may be classified as CDN propagation, run `--phase pre-cdn` in the same worktree after confirming the remote content commit contains the declared HTML, sidecar, `_index.yaml`, and `index.html`. `HTTP 200` is never sufficient evidence of a current release. If the local/remote proof fails, repair the content in the same worktree (or an explicitly recorded recovery worktree) and rerun all local gates; do not repeat-push or label it `PUBLISHED_PENDING_CDN`.
+
+Before reporting cleanup readiness, run `npm run verify:publish-local-gate -- --bundle <bundle> --phase cleanup`. This phase proves only that the retained worktree is clean enough to be a safe candidate; it does not delete anything. A dirty worktree is a hard cleanup block; preserve its path and recovery state. Actual deletion requires the user to reply exactly `del-rm`, after which the agent must re-scan with `node scripts/infocard-worktree.js list --repo <repo>` and run `npm run worktree:cleanup -- --confirm del-rm`. The cleanup command removes only clean registered worktrees inside the fixed root and never uses `--force`.
+>>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 
 ## Visual evidence
 
@@ -102,9 +127,27 @@ After public verification, capture a fresh online-URL screenshot when state is \
 
 The Publisher operates in the authorized repository checkout and does not create or switch to an alternate checkout. Inspect the working tree and preserve unrelated user changes. Copy only manifest-declared source files from \`.docs/<card>/\` to exact formal targets; do not use unrestricted directory copies or \`git add -A\`.
 
+<<<<<<< HEAD
 For a multi-card batch, validate each manifest, promote all declared files, run one shared build, and regenerate shared indexes once. Inspect the full diff after build; restore unrelated timestamp, sidecar, taxonomy, and historical index spillover before staging. Stage exactly the promoted card files, declared assets, and generated index artifacts.
 
 If the remote branch advances before push, reconcile in the authorized checkout, regenerate generated artifacts, rerun affected gates, and retry once. A second integration failure is \`BLOCKED_AT_INTEGRATION\`; never force-push or alter unrelated user changes. Network/Pages verification uses one initial attempt plus three backoff retries. HTTP 200 alone is not current-release evidence.
+=======
+Every publication gets a dedicated branch and worktree based on fresh `origin/main`. New worktrees are created only under the fixed `os.tmpdir()/infocard-worktree` root resolved by `scripts/infocard-worktree.js`.
+
+For a multi-card batch, use one fresh integration/publish worktree and copy each card's source artifacts according to its bundle allowlist. Do not cherry-pick child commits that contain independently generated `_index.yaml`, `index.html`, or timestamps. Regenerate shared artifacts once in the integration worktree.
+
+- If the repository needs local Node dependencies, symlink the validated primary repository `node_modules` into the worktree.
+- If the package manifest has no local dependencies and the live commands run without `node_modules`, record `local_dependencies: none`; do not create an empty dependency directory merely to satisfy this protocol.
+- Do not run dependency installation in a publication worktree.
+- Build, validation, generated-index updates, staging, commit, push, recovery, and audit all occur only in that worktree. The publisher must run the deterministic prebuild/postbuild local gate there; it must never build in the primary repository and commit from the publish worktree (or vice versa).
+- After build, inspect `git diff --stat`, full status, and all files outside the candidate allowlist. Restore unrelated timestamp, sidecar, taxonomy, and historical index spillover before staging.
+- The content commit stages exactly the bundle source allowlist plus generated index artifacts; do not use unreviewed `git add -A`.
+- Fetch immediately before push. If `origin/main` advanced, rebase once in the same worktree, regenerate generated artifacts, rerun affected gates, and retry once.
+- A second integration failure is `BLOCKED_AT_INTEGRATION`. Do not force-push or alter another worktree.
+- At a terminal state (`PUBLISHED`, `PUBLISHED_PENDING_VISUAL`, `BLOCKED_*`, or `CANCELLED`), copy only non-secret run evidence/audit outside the worktree, verify `git status --porcelain` for cleanup readiness, keep the worktree, and include the worktree path plus historical WT report in closeout. Remove worktrees only after the user replies exactly `del-rm`; remove the dedicated branch only after merge or confirmed obsolescence. A dirty worktree is a cleanup blocker, never a reason to force-remove artifacts.
+
+Network and Pages verification use one initial attempt plus three backoff retries. Public verification requires HTTP 200 plus the expected identity/new content in HTML and the correct slug/path in public `_index.yaml`; HTTP 200 alone is not evidence that CDN content is current.
+>>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 
 ## States
 
