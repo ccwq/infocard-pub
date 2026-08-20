@@ -253,6 +253,139 @@ function buildIndexData() {
   };
 }
 
+function collectIndexReconciliationData() {
+  const metas = [];
+  const duplicateSlugGroups = new Map();
+  const duplicatePathGroups = new Map();
+  const htmlMetaMismatches = [];
+  const repoOnlyHtmlPaths = [];
+  const repoHtmlPaths = new Set();
+  const metaPaths = new Set();
+
+  for (const metaPath of listMetaFiles(DOCS_DIR)) {
+    const relMetaPath = normalizeSlashes(path.relative(ROOT_DIR, metaPath));
+    metaPaths.add(relMetaPath);
+    const data = loadMetaYaml(metaPath);
+    const slug = String(data.slug || "").trim();
+    const declaredPath = String(data.path || "").trim();
+    const expectedPath = normalizeSlashes(path.relative(ROOT_DIR, metaPath.slice(0, -".meta.yaml".length)));
+
+    metas.push({
+      meta_path: relMetaPath,
+      slug,
+      path: declaredPath,
+    });
+
+    if (slug) {
+      if (!duplicateSlugGroups.has(slug)) duplicateSlugGroups.set(slug, []);
+      duplicateSlugGroups.get(slug).push(relMetaPath);
+    }
+    if (declaredPath) {
+      if (!duplicatePathGroups.has(declaredPath)) duplicatePathGroups.set(declaredPath, []);
+      duplicatePathGroups.get(declaredPath).push(relMetaPath);
+      if (declaredPath !== expectedPath) {
+        htmlMetaMismatches.push({
+          meta_path: relMetaPath,
+          declared_path: declaredPath,
+          expected_path: expectedPath,
+        });
+      }
+    }
+  }
+
+  const htmlFiles = [];
+  const stack = [DOCS_DIR];
+  while (stack.length) {
+    const current = stack.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith(".html")) continue;
+      const relHtmlPath = normalizeSlashes(path.relative(ROOT_DIR, fullPath));
+      htmlFiles.push(relHtmlPath);
+      repoHtmlPaths.add(relHtmlPath);
+    }
+  }
+
+  const nonCardHtmlPaths = new Set([
+    "docs/index.html",
+    "docs/infocard-style-demo.html",
+    "docs/20260531-huawei-tau-scaling-law/index.html",
+  ]);
+
+  for (const htmlPath of htmlFiles.sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))) {
+    if (nonCardHtmlPaths.has(htmlPath)) continue;
+    if (metaPaths.has(`${htmlPath}.meta.yaml`) || metaPaths.has(`${htmlPath.replace(/\.html$/, ".meta.yaml")}`)) continue;
+    repoOnlyHtmlPaths.push(htmlPath);
+  }
+
+  const indexOnlyCards = [];
+  if (fs.existsSync(INDEX_PATH)) {
+    try {
+      const indexData = yaml.load(readText(INDEX_PATH), { schema: yaml.FAILSAFE_SCHEMA });
+      const cards = Array.isArray(indexData && indexData.cards) ? indexData.cards : [];
+      for (const card of cards) {
+        const pathValue = String(card && card.path ? card.path : "").trim();
+        if (!pathValue) continue;
+        const hasMeta = metas.some((meta) => meta.path === pathValue);
+        if (!hasMeta) {
+          indexOnlyCards.push(pathValue);
+        }
+      }
+    } catch {
+      // Read-only audit: malformed index is reported elsewhere.
+    }
+  }
+
+  const duplicateSlugs = [...duplicateSlugGroups.entries()]
+    .filter(([, files]) => files.length > 1)
+    .map(([slug, files]) => ({ slug, files: files.sort((a, b) => a.localeCompare(b, "zh-Hans-CN")) }))
+    .sort((a, b) => a.slug.localeCompare(b.slug, "zh-Hans-CN"));
+
+  const duplicatePaths = [...duplicatePathGroups.entries()]
+    .filter(([, files]) => files.length > 1)
+    .map(([pathValue, files]) => ({ path: pathValue, files: files.sort((a, b) => a.localeCompare(b, "zh-Hans-CN")) }))
+    .sort((a, b) => a.path.localeCompare(b.path, "zh-Hans-CN"));
+
+  return {
+    duplicate_slugs: duplicateSlugs,
+    duplicate_paths: duplicatePaths,
+    html_meta_mismatches: htmlMetaMismatches.sort((a, b) => a.meta_path.localeCompare(b.meta_path, "zh-Hans-CN")),
+    repo_only_html_paths: repoOnlyHtmlPaths,
+    index_only_paths: indexOnlyCards.sort((a, b) => a.localeCompare(b, "zh-Hans-CN")),
+    scanned_meta_count: metas.length,
+    scanned_html_count: htmlFiles.length,
+  };
+}
+
+function formatIndexReconciliationData(report) {
+  const lines = [
+    `[index-reconciliation] metas=${report.scanned_meta_count} html=${report.scanned_html_count}`,
+    `[index-reconciliation] duplicate_slugs=${report.duplicate_slugs.length} duplicate_paths=${report.duplicate_paths.length} mismatches=${report.html_meta_mismatches.length} repo_only_html=${report.repo_only_html_paths.length} index_only=${report.index_only_paths.length}`,
+  ];
+
+  for (const group of report.duplicate_slugs) {
+    lines.push(`[index-reconciliation] DUPLICATE_SLUG ${group.slug} | ${group.files.join(", ")}`);
+  }
+  for (const group of report.duplicate_paths) {
+    lines.push(`[index-reconciliation] DUPLICATE_PATH ${group.path} | ${group.files.join(", ")}`);
+  }
+  for (const mismatch of report.html_meta_mismatches) {
+    lines.push(`[index-reconciliation] HTML_META_MISMATCH ${mismatch.meta_path} | path=${mismatch.declared_path} | expected=${mismatch.expected_path}`);
+  }
+  for (const htmlPath of report.repo_only_html_paths) {
+    lines.push(`[index-reconciliation] REPO_ONLY_HTML ${htmlPath}`);
+  }
+  for (const indexPath of report.index_only_paths) {
+    lines.push(`[index-reconciliation] INDEX_ONLY ${indexPath}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
 function serializeIndexYaml(indexData) {
   return yaml.dump(indexData, {
     lineWidth: -1,
@@ -295,27 +428,68 @@ function extractInjectedIndexData(htmlText) {
   return JSON.parse(match[1]);
 }
 
+// Plan-B rewrite: explicit allowlist instead of full-repo recursion.
+// Only published content enters dist/.
+const COPY_SUBDIRS = [
+  "assets",
+  "docs",
+  "published",
+  "static",
+  "theme",
+  "infocard-claude-init",
+  "infocard-deepseek",
+  "infocard-openwiki",
+  "infocard-watermark-removal",
+  "integration",
+  "subagent-matrix",
+];
+
+const COPY_ROOT_FILES = [
+  "index.html",
+  "_index.yaml",
+  "_taxonomy.yaml",
+  "_themes.yaml",
+  "themes.html",
+  "manifest.json",
+  "sw.js",
+  "README.md",
+];
+
+function copyDir(src, dst) {
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    if (entry.name === ".DS_Store") continue;
+    const from = path.join(src, entry.name);
+    const to = path.join(dst, entry.name);
+    if (entry.isDirectory()) {
+      fs.mkdirSync(to, { recursive: true });
+      copyDir(from, to);
+    } else if (entry.isFile()) {
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.copyFileSync(from, to);
+    }
+  }
+}
+
 function copyStaticTreeToDist() {
   fs.rmSync(DIST_DIR, { recursive: true, force: true });
   fs.mkdirSync(DIST_DIR, { recursive: true });
-  const skip = new Set([".git", "node_modules", "dist", ".claude", ".DS_Store"]);
 
-  function copyDir(src, dst) {
-    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-      if (skip.has(entry.name)) continue;
-      const from = path.join(src, entry.name);
-      const to = path.join(dst, entry.name);
-      if (entry.isDirectory()) {
-        fs.mkdirSync(to, { recursive: true });
-        copyDir(from, to);
-      } else if (entry.isFile()) {
-        fs.mkdirSync(path.dirname(to), { recursive: true });
-        fs.copyFileSync(from, to);
-      }
-    }
+  // Copy allowlisted subdirectories.
+  for (const subdir of COPY_SUBDIRS) {
+    const src = path.join(ROOT_DIR, subdir);
+    const dst = path.join(DIST_DIR, subdir);
+    if (!fs.existsSync(src)) continue;
+    copyDir(src, dst);
   }
 
-  copyDir(ROOT_DIR, DIST_DIR);
+  // Copy allowlisted root files.
+  for (const file of COPY_ROOT_FILES) {
+    const src = path.join(ROOT_DIR, file);
+    const dst = path.join(DIST_DIR, file);
+    if (!fs.existsSync(src)) continue;
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.copyFileSync(src, dst);
+  }
 }
 
 function writeGeneratedArtifacts(indexData) {
@@ -335,7 +509,9 @@ module.exports = {
   SOURCE_INDEX_YAML_PATH,
   ROOT_DIR,
   buildIndexData,
+  collectIndexReconciliationData,
   extractInjectedIndexData,
+  formatIndexReconciliationData,
   readText,
   runFixMetaDate,
   serializeIndexYaml,
