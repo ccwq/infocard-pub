@@ -128,7 +128,7 @@ save-btn（右下角固定）
 **关键教训（2026-06-05）：**
 - 用户说"内容太空洞"、"风格不对" → 用了简化版做 rich 内容
 - 方法数 > 10 个时必须用完整版，每种方法独立 card，含 theory/用途 双区块
-- 完整版参考：`/home/ccwq/qbox/opendir/project/infocard-pub/docs/20260604-revfactory-harness-q-style.html`
+- 完整版参考：`docs/20260604-revfactory-harness-q-style.html`（相对于当前 active repository root）
   （直接读取该文件获取精确的 class/结构，不要自己凭感觉写）
 - 触发词："harness那个风格"、"框架对比"、"方法论总览" → 走完整版
 

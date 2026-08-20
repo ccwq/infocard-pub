@@ -76,7 +76,7 @@ for j in d.get('jobs',[]):
 GitHub Actions 日志需要 admin 权限不可得，**本地 `npm run build` 是最可靠的精确诊断**：
 
 ```bash
-cd /home/ccwq/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 npm run build 2>&1 | grep -E "Error|error|fail" | head -20
 ```
 

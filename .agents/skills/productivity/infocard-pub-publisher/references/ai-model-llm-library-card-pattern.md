@@ -91,7 +91,7 @@
 ```
 
 ## 实际文件参考
-`/home/ccwq/qbox/opendir/project/infocard-pub/docs/20260707-minimind.html`（565行，33KB，redswiss 风格）
+`docs/20260707-minimind.html`（相对于当前 active repository root；565行，33KB，redswiss 风格）
 
 ## 来源数据采集命令
 ```bash

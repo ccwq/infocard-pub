@@ -34,7 +34,7 @@ Structure the CSS with `:root` custom properties for all extracted tokens. Inclu
 ### Step 3: Start Local Preview Server
 
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 npx live-server --port=5588 --host=0.0.0.0 --no-browser
 ```
 

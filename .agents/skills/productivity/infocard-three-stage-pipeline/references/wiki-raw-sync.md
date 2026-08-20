@@ -44,8 +44,8 @@ created: <YYYY-MM-DD，从文件名或meta.yaml date提取>
 
 ```bash
 python3 -c "
-import os, re
-repo_dir = '~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub/docs'
+import os, re, subprocess
+repo_dir = os.path.join(subprocess.check_output(['git','rev-parse','--show-toplevel'], text=True).strip(), 'docs')
 wiki_dir = '~/hehome/hermes-data/home/wiki/raw/articles'
 repo_slugs = set()
 for f in os.listdir(repo_dir):

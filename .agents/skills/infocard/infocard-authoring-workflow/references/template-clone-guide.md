@@ -30,7 +30,7 @@ white-purple:  <title>infocard-white-purple-style 元素演示</title>
 ```bash
 STYLE=darkblue
 SLUG=my-card-name
-REPO=/home/ccwq/qbox/opendir/project/infocard-pub
+REPO="$(git rev-parse --show-toplevel)" || exit 1
 WORKTREE=/home/ccwq/infocard-${SLUG}-wt   # avoid /tmp if disk is tight (~same partition as /)
 
 # 1. Fetch origin/main so rev-parse works

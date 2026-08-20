@@ -3,7 +3,7 @@
 ## 发布完整脚本
 
 ```bash
-REPO_DIR="/home/ccwq/hehome/hermes-data/home/qbox/opendir/project/infocard-pub"
+REPO_DIR="$(git rev-parse --show-toplevel)" || exit 1
 SLUG="YYYYMMDD-keyword"
 cp /tmp/info-card-*.html "$REPO_DIR/docs/$SLUG.html"
 

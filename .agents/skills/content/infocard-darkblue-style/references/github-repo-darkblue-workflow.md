@@ -28,7 +28,7 @@ Use the subagent's summary as the card content source. Do NOT try to build a car
 
 ```python
 skill_view(name='infocard-darkblue-style')                    # get design DNA + CSS tokens
-read_file(path='/home/ccwq/qbox/opendir/project/infocard-pub/theme/darkblue.html')  # exact HTML template
+read_file(path='theme/darkblue.html')  # relative to the active repository root
 ```
 
 **Critical**: Read the actual `theme/darkblue.html` file directly — it is the source of truth for HTML structure and CSS, not the skill reference docs. The skill documents the design intent; the theme file contains the exact code.

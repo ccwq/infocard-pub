@@ -8,7 +8,7 @@
 When running `npm run build` twice without clearing `dist/`, the second invocation fails:
 
 ```
-Error: ENOTEMPTY, Directory not empty: '/home/ccwq/infocard-pub/dist'
+历史现场值（不可复制执行）：Error: ENOTEMPTY, Directory not empty: '/home/ccwq/infocard-pub/dist'
     at Object.rmSync (node:fs:1222:18)
     at copyStaticTreeToDist (.../index-build-lib.js:298:6)
 ```

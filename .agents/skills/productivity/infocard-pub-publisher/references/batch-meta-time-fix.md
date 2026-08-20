@@ -13,7 +13,7 @@
 ### 第一步：获取所有卡的真实 commit 时间
 
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 for f in docs/20260707-*.html; do
   slug=$(basename "$f" .html)
   ts=$(git log --format="%ad" --date=format:"%Y-%m-%d %H:%M:%S" -1 -- "docs/${slug}.html")
@@ -25,8 +25,10 @@ done
 
 ```python
 from pathlib import Path
-import re
-root = Path('/home/ccwq/qbox/opendir/project/infocard-pub')
+import re, subprocess
+root = Path(subprocess.check_output(
+    ["git", "rev-parse", "--show-toplevel"], text=True
+).strip()).resolve()
 commit_times = {
     '20260707-zvec': '2026-07-07 18:40:12',
     '20260707-tutti': '2026-07-07 18:37:56',

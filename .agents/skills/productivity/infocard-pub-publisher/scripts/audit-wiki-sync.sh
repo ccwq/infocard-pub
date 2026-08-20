@@ -3,8 +3,10 @@
 # Usage: bash scripts/audit-wiki-sync.sh
 set -euo pipefail
 
-REPO="$HOME/hehome/hermes-data/home/qbox/opendir/project/infocard-pub/docs"
-WIKI_RAW="$HOME/hehome/hermes-data/home/wiki/raw/articles"
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(python3 "$SCRIPT_DIR/repo_root.py" "$SCRIPT_DIR") || exit 1
+REPO="$REPO_ROOT/docs"
+WIKI_RAW="${WIKI_RAW:-$REPO_ROOT/../wiki/raw/articles}"
 TMP=$(mktemp -d)
 trap "rm -rf $TMP" EXIT
 
@@ -37,7 +39,7 @@ done | sort -u > "$TMP/wiki_slugs.txt"
 
 # 3. Coverage
 MISSING=$(comm -23 "$TMP/repo_slugs.txt" "$TMP/wiki_slugs.txt")
-MISSING_COUNT=$(echo "$MISSING" | grep -c .)
+MISSING_COUNT=$(printf '%s\n' "$MISSING" | awk 'NF { count++ } END { print count+0 }')
 REPO_UNIQUE=$(wc -l < "$TMP/repo_slugs.txt")
 echo ""
 echo "=== COVERAGE ==="
@@ -48,17 +50,17 @@ echo "$MISSING" | head -20
 echo ""
 echo "=== DUPLICATE SLUGS ==="
 cd "$WIKI_RAW"
-DUP=$(ls | sed 's/^[0-9-]*-//' | sed 's/.md$//' | sort | uniq -c | sort -rn | grep -v '  1 ')
-DUP_COUNT=$(echo "$DUP" | grep -c .)
+DUP=$(ls | sed 's/^[0-9-]*-//' | sed 's/.md$//' | sort | uniq -c | sort -rn | awk '$1 != 1')
+DUP_COUNT=$(printf '%s\n' "$DUP" | awk 'NF { count++ } END { print count+0 }')
 echo "Total duplicate slugs: $DUP_COUNT"
 echo "$DUP" | head -10
 
 # 5. Frontmatter format
 echo ""
 echo "=== FRONTMATTER FORMAT ==="
-FM_TITLE=$(grep -l '^title:' "$WIKI_RAW"/*.md 2>/dev/null | wc -l)
-FM_OLD=$(grep -l '^source_url:' "$WIKI_RAW"/*.md 2>/dev/null | wc -l)
-FM_NONE=$(grep -L '^---' "$WIKI_RAW"/*.md 2>/dev/null | wc -l)
+FM_TITLE=$(grep -l '^title:' "$WIKI_RAW"/*.md 2>/dev/null | wc -l || true)
+FM_OLD=$(grep -l '^source_url:' "$WIKI_RAW"/*.md 2>/dev/null | wc -l || true)
+FM_NONE=$(grep -L '^---' "$WIKI_RAW"/*.md 2>/dev/null | wc -l || true)
 echo "Standard (title/desc/source/tags/created): $FM_TITLE"
 echo "Old format (source_url/slug/ingested): $FM_OLD"
 echo "No frontmatter: $FM_NONE"
@@ -66,9 +68,9 @@ echo "No frontmatter: $FM_NONE"
 # 6. Date format
 echo ""
 echo "=== DATE FORMAT (created field) ==="
-ISO_TZ=$(grep '^created:' "$WIKI_RAW"/*.md 2>/dev/null | grep 'T' | grep '+08:00' | wc -l)
-SPACE=$(grep '^created:' "$WIKI_RAW"/*.md 2>/dev/null | grep ' ' | grep -v 'T' | wc -l)
-PLAIN=$(grep '^created:' "$WIKI_RAW"/*.md 2>/dev/null | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | wc -l)
+ISO_TZ=$(grep '^created:' "$WIKI_RAW"/*.md 2>/dev/null | grep 'T' | grep '+08:00' | wc -l || true)
+SPACE=$(grep '^created:' "$WIKI_RAW"/*.md 2>/dev/null | grep ' ' | grep -v 'T' | wc -l || true)
+PLAIN=$(grep '^created:' "$WIKI_RAW"/*.md 2>/dev/null | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | wc -l || true)
 echo "ISO T+timezone: $ISO_TZ"
 echo "Space format: $SPACE"
 echo "Plain YYYY-MM-DD: $PLAIN (should be ≥1)"
@@ -76,12 +78,15 @@ echo "Plain YYYY-MM-DD: $PLAIN (should be ≥1)"
 # 7. Empty desc
 echo ""
 echo "=== EMPTY DESC ==="
-EMPTY_DESC=$(mktemp)
+EMPTY_DESC="$TMP/empty-desc.txt"
+: > "$EMPTY_DESC"
 for f in "$WIKI_RAW"/*.md; do
-  desc_line=$(grep '^desc:' "$f" 2>/dev/null)
-  if [ -n "$desc_line" ]; then
+  desc_line=$(grep '^desc:' "$f" 2>/dev/null || true)
+  if [ -z "$desc_line" ]; then
+    echo "$(basename "$f")" >> "$EMPTY_DESC"
+  else
     desc_val=$(echo "$desc_line" | sed "s/^desc: *['\"]*//" | sed "s/['\"]*$//")
-    [ ${#desc_val} -lt 5 ] && echo "$(basename "$f")"
+    [ ${#desc_val} -lt 5 ] && echo "$(basename "$f")" >> "$EMPTY_DESC"
   fi
 done
 echo "Files with empty/short desc: $(wc -l < $EMPTY_DESC)"

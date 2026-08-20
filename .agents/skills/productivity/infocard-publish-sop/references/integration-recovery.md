@@ -38,13 +38,13 @@ If the worktree was created while another process was active (e.g., during a bat
 
 ```
 git remote -v
-# Expected: /home/ccwq/qbox/opendir/project/infocard-pub/.git
+# Expected: the repository's configured remote identity; local absolute paths are historical evidence only
 # Wrong:   /tmp/pureslop-bare.git  or other stray paths
 ```
 
-If wrong, reset: `git remote set-url origin /home/ccwq/qbox/opendir/project/infocard-pub/.git`
+If wrong, stop and inspect the configured remote. Do not set `origin` to a machine-local absolute `.git` path.
 
-The correct primary repo path is `/home/ccwq/qbox/opendir/project/infocard-pub` (has `package.json`, `node_modules`, `scripts/`). Not `~/hehome/...` — always use the absolute path.
+The active repository root must contain `package.json` and `scripts/`; resolve it with `git rev-parse --show-toplevel`. Historical mirror paths are not executable instructions.
 
 ## New-file-first rebase pattern (2026-07-17)
 

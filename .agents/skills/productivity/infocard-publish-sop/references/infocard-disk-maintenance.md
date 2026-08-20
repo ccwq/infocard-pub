@@ -25,14 +25,15 @@ directories persist even after `git worktree remove` if not tracked by the git i
 du -h --max-depth=1 /tmp/infocard 2>/dev/null | sort -hr
 
 # Check if a specific worktree's card was already published
-git -C ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub \
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+git -C "$REPO_ROOT" \
   log --oneline --all | grep <slug>
 
 # Check for recent writes (active worktrees have recent mtimes)
 ls -la /tmp/infocard/<worktree>/integration/
 
 # Remove cleanly-registered worktree
-git -C ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub \
+git -C "$REPO_ROOT" \
   worktree remove /tmp/infocard/<worktree> --force 2>/dev/null
 
 # Remove unregistered orphan
@@ -61,7 +62,7 @@ for d in /tmp/infocard/*/; do
 done
 
 # Step 2: cross-reference against git worktree list
-cd ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
+cd "$REPO_ROOT"
 git worktree list
 
 # Any .git-file directory absent from worktree list = orphan → rm -rf

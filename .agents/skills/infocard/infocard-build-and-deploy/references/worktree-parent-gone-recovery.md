@@ -3,7 +3,7 @@
 ## 症状
 
 ```
-fatal: not a git repository: /home/ccwq/infocard-pub/.git/worktrees/wt-pake
+历史现场值（不可复制执行）：fatal: not a git repository: /home/ccwq/infocard-pub/.git/worktrees/wt-pake
 ```
 
 `git status`、`git log`、`npm run build`（内部调用 `scripts/sync-build-timestamps.js`）全部报错。

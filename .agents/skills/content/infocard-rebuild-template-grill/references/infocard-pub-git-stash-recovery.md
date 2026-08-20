@@ -17,7 +17,7 @@
 ## 恢复步骤（按顺序执行）
 
 ```bash
-cd /home/ccwq/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 
 # Step 1：退出任何 rebase/merge 状态
 git rebase --abort 2>/dev/null

@@ -18,7 +18,7 @@ After merging multiple PRs:
 ```bash
 # Check how many slugs each worktree would publish
 for wt in infocard-openwiki infocard-watermark-removal infocard-claude-init; do
-  path=/home/ccwq/infocard-pub/$wt/_index.yaml
+  path="$REPO_ROOT/$wt/_index.yaml"
   if [ -f "$path" ]; then
     n=$(grep -c '  - slug:' "$path")
     echo "$wt: $n slugs"
@@ -33,7 +33,7 @@ curl -s https://ccwq.github.io/infocard-pub/_index.yaml | grep -c '  - slug:'
 Before building in **any** parallel worktree, sync it to `origin/main`:
 
 ```bash
-cd /home/ccwq/infocard-pub/infocard-<slug>
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT/infocard-<slug>"
 
 # Option A: if no local changes
 git fetch origin main

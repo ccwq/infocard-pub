@@ -30,7 +30,7 @@ git log --oneline -3
 ## 主线程接手命令
 
 ```bash
-cd ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 npm run build && cp dist/_index.yaml _index.yaml && cp dist/index.html index.html
 git add docs/<slug>.html docs/<slug>.meta.yaml _index.yaml index.html
 git commit -m "feat: add <slug>"

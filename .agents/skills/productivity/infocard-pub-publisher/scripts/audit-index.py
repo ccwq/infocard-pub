@@ -4,29 +4,34 @@ Run from the infocard-pub repository root.
 """
 from __future__ import annotations
 
-import glob
-import os
 from collections import Counter
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from repo_root import RepoRootError, resolve_repo_path, script_repo_root
 
 import yaml
 
 REQUIRED = ["slug", "path", "category", "title", "date", "tags"]
 SUPPORT_HTML = {"index.html"}
 
-root = Path.cwd()
+try:
+    root = script_repo_root(__file__)
+except RepoRootError as exc:
+    raise SystemExit(f"ERROR: {exc}") from exc
 index_path = root / "_index.yaml"
 if not index_path.exists():
     raise SystemExit("ERROR: _index.yaml not found; run from infocard-pub repo root")
 
-htmls = [Path(p) for p in sorted(glob.glob("docs/*.html")) if Path(p).name not in SUPPORT_HTML]
-metas = [Path(p) for p in sorted(glob.glob("docs/*.html.meta.yaml"))]
+docs_dir = root / "docs"
+htmls = [p for p in sorted(docs_dir.glob("*.html")) if p.name not in SUPPORT_HTML]
+metas = sorted(docs_dir.glob("*.html.meta.yaml"))
 index = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
 cards = index.get("cards", []) or []
 indexed_paths = {c.get("path") for c in cards}
 indexed_slugs = {c.get("slug") for c in cards}
 
-missing_meta = [str(h) for h in htmls if not (root / f"{h}.meta.yaml").exists()]
+missing_meta = [str(h.relative_to(root)) for h in htmls if not Path(f"{h}.meta.yaml").exists()]
 missing_required = []
 not_indexed = []
 
@@ -42,8 +47,14 @@ for mf in metas:
 index_missing_files = []
 for c in cards:
     p = c.get("path")
-    if p and not (root / p).exists():
-        index_missing_files.append((c.get("slug"), p))
+    if p:
+        try:
+            target = resolve_repo_path(root, p)
+        except RepoRootError:
+            index_missing_files.append((c.get("slug"), p))
+            continue
+        if not target.exists():
+            index_missing_files.append((c.get("slug"), p))
 
 dup_slugs = [(k, v) for k, v in Counter(c.get("slug") for c in cards).items() if k and v > 1]
 dup_paths = [(k, v) for k, v in Counter(c.get("path") for c in cards).items() if k and v > 1]

@@ -284,6 +284,6 @@ metadata:
 
 ## 模板位置
 
-- 主模板：`/home/ccwq/qbox/opendir/project/infocard-pub/theme/pixelstack.html`
+- 主模板：`theme/pixelstack.html`（相对于当前 active repository root）
 - 注册位置：`_themes.yaml` slug=`pixelstack-style` position=`15`
 - themes.html 已注册：通过 `python3 scripts/rebuild_themes.py` 重建

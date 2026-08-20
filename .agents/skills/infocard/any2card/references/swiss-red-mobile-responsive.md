@@ -147,7 +147,7 @@ curl -s "https://raw.githubusercontent.com/ccwq/infocard-pub/main/docs/<filename
 
 ### 快速恢复损坏的 CSS
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 git show HEAD~1:docs/<filename>.html > /tmp/clean.html
 # 重新从干净版本应用修复
 ```

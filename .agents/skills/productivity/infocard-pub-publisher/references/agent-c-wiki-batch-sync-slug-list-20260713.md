@@ -36,10 +36,13 @@ script used by Agent C for a 50-slug batch.
 #!/usr/bin/env python3
 """Batch sync infocard HTML files to LLM Wiki raw articles (Agent C)."""
 
-import os, re, yaml
+import os, re, subprocess, yaml
 from pathlib import Path
 
-DOCS_DIR = Path("/home/ccwq/hehome/hermes-data/home/qbox/opendir/project/infocard-pub/docs")
+REPO_ROOT = Path(subprocess.check_output(
+    ["git", "rev-parse", "--show-toplevel"], text=True
+).strip()).resolve()
+DOCS_DIR = REPO_ROOT / "docs"
 WIKI_RAW  = Path(os.path.expanduser("~")) / "hehome/hermes-data/home/wiki/raw/articles"
 SLUGS_FILE = Path("/tmp/agent_c_slugs.txt")
 

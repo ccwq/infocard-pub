@@ -9,7 +9,7 @@
 
 | 路径 | 内容 |
 |------|------|
-| `REPO` = `~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub/docs/` | 501 个 HTML 文件（公网信息卡） |
+| `REPO` = `$REPO_ROOT/docs/`（由 active repo root 解析） | 501 个 HTML 文件（公网信息卡） |
 | `WIKI_RAW` = `~/hehome/hermes-data/home/wiki/raw/articles/` | 802 个 .md 文件（含重复 slug） |
 
 ---
@@ -93,7 +93,8 @@ sha256: <hash>
 ## 审计命令模板
 
 ```bash
-REPO=~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub/docs
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+REPO="$REPO_ROOT/docs"
 WIKI_RAW=~/hehome/hermes-data/home/wiki/raw/articles
 
 # 1. 覆盖率：缺失的 HTML slug

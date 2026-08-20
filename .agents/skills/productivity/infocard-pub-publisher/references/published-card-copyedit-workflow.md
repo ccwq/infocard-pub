@@ -9,7 +9,7 @@
 用 `search_files` 在整个 `infocard-pub/` 仓库中搜索旧字符串，找出所有出现位置：
 
 ```bash
-search_files(path="/home/ccwq/infocard-pub", pattern="牛肉项目雷达", target="content")
+search_files(path="<active-repository-root>", pattern="牛肉项目雷达", target="content")
 ```
 
 常见命中位置（按优先级）：
@@ -32,7 +32,7 @@ search_files(path="/home/ccwq/infocard-pub", pattern="牛肉项目雷达", targe
 ### 3. 构建 + 提交 + 推送
 
 ```bash
-cd /home/ccwq/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 git fetch && git status -sb   # 先确认无分叉
 npm run build                # 生成 _index.yaml 和注入 index.html
 git add docs/<slug>.html docs/<slug>.html.meta.yaml _index.yaml index.html

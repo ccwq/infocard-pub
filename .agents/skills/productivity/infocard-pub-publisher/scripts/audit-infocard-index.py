@@ -13,29 +13,34 @@ Checks:
 """
 from __future__ import annotations
 
-import glob
-import os
 from collections import Counter
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from repo_root import RepoRootError, resolve_repo_path, script_repo_root
 
 import yaml
 
 REQUIRED = ["slug", "path", "category", "title", "date", "tags"]
-SUPPORT_HTML = {"docs/index.html"}
+SUPPORT_HTML = {"index.html"}
 
-root = Path.cwd()
+try:
+    root = script_repo_root(__file__)
+except RepoRootError as exc:
+    raise SystemExit(f"FAIL: {exc}") from exc
 index_path = root / "_index.yaml"
 if not index_path.exists():
     raise SystemExit("FAIL: _index.yaml not found; run from infocard-pub repo root")
 
-htmls = sorted(p for p in glob.glob("docs/*.html") if p not in SUPPORT_HTML)
-metas = sorted(glob.glob("docs/*.html.meta.yaml"))
+docs_dir = root / "docs"
+htmls = sorted(p for p in docs_dir.glob("*.html") if p.name not in SUPPORT_HTML)
+metas = sorted(docs_dir.glob("*.html.meta.yaml"))
 index = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
 cards = index.get("cards", []) or []
 indexed_paths = {c.get("path") for c in cards}
 indexed_slugs = {c.get("slug") for c in cards}
 
-missing_meta = [h for h in htmls if not Path(h + ".meta.yaml").exists()]
+missing_meta = [h for h in htmls if not Path(f"{h}.meta.yaml").exists()]
 missing_required = []
 not_indexed = []
 for mf in metas:
@@ -47,7 +52,18 @@ for mf in metas:
         if data["path"] not in indexed_paths and data["slug"] not in indexed_slugs:
             not_indexed.append((mf, data["slug"], data["path"]))
 
-index_missing_files = [(c.get("slug"), c.get("path")) for c in cards if c.get("path") and not Path(c["path"]).exists()]
+index_missing_files = []
+for card in cards:
+    path = card.get("path")
+    if not path:
+        continue
+    try:
+        target = resolve_repo_path(root, path)
+    except RepoRootError:
+        index_missing_files.append((card.get("slug"), path))
+        continue
+    if not target.exists():
+        index_missing_files.append((card.get("slug"), path))
 dup_slugs = [(k, v) for k, v in Counter(c.get("slug") for c in cards).items() if k and v > 1]
 dup_paths = [(k, v) for k, v in Counter(c.get("path") for c in cards).items() if k and v > 1]
 

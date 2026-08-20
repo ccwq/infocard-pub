@@ -9,7 +9,8 @@ Infocard publishing is path-sensitive: a local branch may contain older/unrelate
 ## Pattern
 
 ```bash
-SRC=/home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+SRC="$REPO_ROOT"
 TMP=/tmp/infocard-pub-<slug>-publish
 rm -rf "$TMP"
 

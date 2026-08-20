@@ -1,7 +1,7 @@
 # darkblue CSS 系统（完整 token + 骨架）
 
 ## 源文件
-`/home/ccwq/qbox/opendir/project/infocard-pub/theme/darkblue.html`
+`theme/darkblue.html`（相对于当前 active repository root）
 
 ## CSS 变量
 

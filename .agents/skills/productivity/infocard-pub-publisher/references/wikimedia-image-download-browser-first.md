@@ -32,7 +32,7 @@ file docs/assets/<slug>/image.png
 
 ### 示例：体素立方体等距投影 SVG（科学普及卡）
 
-`/home/ccwq/qbox/opendir/project/infocard-pub/docs/assets/20260622-voxel/voxels-cube.svg`：用 isometric polygon（top / left / right 三面菱形）堆叠成 3×3×3 + 上层方块，高亮单个体素并用引线标 "1 voxel"，配 x/y/z 三轴箭头。9 KB，浏览器直接渲染。
+`docs/assets/20260622-voxel/voxels-cube.svg`（相对于当前 active repository root）：用 isometric polygon（top / left / right 三面菱形）堆叠成 3×3×3 + 上层方块，高亮单个体素并用引线标 "1 voxel"，配 x/y/z 三轴箭头。9 KB，浏览器直接渲染。
 
 ## 不可靠的备选尝试（2026-06-22 全部失败）
 

@@ -23,7 +23,7 @@
 快速检查：
 
 ```bash
-cd /home/ccwq/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 git status -sb
 ls docs/*ornith* 2>/dev/null || true
 grep -n "<title>\|save\|html2canvas\|window.print" docs/<slug>.html | head -30

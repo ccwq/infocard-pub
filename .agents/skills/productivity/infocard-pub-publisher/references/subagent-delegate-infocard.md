@@ -22,7 +22,7 @@
 ### 标准 Rescue 步骤（文件已存在时）
 
 ```bash
-cd /home/ccwq/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 # 1. 检查文件 + git 状态
 wc -l docs/<slug>.html
 git status -sb
@@ -34,7 +34,7 @@ git log --format="%ad" --date=format:"%Y-%m-%d %H:%M:%S" -1 -- docs/<slug>.html
 python3 - <<'PY'
 from pathlib import Path
 import subprocess
-repo = Path('/home/ccwq/infocard-pub')
+repo = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip())
 for meta in sorted((repo/'docs').glob('20260709-*.html.meta.yaml')):
     html = meta.name.replace('.meta.yaml','')
     ts = subprocess.check_output(['git','-C',str(repo),'log',
@@ -102,7 +102,7 @@ curl -s -o /dev/null -w "%{http_code}" https://ccwq.github.io/infocard-pub/docs/
 
 ### 三阶段写卡的高频失败模式（2026-07-09 复盘）
 - **agent2 跑题**：把 Claudian 写成 Claude Code CLI，或把用户主体替换成相邻工具名。解决：agent2 prompt 里必须重复主体全名、URL、禁写对象，并在完成后先核验标题/slug 再接管。
-- **路径镜像漂移**：写到 `/home/ccwq/hehome/hermes-data/home/qbox/...` 这类镜像目录，主仓库里看不到。解决：主线程接手前先 `find` / `git status` 确认文件是否落在 `/home/ccwq/qbox/opendir/project/infocard-pub`。
+- **路径镜像漂移**：写到历史镜像目录这类路径，主仓库里看不到。解决：主线程接手前先 `find` / `git status` 确认文件是否落在 active repository root。
 - **过程文件工作流**：agent1 必须输出 `/tmp/infocard-process-YYYYMMDD-HHmm.md`；agent2 只读该过程文件，不允许再调研新的事实。否则易把用户原文与外部搜索混成一体，导致卡面表述失真。
 - **wiki index 先读后写**：更新 `wiki/index.md` 前必须先重新读取目标段落，避免并发/兄弟进程改动被覆盖。
 
@@ -110,8 +110,8 @@ curl -s -o /dev/null -w "%{http_code}" https://ccwq.github.io/infocard-pub/docs/
 
 ```bash
 npm run build
-# Error: ENOTEMPTY, Directory not empty: /home/ccwq/infocard-pub/dist
-rm -rf /home/ccwq/infocard-pub/dist
+# 历史现场值（不可复制执行）：Error: ENOTEMPTY, Directory not empty: /home/ccwq/infocard-pub/dist
+rm -rf "$REPO_ROOT/dist"
 npm run build  # 重试
 ```
 

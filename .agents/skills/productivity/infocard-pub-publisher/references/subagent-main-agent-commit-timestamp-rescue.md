@@ -22,7 +22,7 @@
 python3 - <<'PY'
 from pathlib import Path
 import subprocess
-repo = Path('/home/ccwq/infocard-pub')
+repo = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip())
 for meta in sorted((repo/'docs').glob('20260709-*.html.meta.yaml')):
     html = meta.name.replace('.meta.yaml','')
     ts = subprocess.check_output(['git','-C',str(repo),'log',

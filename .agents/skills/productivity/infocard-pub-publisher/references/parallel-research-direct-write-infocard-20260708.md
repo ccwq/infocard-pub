@@ -28,7 +28,7 @@
 
 ```
 1. 读取 infocard-pub 仓库状态
-   cd /home/ccwq/infocard-pub && git status -sb | head-3
+   REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT" && git status -sb | head-3
 
 2. 选择主题
    - 技术调研/深度分析 → hardblue（网格纸 + 彩色标题）

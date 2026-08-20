@@ -3,16 +3,16 @@
 ## Correct repo path
 
 ```
-/home/ccwq/qbox/opendir/project/infocard-pub/
+当前 active repository root/
 ```
 
-**NOT** `/home/ccwq/infocard-pub/` (does not exist) or other paths.
+不要使用历史 checkout 或其他猜测路径。
 Always use the full absolute path when verifying file existence.
 
 ## Target path for theme files
 
 ```
-/home/ccwq/qbox/opendir/project/infocard-pub/theme/<slug>.html
+theme/<slug>.html（相对于当前 active repository root）
 ```
 
 Theme slugs follow kebab-case: `sage-swiss`, `archive-green`, `redswiss`.
@@ -20,7 +20,7 @@ Theme slugs follow kebab-case: `sage-swiss`, `archive-green`, `redswiss`.
 ## File existence verification (mandatory after every write)
 
 ```bash
-ls -la /home/ccwq/qbox/opendir/project/infocard-pub/theme/<slug>.html
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; ls -la "$REPO_ROOT/theme/<slug>.html"
 ```
 
 Do NOT just `ls <slug>.html` from an unknown cwd — always include the full path.
@@ -28,7 +28,7 @@ Do NOT just `ls <slug>.html` from an unknown cwd — always include the full pat
 ## Live-server startup
 
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 npx live-server --port=5588 --host=0.0.0.0 --no-browser
 ```
 
@@ -77,7 +77,7 @@ curl -s -o /dev/null -w "%{http_code}" \
 
 | Failure | Root cause | Fix |
 |---|---|---|
-| File 404 after write | File written to wrong directory | `ls -la /home/ccwq/qbox/opendir/project/infocard-pub/theme/<slug>.html` |
+| File 404 after write | File written to wrong directory | `ls -la "$REPO_ROOT/theme/<slug>.html"` |
 | live-server unreachable | Bound to wrong host (`10.6.8.14` instead of `0.0.0.0`) | Kill and restart with `0.0.0.0` |
 | `curl` to live-server returns `000` | Server not running or port wrong | Check `ps aux | grep live-server` |
 | Review rounds exceed cap | No cap was agreed upfront | Set cap explicitly at round 1 ("up to N rounds") |

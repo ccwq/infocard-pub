@@ -23,7 +23,8 @@ metadata:
 **Correct path (always):**
 ```bash
 # Stage → commit → push (no local build needed)
-cd ~/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+cd "$REPO_ROOT"
 git add docs/<slug>.html docs/<slug>.html.meta.yaml _index.yaml index.html
 git commit -m "feat: add <slug> infocard (YYYY-MM-DD)"
 git push origin main
@@ -54,7 +55,7 @@ ps aux | grep -E "git (push|send-pack|pack-objects)" | grep -v grep
 # 重复直到返回空（通常 60-120s）
 
 # 2. 清除锁
-rm -f ~/qbox/opendir/project/infocard-pub/.git/index.lock
+rm -f "$REPO_ROOT/.git/index.lock"
 
 # 3. 重试 commit + push
 git add docs/<slug>.html docs/<slug>.html.meta.yaml _index.yaml

@@ -45,7 +45,7 @@ print(f'Found: {len(found)}')
 
 **修复**（timeout 后立即执行）：
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 node --eval "
 const { buildIndexData, serializeIndexYaml } = require('./scripts/index-build-lib');
 const fs = require('fs');

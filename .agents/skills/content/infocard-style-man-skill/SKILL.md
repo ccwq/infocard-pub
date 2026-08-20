@@ -114,7 +114,7 @@ Agent B（辩护者）：挑战 A 的判断，提出修复方案
 
 ### 新主题 Skill 文件
 
-在 `~/hehome/hermes-data/skills/content/infocard-***-style/SKILL.md` 创建，含：
+在当前 Skill 安装根的 `content/infocard-***-style/SKILL.md` 创建，含：
 CSS 变量表、核心类名、适用/不适用场景、参考页面。
 
 ### 新主题→信息卡标准链路

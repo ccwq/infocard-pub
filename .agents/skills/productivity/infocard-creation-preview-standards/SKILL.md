@@ -99,7 +99,8 @@ All infocard local preview, including **PC preview and mobile preview**, should 
 Canonical command:
 
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+cd "$REPO_ROOT"
 live-server --host=0.0.0.0 --port=5588 --no-browser .
 ```
 

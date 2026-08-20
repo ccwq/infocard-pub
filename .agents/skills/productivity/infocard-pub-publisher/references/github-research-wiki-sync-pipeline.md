@@ -36,7 +36,7 @@ curl -s "https://raw.githubusercontent.com/<owner>/<repo>/main/README.md" | head
 ### Step 5: 发布
 
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 node scripts/build-site.js 2>&1 | tail -5
 node scripts/verify-index.js 2>&1 | tail -3
 git add docs/<slug>.html docs/<slug>.html.meta.yaml _index.yaml index.html
@@ -105,4 +105,4 @@ git status   # 确认工作区干净
 | 05 | 快速上手 | `.quick-cmd` + `.code-block` | pip install + 代码示例 |
 | 06 | 版本新特性 | `.cli-grid`（4列） | 新版本亮点 |
 
-参考卡：`/home/ccwq/qbox/opendir/project/infocard-pub/docs/20260707-zvec.html`
+参考卡：`docs/20260707-zvec.html`（相对于当前 active repository root）

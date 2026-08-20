@@ -2,7 +2,7 @@
 
 ## 问题
 
-在 `/home/ccwq/infocard-pub` 目录下：
+在 active repository root 下：
 
 - 背景进程（如 Python HTTP 服务器）运行中，**不保护**工作树分支状态
 - 后续在同一目录执行的任何 `git checkout`、`git fetch`、`git status` 等终端命令，**会重置**工作树到该命令指定的分支
@@ -38,7 +38,7 @@ cd ../infocard-pr-work
 ### 方案 B：禁止在主仓库做分支切换
 
 ```bash
-# 禁止在 /home/ccwq/infocard-pub 直接执行
+# 禁止在未验证的 primary checkout 直接执行
 git checkout <branch>
 git fetch <remote> <branch>
 git pull

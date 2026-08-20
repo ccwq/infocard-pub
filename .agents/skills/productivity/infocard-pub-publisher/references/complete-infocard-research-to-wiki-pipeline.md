@@ -38,7 +38,7 @@ GitHub API 和 README 各司其职，不要混用：
 
 ### 2. Build + Verify
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 npm run build && npm run verify
 ```
 - 失败常见原因：`updated` 字段缺失 → 补上后重跑

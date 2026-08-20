@@ -21,7 +21,7 @@ curl -s "https://raw.githubusercontent.com/ccwq/infocard-pub/main/docs/<slug>.ht
 #    DO NOT patch/recolor — rebuild means full structure rewrite
 
 # 3. Check if .meta.yaml exists
-ls /home/ccwq/infocard-pub/docs/<slug>.html.meta.yaml
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; ls "$REPO_ROOT/docs/<slug>.html.meta.yaml"
 
 # 4a. If exists → update date/updated to current publish time, keep slug
 # 4b. If not exists → create new .meta.yaml with current TZ=Asia/Shanghai date

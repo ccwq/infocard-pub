@@ -21,7 +21,7 @@ Typical signals:
    - Do not assume the repo worktree contains the draft; batch subagents may emit HTML into `/tmp` but never copy it into `docs/` before timing out.
 
 3. **Avoid the dirty main checkout**
-   - If `/home/ccwq/infocard-pub` has unrelated modified files, do **not** reset/stash them just to publish a card.
+   - If the active repository root has unrelated modified files, do **not** reset/stash them just to publish a card.
    - Create a fresh worktree from `origin/main`, e.g.:
      ```bash
      git worktree add -B publish-batch-<date> /tmp/infocard-batch origin/main

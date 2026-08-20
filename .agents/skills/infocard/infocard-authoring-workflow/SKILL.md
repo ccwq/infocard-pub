@@ -83,7 +83,7 @@ This keeps project-specific workflows separate from the global skill library and
 **Primary checkout HEAD is not `main`:** if the primary checkout's `HEAD` is a named branch (e.g. `infocard/20260804-qm-agent`) or detached, `git worktree add -b <branch> origin/main <path>` fails with `fatal: invalid reference: origin/main` or `fatal: invalid reference: /absolute/path`. This is because `origin/main` is not the current branch. New publish worktrees must still use the fixed path from `node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug>` under os.tmpdir()/infocard-worktree. **Correct pattern:**
 
 ```bash
-REPO="/home/ccwq/qbox/opendir/project/infocard-pub"
+REPO="$(git rev-parse --show-toplevel)" || exit 1
 WORKTREE="$(node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug> --plain)"
 SHA="<sha>"
 
@@ -134,7 +134,7 @@ If the primary checkout reports a corrupt or missing Git object, do not repair i
 - Skip `git branch` entirely
 - Check existing docs/ directory directly: `ls wt-<slug>/docs/`
 - If template file already exists in `wt-<slug>/theme/<style>.html`, copy from there
-- If no template in worktree, copy from parent repo: `cp /home/ccwq/hehome/hermes-data/home/qbox/opendir/project/infocard-pub/theme/<style>.html wt-<slug>/docs/<slug>.html`
+- If no template in worktree, copy from the active repository root: `cp "$REPO/theme/<style>.html" "wt-<slug>/docs/<slug>.html"`
 
 **If no worktree exists**: follow the git worktree pattern in the template clone script.
 
@@ -739,7 +739,8 @@ When a dispatched subagent times out (e.g. `Non-streaming API call timed out aft
 **Step 1 · Diagnose what the subagent left behind**
 ```bash
 # Check in the primary checkout docs/ (subagents often write to parent repo)
-ls ~/qbox/opendir/project/infocard-pub/docs/ | grep <slug>
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+ls "$REPO_ROOT/docs/" | grep <slug>
 # If meta.yaml exists but HTML is missing → partial state, fix it
 # If both exist → just build + commit + push
 ```

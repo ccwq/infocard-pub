@@ -379,7 +379,7 @@ author: "author"
 .quick-cmd{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:10px 14px;margin-bottom:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;font-weight:800;letter-spacing:.02em}
 ```
 
-**Zvec 卡参考**：`/home/ccwq/qbox/opendir/project/infocard-pub/docs/20260707-zvec.html`
+**Zvec 卡参考**：`docs/20260707-zvec.html`（相对于当前 active repository root）
 
 ## 坑点
 

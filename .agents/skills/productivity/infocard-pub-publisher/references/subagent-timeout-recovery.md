@@ -124,7 +124,7 @@ commit 在本地但未 push？
 
 **关键诊断（简化版）**：
 ```bash
-cd ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 ls docs/2026071x-{slug}*
 git log --oneline origin/main | grep {slug}
 curl -o /dev/null -w "%{http_code}" "https://ccwq.github.io/infocard-pub/docs/2026071x-{slug}.html"

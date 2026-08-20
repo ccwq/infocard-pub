@@ -16,7 +16,7 @@
 
 **现象**：子智能体尝试用 `~/infocard-pub/assets/img/...` 路径下载图片，背景任务返回"Done: 0 files"——因为 `~` 在 `curl -o` 中没有展开。
 
-**修复**：子智能体 prompt 必须用绝对路径 `/home/ccwq/infocard-pub/...`，不能用 `~`。已在 SOP 明确。
+**修复**：子智能体 prompt 必须使用已验证的 active repository root，不能猜测 home 路径。
 
 ### 教训 3：图片资源由 agent1 负责
 
@@ -54,5 +54,5 @@ agent2 prompt 应在 context 中明确：
 图片资产路径：~/infocard-pub/assets/img/<slug>/
 manifest.json 路径：~/infocard-pub/assets/img/<slug>/manifest.json
 HTML 输出：docs/YYYYMMDD-<slug>.html
-绝对路径前缀：/home/ccwq/infocard-pub/（不要用 ~）
+路径前缀：由 `git rev-parse --show-toplevel` 解析的 active repository root
 ```

@@ -44,7 +44,7 @@ The `docs/` directory is **still fully writable**. `npm run build && npm run ver
 
 ```bash
 # 1. Check repo state
-cd /home/ccwq/infocard-pub && git status --short | head -5
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT" && git status --short | head -5
 
 # 2. If docs/ is writable (usually is), write directly
 write_file(path="docs/<slug>.html", content=<HTML>)

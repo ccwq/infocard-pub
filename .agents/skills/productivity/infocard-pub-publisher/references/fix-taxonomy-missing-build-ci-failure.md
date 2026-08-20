@@ -74,7 +74,7 @@
 ## 本地修复步骤（当 CI 已失败时）
 
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 
 # 1. fix-taxonomy 产生 dirty worktree
 npm run fix-taxonomy

@@ -125,5 +125,5 @@
 
 ## 原始文件
 
-- 卡片：`/home/ccwq/infocard-pub/docs/20260708-awesome-design-md.html`
+- 卡片：`docs/20260708-awesome-design-md.html`（相对于 active repository root）
 - 类型：redswiss，单开源项目顶流卡

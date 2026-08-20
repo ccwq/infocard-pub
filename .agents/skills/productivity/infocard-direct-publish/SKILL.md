@@ -111,7 +111,7 @@ done
 
 ### Step 6 — Wiki 同步
 ```bash
-WIKI_PATH="/home/ccwq/hehome/hermes-data/home/wiki"
+WIKI_PATH="${WIKI_PATH:?Set WIKI_PATH to the active wiki checkout}"
 TS=$(TZ=Asia/Shanghai date "+%Y-%m-%d %H:%M:%S")
 
 # raw article

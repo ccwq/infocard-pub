@@ -43,7 +43,8 @@ Before build, run a cardinality preflight:
 This is especially important when a subagent writes outside the repository or returns a legacy sidecar: a page can return HTTP 200 while remaining absent from the public index.
 
 ```bash
-cd ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+cd "$REPO_ROOT"
 git fetch origin main --quiet
 git branch -f infocard/<batch-slug>-YYYYMMDD origin/main
 WT=$(node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <batch-slug>-YYYYMMDD --plain)
@@ -109,7 +110,8 @@ Both must return `HTTP/2 200`.
 ### Step 6 — Retained worktree report
 
 ```bash
-cd ~/hehome/hermes-data/home/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+cd "$REPO_ROOT"
 npm run worktree:list -- --repo .
 ```
 

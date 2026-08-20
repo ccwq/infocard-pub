@@ -45,7 +45,7 @@ python3 -m http.server 5588
 
 # ✅ 正确：使用 live-server
 cd /path/to/wt-<slug>
-export PATH="$PATH:/home/ccwq/hehome/hermes-data/home/.volta/bin"
+command -v live-server >/dev/null || { echo "live-server is required on PATH" >&2; exit 1; }
 live-server --port=5588 --host=10.6.8.14 .
 ```
 

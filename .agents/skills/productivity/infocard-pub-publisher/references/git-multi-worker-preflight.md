@@ -2,7 +2,7 @@
 
 ## 触发场景
 
-`/home/ccwq/qbox/opendir/project/infocard-pub` 是被多个 Hermes 会话 / 多个 worktree 共用的协作仓。
+当前 active repository root 是被多个 Hermes 会话 / 多个 worktree 共用的协作仓。
 不同会话可能在同一时间窗口里：
 
 - 写新卡（每张 commit 一次）
@@ -19,7 +19,7 @@
 ## 必做：开工前 3 行预检
 
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 git fetch origin --quiet
 git status -sb
 git log --oneline -5 origin/main

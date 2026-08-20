@@ -34,7 +34,7 @@
 ## 标准化接手流程
 
 ```bash
-cd /home/ccwq/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 git fetch && git status -sb
 
 # Step 1: 检查文件存在
@@ -49,7 +49,7 @@ cat docs/<slug>.meta.yaml
 #   C. duplicate key → 重写完整文件
 
 # Step 4: 验证
-node /home/ccwq/infocard-pub/scripts/verify-meta-timestamps.js
+node "$REPO_ROOT/scripts/verify-meta-timestamps.js"
 
 # Step 5: build
 npm run build

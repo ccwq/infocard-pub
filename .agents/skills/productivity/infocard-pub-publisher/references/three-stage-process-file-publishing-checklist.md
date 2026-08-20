@@ -6,8 +6,8 @@
 1. 先确认 agent1 过程文件真实存在，路径为 `/tmp/infocard-process-*.md`。
 2. `read_file` 读取过程文件，确认包含：主体、用户原始内容、调查内容（含来源）、事实核验结果（含存疑标注）、用户附加信息。
 3. agent2 只允许基于过程文件写卡，不允许补新的外部调研。
-4. 写卡完成后，先核对文件是否落在 **主仓库路径**：`/home/ccwq/qbox/opendir/project/infocard-pub/docs/`。
-5. 如果发现落在镜像目录（例如 `/home/ccwq/hehome/hermes-data/home/qbox/...`），必须先迁回主仓库，再 build。
+4. 写卡完成后，先在 active repository root 下核对文件是否落在 `docs/`。
+5. 如果发现落在镜像目录，必须先迁回 active repository root，再 build。
 
 ## meta.yaml 防呆
 - 必须同时存在 `date` 和 `updated`

@@ -31,7 +31,7 @@ updated: "2026-07-07 07:10:00"
 **注意**：旧卡（未修改的不算 changed/new）不需要补 `updated`。仅限本轮新建或修改的卡需要。
 
 ## Concurrent Subagent Warning
-**现象**：`write_file` 报错 `_warning: /home/ccwq/infocard-pub/docs/20260707-react-bits.html was modified by sibling subagent`
+**现象**：历史现场值（不可复制执行）：`write_file` 报错 `_warning: /home/ccwq/infocard-pub/docs/20260707-react-bits.html was modified by sibling subagent`
 
 **根因**：两个子智能体（主会话派发的 + 子智能体自己派发的）同时写同一文件。
 

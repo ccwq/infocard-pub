@@ -20,13 +20,13 @@ When the user provides a reference image and asks to "recreate" or "rebuild" a t
 
 Write `theme/<slug>.html` **in one shot** — do not incrementally patch an existing file. The from-scratch approach ensures the reference's design language is captured as a complete system, not as modifications to a prior theme.
 
-Target path: `/home/ccwq/qbox/opendir/project/infocard-pub/theme/<slug>.html`
+Target path: `theme/<slug>.html`（相对于当前 active repository root）
 
 ### Phase 3: Verification gate (MUST pass before reporting)
 
 After every code change:
 
-1. **`ls` the target path immediately**: `ls -la /home/ccwq/qbox/opendir/project/infocard-pub/theme/<slug>.html` — confirm the file exists at the **correct path**, not just anywhere. This catches directory errors when working directories change between sessions.
+1. **`ls` the target path immediately**: `ls -la "$REPO_ROOT/theme/<slug>.html"` — confirm the file exists at the **correct path**, not just anywhere. This catches directory errors when working directories change between sessions.
 2. **Start live-server**: `npx live-server --port=5588 --host=0.0.0.0 --no-browser` in the repo root. Verify HTTP 200 via `curl -s -o /dev/null -w "%{http_code}" http://10.6.8.14:5588/theme/<slug>.html`.
 3. **Browser screenshot**: `browser_vision` or `google-chrome --headless=new --screenshot=/tmp/preview.png --window-size=1280,900 <URL>`.
 4. **Report LAN preview URL** to the user immediately after the screenshot. Do not wait to be asked.

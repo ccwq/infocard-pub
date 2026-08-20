@@ -21,7 +21,7 @@ curl -sL "$BASE/$img" -o "~/infocard-pub/assets/img/.../$name" &
 
 **根因**：`~` 在某些 shell 链式调用（`&&` 或 `;` 分隔的复合命令）中不会由 bash 展开为 `$HOME`。
 
-**修复**：始终使用绝对路径 `/home/ccwq/infocard-pub/...`。
+**修复**：始终从已验证的 active repository root 拼接目标路径。
 
 ## 图片验证命令
 

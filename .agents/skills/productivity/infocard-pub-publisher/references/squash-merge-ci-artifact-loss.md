@@ -18,7 +18,7 @@ The `verify-generated` CI step (`.github/workflows/index.yml`) checks that all c
 
 ```bash
 # After squash merge completes
-cd /home/ccwq/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 git checkout origin/main -- _index.yaml index.html   # restore committed artifacts from main
 npm run build                                        # regenerate with all cards
 git add _index.yaml index.html

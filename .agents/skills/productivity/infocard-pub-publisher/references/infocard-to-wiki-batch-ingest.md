@@ -28,12 +28,12 @@ Wiki 根路径：
 在 infocard-pub 仓库执行：
 
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 
 python3 - <<'PY'
 import os, yaml, glob, re
 
-INFOCARD = "/home/ccwq/qbox/opendir/project/infocard-pub/docs"
+INFOCARD = os.path.join(os.getcwd(), "docs")
 WIKI     = "/home/ccwq/hehome/hermes-data/home/wiki"
 
 # 1. 扫描所有 meta.yaml

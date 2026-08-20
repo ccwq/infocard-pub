@@ -57,13 +57,15 @@ Worktrees created with `--detach` inherit git remotes from the parent repo's `.g
 **Detection** (run immediately after worktree creation):
 ```bash
 git remote -v && git log --oneline -2
-# Verify origin points to: /home/ccwq/qbox/opendir/project/infocard-pub/.git
+# Verify origin against the intended remote identity; do not compare it to a machine-local path
 # Verify HEAD commit matches current origin/main
 ```
 
 **Fix**: Immediately reset the worktree's remote:
 ```bash
-git remote set-url origin /home/ccwq/qbox/opendir/project/infocard-pub/.git
+# Do not repair origin with a machine-local .git path.
+git remote -v
+exit 1
 ```
 
 **Prevention**: Always run remote + HEAD check after `git worktree add`. If wrong, fix before writing any files.
@@ -71,14 +73,14 @@ git remote set-url origin /home/ccwq/qbox/opendir/project/infocard-pub/.git
 ## Pitfall: Two Repo Paths for infocard-pub
 
 infocard-pub exists at **two paths**:
-- `/home/ccwq/qbox/opendir/project/infocard-pub` — canonical (has `package.json`, `node_modules`, all npm scripts)
-- `/home/ccwq/hermes-data/home/qbox/opendir/project/infocard-pub` — secondary (may lack `package.json`)
+- The active repository root — canonical when it has `package.json`, `node_modules`, and the required scripts.
+- Any mirror checkout — historical evidence only; do not copy or execute its path.
 
 **Symptom**: `npm run build` fails with "ENOENT: no such file or directory, open 'package.json'" when running from the wrong path.
 
 **Fix**: Use the path with `package.json`:
 ```bash
-cd /home/ccwq/qbox/opendir/project/infocard-pub
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
 ```
 
 ## Pitfall: meta.yaml Timestamp Gate (verify-meta-timestamps.js)
@@ -100,4 +102,4 @@ Four parallel worktrees: Dataset Viewer (first, no rebase needed), Agent Skills 
 
 AgentKey and Web-Check both hit: rebase regenerated their `_index.yaml`/`index.html`, causing merge conflicts. Resolved by `git checkout --theirs` on those files, then `git commit --amend --no-edit`.
 
-AiderDesk (single-card, copy-to-canonical-path): worktree remote pointed to `/tmp/pureslop-bare.git`. Fixed by copying files to canonical path (`/home/ccwq/qbox/opendir/project/infocard-pub`) and building there. Meta.yaml timestamp format gate blocked first build; patched `date`/`updated` to wall-clock format before `npm run build`.
+AiderDesk (single-card, copy-to-canonical-path): worktree remote pointed to `/tmp/pureslop-bare.git`. 历史现场值（不可复制执行）：当时曾复制到一个固定 checkout 并在那里构建。当前流程必须在 active repository root 中验证并构建。
