@@ -1,179 +1,429 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="darkblue">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SRT白板动画：把字幕转成手绘视频</title>
+  <link rel="canonical" href="https://ccwq.github.io/infocard-pub/docs/20260821-srt-whiteboard-animation.html">
+  <meta name="description" content="将SRT字幕自动转为分区遮罩+流式笔迹手绘动画，支持多幕合并导出MP4。GitHub 2057 Stars，MIT协议，适合知识讲解、课程字幕与短视频文案转视频。">
+  <meta name="author" content="江哥是老登啊">
+  <meta name="category" content="tool">
+  <meta name="tags" content="白板动画,SRT字幕,AI视频,知识讲解,手绘风格,OpenCV,多幕合并,GeekLee">
+  <meta name="date" content="2026-08-21">
   <style>
-    :root{--bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);--cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--shadow:0 18px 42px rgba(0,0,0,.34);--grid:rgba(88,195,255,.10)}
-body{margin:0;padding:0;overflow-x:hidden}
-
-    .card-wrap { background: var(--bg); color: var(--fg); font-family: var(--font, sans-serif); min-height: 100vh; padding: 2rem; box-sizing: border-box; }
-    .card-header { display: flex; align-items: flex-start; gap: 1.5rem; margin-bottom: 1.5rem; }
-    .card-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--accent); color: #fff; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; flex-shrink: 0; }
-    .card-body { display: grid; gap: 1.25rem; }
-    .card-title { font-size: 1.6rem; font-weight: 700; color: var(--title, #0ef); line-height: 1.3; margin: 0; }
-    .card-desc { font-size: 1rem; color: var(--muted, #abc); line-height: 1.7; }
-    .card-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; }
-    .meta-item { background: var(--surface, rgba(255,255,255,0.05)); border: 1px solid var(--border, rgba(255,255,255,0.1)); border-radius: 0.75rem; padding: 0.75rem 1rem; }
-    .meta-label { font-size: 0.7rem; color: var(--muted, #abc); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.3rem; }
-    .meta-value { font-size: 0.95rem; font-weight: 600; color: var(--fg); }
-    .tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .tag { background: var(--accent); color: #fff; font-size: 0.75rem; padding: 0.2rem 0.65rem; border-radius: 1rem; font-weight: 500; }
-    .card-section { background: var(--surface, rgba(255,255,255,0.05)); border: 1px solid var(--border, rgba(255,255,255,0.1)); border-radius: 0.75rem; padding: 1.25rem; }
-    .section-title { font-size: 0.75rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 0.75rem; font-weight: 700; }
-    .step-list { display: grid; gap: 0.6rem; }
-    .step-item { display: grid; grid-template-columns: 2rem 1fr; gap: 0.5rem; align-items: start; }
-    .step-num { width: 1.6rem; height: 1.6rem; background: var(--accent); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
-    .step-text { font-size: 0.9rem; color: var(--fg); line-height: 1.5; padding-top: 0.15rem; }
-    .quote-block { background: var(--bg2, rgba(0,0,0,0.3)); border-left: 3px solid var(--accent); padding: 0.75rem 1rem; border-radius: 0 0.5rem 0.5rem 0; font-size: 0.9rem; color: var(--fg); font-style: italic; line-height: 1.6; }
-    .quote-block .source { font-size: 0.75rem; color: var(--muted, #abc); font-style: normal; margin-top: 0.5rem; display: block; }
-    .capability-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.6rem; }
-    .cap-item { background: var(--bg2, rgba(0,0,0,0.3)); border: 1px solid var(--border, rgba(255,255,255,0.08)); border-radius: 0.5rem; padding: 0.75rem; }
-    .cap-name { font-size: 0.85rem; font-weight: 600; color: var(--fg); margin-bottom: 0.25rem; }
-    .cap-desc { font-size: 0.78rem; color: var(--muted, #abc); line-height: 1.4; }
-    .card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border, rgba(255,255,255,0.1)); }
-    .source-link { font-size: 0.8rem; color: var(--accent); text-decoration: none; }
-    .source-link:hover { text-decoration: underline; }
-    .author-tag { font-size: 0.75rem; color: var(--muted, #abc); }
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);--grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .panel-head .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#dfe8ff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .project{border:1.5px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2131,#171c2b);padding:10px 11px;border-radius:14px;display:grid;gap:4px;min-width:0}
+    .project .name{font-size:13px;font-weight:900;color:#fff}
+    .project .path{font-size:11.5px;color:#9fb0de;overflow-wrap:anywhere}
+    .project .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .mini-dot{width:10px;height:10px;border-radius:50%;margin-top:2px;background:linear-gradient(135deg,var(--cyan),var(--purple));box-shadow:0 0 0 3px rgba(88,195,255,.12)}
+    .task{border:1.5px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2030,#151a28);padding:10px 11px;border-radius:14px;display:grid;gap:8px}
+    .task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .task-name{font-size:13px;font-weight:900;color:#fff}
+    .status{font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:rgba(45,179,106,.14);color:#7fe1a2;border:1px solid rgba(45,179,106,.32)}
+    .task p{font-size:12px;line-height:1.55;color:#d9e2ff;margin:0}
+    .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);padding:4px 8px;border-radius:999px;font-size:11px;color:#b6c5f2}
+    .term{background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#111831;border-bottom:1px solid rgba(255,255,255,.08);color:#dfe8ff;font-size:11px}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8f59f;font-size:12px;line-height:1.7;min-height:180px;white-space:pre-wrap}
+    .term .url{color:#7ad9ff}
+    .section{margin:18px 0;padding:18px 20px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(20,28,52,.78), rgba(12,18,38,.82));box-shadow:0 14px 30px rgba(0,0,0,.34)}
+    .section-head{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .section-no{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#f4f9ff;background:linear-gradient(135deg,#3aa8ff,#4a78ff 60%,#8459ff);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 8px 18px rgba(74,120,255,.30)}
+    .section-no.b{background:linear-gradient(135deg,#8459ff,#4a78ff)}
+    .section-no.k{background:linear-gradient(135deg,#2db36a,#3aa8ff)}
+    .section-meta .label{font-size:12px;color:#9fb0e0;letter-spacing:.08em;margin-bottom:4px}
+    .section-meta h2{margin:0 0 6px;font-size:24px;color:#f4f9ff}
+    .section-meta p{margin:0;color:#b8c4e8;font-size:13px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));box-shadow:0 8px 18px rgba(0,0,0,.24)}
+    .card h3{margin:6px 0 8px;font-size:16px;color:#f4f9ff}
+    .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+    .tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#cfd9f5;background:rgba(255,255,255,.05)}
+    .tag.cyan{border-color:rgba(88,195,255,.45);color:#d8f4ff;background:rgba(88,195,255,.12)}
+    .tag.green{border-color:rgba(45,179,106,.45);color:#ddffe8;background:rgba(45,179,106,.12)}
+    .tag.yellow{border-color:rgba(244,200,76,.45);color:#fff0bf;background:rgba(244,200,76,.12)}
+    .tag.purple{border-color:rgba(132,89,255,.45);color:#ede3ff;background:rgba(132,89,255,.14)}
+    .lead{font-size:11px;letter-spacing:.08em;color:#9fb0e0;margin-bottom:4px}
+    .quote-line{margin:0;color:#cfd9f5;font-size:13px;line-height:1.5}
+    .flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .flow-item{padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+    .flow-item .t{font-weight:700;color:#f4f9ff;font-size:13px}
+    .flow-item .c{color:#9fb0e0;font-size:12px;margin-top:2px}
+    .flow-item.green{border-color:rgba(45,179,106,.4);background:rgba(45,179,106,.10)}
+    .flow-item.yellow{border-color:rgba(244,200,76,.4);background:rgba(244,200,76,.10)}
+    .flow-item.cyan{border-color:rgba(88,195,255,.4);background:rgba(88,195,255,.10)}
+    .flow-item.purple{border-color:rgba(132,89,255,.4);background:rgba(132,89,255,.10)}
+    .footer{margin-top:14px;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#dfe8ff;font-size:12px;flex-wrap:wrap}
+    .footer .stars{font-weight:900}
+    @media (max-width:1080px){.hero,.shell{grid-template-columns:1fr}}
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .shell{padding:10px;gap:10px}
+      .footer{font-size:11.5px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+    }
   </style>
 </head>
 <body>
-<div class="card-wrap">
-  <header class="card-header">
-    <div class="card-badge">AI视频</div>
-    <div>
-      <h1 class="card-title">SRT白板动画：把字幕转成手绘视频</h1>
-      <p class="card-desc">将SRT字幕自动转为分区遮罩 + 流式笔迹手绘动画，支持多幕合并导出MP4。适合知识讲解、课程字幕与短视频文案转视频。</p>
-    </div>
-  </header>
+  <main class="page">
 
-  <div class="card-body">
+    <!-- HERO BAR -->
+    <div class="hero-bar"></div>
 
-    <div class="card-meta">
-      <div class="meta-item">
-        <div class="meta-label">仓库</div>
-        <div class="meta-value">geeklee/srt-whiteboard-animation</div>
-      </div>
-      <div class="meta-item">
-        <div class="meta-label">Stars</div>
-        <div class="meta-value">2057</div>
-      </div>
-      <div class="meta-item">
-        <div class="meta-label">协议</div>
-        <div class="meta-value">MIT</div>
-      </div>
-      <div class="meta-item">
-        <div class="meta-label">语言</div>
-        <div class="meta-value">Python · HTML</div>
-      </div>
-    </div>
-
-    <div class="card-meta">
-      <div class="meta-item">
-        <div class="meta-label">发布日期</div>
-        <div class="meta-value">2026-08-21</div>
-      </div>
-      <div class="meta-item">
-        <div class="meta-label">核心依赖</div>
-        <div class="meta-value">OpenCV · Python</div>
-      </div>
-      <div class="meta-item">
-        <div class="meta-label">输出格式</div>
-        <div class="meta-value">MP4 · PNG</div>
-      </div>
-      <div class="meta-item">
-        <div class="meta-label">作者</div>
-        <div class="meta-value">江哥是老登啊</div>
-      </div>
-    </div>
-
-    <div class="tag-list">
-      <span class="tag">白板动画</span>
-      <span class="tag">SRT字幕</span>
-      <span class="tag">AI视频</span>
-      <span class="tag">知识讲解</span>
-      <span class="tag">手绘风格</span>
-      <span class="tag">OpenCV</span>
-      <span class="tag">多幕合并</span>
-    </div>
-
-    <div class="card-section">
-      <div class="section-title">6步工作流</div>
-      <div class="step-list">
-        <div class="step-item"><span class="step-num">1</span><span class="step-text">解析SRT字幕，按25–35秒建议时长拆分为多幕</span></div>
-        <div class="step-item"><span class="step-num">2</span><span class="step-text">确认分镜后生成统一风格的线稿草图</span></div>
-        <div class="step-item"><span class="step-num">3</span><span class="step-text">结合字幕和原图创建标注（annotation.json），载入预览台</span></div>
-        <div class="step-item"><span class="step-num">4</span><span class="step-text">在预览台调整区域、叙事顺序、时序，保存标注</span></div>
-        <div class="step-item"><span class="step-num">5</span><span class="step-text">确认后逐幕渲染MP4（流式笔迹：先ink后color）</span></div>
-        <div class="step-item"><span class="step-num">6</span><span class="step-text">多幕项目合并为完整视频导出</span></div>
-      </div>
-    </div>
-
-    <div class="card-section">
-      <div class="section-title">核心能力</div>
-      <div class="capability-grid">
-        <div class="cap-item">
-          <div class="cap-name">字幕驱动编排</div>
-          <div class="cap-desc">按字幕事件而非画面坐标建立绘制顺序，每步完成后等待确认</div>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <div class="kicker">🎬 AI视频 · 白板动画 · 手绘风格</div>
+          <div class="source">@huangyun_122 · 2026-08-20</div>
         </div>
-        <div class="cap-item">
-          <div class="cap-name">分区遮罩（Mask）</div>
-          <div class="cap-desc">每个元素跟随字幕依次出场，配合 protectedRegions 防止遮挡露馅</div>
+        <h1 class="title">SRT白板动画</h1>
+        <p class="subtitle">把字幕转成手绘视频</p>
+        <p class="subcn">将SRT字幕自动转为分区遮罩+流式笔迹手绘动画，支持多幕合并导出MP4。适合知识讲解、课程字幕与短视频文案转视频。</p>
+        <div class="pill-row">
+          <span class="pill cyan">SRT字幕解析</span>
+          <span class="pill green">分区遮罩编排</span>
+          <span class="pill yellow">流式笔迹</span>
+          <span class="pill purple">多幕合并</span>
         </div>
-        <div class="cap-item">
-          <div class="cap-name">流式笔迹</div>
-          <div class="cap-desc">先输出 ink 线稿，再 color 添彩；笔尖贴近当前笔迹，支持 skeleton 加速</div>
-        </div>
-        <div class="cap-item">
-          <div class="cap-name">本地预览台</div>
-          <div class="cap-desc">assets/preview.html 可视化编辑区域、顺序、时间和字幕关联</div>
-        </div>
-        <div class="cap-item">
-          <div class="cap-name">暖米黄纸张背景</div>
-          <div class="cap-desc">默认 #F5EBD7，深灰线条，红/橙/蓝仅作点缀，极简干净</div>
-        </div>
-        <div class="cap-item">
-          <div class="cap-name">断点续做</div>
-          <div class="cap-desc">每步人工确认后进入下一步，避免在分镜未定时浪费渲染成本</div>
+        <div class="hero-note">
+          <strong>2057 ★ · MIT · Python + OpenCV</strong>
+          <p>把字幕文件扔进去，逐句画出白板动画。配合 Codex 批量生产，日更100条不是梦。</p>
         </div>
       </div>
-    </div>
 
-    <div class="card-section">
-      <div class="section-title">典型应用场景</div>
-      <p class="card-desc">适合把知识讲解、故事口播、课程字幕或短视频文案（如天涯神贴）制作成暖米黄色纸张底的手绘动画。可结合AI配音（如Edge TTS）做完整短视频，或接入 CodeX + AI视频模型批量生产。</p>
-    </div>
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">✏</div>
+          <div class="visual-meta">
+            <div class="big">geeklee/srt-whiteboard-animation</div>
+            <div class="small">2057 ★ · 312 forks · MIT</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <div class="mini-card">
+            <div class="mini-icon cyan" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M9 11H3v10h6V11z"></path><path d="M3 17h18v2H3z"></path><path d="M15 3h6v8h-6z"></path><path d="M14 4v2h2l4 4"></path></svg>
+            </div>
+            <div class="label">核心依赖</div>
+            <div class="value">OpenCV · Python</div>
+            <div class="desc">pip install opencv-python</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon green" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            </div>
+            <div class="label">输出格式</div>
+            <div class="value">MP4 · PNG</div>
+            <div class="desc">流式笔迹 → ink → color</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon yellow" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path><path d="M16 13H8"></path><path d="M16 17H8"></path><path d="M10 9H8"></path></svg>
+            </div>
+            <div class="label">场景分镜</div>
+            <div class="value">25–35秒/幕</div>
+            <div class="desc">按字幕时长自动拆分</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon purple" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <div class="label">作者</div>
+            <div class="value">江哥是老登啊</div>
+            <div class="desc">抖音 · B站 · 公众号</div>
+          </div>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
 
-    <div class="card-section">
-      <div class="section-title">X原帖</div>
-      <blockquote class="quote-block">
-        兄弟们，这个 GitHub 开源宝库，真神了啊。把它嫁接到 Codex 里面，分分钟出视频，日更100条不是痴人说梦。我试了一条天涯的神贴，配上祁同伟的口音，有那个味了。<span class="source">— @huangyun_122，2026-08-20</span>
-      </blockquote>
-    </div>
+    <!-- LIVE DEMO PREVIEW -->
+    <section class="section" style="margin-bottom:14px">
+      <div class="section-head">
+        <div class="section-no">▶</div>
+        <div class="section-meta">
+          <div class="label">效果演示 · LIVE DEMO</div>
+          <h2>猴子山抢香蕉 · 场景示例</h2>
+          <p>字幕叙事顺序驱动：假山 → 小猴拿香蕉 → 大猴抢走 → 围观小朋友。暖米黄纸张底 #F5EBD7，深灰线条，红/橙/蓝点缀。</p>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;display:grid;gap:10px">
+          <div style="font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0e0">线稿阶段 · ink</div>
+          <div style="background:#F5EBD7;border-radius:8px;padding:20px;text-align:center">
+            <img src="https://raw.githubusercontent.com/geeklee/srt-whiteboard-animation/main/examples/scene-01-monkey-mountain.png" alt="SRT白板动画线稿示例" style="max-width:100%;border-radius:4px" loading="lazy">
+          </div>
+          <div style="font-size:11px;color:#9fb0e0">笔尖沿轨迹连续落墨，深灰线条</div>
+        </div>
+        <div style="background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;display:grid;gap:10px">
+          <div style="font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0e0">成片效果 · 流式笔迹</div>
+          <div style="background:#F5EBD7;border-radius:8px;padding:20px;text-align:center">
+            <img src="https://raw.githubusercontent.com/geeklee/srt-whiteboard-animation/main/examples/scene-01-monkey-mountain-stream.gif" alt="SRT白板动画GIF演示" style="max-width:100%;border-radius:4px" loading="lazy">
+          </div>
+          <div style="font-size:11px;color:#9fb0e0">ink → color 添彩，逐字幕依次出场</div>
+        </div>
+      </div>
+    </section>
 
-    <div class="card-section">
-      <div class="section-title">安装命令</div>
-      <pre style="background:#111;color:#0ef;font-size:0.82rem;padding:0.75rem 1rem;border-radius:0.5rem;overflow-x:auto;line-height:1.6;margin:0;">python scripts/prepare_env.py --check
+    <!-- 6-STEP WORKFLOW -->
+    <section class="shell" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <section class="panel" style="background:transparent;border:none;box-shadow:none">
+        <div class="panel-head"><h3>📋 6步工作流</h3><span class="badge">字幕驱动</span></div>
+        <div class="panel-body">
+          <div class="flow">
+            <div class="flow-item">
+              <div class="t">① 解析字幕</div>
+              <div class="c">python parse_srt.py &lt;字幕.srt&gt; --target-sec 30<br>按25–35秒拆分多幕</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">② 生成线稿</div>
+              <div class="c">确认分镜后生成统一风格线稿草图</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">③ 创建标注</div>
+              <div class="c">annotation.json 关联区域、时序、字幕</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">④ 预览台调整</div>
+              <div class="c">assets/preview.html 编辑区域/顺序/时序</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">⑤ 逐幕渲染</div>
+              <div class="c">流式笔迹：先 ink 线稿，再 color 添彩</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">⑥ 多幕合并</div>
+              <div class="c">merge_scenes.py --inputs 幕1 幕2 --output final.mp4</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="background:transparent;border:none;box-shadow:none">
+        <div class="panel-head"><h3>⚡ 核心能力</h3><span class="badge">6项</span></div>
+        <div class="panel-body">
+          <div class="flow">
+            <div class="flow-item green">
+              <div class="t">字幕驱动编排</div>
+              <div class="c">按字幕事件而非画面坐标建立绘制顺序，每步确认后进入下一步</div>
+            </div>
+            <div class="flow-item cyan">
+              <div class="t">分区遮罩（Mask）</div>
+              <div class="c">protectedRegions 防止遮挡露馅，元素跟随字幕依次出场</div>
+            </div>
+            <div class="flow-item yellow">
+              <div class="t">流式笔迹</div>
+              <div class="c">先 ink 线稿再 color 添彩，支持 skeleton 加速渲染</div>
+            </div>
+            <div class="flow-item purple">
+              <div class="t">本地预览台</div>
+              <div class="c">assets/preview.html 可视化编辑区域、顺序、时间和字幕关联</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">暖米黄纸张背景</div>
+              <div class="c">默认 #F5EBD7，深灰线条，红/橙/蓝仅作点缀，极简干净</div>
+            </div>
+            <div class="flow-item">
+              <div class="t">断点续做</div>
+              <div class="c">每步人工确认后进入下一步，避免分镜未定浪费渲染成本</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- INSTALL COMMANDS -->
+    <section class="section" style="margin-bottom:14px">
+      <div class="section-head">
+        <div class="section-no b">⚙</div>
+        <div class="section-meta">
+          <div class="label">安装与环境 · SETUP</div>
+          <h2>环境准备</h2>
+          <p>独立的 Python 虚拟环境，无需全局安装依赖。</p>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="term">
+          <div class="term-top"><span>Terminal</span><span>bash</span></div>
+          <div class="term-body"># 检查环境
+python scripts/prepare_env.py --check
+
+# 准备虚拟环境
 python scripts/prepare_env.py
-# 输出 ENV_PY=&lt;路径&gt;，后续渲染使用该解释器
+# 输出: ENV_PY=&lt;路径&gt;
 
 # 解析字幕生成分镜
-python scripts/parse_srt.py &lt;字幕.srt&gt; --target-sec 30
+python scripts/parse_srt.py &lt;字幕.srt&gt; \
+  --target-sec 30 --min-sec 25 --max-sec 35
 
-# 渲染单幕
-&lt;ENV_PY&gt; scripts/render_stream_whiteboard.py &lt;图&gt; &lt;标注.json&gt; output.mp4 assets/drawing-hand.png --ink-path grid --color-fill contour-wipe
+# 生成区域检查图
+python scripts/render_annotation_preview.py \
+  &lt;图片&gt; &lt;标注.json&gt; &lt;预览图输出&gt;</div>
+        </div>
+        <div class="term">
+          <div class="term-top"><span>Terminal</span><span>bash</span></div>
+          <div class="term-body"># 渲染单幕（流式笔迹）
+&lt;ENV_PY&gt; scripts/render_stream_whiteboard.py \
+  &lt;图片&gt; &lt;标注.json&gt; output.mp4 \
+  assets/drawing-hand.png \
+  --ink-path grid --color-fill contour-wipe
 
-# 合并多幕
-&lt;ENV_PY&gt; scripts/merge_scenes.py --inputs 幕1.mp4 幕2.mp4 --output final.mp4</pre>
-    </div>
+# 使用 skeleton 加速（线稿清晰时）
+&lt;ENV_PY&gt; scripts/render_stream_whiteboard.py \
+  &lt;图片&gt; &lt;标注.json&gt; output.mp4 \
+  assets/drawing-hand.png \
+  --ink-path skeleton
 
-  </div>
+# 合并多幕为完整视频
+&lt;ENV_PY&gt; scripts/merge_scenes.py \
+  --inputs 幕1.mp4 幕2.mp4 幕3.mp4 \
+  --output final.mp4</div>
+        </div>
+      </div>
+    </section>
 
-  <footer class="card-footer">
-    <a class="source-link" href="https://github.com/geeklee/srt-whiteboard-animation" target="_blank" rel="noopener">GitHub · geeklee/srt-whiteboard-animation</a>
-    <span class="author-tag">作者：江哥是老登啊 · 抖音/B站/公众号</span>
-  </footer>
-</div>
+    <!-- X QUOTE + APPLICATION -->
+    <section class="shell" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <section class="panel">
+        <div class="panel-head"><h3>💬 X 原帖</h3><span class="badge">@huangyun_122</span></div>
+        <div class="panel-body">
+          <blockquote style="margin:0 0 10px;padding:12px;border-radius:12px;border:1.5px solid rgba(132,89,255,.36);background:rgba(132,89,255,.12);font-size:13px;color:#ede3ff;line-height:1.6;font-style:normal">
+            兄弟们，这个 GitHub 开源宝库，真神了啊。把它嫁接到 Codex 里面，分分钟出视频，日更100条不是痴人说梦。我试了一条天涯的神贴，配上祁同伟的口音，有那个味了。
+          </blockquote>
+          <div style="font-size:11.5px;color:#9fb0de;text-align:right">2026-08-20</div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h3>🎯 典型应用场景</h3><span class="badge">use cases</span></div>
+        <div class="panel-body">
+          <div style="display:grid;gap:8px">
+            <div class="flow-item green">
+              <div class="t">知识讲解 / 课程字幕</div>
+              <div class="c">把教程视频字幕转成手绘动画，视觉清晰、节奏可控</div>
+            </div>
+            <div class="flow-item yellow">
+              <div class="t">故事口播 / 天涯神贴</div>
+              <div class="c">配合 Edge TTS 做完整短视频，批量生产有"那个味"的配音</div>
+            </div>
+            <div class="flow-item purple">
+              <div class="t">Codex + AI视频批量生产</div>
+              <div class="c">接入 Codex 自动生成 SRT → 手绘动画，日更100条</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- TAGS -->
+    <section class="section">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-size:11px;font-weight:900;letter-spacing:.08em;color:#9fb0e0;margin-right:4px">标签：</span>
+        <span class="tag cyan">白板动画</span>
+        <span class="tag green">SRT字幕</span>
+        <span class="tag yellow">AI视频</span>
+        <span class="tag purple">知识讲解</span>
+        <span class="tag">手绘风格</span>
+        <span class="tag">OpenCV</span>
+        <span class="tag">多幕合并</span>
+        <span class="tag">Python</span>
+        <span class="tag">FFmpeg</span>
+        <span class="tag">字幕驱动动画</span>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <section class="footer">
+      <a href="https://github.com/geeklee/srt-whiteboard-animation" target="_blank" rel="noopener" style="color:#58c3ff;font-size:12px;font-weight:700;text-decoration:none">★ 2057 · GitHub · geeklee/srt-whiteboard-animation</a>
+      <div>作者：江哥是老登啊 · 抖音 · B站 · 公众号</div>
+      <div style="font-size:11px;color:#9fb0de">MIT License · Python · HTML</div>
+    </section>
+
+  </main>
+
+  <script>
+    (function(){
+      function send(){
+        var h=document.body.scrollHeight;
+        window.parent.postMessage({type:'theme-height',slug:'darkblue',height:h},'*');
+      }
+      if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+      setTimeout(send,500);
+    })();
+  </script>
 </body>
 </html>
