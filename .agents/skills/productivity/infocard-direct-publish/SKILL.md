@@ -21,6 +21,20 @@ description: 用户直接给 GitHub URL 时的主线程直连发布流程——�
 - 当用户给的是研究报告/提纲而不是 URL，先做候选审计；如存在多个可发布对象或多个既有卡片可复用，先问**一个**澄清问题，不要默认替用户挑对象。
 - 用户明确说「调研→写卡→发布」三阶段分工时，改用 `infocard-three-stage-pipeline`。
 
+
+## STOP GATE — 先视觉验收，后 build/commit/push
+
+直连发布不是视觉门禁豁免。任何 `docs/*.html` 写入或修改后，顺序必须是：
+
+1. 本地预览当前 worktree 的目标 HTML。
+2. 采集桌面与移动截图，得到明确 `critical / major / minor` 结论。
+3. 写入或更新 `.visual-evidence/<slug>/manifest.json`，绑定当前 HTML sha256。
+4. 运行 `npm run verify:visual-gate -- docs/<slug>.html`。
+5. 只有 `0 critical / 0 major` 且 manifest hash 匹配，才允许 `npm run build`、commit、push。
+6. push 后必须 cache-bust 打开公网 URL，重新截图复核；公网 PASS 与本地 PASS 分开报告。
+
+禁止：先 push 后补截图；把 HTTP 200/build 成功当视觉通过；把 `theme/*.html` 当 stylesheet 引入；HTML/CSS/结构变更后复用旧截图。
+
 ## 执行步骤
 
 ### Step 1 — 调研（主线程，直接 curl）
@@ -68,23 +82,36 @@ TZ=Asia/Shanghai date "+%Y-%m-%d %H:%M:%S"  # 获取时间戳
 - meta.yaml：`docs/[slug].html.meta.yaml`
 - 时间戳：`YYYY-MM-DD HH:MM:SS` Asia/Shanghai，**禁止裸日期**
 
-### Step 4 — Build + Commit + Push
+### Step 4 — 本地视觉门禁（必须在 build / commit / push 前）
 
 **不要 commit `_index.yaml` 和 `index.html`**。CI 在每次 push main 后自动从 `docs/` rebuild 并部署到 GitHub Pages。commit 根级 index 文件会在 rebase 时产生冲突。
 
 ```bash
+# 先生成/更新 .visual-evidence/<slug>/manifest.json，必须绑定当前 HTML sha256
+npm run verify:visual-gate -- docs/20260714-[slug].html
+```
+
+### Step 5 — Build + Verify
+
+```bash
 npm run build           # 生成 _index.yaml（仅用于本地验证，不 commit）
+npm run verify
+npm run fix-taxonomy
+npm run verify-taxonomy
+npm run check-leak
 # 确认新卡已写入：grep "slug" _index.yaml
+```
 
-# 只 add docs/ 文件
-git add docs/20260714-[slug].html docs/20260714-[slug].html.meta.yaml
+### Step 6 — Commit + Push
+
+```bash
+# 只 add 本卡 docs/meta、必要生成产物与本卡视觉证据 manifest；禁止 git add -A
+git add docs/20260714-[slug].html docs/20260714-[slug].html.meta.yaml .visual-evidence/[slug]/manifest.json
 git commit -m "feat: publish [slug] (style) — description"
-
-# push，CI 自动 rebuild + deploy
 git push origin main
 ```
 
-### Step 5 — HTTP 验收
+### Step 7 — HTTP + 公网视觉复核
 
 GitHub Pages 部署约需 25-35s（CI build + CDN 传播）。不要在 push 后立即查询，会得到 404。
 

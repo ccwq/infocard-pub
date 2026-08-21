@@ -1,7 +1,7 @@
 ---
 name: infocard-pub-publisher
 description: Use when an authorized Protocol v3 infocard bundle is ready for exact .docs authoring promotion, build, release, public verification, and audit.
-version: 3.1.0
+version: 3.2.0
 ---
 
 # Infocard Pub Publisher
@@ -9,6 +9,8 @@ version: 3.1.0
 ## Purpose
 
 The leading word is **promotion**. This skill turns a frozen Protocol v3 bundle and its .docs/<card>/promotion-manifest.json into a formal release. It does not research, author card content, select themes, or manage subagents.
+
+**No worktree is used for publishing.** All operations run directly in the primary repository checkout.
 
 Load infocard-publish-sop/references/infocard-publish-protocol-v3.md before any promotion, Git write, or public verification.
 
@@ -24,16 +26,10 @@ Completion criterion: the bundle and manifest validate, every declared source ex
 
 ## 2. Promote exactly the manifest
 
-<<<<<<< HEAD
 1. Inspect git status --short and preserve unrelated user changes.
 2. Copy each declared source file to its exact target. Create only the target parent directories required by the manifest.
 3. Copy declared assets in the same way. Do not copy the whole .docs/<card>/ directory.
 4. Record the source/target mapping, hashes, and promotion timestamp in the run bundle. Mark the business state PROMOTED only after the exact diff has been inspected.
-=======
-1. Fetch `origin/main`; create one branch and one worktree for the candidate card from the fresh remote base. The worktree path must come from `node scripts/infocard-worktree.js resolve --run-id <run-id> --slug <slug>` and therefore live under the cross-platform fixed `os.tmpdir()/infocard-worktree` root. Do not create repo-local `wt-*`, `/tmp/infocard-*`, clones, or copied repos for new publish runs.
-2. If live repository commands need local Node dependencies, symlink validated primary-repository `node_modules` into the worktree. If no local dependencies are needed, record that in the bundle. Never install Node dependencies in the worktree.
-3. Confirm that the frozen bundle artifact allowlist exists in the worktree and that no process artifact is included.
->>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 
 For a multi-card batch, validate every card manifest first, then promote all cards before one shared build. Never promote generated _index.yaml or index.html from authoring output; the repository build owns them.
 
@@ -87,27 +83,13 @@ Completion criterion: the audit sidecar passes and the audit commit is pushed, o
 
 Retain .docs/<card>/ after the terminal business state. Report its absolute or repository-relative path, retained files, manifest hash, and any cleanup candidates. Run the closeout dry-run/report command defined by the repository or project convention; it may classify candidates but must not delete them.
 
-Do not create, list, remove, or clean alternate checkouts as part of this skill. Do not request or use del-rm. Any deletion requires a separate explicit cleanup command and separately scoped authorization.
-
-## 6. Retain and report publish worktrees
-
-After the terminal Pages/audit state is recorded, do not automatically remove the publish worktree. Run `npm run worktree:list -- --repo <repo>` from the primary repository or equivalent repo root, report historical worktrees, and prompt the user exactly: `如需清理可安全删除的历史 worktree，请回复：del-rm`.
-
-If the user later replies exactly `del-rm`, re-run the inventory first, then run `npm run worktree:cleanup -- --repo <repo> --confirm del-rm`. The cleanup command may remove only clean registered worktrees inside the fixed temp/infocard-worktree root and must not use `--force`. Dirty, active, external, repo-local, unregistered, or ownership-uncertain directories are skipped and reported.
+Do not create, list, remove, or clean alternate checkouts as part of this skill. Any deletion requires a separate explicit cleanup command and separately scoped authorization.
 
 ## Boundaries
 
-<<<<<<< HEAD
 - Never copy files outside the promotion manifest.
 - Never promote bundles, screenshots, process files, secrets, or generated indexes from .docs/<card>/.
 - Never use unrestricted directory copies or git add -A for release scope.
 - Never force-push, alter unrelated user changes, or turn VISUAL_PENDING into a visual pass.
 - Never delete retained .docs authoring material during publish or closeout.
-=======
-- Never install dependencies in a worktree.
-- Never stage files outside the bundle allowlist and generated index artifacts.
-- Never force-push, repair another worktree, or turn `VISUAL_PENDING` into visual PASS.
-- Never create new publish worktrees outside the fixed temp/infocard-worktree root.
-- Never remove publish worktrees unless the user replied exactly `del-rm` for this cleanup pass.
->>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 - Never start Wiki automatically; it must be requested by the task.
