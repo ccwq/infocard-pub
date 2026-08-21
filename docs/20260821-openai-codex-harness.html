@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenAI Codex Harness 开放：把 Agent 能力嵌进产品</title>
+  <link rel="canonical" href="https://ccwq.github.io/infocard-pub/docs/20260821-openai-codex-harness.html">
+  <meta name="description" content="OpenAI 公布 Codex 架构文档：Harness（Agent Loop）作为可复用基础设施开放，App Server 通过 JSON-RPC 把 Agent 能力嵌入产品。108k Stars，Apache 2.0。">
+  <meta name="author" content="Xudong Han @Xudong07452910">
+  <meta name="category" content="ai-agent">
+  <meta name="tags" content="OpenAI,Codex,Harness,Agent Loop,App Server,JSON-RPC,架构文档,SDK">
+  <meta name="date" content="2026-08-21">
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);--grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .panel-head .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#dfe8ff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .task{border:1.5px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2030,#151a28);padding:10px 11px;border-radius:14px;display:grid;gap:8px}
+    .task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .task-name{font-size:13px;font-weight:900;color:#fff}
+    .status{font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:rgba(45,179,106,.14);color:#7fe1a2;border:1px solid rgba(45,179,106,.32)}
+    .task p{font-size:12px;line-height:1.55;color:#d9e2ff;margin:0}
+    .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);padding:4px 8px;border-radius:999px;font-size:11px;color:#b6c5f2}
+    .term{background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#111831;border-bottom:1px solid rgba(255,255,255,.08);color:#dfe8ff;font-size:11px}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8f59f;font-size:12px;line-height:1.7;min-height:180px;white-space:pre-wrap}
+    .term .url{color:#7ad9ff}
+    .section{margin:18px 0;padding:18px 20px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(20,28,52,.78), rgba(12,18,38,.82));box-shadow:0 14px 30px rgba(0,0,0,.34)}
+    .section-head{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .section-no{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#f4f9ff;background:linear-gradient(135deg,#3aa8ff,#4a78ff 60%,#8459ff);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 8px 18px rgba(74,120,255,.30)}
+    .section-no.b{background:linear-gradient(135deg,#8459ff,#4a78ff)}
+    .section-no.k{background:linear-gradient(135deg,#2db36a,#3aa8ff)}
+    .section-meta .label{font-size:12px;color:#9fb0e0;letter-spacing:.08em;margin-bottom:4px}
+    .section-meta h2{margin:0 0 6px;font-size:24px;color:#f4f9ff}
+    .section-meta p{margin:0;color:#b8c4e8;font-size:13px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));box-shadow:0 8px 18px rgba(0,0,0,.24)}
+    .card h3{margin:6px 0 8px;font-size:16px;color:#f4f9ff}
+    .card p{margin:0;font-size:13px;color:#c9d4f7;line-height:1.6}
+    .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+    .tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#cfd9f5;background:rgba(255,255,255,.05)}
+    .tag.cyan{border-color:rgba(88,195,255,.45);color:#d8f4ff;background:rgba(88,195,255,.12)}
+    .tag.green{border-color:rgba(45,179,106,.45);color:#ddffe8;background:rgba(45,179,106,.12)}
+    .tag.yellow{border-color:rgba(244,200,76,.45);color:#fff0bf;background:rgba(244,200,76,.12)}
+    .tag.purple{border-color:rgba(132,89,255,.45);color:#ede3ff;background:rgba(132,89,255,.14)}
+    .lead{font-size:11px;letter-spacing:.08em;color:#9fb0e0;margin-bottom:4px}
+    .quote-line{margin:0;color:#cfd9f5;font-size:13px;line-height:1.5}
+    .flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .flow-item{padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+    .flow-item .t{font-weight:700;color:#f4f9ff;font-size:13px}
+    .flow-item .c{color:#9fb0e0;font-size:12px;margin-top:2px}
+    .flow-item.green{border-color:rgba(45,179,106,.4);background:rgba(45,179,106,.10)}
+    .flow-item.yellow{border-color:rgba(244,200,76,.4);background:rgba(244,200,76,.10)}
+    .flow-item.cyan{border-color:rgba(88,195,255,.4);background:rgba(88,195,255,.10)}
+    .flow-item.purple{border-color:rgba(132,89,255,.4);background:rgba(132,89,255,.10)}
+    .divider{height:1px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);margin:14px 0}
+    .footer{margin-top:14px;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#dfe8ff;font-size:12px;flex-wrap:wrap}
+    .footer .stars{font-weight:900}
+    @media (max-width:1080px){.hero,.shell{grid-template-columns:1fr}}
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .shell{padding:10px;gap:10px}
+      .footer{font-size:11.5px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <div class="hero-bar"></div>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <div class="kicker">🤖 Agent Loop · Harness 架构 · 平台化</div>
+          <div class="source">@Xudong07452910 · 2026-08-20 · 387 ❤️ 69 RT</div>
+        </div>
+        <h1 class="title">OpenAI Codex<br>Harness 开放</h1>
+        <p class="subtitle">把 Agent 能力嵌进自己的产品</p>
+        <p class="subcn">OpenAI 公布 Codex 架构文档：Harness（Agent Loop）作为可复用基础设施开放，App Server 通过 JSON-RPC 把完整 Agent 能力嵌入任何产品。</p>
+        <div class="pill-row">
+          <span class="pill cyan">Agent Loop</span>
+          <span class="pill green">App Server</span>
+          <span class="pill yellow">JSON-RPC</span>
+          <span class="pill purple">SDK / Codex Exec</span>
+        </div>
+        <div class="hero-note">
+          <strong>108k ★ · Apache 2.0 · 双篇架构文档</strong>
+          <p>模型负责能力，Harness 负责把能力接入工作流。Context、工具、审批、沙箱全部可复用。</p>
+        </div>
+      </div>
+
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">⬡</div>
+          <div class="visual-meta">
+            <div class="big">openai/codex</div>
+            <div class="small">108k ★ · 16.5k forks · Apache 2.0</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <div class="mini-card">
+            <div class="mini-icon cyan" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 6.5h16v11H4z"></path><path d="M4 10h16"></path><path d="M7 14h4"></path></svg>
+            </div>
+            <div class="label">Agent Loop</div>
+            <div class="value">Harness 核心</div>
+            <div class="desc">用户输入 → 推理 → 工具调用 → 上下文追加 → 循环</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon purple" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path></svg>
+            </div>
+            <div class="label">App Server</div>
+            <div class="value">JSON-RPC over stdio</div>
+            <div class="desc">双向通信，稳定事件流</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon green" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            </div>
+            <div class="label">Three Primitives</div>
+            <div class="value">Item · Turn · Thread</div>
+            <div class="desc">Agent 对话的结构化原语</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-icon yellow" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+            </div>
+            <div class="label">Integration</div>
+            <div class="value">codex exec / SDK / App Server</div>
+            <div class="desc">三种方式嵌入 Agent 能力</div>
+          </div>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <!-- TWO BLOG POSTS -->
+    <section class="shell" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <section class="panel">
+        <div class="panel-head"><h3>📄 架构文档 ①</h3><span class="badge">Jan 23, 2026</span></div>
+        <div class="panel-body">
+          <div class="task">
+            <div class="task-top">
+              <div class="task-name">Unrolling the Codex agent loop</div>
+              <div class="status">Michael Bolin</div>
+            </div>
+            <p>Core agent loop 机制详解：Prompt 构建、工具调用、上下文窗口管理、自动压缩。</p>
+            <div class="divider"></div>
+            <div style="font-size:12px;color:#9fb0e0;line-height:1.6">
+              · Agent Loop = 用户输入 → 推理 → 工具调用 → 追加上下文 → 重复<br>
+              · Prompt = instructions + tools + input（优先级 system &gt; developer &gt; user &gt; assistant）<br>
+              · 二次方增长问题：每个 Turn 携带完整历史 → Prompt Cache 缓解 → 自动上下文压缩<br>
+              · 支持 OpenAI / Ollama / LM Studio / Azure Responses API
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h3>📄 架构文档 ②</h3><span class="badge">Feb 4, 2026</span></div>
+        <div class="panel-body">
+          <div class="task">
+            <div class="task-top">
+              <div class="task-name">Unlocking the Codex Harness</div>
+              <div class="status">Celia Chen</div>
+            </div>
+            <p>App Server 设计：Codex Core + JSON-RPC 协议，把 Harness 变成可集成的产品平台。</p>
+            <div class="divider"></div>
+            <div style="font-size:12px;color:#9fb0e0;line-height:1.6">
+              · Codex Core = 线程生命周期 + 配置/认证 + 工具执行与扩展<br>
+              · App Server = stdio reader + message processor + thread manager + core threads<br>
+              · 三个原语：Item（原子单元）→ Turn（工作单元）→ Thread（持久容器）<br>
+              · JetBrains / Xcode / VS Code / macOS App 全部由同一 Harness 驱动
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- HARNESS ARCHITECTURE -->
+    <section class="section" style="margin-bottom:14px">
+      <div class="section-head">
+        <div class="section-no k">⬡</div>
+        <div class="section-meta">
+          <div class="label">HARNESS 架构 · PRODUCT vs CODEX</div>
+          <h2>分工边界：谁负责什么</h2>
+          <p>Harness 开放的核心洞察：产品负责 Context / 业务规则 / 工具定义，Codex 负责 Agent Loop。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card" style="border-color:rgba(88,195,255,.36);background:linear-gradient(180deg, rgba(88,195,255,.14), rgba(255,255,255,.02))">
+          <div class="tagrow"><span class="tag cyan">产品 / 开发团队</span></div>
+          <h3>你负责</h3>
+          <p>Context 维护 · 业务规则定义 · 工具集实现（Shell / MCP / 文件操作） · 审批策略 · 沙箱权限</p>
+        </div>
+        <div class="card" style="border-color:rgba(132,89,255,.36);background:linear-gradient(180deg, rgba(132,89,255,.14), rgba(255,255,255,.02))">
+          <div class="tagrow"><span class="tag purple">Codex Harness</span></div>
+          <h3>Codex 负责</h3>
+          <p>Agent Loop 逻辑 · 推理调度 · 工具调用编排 · 上下文压缩 · 线程持久化 · 事件流</p>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:12px;border-radius:12px;border:1.5px solid rgba(244,200,76,.36);background:rgba(244,200,76,.10);font-size:13px;color:#fff0bf;text-align:center;line-height:1.6">
+        💡 以后做 Agent 产品，不必都造一个聊天框。客服继续用客服后台，安服继续看 incident dashboard，Codex 在下层跑 Agent Loop。
+      </div>
+    </section>
+
+    <!-- INTEGRATION METHODS -->
+    <section class="section" style="margin-bottom:14px">
+      <div class="section-head">
+        <div class="section-no b">⚙</div>
+        <div class="section-meta">
+          <div class="label">三种集成方式 · INTEGRATION METHODS</div>
+          <h2>把 Codex 嵌进产品</h2>
+          <p>按需选择：轻量脚本 / 原生库 / 完整 App Server。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="tagrow"><span class="tag yellow">codex exec</span></div>
+          <h3>轻量脚本 / CI</h3>
+          <p>一次性任务、非交互流、结构化输出、日志记录、明确成功/失败退出码。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag cyan">Codex SDK</span></div>
+          <h3>TypeScript 库</h3>
+          <p>原生库接口，适合服务端工具和工作流集成，比 App Server 轻量但功能面更小。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag purple">App Server</span></div>
+          <h3>完整平台集成</h3>
+          <p>全功能 Harness 暴露为稳定事件流，支持 Sign in with ChatGPT、模型发现、配置管理。</p>
+        </div>
+      </div>
+      <div class="term" style="margin-top:14px">
+        <div class="term-top"><span>Terminal</span><span>bash</span></div>
+        <div class="term-body"># 安装 Codex CLI
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+
+# 用 App Server 启动（stdio 模式）
+codex app-server
+
+# 代码集成：SDK
+npm install -g @openai/codex
+
+# 快速脚本
+codex exec "run tests and summarize failures"</div>
+      </div>
+    </section>
+
+    <!-- CONTEXT MANAGEMENT -->
+    <section class="shell" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <section class="panel">
+        <div class="panel-head"><h3>🧠 上下文管理</h3><span class="badge">context window</span></div>
+        <div class="panel-body">
+          <div class="flow">
+            <div class="flow-item cyan">
+              <div class="t">二次方增长问题</div>
+              <div class="c">每个 Turn 携带完整历史，prompt 长度趋于二次方增长</div>
+            </div>
+            <div class="flow-item green">
+              <div class="t">Prompt Cache</div>
+              <div class="c">精确前缀匹配复用计算，命中时采样从二次变线性</div>
+            </div>
+            <div class="flow-item yellow">
+              <div class="t">自动上下文压缩</div>
+              <div class="c">超阈值自动调用 /responses/compact，保留模型"理解"摘要</div>
+            </div>
+            <div class="flow-item purple">
+              <div class="t">变更处理策略</div>
+              <div class="c">工具/模型/沙箱变更时，插入新 role=developer 消息而非修改历史</div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h3>🛡️ 安全模型</h3><span class="badge">sandbox + approval</span></div>
+        <div class="panel-body">
+          <div class="flow">
+            <div class="flow-item">
+              <div class="t">沙箱隔离</div>
+              <div class="c">Shell / 文件工具在受控环境执行，可配置权限和目录范围</div>
+            </div>
+            <div class="flow-item yellow">
+              <div class="t">审批流（Approval）</div>
+              <div class="c">Agent 需要输入时（如执行危险命令）发 server request，暂停 Turn 等待客户端 allow/deny</div>
+            </div>
+            <div class="flow-item green">
+              <div class="t">MCP 服务器支持</div>
+              <div class="c">用户通过 MCP 服务器提供自定义工具，Codex 在统一策略模型下编排</div>
+            </div>
+            <div class="flow-item purple">
+              <div class="t">ZDR 配置</div>
+              <div class="c">Zero Data Retention 模式下保持全请求无状态，不使用 previous_response_id</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- X QUOTE -->
+    <section class="section" style="margin-bottom:14px">
+      <div class="section-head">
+        <div class="section-no">💬</div>
+        <div class="section-meta">
+          <h2>X 原帖</h2>
+        </div>
+      </div>
+      <blockquote style="margin:0;padding:14px;border-radius:12px;border:1.5px solid rgba(132,89,255,.36);background:rgba(132,89,255,.12);font-size:13px;color:#ede3ff;line-height:1.65;font-style:normal">
+        OpenAI 今天发布了关于 Codex 的文章，开始重新定位 Codex。<br><br>
+        Codex 现在已经不只是 App、CLI 或 IDE 里的 Coding Agent。OpenAI 把背后的开源 Harness 单独拿了出来。<br><br>
+        Context 怎么维护、工具怎么调用、任务怎么跨轮继续、什么时候需要 approval、沙箱怎么限制——这些 Agent loop 里的东西都可以直接复用。<br><br>
+        开发者现在可以通过 "codex exec"、SDK 和 app-server，把这套 Agent 能力嵌进自己的产品。<br><br>
+        文章里也提到了一个判断：以后做 Agent 产品，没必要都造一个聊天框。<br><br>
+        客服可以继续用客服后台，安服可以继续看 incident dashboard，运营可以继续看自己的业务系统。产品负责 Context、业务规则和工具，Codex 在下面负责 Agent loop。<br><br>
+        我觉得这也可能是 Harness 接下来很重要的一种形态。<br><br>
+        模型负责能力，Harness 负责把这种能力真正接进一个具体工作流里。Codex 正在开始做这一层的平台。
+        <div style="margin-top:10px;font-size:11.5px;color:#9fb0de;text-align:right">— @Xudong07452910，2026-08-20</div>
+      </blockquote>
+    </section>
+
+    <!-- TAGS -->
+    <section class="section">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-size:11px;font-weight:900;letter-spacing:.08em;color:#9fb0e0;margin-right:4px">标签：</span>
+        <span class="tag cyan">OpenAI</span>
+        <span class="tag green">Codex</span>
+        <span class="tag yellow">Harness</span>
+        <span class="tag purple">Agent Loop</span>
+        <span class="tag">App Server</span>
+        <span class="tag">JSON-RPC</span>
+        <span class="tag">SDK</span>
+        <span class="tag">MCP</span>
+        <span class="tag">上下文管理</span>
+        <span class="tag">沙箱</span>
+        <span class="tag">Agent 平台</span>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <section class="footer">
+      <a href="https://github.com/openai/codex" target="_blank" rel="noopener" style="color:#58c3ff;font-size:12px;font-weight:700;text-decoration:none">★ 108k · GitHub · openai/codex</a>
+      <div>Apache 2.0 · Rust / TypeScript</div>
+      <a href="https://openai.com/index/unrolling-the-codex-agent-loop/" target="_blank" rel="noopener" style="color:#8459ff;font-size:12px;text-decoration:none">Blog ① · Blog ② →</a>
+    </section>
+
+  </main>
+
+  <script>
+    (function(){
+      function send(){
+        var h=document.body.scrollHeight;
+        window.parent.postMessage({type:'theme-height',slug:'darkblue',height:h},'*');
+      }
+      if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+      setTimeout(send,500);
+    })();
+  </script>
+</body>
+</html>
