@@ -1,0 +1,615 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"><title>IWE：用 Rust 把 Markdown 目录变成可查询的知识图谱</title>
+<style>
+    :root{
+      --bg:#f4f3ee; --paper:#fbfaf6; --ink:#0c0c0c;
+      --blue:#0f3a8a; --soft-blue:#e8eef8;
+      --line:#0c0c0c;
+      --shadow:5px 5px 0 rgba(12,12,12,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === 顶栏：深蓝白 hero + 右侧 meta pill（hardblue 风格） === */
+    .topbar{
+      display:grid;grid-template-columns:1.32fr .68fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:var(--blue);
+      color:#fff;
+      border-right:3px solid var(--line);
+    }
+    .topbar-hero h1{
+      font-size:22px;font-weight:900;line-height:1.18;
+      letter-spacing:-.01em;margin-bottom:6px;
+    }
+    .topbar-hero .kicker{
+      font-size:10px;font-weight:800;letter-spacing:.12em;
+      text-transform:uppercase;opacity:.85;margin-bottom:6px;
+    }
+    .topbar-hero .sub{
+      font-size:12px;line-height:1.5;opacity:.95;margin-top:4px;
+    }
+    .topbar-hero .tag-row{
+      display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;
+    }
+    .topbar-hero .tag{
+      display:inline-block;border:1.5px solid #fff;
+      padding:2px 7px;font-size:10px;font-weight:800;
+      letter-spacing:.04em;text-transform:uppercase;
+    }
+    .topbar-meta{
+      padding:12px;
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#eef1f6;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:6px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:5px;
+    }
+    .meta-pill{
+      border:2px solid var(--line);
+      padding:5px 7px 4px;
+      background:#fff;
+      font-weight:800;
+      font-size:10.5px;
+      line-height:1.2;
+    }
+    .meta-pill .lbl{
+      display:block;
+      font-size:8px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#666;
+      margin-bottom:1px;
+    }
+    .meta-pill .val{
+      display:block;
+      font-weight:900;
+      font-size:11.5px;
+    }
+    .meta-pill .accent{color:var(--blue)}
+
+    /* === 章节通用 === */
+    section{margin:18px 0}
+    .sec-title{
+      font-size:14px;font-weight:900;
+      border-left:5px solid var(--blue);
+      padding-left:9px;margin-bottom:10px;
+      text-transform:uppercase;letter-spacing:.06em;
+    }
+    .sec-sub{
+      font-size:11px;color:#555;margin:-6px 0 10px 14px;
+    }
+    .card-block{
+      background:var(--paper);
+      border:2px solid var(--line);
+      padding:12px 14px;
+      box-shadow:var(--shadow);
+      margin-bottom:12px;
+    }
+    .card-block h3{
+      font-size:13px;font-weight:900;margin-bottom:6px;
+      color:var(--blue);
+    }
+    .card-block p{font-size:12px;line-height:1.65;margin-bottom:6px}
+    .card-block ul{margin:4px 0 6px 18px;font-size:12px;line-height:1.65}
+    .card-block li{margin-bottom:3px}
+
+    /* === 网格 === */
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+
+    /* === 命令块 === */
+    pre.cmd{
+      background:#0c0c0c;color:#e6e6e6;
+      padding:9px 12px;border-left:4px solid var(--blue);
+      font-size:11px;line-height:1.55;
+      overflow-x:auto;
+      margin:6px 0;
+    }
+    pre.cmd .c{color:#8db1ff}
+    pre.cmd .k{color:#ffb37a}
+    pre.cmd .s{color:#a8e6a3}
+
+    /* === 表格 === */
+    table.t{
+      width:100%;border-collapse:collapse;
+      font-size:11.5px;margin:8px 0;
+    }
+    table.t th,table.t td{
+      border:2px solid var(--line);
+      padding:6px 8px;text-align:left;vertical-align:top;
+    }
+    table.t th{
+      background:var(--blue);color:#fff;font-weight:800;font-size:11px;
+      text-transform:uppercase;letter-spacing:.04em;
+    }
+    table.t tr:nth-child(even) td{background:#f0eee6}
+
+    /* === KPI 行 === */
+    .kpi-row{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+      margin:10px 0;
+    }
+    .kpi{
+      background:#fff;border:2px solid var(--line);
+      padding:8px 10px;
+      box-shadow:3px 3px 0 rgba(12,12,12,.08);
+    }
+    .kpi .num{
+      font-size:20px;font-weight:900;color:var(--blue);
+      line-height:1.05;letter-spacing:-.01em;
+    }
+    .kpi .lbl{
+      font-size:9.5px;font-weight:700;
+      text-transform:uppercase;letter-spacing:.06em;
+      color:#555;margin-top:2px;
+    }
+
+    /* === 节点链 === */
+    .chain{
+      display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+      background:var(--paper);border:2px solid var(--line);
+      padding:10px 12px;margin:8px 0;
+    }
+    .chain .node{
+      background:#fff;border:2px solid var(--line);
+      padding:5px 9px;font-size:11px;font-weight:800;
+    }
+    .chain .node.cur{background:var(--blue);color:#fff}
+    .chain .arr{font-size:14px;font-weight:900;color:var(--blue)}
+    .chain .grp{
+      display:flex;gap:5px;align-items:center;flex-wrap:wrap;
+      background:#eef1f6;border:1.5px dashed var(--line);
+      padding:5px 7px;
+    }
+    .chain .grp-lbl{
+      font-size:10px;font-weight:900;color:var(--blue);
+      text-transform:uppercase;letter-spacing:.06em;
+    }
+
+    /* === 章节小卡 === */
+    .mini{
+      background:#fff;border:2px solid var(--line);
+      padding:9px 11px;
+    }
+    .mini h4{font-size:12px;font-weight:900;margin-bottom:4px;color:var(--blue)}
+    .mini p{font-size:11px;line-height:1.55;color:#333}
+    .mini ul{font-size:11px;line-height:1.5;margin:3px 0 0 16px}
+
+    /* === 来源 / footer === */
+    .src-list{
+      background:var(--paper);border:2px solid var(--line);
+      padding:10px 14px;font-size:11px;
+    }
+    .src-list .src-item{
+      padding:4px 0;border-bottom:1px dashed #bbb;
+    }
+    .src-list .src-item:last-child{border-bottom:0}
+    .src-list .src-item .lab{
+      font-weight:900;color:var(--blue);
+      font-size:10px;text-transform:uppercase;letter-spacing:.04em;
+      margin-right:5px;
+    }
+    footer.foot{
+      margin-top:18px;padding-top:10px;
+      border-top:3px solid var(--line);
+      font-size:10.5px;color:#555;
+      display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+    }
+
+    /* === 响应式 === */
+    @media (max-width:760px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-hero{border-right:0;border-bottom:2px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+      .kpi-row{grid-template-columns:1fr 1fr}
+      .chain{flex-direction:column;align-items:flex-start}
+      .chain .arr{transform:rotate(90deg)}
+    }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ================================================================
+     顶栏 hero + meta pills
+============================================================= -->
+<div class="topbar">
+  <div class="topbar-hero">
+    <div class="kicker">iwe · v0.19.1 · Apache-2.0</div>
+    <h1>IWE：用 Rust 把 Markdown 目录变成可查询的知识图谱</h1>
+    <div class="sub">iwe 把任意 Markdown 文档树解析成结构化的「文档-章节-链接」知识图谱，并通过 CLI 和 MCP server 把同一份底层数据暴露给人和 LLM agent。它适合做笔记、知识库、文档站点的 LLM 检索层，以及任何「markdown 当数据库」的场景。</div>
+    <div class="tag-row">
+      <span class="tag">Rust</span>
+      <span class="tag">Markdown</span>
+      <span class="tag">Knowledge Graph</span>
+      <span class="tag">MCP</span>
+      <span class="tag">CLI</span>
+    </div>
+  </div>
+  <div class="topbar-meta">
+    <div class="meta-row-high">
+      <div class="meta-pill">
+        <span class="lbl">Repository</span>
+        <span class="val accent">iwe-org/iwe</span>
+      </div>
+      <div class="meta-pill">
+        <span class="lbl">Version</span>
+        <span class="val">v0.19.1</span>
+      </div>
+    </div>
+    <div class="meta-row-low">
+      <div class="meta-pill">
+        <span class="lbl">License</span>
+        <span class="val">Apache-2.0</span>
+      </div>
+      <div class="meta-pill">
+        <span class="lbl">Language</span>
+        <span class="val">Rust</span>
+      </div>
+      <div class="meta-pill">
+        <span class="lbl">Channel</span>
+        <span class="val">CLI + MCP</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     KPI 行
+============================================================= -->
+<section>
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="num">705<span style="font-size:11px">ms</span></div>
+      <div class="lbl">20,001 files · no BM25 · M3 Pro</div>
+    </div>
+    <div class="kpi">
+      <div class="num">958<span style="font-size:11px">ms</span></div>
+      <div class="lbl">20,001 files · with BM25 · M3 Pro</div>
+    </div>
+    <div class="kpi">
+      <div class="num">4 + 1</div>
+      <div class="lbl">MCP tools · search / retrieve / create / refactor</div>
+    </div>
+    <div class="kpi">
+      <div class="num">4</div>
+      <div class="lbl">编辑器集成：VS Code / Neovim / Zed / Helix</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     一句话定位
+============================================================= -->
+<section>
+  <div class="sec-title">01 · 一句话定位</div>
+  <div class="card-block">
+    <p>iwe 是一个 Rust workspace，把磁盘上的 <strong>Markdown 目录</strong>解析成一张「文档 → 章节 → 链接」的<strong>轻量知识图谱</strong>。它同时暴露两个面：</p>
+    <ul>
+      <li><strong>CLI 面</strong> —— 给人和脚本使用：<code>iwe init --okf</code> 一键初始化文件夹，<code>iwe schema validate</code> 校验文档结构，<code>iwe find --filter</code> 做语义查询。</li>
+      <li><strong>MCP server 面</strong> —— 给 LLM agent 使用：把 <code>search</code> / <code>retrieve</code> / <code>create</code> / <code>refactor</code> 四个工具暴露成 Model Context Protocol，任何 MCP 客户端（Claude Code、Cursor、自研 agent）都可以直接挂载。</li>
+    </ul>
+    <p>底层是同一份 <strong>document graph</strong>，所以人改 Markdown、agent 通过 MCP 改 Markdown、CI 用 CLI 校验，三条路径看到的是同一份事实。</p>
+  </div>
+</section>
+
+<!-- ================================================================
+     02 工作流：人 → Markdown → Graph → CLI/MCP → Agent
+============================================================= -->
+<section>
+  <div class="sec-title">02 · 工作流与角色分工</div>
+  <div class="sec-sub">左边是 Markdown 作者，中间是 iwe 内部 graph，右边是消费方</div>
+  <div class="chain">
+    <span class="grp">
+      <span class="grp-lbl">作者</span>
+      <span class="node">VS Code</span>
+      <span class="node">Neovim</span>
+      <span class="node">Zed</span>
+      <span class="node">Helix</span>
+    </span>
+    <span class="arr">→</span>
+    <span class="node">.md 文档树</span>
+    <span class="arr">→</span>
+    <span class="node cur">iwe graph</span>
+    <span class="arr">→</span>
+    <span class="grp">
+      <span class="grp-lbl">CLI</span>
+      <span class="node">init</span>
+      <span class="node">validate</span>
+      <span class="node">find</span>
+    </span>
+    <span class="arr">→</span>
+    <span class="grp">
+      <span class="grp-lbl">MCP</span>
+      <span class="node">search</span>
+      <span class="node">retrieve</span>
+      <span class="node">create</span>
+      <span class="node">refactor</span>
+    </span>
+    <span class="arr">→</span>
+    <span class="node">LLM agent</span>
+  </div>
+</section>
+
+<!-- ================================================================
+     03 CLI 命令面
+============================================================= -->
+<section>
+  <div class="sec-title">03 · CLI 命令面（v0.19.1）</div>
+  <div class="sec-sub">面向人和脚本。零依赖装 Rust 工具链后即可使用。</div>
+
+  <div class="grid-2">
+    <div class="card-block">
+      <h3>1) iwe init --okf</h3>
+      <p>在当前目录一键生成 iwe 推荐的结构：<code>index.md</code>、章节组织、推荐 frontmatter。</p>
+      <pre class="cmd"><span class="c"># 把空目录变成 iwe 知识库</span>
+<span class="k">$</span> iwe init <span class="k">--okf</span>
+<span class="c"># 已生成 index.md 与子章节模板</span></pre>
+    </div>
+
+    <div class="card-block">
+      <h3>2) iwe schema validate</h3>
+      <p>把整棵 Markdown 树当成 schema 文档校验：链接是否断、章节是否孤立、frontmatter 是否完整。</p>
+      <pre class="cmd"><span class="c"># CI 友好：非零退出码即失败</span>
+<span class="k">$</span> iwe schema validate ./docs
+<span class="c"># 3 docs validated, 0 errors</span></pre>
+    </div>
+
+    <div class="card-block">
+      <h3>3) iwe find --filter</h3>
+      <p>对图谱做语义查询：按标签、章节类型、引用关系过滤，支持 BM25 全文检索（启用后约 250ms 增量）。</p>
+      <pre class="cmd"><span class="c"># 找所有 tag=concept 的文档</span>
+<span class="k">$</span> iwe find <span class="k">--filter</span> tag=concept
+<span class="c"># 找引用过 auth.md 的章节</span>
+<span class="k">$</span> iwe find <span class="k">--filter</span> refs=auth.md</pre>
+    </div>
+
+    <div class="card-block">
+      <h3>4) iwe serve / iwe refactor</h3>
+      <p>serve 启动本地 HTTP；refactor 触发安全重命名、链接修复、章节迁移 —— 与 MCP 的 <code>refactor</code> 调用同一份逻辑。</p>
+      <pre class="cmd"><span class="c"># 本地预览与服务 agent</span>
+<span class="k">$</span> iwe serve <span class="k">--port</span> 4173
+<span class="c"># 全局重命名文档标题并修正链接</span>
+<span class="k">$</span> iwe refactor <span class="k">--rename</span> <span class="s">"Old"</span>:<span class="s">"New"</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     04 MCP 工具面
+============================================================= -->
+<section>
+  <div class="sec-title">04 · MCP 工具面（给 LLM agent 的 4 个工具）</div>
+  <div class="sec-sub">通过 Model Context Protocol 直接挂载到 Claude Code / Cursor / 自研 agent。</div>
+
+  <table class="t">
+    <thead>
+      <tr>
+        <th style="width:13%">工具</th>
+        <th style="width:24%">作用</th>
+        <th style="width:30%">关键参数</th>
+        <th style="width:33%">典型用法</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>search</strong></td>
+        <td>在知识图谱中按语义 / BM25 检索相关文档与章节</td>
+        <td><code>query</code>, <code>filter</code>, <code>limit</code></td>
+        <td>agent 在回答前先 <code>search("OAuth 流程")</code> 拿上下文</td>
+      </tr>
+      <tr>
+        <td><strong>retrieve</strong></td>
+        <td>读取指定文档 / 章节的完整内容与元数据</td>
+        <td><code>path</code>, <code>section</code></td>
+        <td><code>retrieve("docs/auth.md", "token-rotation")</code></td>
+      </tr>
+      <tr>
+        <td><strong>create</strong></td>
+        <td>新建文档 / 章节，并自动补全反向链接</td>
+        <td><code>path</code>, <code>template</code>, <code>frontmatter</code></td>
+        <td>agent 生成新 ADR / note，自动挂在正确位置</td>
+      </tr>
+      <tr>
+        <td><strong>refactor</strong></td>
+        <td>安全重命名、链接修复、章节迁移</td>
+        <td><code>old_path</code>, <code>new_path</code>, <code>cascade</code></td>
+        <td>把 <code>auth.md</code> 改名后所有引用一次性更新</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================================================================
+     05 编辑器集成
+============================================================= -->
+<section>
+  <div class="sec-title">05 · 编辑器集成（4 套）</div>
+  <div class="sec-sub">每套都是 LSP 形式直连 iwe 内部 API，不走 HTTP。</div>
+  <div class="grid-4">
+    <div class="mini">
+      <h4>VS Code</h4>
+      <p>官方扩展 <code>iwe.vscode-iwe</code>，补全、跳转、graph 面板。</p>
+    </div>
+    <div class="mini">
+      <h4>Neovim</h4>
+      <p>通过 <code>nvim-lspconfig</code> 注册 <code>iwe-ls</code>，与 Telescope 配合。</p>
+    </div>
+    <div class="mini">
+      <h4>Zed</h4>
+      <p>在 <code>settings.json</code> 里加 iwe LSP，秒级补全。</p>
+    </div>
+    <div class="mini">
+      <h4>Helix</h4>
+      <p>内置 LSP 机制直接接管 <code>markdown</code> filetype。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     06 性能 benchmark
+============================================================= -->
+<section>
+  <div class="sec-title">06 · 性能基准（README 合成）</div>
+  <div class="sec-sub">仅来自官方 README 合成结果，非通用性能保证。</div>
+
+  <div class="grid-2">
+    <div class="card-block">
+      <h3>Apple M3 Pro · 20,001 files</h3>
+      <table class="t">
+        <tr><th>模式</th><th>耗时</th></tr>
+        <tr><td>无 BM25（仅 graph 解析）</td><td><strong>705 ms</strong></td></tr>
+        <tr><td>开启 BM25 全文索引</td><td><strong>958 ms</strong></td></tr>
+      </table>
+      <p style="font-size:11px;color:#666;margin-top:6px">实测数据集、文件类型分布、命令参数以官方仓库 README 为准；不可外推到其它硬件、文档大小或 markdown 写法。</p>
+    </div>
+
+    <div class="card-block">
+      <h3>什么时候这个数字有意义</h3>
+      <ul>
+        <li><strong>整树扫描 &lt; 1 秒</strong>：做 CI 校验、agent 启动时一次性加载都够用。</li>
+        <li><strong>增量场景默认不重扫</strong>：LSP 监听文件改动，graph 增量更新。</li>
+        <li><strong>BM25 是可选项</strong>：需要全文检索才开；纯图谱操作不付这个代价。</li>
+        <li><strong>不能跨硬件横比</strong>：M3 Pro / Apple Silicon 结果与 x86 服务器、笔记本差异较大。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     07 适用 / 不适用
+============================================================= -->
+<section>
+  <div class="sec-title">07 · 适用与不适用</div>
+
+  <div class="grid-2">
+    <div class="card-block">
+      <h3>✅ 推荐场景</h3>
+      <ul>
+        <li>个人 / 团队的 <strong>Markdown 笔记系统</strong>（Obsidian 替代品倾向）。</li>
+        <li>把 <strong>文档站点</strong>（VitePress / Docusaurus 之前）当作 queryable 数据库用。</li>
+        <li>给 LLM agent 提供 <strong>可检索、可改写</strong> 的知识库底座。</li>
+        <li><strong>ADR / RFC / 决策记录</strong> 的强链接、强校验场景。</li>
+        <li>需要 <strong>纯文本 source of truth</strong>、git diff 友好的知识沉淀。</li>
+      </ul>
+    </div>
+
+    <div class="card-block">
+      <h3>⚠️ 不太适合</h3>
+      <ul>
+        <li>需要 <strong>全文 + 向量混合检索</strong> 的 RAG（iwe 没有内建 embedding 索引）。</li>
+        <li>非 Markdown 内容为主的 wiki（PDF、视频、数据库 schema）。</li>
+        <li><strong>实时协作编辑</strong>：iwe 是 single-writer of truth（git），不是 CRDT 协同。</li>
+        <li>需要 <strong>富文本所见即所得</strong> 编辑器的工作流。</li>
+        <li>对 <strong>超大二进制附件</strong>（&gt;100 MB / 文件）的内联管理。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     08 快速上手
+============================================================= -->
+<section>
+  <div class="sec-title">08 · 5 步上手</div>
+
+  <div class="card-block">
+    <h3>Step 1 · 安装 iwe</h3>
+    <pre class="cmd"><span class="c"># 推荐从 crates.io（Rust 工具链）</span>
+<span class="k">$</span> cargo install iwe
+<span class="c"># 或预编译二进制（见官方仓库 Releases）</span></pre>
+  </div>
+
+  <div class="card-block">
+    <h3>Step 2 · 初始化知识库</h3>
+    <pre class="cmd"><span class="k">$</span> mkdir my-kb && <span class="k">cd</span> my-kb
+<span class="k">$</span> iwe init <span class="k">--okf</span>
+<span class="c"># 自动生成 index.md 与模板子目录</span></pre>
+  </div>
+
+  <div class="card-block">
+    <h3>Step 3 · 编辑 + 装编辑器扩展</h3>
+    <p>用 VS Code / Neovim / Zed / Helix 任一打开目录，iwe LSP 自动接管 Markdown 文件类型。</p>
+  </div>
+
+  <div class="card-block">
+    <h3>Step 4 · 接入 LLM agent（以 Claude Code 为例）</h3>
+    <pre class="cmd"><span class="c"># claude_desktop_config.json / .mcp.json</span>
+{
+  <span class="s">"mcpServers"</span>: {
+    <span class="s">"iwe"</span>: {
+      <span class="s">"command"</span>: <span class="s">"iwe"</span>,
+      <span class="s">"args"</span>: [<span class="s">"serve"</span>],
+      <span class="s">"cwd"</span>: <span class="s">"./my-kb"</span>
+    }
+  }
+}</pre>
+    <p style="font-size:11px;margin-top:6px">挂上之后，agent 能用 search / retrieve / create / refactor 直接操作你的 Markdown。</p>
+  </div>
+
+  <div class="card-block">
+    <h3>Step 5 · CI 校验</h3>
+    <pre class="cmd"><span class="c"># GitHub Actions 片段</span>
+- run: cargo install iwe
+- run: iwe schema validate ./docs</pre>
+  </div>
+</section>
+
+<!-- ================================================================
+     09 来源
+============================================================= -->
+<section>
+  <div class="sec-title">09 · 来源与时间戳</div>
+  <div class="src-list">
+    <div class="src-item"><span class="lab">官方仓库</span> https://github.com/iwe-org/iwe （HEAD 54074f46）</div>
+    <div class="src-item"><span class="lab">版本</span> iwe-v0.19.1（最新官方 HEAD 54074f46）</div>
+    <div class="src-item"><span class="lab">许可证</span> Apache-2.0</div>
+    <div class="src-item"><span class="lab">性能数据</span> 官方 README 合成 benchmark：20,001 files on Apple M3 Pro —— 705 ms (no BM25) / 958 ms (with BM25)。来源原文标注「synthetic benchmark」，不可外推为通用性能保证。</div>
+    <div class="src-item"><span class="lab">CLI 命令</span> <code>iwe init --okf</code> / <code>iwe schema validate</code> / <code>iwe find --filter</code>，均来自官方 README 与 docs/。</div>
+    <div class="src-item"><span class="lab">MCP 工具</span> <code>search</code> / <code>retrieve</code> / <code>create</code> / <code>refactor</code>，来自仓库 README 的 MCP server 章节。</div>
+    <div class="src-item"><span class="lab">编辑器集成</span> VS Code / Neovim / Zed / Helix 四套 LSP 集成，来自 README editor integrations 段落。</div>
+    <div class="src-item"><span class="lab">发现来源（附注）</span> X 平台 status id 2088981624872661324，作者 @GitHubDaily，快照：4 likes / 1 retweet / 1 reply / 1159 views / 10 bookmarks。本卡正文与命令示例不依赖该 X 帖的具体措辞，仅以官方仓库为事实依据。</div>
+    <div class="src-item"><span class="lab">信息卡抓取时间</span> 2026-08-18 UTC</div>
+  </div>
+</section>
+
+<!-- ================================================================
+     footer
+============================================================= -->
+<footer class="foot">
+  <span>infocard-pub · 20260818-iwe-knowledge-graph-memory · hardblue · Apache-2.0</span>
+  <span>visual: PENDING · build/PAGES PASS</span>
+</footer>
+
+</div>
+</body></html>
