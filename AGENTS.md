@@ -1,5 +1,18 @@
 # Repository Guidelines
 
+## Infocard 发布前视觉门禁（硬规则）
+
+任何信息卡创建、修复、重建、发布或 push 前，必须先读取并执行项目内流程：
+
+- `.agents/skills/productivity/infocard-publish-sop/SKILL.md`
+- `.agents/skills/productivity/visual-verification-gate/SKILL.md`
+- `.agents/skills/infocard-styles/infocard-visual-evidence-grounding/SKILL.md`
+
+顺序是硬门禁：**本地渲染 → 桌面与移动截图 → critical/major/minor 结论 → `npm run verify:visual-gate -- docs/<slug>.html` → build/verify → commit → push → 公网重新截图复核**。
+
+禁止把 `HTTP 200`、`npm run build`、DOM/CSS token、或单端截图当作视觉通过。任何 HTML/CSS/结构/内容改动都会使旧截图与旧 manifest 失效。不得在 `docs/*.html` 中把 `theme/*.html` 当作 stylesheet 引用。
+
+
 ## 项目结构与内容模型
 
 本仓库通过 GitHub Pages 发布静态信息卡。主要内容放在 `docs/`：使用 `docs/YYYYMMDD-slug.html` 或 `docs/YYYYMMDD-slug/index.html`。每张已发布卡片都必须有同名 `.meta.yaml`，其中的 `path` 必须与实际发布路径完全一致。

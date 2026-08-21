@@ -14,6 +14,20 @@ metadata:
 
 ## Purpose
 
+## STOP GATE — Pre-push visual evidence is mandatory
+
+Before `npm run build`, commit, or push for any changed card HTML/CSS/structure/content:
+
+1. Render the exact local candidate from the current worktree.
+2. Capture desktop and mobile screenshots/regions.
+3. Produce explicit `critical / major / minor` findings.
+4. Persist a visual evidence manifest bound to the current HTML sha256.
+5. Run `npm run verify:visual-gate -- docs/<slug>.html`.
+6. Block release unless every required viewport is `0 critical / 0 major`.
+
+`HTTP 200`, build success, DOM checks, CSS token presence, and previous screenshots are preconditions only; none authorize push. Any HTML/CSS/structure/content edit invalidates prior evidence. After push, verify public HTML identity and run a fresh public visual review; report local and public visual states separately.
+
+
 The leading word is **route**. This is the sole entry for an infocard run and the medium orchestrator: it directly handles a simple card or coordinates bounded specialist handoffs for a complex card. It owns run state and the authorized release outcome; it does not own theme reconstruction or open-ended visual redesign.
 
 Load `references/infocard-publish-protocol-v3.md` before selecting a route. It is the single source of truth for bundle schema, `.docs/<card>/` authoring, promotion manifests, retry budgets, states, audits, and migration.
@@ -75,9 +89,7 @@ Any HTML, CSS, or structure change invalidates prior visual evidence. After prom
 
 ## Publish and audit
 
-<<<<<<< HEAD
 When authoring is complete, call `infocard-pub-publisher` with the frozen bundle. It validates and promotes only the manifest, then runs the repository gates from the authorized checkout. The canonical gate sequence is:
-=======
 **⚠️ Authoring subagent timeout vs. detached HEAD (2026-07-23)**: There are TWO failure shapes after subagent `status=timeout`. Distinguish before recovery:
 
 1. **Detached HEAD commit exists**: `git log --all --oneline` shows a new commit on a detached HEAD. Recovery: `git checkout -b publish/<slug>-YYYYMMDD` → continue.
@@ -359,7 +371,6 @@ The publisher must mechanically check: assignment-record completeness; canonical
 ## Pre-publish LLM Wiki duplicate gate
 
 Before authoring or releasing a new card, query the current LLM Wiki read-only:
->>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 
 ```bash
 npm run build
@@ -397,11 +408,8 @@ Then report literal verification commands and results, the retained `.docs/<card
 
 ## Completion language
 
-<<<<<<< HEAD
 Report evidence by layer: `build/static`, `public HTTP/index`, and `mobile visual`. Do not call a card or batch complete when a required layer is pending. Preserve exact `VISUAL_PENDING`, `BLOCKED_AT_LOCAL_GATE`, `BLOCKED_AT_INTEGRATION`, `PAGES_VERIFICATION_FAILED`, `FAILED`, or `AUDIT_PENDING` states.
-=======
 Before final delivery, perform a residue pass: stop temporary HTTP servers, remove only verified scratch files, run `node scripts/infocard-worktree.js list --repo <repo>` to report historical publish worktrees, and re-run `git status -sb` in both target repositories. Preserve intentional `.tmp` artifacts and all publish worktrees by default. Do not remove worktrees during ordinary closeout; prompt the user to reply exactly `del-rm` if they want the safe cleanup pass.
->>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 
 ## Boundaries
 

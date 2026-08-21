@@ -10,7 +10,6 @@ const test = require('node:test');
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = path.join(ROOT, 'scripts/verify-publish-local-gate.js');
 const yaml = require(path.join(ROOT, 'assets/home/vendor/js-yaml.min.js'));
-const { fixedWorktreeRoot } = require(path.join(ROOT, 'scripts/lib/infocard-worktree.js'));
 
 const FIXTURE_ROOTS = [];
 
@@ -21,13 +20,8 @@ function git(cwd, args) {
 }
 
 function fixture() {
-<<<<<<< HEAD
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-primary-gate-'));
-=======
-  fs.mkdirSync(fixedWorktreeRoot(), { recursive: true });
-  const root = fs.mkdtempSync(path.join(fixedWorktreeRoot(), 'publish-local-gate-'));
   FIXTURE_ROOTS.push(root);
->>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
   git(root, ['init', '-q']);
   git(root, ['config', 'user.email', 'test@example.com']);
   git(root, ['config', 'user.name', 'Test']);
@@ -80,21 +74,12 @@ test('prebuild accepts the primary repository cwd and strict sidecar', () => {
   assert.equal(result.json.phase, 'prebuild');
 });
 
-<<<<<<< HEAD
 test('prebuild rejects execution outside the primary repository root', () => {
   /**
    * Given：bundle 属于一个 primary repository。
    * When：从 repo 外部 cwd 调用同一个 bundle。
    * Then：gate 拒绝运行，避免相对路径落到错误目录。
    * 防回归：迁移到 primary repo 后仍必须保留 cwd containment。
-=======
-test('prebuild blocks execution outside declared worktree and rejects relative roots', () => {
-  /**
-   * Given：bundle.repository.root 是发布 worktree 的唯一运行时根目录。
-   * When：命令不在声明目录运行，或 root 使用相对路径。
-   * Then：prebuild 必须拒绝，避免同一 bundle 在不同 CWD 指向不同目录。
-   * 防回归：防止发布流程重新混用主仓库与 publish worktree。
->>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
    */
   const f = fixture();
   const result = run(os.tmpdir(), path.join(f.root, 'bundle.json'));
@@ -132,50 +117,6 @@ test('prebuild rejects formal publish outputs inside .docs', () => {
   const result = run(f.root, 'docs-output.json');
   assert.notEqual(result.status, 0);
   assert.ok(result.json.errors.some((error) => error.field === 'html_path'));
-});
-
-test('prebuild rejects repo-local worktrees outside the fixed temp infocard-worktree root', () => {
-  /**
-   * Given：新协议要求发布 worktree 只允许放在系统 temp/infocard-worktree 下。
-   * When：bundle.repository.root 指向仓库内 wt-* 旧路径。
-   * Then：prebuild 必须拒绝该路径。
-   * 防回归：阻止再次在主仓库下创建 gitlink 风险目录或散落历史 WT。
-   */
-  const f = fixture();
-  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-local-gate-outside-'));
-  git(outside, ['init', '-q']);
-  const bundle = JSON.parse(fs.readFileSync(path.join(f.root, 'bundle.json'), 'utf8'));
-  bundle.repository.root = outside;
-  fs.writeFileSync(path.join(outside, 'bundle.json'), JSON.stringify(bundle));
-  const result = run(outside, 'bundle.json');
-
-  assert.notEqual(result.status, 0);
-  assert.ok(result.json.errors.some((error) => error.field === 'repository.root'));
-});
-
-test('prebuild allows an explicit user-supplied external recovery worktree policy', () => {
-  /**
-   * Given：兼容性要求允许用户显式指定既有外部 recovery worktree。
-   * When：bundle.repository.root 在固定 temp 根目录外，但声明 root_policy=external-user-supplied。
-   * Then：prebuild 可以继续执行普通 worktree 与 sidecar 校验。
-   * 防回归：固定路径规则不能误伤用户明确给出的接管场景。
-   */
-  const f = fixture();
-  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-local-gate-external-'));
-  git(outside, ['init', '-q']);
-  git(outside, ['config', 'user.email', 'test@example.com']);
-  git(outside, ['config', 'user.name', 'Test']);
-  fs.cpSync(f.root, outside, { recursive: true, force: true });
-  const bundle = JSON.parse(fs.readFileSync(path.join(outside, 'bundle.json'), 'utf8'));
-  bundle.repository.root = outside;
-  bundle.repository.root_policy = 'external-user-supplied';
-  fs.writeFileSync(path.join(outside, 'bundle.json'), JSON.stringify(bundle));
-  git(outside, ['add', '.']);
-  git(outside, ['commit', '-qm', 'external fixture']);
-
-  const result = run(outside, 'bundle.json');
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.json.valid, true);
 });
 
 test('prebuild rejects a sidecar with multiple YAML documents or missing required fields', () => {

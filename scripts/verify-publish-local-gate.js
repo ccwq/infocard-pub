@@ -10,7 +10,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const yaml = require('../assets/home/vendor/js-yaml.min.js');
-const { fixedWorktreeRoot, isInsideFixedWorktreeRoot } = require('./lib/infocard-worktree');
 const { loadBundle, validateBundle } = require('./lib/publish-bundle');
 const { extractInjectedIndexData } = require('./index-build-lib');
 
@@ -119,39 +118,6 @@ function parseStrictSingleDocumentMeta(text) {
   return docs[0];
 }
 
-<<<<<<< HEAD
-=======
-function verifyWorktree(bundle, cwd) {
-  const errors = [];
-  if (!bundle.repository || typeof bundle.repository.root !== 'string' || bundle.repository.root.trim() === '') {
-    return [error('repository.root', 'is required and must declare the dedicated publish worktree')];
-  }
-  if (!path.isAbsolute(bundle.repository.root)) {
-    return [error('repository.root', 'must be an absolute dedicated publish worktree path')];
-  }
-  const declared = path.resolve(bundle.repository.root);
-  if (!fs.existsSync(declared)) return [error('repository.root', 'declared worktree does not exist')];
-  const rootPolicy = bundle.repository.root_policy || 'fixed-temp';
-  if (rootPolicy !== 'fixed-temp' && rootPolicy !== 'external-user-supplied') {
-    return [error('repository.root_policy', 'must be fixed-temp or external-user-supplied')];
-  }
-  if (rootPolicy === 'fixed-temp' && !isInsideFixedWorktreeRoot(declared)) {
-    return [error('repository.root', 'must be inside ' + fixedWorktreeRoot())];
-  }
-  try {
-    git(declared, ['rev-parse', '--is-inside-work-tree']);
-  } catch (cause) {
-    errors.push(error('repository.root', 'declared root is not a Git worktree'));
-  }
-  try {
-    if (!isSameDirectory(cwd, declared)) errors.push(error('repository.root', 'current directory must equal the declared publish worktree'));
-  } catch (cause) {
-    errors.push(error('repository.root', `cannot resolve worktree: ${cause.message}`));
-  }
-  return errors;
-}
-
->>>>>>> c23d4d1f2ee3dd05cbbbeb57333bc2f5479e6fdf
 function verifyMeta(bundle, root) {
   const errors = [];
   const metaAbsolute = path.resolve(root, bundle.meta_path || '');
