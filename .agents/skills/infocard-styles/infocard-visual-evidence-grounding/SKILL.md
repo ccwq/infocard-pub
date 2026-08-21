@@ -27,6 +27,14 @@ Use evidence in this order:
 
 A vision report that contradicts the DOM must be recorded as a false-positive or unresolved discrepancy, not silently turned into a design requirement.
 
+### Known vision model limitations
+
+Vision models are reliable for spatial/compositional findings but systematically unreliable for:
+
+1. **Date/number hallucination** — A date like `2026-08-21` in the HTML may be read as `2026-07-27` or another plausible near-date. Always cross-verify numeric data fields by fetching the actual HTML (`curl <url>` or `web_extract`) and grepping for the value, rather than trusting the screenshot description.
+2. **Color consistency** — The same CSS color value may be described differently across multiple screenshot reads. Treat color descriptions as approximate unless the contrast ratio is clearly broken.
+3. **Anchoring bias** — If the agent already holds a file-based assumption (e.g. "this page uses darkblue theme"), the vision description gets filtered through that assumption. Force a first-pass reading of "what do I actually see?" before comparing against any file-based claim.
+
 ## Standard review loop
 
 ### 1. Freeze target and scope
@@ -79,6 +87,18 @@ Any HTML/CSS/structure change invalidates affected visual evidence. Re-render wi
 
 Judge against the selected theme's actual contract, not a reviewer-implied variant. For example, a redswiss single-project card may legitimately use the standard topbar variant; a reviewer expecting a diagonal hero is not proof that the card is wrong. Verify implemented tokens and structural classes first.
 
+### Theme cross-validation (CRITICAL mandatory step)
+
+**Every visual review MUST complete this step before any other finding:**
+
+1. From the screenshot, describe in one sentence: "The page background is [light/dark] and the overall tone is [warm/cool/neutral]."
+2. From the HTML source, read the `<link rel="stylesheet" href="../theme/X.html">` tag to get the declared theme name.
+3. Cross-check: does the screenshot's visual description match the declared theme's documented appearance?
+   - **If NO** (e.g., screenshot shows white/light background but declared theme is darkblue): this is a **Critical** issue — the theme failed to load, the page is showing fallback/unstyled content. Record as `THEME_MISMATCH`.
+   - If the declared theme is verified to produce the observed visual, proceed.
+
+This step prevents the most common failure mode: checking layout/content while the page is visually broken due to a missing or wrong theme.
+
 ## Public artifact truth and code-overflow proof
 
 A local repair, local screenshot, successful build, or HTTP 200 is not evidence that the public artifact changed. Before declaring a repair complete, compare the exact cache-busted public HTML with the candidate's release fingerprint: target slug/title, theme marker, canonical tokens, structural signatures, and a release-specific marker. If the public response still has the old fingerprint, classify the result as `PUBLIC_UNCHANGED` / `LOCAL_ONLY`; an unchanged public screenshot proves non-delivery, not successful repair.
@@ -102,12 +122,14 @@ Session-specific examples and verification snippets are in `references/visual-re
 
 ## Checklist
 
+- [ ] **Theme cross-validation first** — screenshot visual vs declared HTML `<link>` theme; THEME_MISMATCH is Critical.
 - [ ] Exact target and viewport recorded.
 - [ ] Viewport crop distinguished from full-page content.
 - [ ] DOM existence and geometry checked for critical findings.
 - [ ] Page-level overflow separated from local table/code scrolling.
 - [ ] Fixed/sticky controls checked for actual overlap.
 - [ ] Computed font sizes checked.
+- [ ] Date/number fields cross-verified against raw HTML (vision model date hallucination warning).
 - [ ] Findings classified as critical/major/minor/false-positive/pending.
 - [ ] Fresh screenshots captured after visible repairs.
 - [ ] Static, public, and visual states reported separately.
