@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>noScribe — 访谈录音本地转文字稿（Whisper + pyannote）</title>
+  <meta name="description" content="kaixxx/noScribe：访谈录音丢进去，自动出稿，还能区分谁说了什么。完全本地运行，保护受访者隐私。约60种语言，GitHub 2.1k Stars。" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--red:#ff6b6b;--shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box} html,body{margin:0;padding:0;overflow-x:hidden}
+    img{display:block;max-width:100%;height:auto}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(circle at 18% 10%,rgba(88,195,255,.16) 0 10%,transparent 11%),radial-gradient(circle at 86% 8%,rgba(132,89,255,.18) 0 9%,transparent 10%),radial-gradient(circle at 72% 72%,rgba(45,179,106,.10) 0 13%,transparent 14%),radial-gradient(circle at 18% 78%,rgba(244,200,76,.08) 0 11%,transparent 12%),linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%)}
+    a{color:inherit;text-decoration:none}.page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 42px}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(280px,.95fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;font:900 11.2px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .title{margin:0;font-size:clamp(40px,7vw,80px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.36) 0 10%,transparent 11%),linear-gradient(135deg,var(--cyan) 0%,var(--blue) 34%,var(--purple) 68%,var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24),inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:23px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11.2px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11.2px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.6px;line-height:1.45;color:#c9d4f7}
+
+    .x-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:18px;padding:12px 14px;margin-bottom:14px}
+    .x-item{text-align:center}
+    .x-item .n{font-size:26px;font-weight:950;color:#fff;line-height:1}
+    .x-item .l{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#6f7fad;text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
+    .x-item .a{font-size:11.5px;font-weight:800;color:var(--cyan);margin-top:6px}
+
+    .flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+    .phase{padding:12px 10px 10px;border-right:1px solid rgba(255,255,255,.1);display:grid;gap:6px;min-width:0}
+    .phase:last-child{border-right:none}
+    .phase .n{display:block;font:950 22px/1 Georgia,"Times New Roman",serif}
+    .phase .t{font:900 11.2px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .phase .d{font-size:11.4px;line-height:1.52;color:#9fb0de}
+    .phase:nth-child(1) .n{color:var(--cyan)}
+    .phase:nth-child(2) .n{color:var(--blue)}
+    .phase:nth-child(3) .n{color:var(--green)}
+    .phase:nth-child(4) .n{color:var(--yellow)}
+    .phase:nth-child(5) .n{color:var(--purple)}
+
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .card{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px;box-shadow:0 8px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:10px}
+    .card-kicker{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .card-title{margin:0;font-size:16px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .card-body{display:grid;gap:8px;flex:1}
+    .point{padding:7px 9px 6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;display:grid;gap:3px}
+    .point .t{font-size:12.2px;font-weight:800;line-height:1.3}
+    .point .d{font-size:11.6px;line-height:1.55;color:#9fb0de}
+
+    .code-block{background:#080b14;border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:12px 14px;margin-bottom:14px;box-shadow:0 8px 20px rgba(0,0,0,.22)}
+    .code-block .tag{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--cyan);font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;color:#c9d4f7;white-space:pre-wrap;overflow-wrap:anywhere}
+
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .cmp{min-width:0;border-radius:18px;padding:14px;display:grid;gap:10px}
+    .cmp.bad{background:rgba(255,107,107,.08);border:1.5px solid rgba(255,107,107,.2)}
+    .cmp.good{background:rgba(45,179,106,.08);border:1.5px solid rgba(45,179,106,.2)}
+    .cmp-head{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .cmp.bad .cmp-head{color:var(--red)}
+    .cmp.good .cmp-head{color:var(--green)}
+    .cmp-body{display:grid;gap:7px}
+    .cmp-item{font-size:12.5px;line-height:1.5;color:#c5d2f7;padding-left:14px;border-left:2px solid rgba(255,255,255,.1)}
+    .cmp.good .cmp-item{border-left-color:rgba(45,179,106,.4)}
+    .cmp.bad .cmp-item{border-left-color:rgba(255,107,107,.3)}
+
+    .section{margin-bottom:14px}
+    .section-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .section-no{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(74,120,255,.28),rgba(88,195,255,.18));border:1.5px solid rgba(88,195,255,.28);box-shadow:0 8px 20px rgba(88,195,255,.14);font:950 18px/1 Georgia,"Times New Roman",serif;color:#fff;flex:0 0 auto}
+    .section-label{font:900 11.2px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}
+    .panel-kicker{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
+    .feat .label{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .feat .value{font-size:12.5px;font-weight:800;line-height:1.3;color:#eef4ff}
+
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1.5px solid rgba(255,255,255,.09);background:rgba(9,12,22,.42);border-radius:18px;padding:12px 14px 10px;box-shadow:var(--shadow)}
+    .footer .brand{font-weight:900;color:#fff;font-size:15px;letter-spacing:-.02em}
+    .footer .links{display:flex;flex-wrap:wrap;gap:6px}
+    .footer .link-item{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4}
+    .footer .meta{font:800 11.2px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#6f7fad;text-align:right}
+
+    .alert{border:1.5px solid rgba(244,200,76,.28);background:rgba(244,200,76,.08);border-radius:18px;padding:12px 14px;margin-bottom:14px;display:grid;gap:8px}
+    .alert-head{font:900 11.2px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--yellow)}
+    .alert-body{display:grid;gap:6px}
+    .alert-item{font-size:12.5px;line-height:1.5;color:#e8eefc;padding-left:12px;border-left:2px solid rgba(244,200,76,.3)}
+
+    @media(max-width:960px){.hero,.compare{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,minmax(0,1fr))}.grid3{grid-template-columns:1fr 1fr}.footer{flex-direction:column}.footer .meta{text-align:left}}
+    @media(max-width:720px){
+      .grid3{grid-template-columns:1fr}
+      .page{width:min(100% - 14px,1180px);padding:12px 0 32px}
+      .hero,.flow,.grid3,.compare{grid-template-columns:1fr}
+      .shell{display:none}
+      .title{font-size:clamp(36px,10vw,62px)}
+      .x-meta{grid-template-columns:1fr 1fr}
+      .footer{flex-direction:column}
+      .footer .link-item{font-size:11.2px}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker">kaixxx/noScribe · GitHub 2.1k Stars</span>
+      </div>
+      <h1 class="title">noScribe<br>访谈转录</h1>
+      <p class="subtitle">访谈录音丢进去，自动出稿，还能分清谁说了什么。完全本地运行，保护受访者隐私。支持约60种语言。</p>
+      <div class="pill-row">
+        <span class="pill cyan">Whisper 本地识别</span>
+        <span class="pill green">pyannote 说话人分离</span>
+        <span class="pill yellow">60 种语言</span>
+        <span class="pill purple">GPL-3.0</span>
+        <span class="pill">社会科学研究</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">🎙</div>
+        <div class="visual-meta">
+          <span class="big" style="color:var(--cyan)">2,119</span>
+          <span class="small">GitHub Stars</span>
+          <span class="big" style="color:var(--green)">350</span>
+          <span class="small">Forks</span>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <div class="mini-card">
+          <div class="label">核心引擎</div>
+          <div class="value">Whisper + pyannote</div>
+          <div class="desc">OpenAI Whisper 语音识别</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">说话人分离</div>
+          <div class="value">Diarization</div>
+          <div class="desc">pyannote 自动区分发言者</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">版本</div>
+          <div class="value">v0.7</div>
+          <div class="desc">官方站 noscribe.de</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">作者</div>
+          <div class="value">Kai Dröge</div>
+          <div class="desc">PhD 社会学</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- X 帖子数据 -->
+  <div class="x-meta">
+    <div class="x-item"><div class="n">—</div><div class="l">推荐者</div><div class="a">@Ryrenz (Ren)</div></div>
+    <div class="x-item"><div class="n">2.1k</div><div class="l">GitHub Stars</div><div class="a">kaixxx/noScribe</div></div>
+    <div class="x-item"><div class="n">X</div><div class="l">帖子</div><div class="a">2026-08-21</div></div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="flow">
+    <div class="phase"><span class="n">01</span><span class="t" style="color:var(--cyan)">导入</span><div class="d">拖入访谈录音（MP3/WAV/M4A）</div></div>
+    <div class="phase"><span class="n">02</span><span class="t" style="color:var(--blue)">Whisper</span><div class="d">本地语音识别，约60种语言</div></div>
+    <div class="phase"><span class="n">03</span><span class="t" style="color:var(--green)">分离</span><div class="d">pyannote 区分不同说话人</div></div>
+    <div class="phase"><span class="n">04</span><span class="t" style="color:var(--yellow)">编辑器</span><div class="d">内置编辑器核查修正文字稿</div></div>
+    <div class="phase"><span class="n">05</span><span class="t" style="color:var(--purple)">导出</span><div class="d">Word / TXT / JSON 格式</div></div>
+  </div>
+
+  <!-- Section 1: Core Features -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-label">Core Features · 核心功能</div>
+    </div>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-kicker" style="color:var(--cyan)">ASR · 语音识别</div>
+        <h2 class="card-title">Whisper 本地转写</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">OpenAI Whisper</div><div class="d">基于 OpenAI Whisper 模型，完全本地运行，无需联网</div></div>
+          <div class="point"><div class="t">faster-whisper</div><div class="d">使用 Guillaume Klein 的 faster-whisper 实现，效率更高</div></div>
+          <div class="point"><div class="t">约 60 种语言</div><div class="d">西班牙语、意大利语、英语、葡萄牙语、德语效果最佳</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--green)">Diarization · 说话人分离</div>
+        <h2 class="card-title">pyannote 自动分轨</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">pyannote.audio</div><div class="d">Hervé Bredin 的 pyannote 实现说话人 diarization</div></div>
+          <div class="point"><div class="t">自动区分发言者</div><div class="d">分清谁在什么时候说了什么，无需手动标记</div></div>
+          <div class="point"><div class="t">用于社会科学</div><div class="d">质性研究访谈的理想工具，保留受访者隐私</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--yellow)">Editor · 内置编辑器</div>
+        <h2 class="card-title">边转边核查</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">内置核查界面</div><div class="d">转录完成后可直接在界面中核查和修正文字稿</div></div>
+          <div class="point"><div class="t">导出多格式</div><div class="d">支持 Word (.docx)、纯文本 (.txt)、JSON 导出</div></div>
+          <div class="point"><div class="t">完全本地处理</div><div class="d">音频、文字稿、受访者声音数据均不离本机</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Use Cases & Privacy -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-no">02</div>
+      <div class="section-label">Use Cases · 适用场景 &amp; 隐私保护</div>
+    </div>
+    <div class="shell">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">适用场景</span></div>
+        <div class="feat"><div class="label">社会科学</div><div class="value">质性研究访谈、民族志调查</div></div>
+        <div class="feat"><div class="label">新闻采访</div><div class="value">记者采访录音快速整理文字稿</div></div>
+        <div class="feat"><div class="label">口述历史</div><div class="value">历史访谈记录存档与转录</div></div>
+        <div class="feat"><div class="label">学术研究</div><div class="value">心理学、教育学、医学访谈</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">隐私保护</span></div>
+        <div class="feat"><div class="label">音频文件</div><div class="value">保留在本机，不上传任何服务器</div></div>
+        <div class="feat"><div class="label">文字稿</div><div class="value">本机存储，全流程本地运行</div></div>
+        <div class="feat"><div class="label">模型推理</div><div class="value">Whisper + pyannote 均在本机执行</div></div>
+        <div class="feat"><div class="label">受访者保护</div><div class="value">符合社会科学研究伦理要求</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-kicker">输出格式</span></div>
+        <div class="feat"><div class="label">Word</div><div class="value">.docx，含说话人标签</div></div>
+        <div class="feat"><div class="label">纯文本</div><div class="value">.txt，带时间戳和说话人</div></div>
+        <div class="feat"><div class="label">JSON</div><div class="value">结构化数据，便于程序处理</div></div>
+        <div class="feat"><div class="label">字幕</div><div class="value">可导出 SRT 字幕格式</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Limitations -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-no">03</div>
+      <div class="section-label">Limitations · 已知局限</div>
+    </div>
+    <div class="alert">
+      <div class="alert-head">⚠ 购买/部署前需了解</div>
+      <div class="alert-body">
+        <div class="alert-item">首次下载模型约数 GB，需稳定网络连接</div>
+        <div class="alert-item">一小时录音在普通机器上需约三小时转录，慢机器时间更长</div>
+        <div class="alert-item">音频质量差时转录准确率显著下降</div>
+        <div class="alert-item">自动转录永远需要人工核查，不能完全替代人工整理</div>
+        <div class="alert-item">Windows/macOS/Linux 均可，但需安装 Python 环境</div>
+      </div>
+    </div>
+    <div class="compare">
+      <div class="cmp good">
+        <div class="cmp-head">✓ noScribe 优势</div>
+        <div class="cmp-body">
+          <div class="cmp-item">完全本地运行，受访者隐私有保障</div>
+          <div class="cmp-item">自动说话人分离，无需手动标注</div>
+          <div class="cmp-item">多语言支持，约60种语言</div>
+          <div class="cmp-item">内置编辑器，边转边核查修正</div>
+          <div class="cmp-item">多格式导出（Word/TXT/JSON）</div>
+        </div>
+      </div>
+      <div class="cmp bad">
+        <div class="cmp-head">✗ 需注意的局限</div>
+        <div class="cmp-body">
+          <div class="cmp-item">首次需下载数 GB 模型文件</div>
+          <div class="cmp-item">转录速度依赖硬件配置</div>
+          <div class="cmp-item">差音频效差，必须人工核查</div>
+          <div class="cmp-item">自动转录永远不等于完美文字稿</div>
+          <div class="cmp-item">v0.7 版本，仍在活跃开发中</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: Author & Install -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-no">04</div>
+      <div class="section-label">Author · 作者 &amp; 部署</div>
+    </div>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-kicker" style="color:var(--purple)">作者背景</div>
+        <h2 class="card-title">Kai Dröge</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">学术背景</div><div class="d">PhD 社会学（计算机背景）</div></div>
+          <div class="point"><div class="t">机构</div><div class="d">Lucerne 应用科技大学 + 法兰克福社会研究所</div></div>
+          <div class="point"><div class="t">开发初衷</div><div class="d">为自己的社会科学研究访谈设计的工具</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--cyan)">安装方式</div>
+        <h2 class="card-title">pip + 模型下载</h2>
+        <div class="card-body">
+          <div class="code-block" style="margin:0">
+            <div class="tag">pip 安装</div>
+            <pre style="font-size:11px">pip install noscribe
+noscribe --help</pre>
+          </div>
+          <div class="point"><div class="t">需提前安装 Whisper 模型</div><div class="d">首次运行自动下载所需模型</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-kicker" style="color:var(--green)">官方资源</div>
+        <h2 class="card-title">链接汇总</h2>
+        <div class="card-body">
+          <div class="point"><div class="t">官网</div><div class="d">noscribe.de</div></div>
+          <div class="point"><div class="t">GitHub</div><div class="d">kaixxx/noScribe</div></div>
+          <div class="point"><div class="t">版本</div><div class="d">v0.7 · GPL-3.0</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>
+      <div class="brand">kaixxx/noScribe</div>
+      <div class="links">
+        <span class="link-item">⭐ 2,119 Stars</span>
+        <span class="link-item">🍴 350 Forks</span>
+        <span class="link-item">GPL-3.0</span>
+        <span class="link-item">Python</span>
+        <span class="link-item">Whisper</span>
+        <span class="link-item">pyannote</span>
+      </div>
+    </div>
+    <div class="meta">
+      <a href="https://github.com/kaixxx/noScribe" style="color:var(--cyan)">github.com/kaixxx/noScribe</a><br>
+      X: @Ryrenz · 推荐 2026-08-21<br>
+      Card: 2026-08-21 · darkblue · PUBLISHED_PENDING_VISUAL
+    </div>
+  </div>
+</main>
+<script>
+  const btn = document.createElement('button');
+  btn.textContent = '💾 SAVE PNG';
+  btn.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:10px 16px;background:linear-gradient(135deg,var(--cyan),var(--blue));color:#fff;font:900 12px/1 ui-monospace,monospace;border:0;border-radius:999px;cursor:pointer;box-shadow:0 8px 24px rgba(88,195,255,.3);z-index:9999';
+  btn.addEventListener('click',async()=>{
+    try{
+      const canvas = await html2canvas(document.body,{backgroundColor:'#0c1020',scale:1.5,useCORS:true});
+      const a=document.createElement('a');a.download='noscribe-card.png';a.href=canvas.toDataURL('image/png');a.click();
+    }catch(e){console.error(e)}
+  });
+  document.body.appendChild(btn);
+</script>
+</body>
+</html>
