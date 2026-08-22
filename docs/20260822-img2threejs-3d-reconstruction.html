@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>img2threejs — 图片转程序化 Three.js 模型</title>
+  <meta name="description" content="img2threejs: 将参考图以代码方式重建为可动画的 Three.js 程序化模型。Token 高效，零依赖，8-pass 质量门控，支持 CS2 武器/硬表面/角色。">
+  <link rel="alternate" type="text/html" href="https://ccwq.github.io/infocard-pub/docs/20260822-img2threejs-3d-reconstruction.html">
+  <style>
+:root{--bg:#070b14;--surface:#0d1525;--glass:#0f1e38;--border:rgba(80,140,255,.18);--border-bright:rgba(80,140,255,.4);--blue:#4d8ef0;--blue-bright:#7eb5ff;--blue-dim:#2a5baa;--green:#10b981;--yellow:#fbbf24;--red:#f87171;--purple:#a78bfa;--orange:#fb923c;--cyan:#58c3ff;--text:#e2eaf8;--text-dim:#7a90b8;--text-bright:#f0f6ff}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);font-size:12.5px;line-height:1.65}
+a{color:var(--blue);text-decoration:none}
+.page{width:min(1060px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+.kicker-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kicker{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-bright);border-radius:999px;background:rgba(77,142,240,.1);color:var(--blue-bright);font:700 10px/1 ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;width:fit-content}
+.kicker.green{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.1);color:var(--green)}
+.kicker.orange{border-color:rgba(251,146,60,.4);background:rgba(251,146,60,.1);color:var(--orange)}
+.kicker.purple{border-color:rgba(167,139,250,.4);background:rgba(167,139,250,.1);color:var(--purple)}
+.hero{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;border:1px solid var(--border-bright);border-radius:14px;overflow:hidden;margin-bottom:14px;background:linear-gradient(135deg,#0d1e3a 0%,#11254a 45%,#0a1835 100%);box-shadow:0 0 40px rgba(77,142,240,.12)}
+.hero-copy{padding:26px 24px 22px;display:flex;flex-direction:column;gap:12px}
+h1{font-size:clamp(22px,4.5vw,48px);font-weight:950;line-height:1.08;letter-spacing:-.03em;color:var(--text-bright)}
+.subtitle{font-size:13px;line-height:1.7;color:var(--text-dim);max-width:58ch}
+.x-buzz{background:rgba(77,142,240,.08);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.x-buzz .label{font:700 10px/1 ui-monospace,monospace;color:var(--blue-bright);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.x-buzz p{font-size:12.5px;line-height:1.65;color:var(--text-dim)}
+.hero-stats{padding:20px 20px 20px 0;display:flex;flex-direction:column;justify-content:center;gap:10px}
+.stat-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.stat-card .icon{font-size:22px}
+.stat-card .val{font:950 20px/1 ui-monospace,monospace;color:var(--text-bright)}
+.stat-card .lbl{font:600 10px/1.3 ui-monospace,monospace;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+.section{margin-bottom:14px}
+.section-label{font:700 10px/1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);padding:0 0 8px}
+.section-label span{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--blue);margin-right:6px;vertical-align:middle}
+
+/* 8-PASS PIPELINE */
+.pipeline{display:grid;grid-template-columns:repeat(8,1fr);gap:0;margin-bottom:14px;background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:16px 10px;align-items:center}
+.pipe-step{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.pipe-icon{width:36px;height:36px;border-radius:10px;background:rgba(77,142,240,.15);border:1px solid var(--border-bright);display:grid;place-items:center;font-size:17px}
+.pipe-label{font-size:10px;font-weight:700;color:var(--text-bright);letter-spacing:.02em}
+.pipe-desc{font-size:9.5px;color:var(--text-dim);line-height:1.3}
+.pipe-arrow{color:var(--blue-dim);font-size:13px}
+
+/* TOKEN EFFICIENCY */
+.eff-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.eff-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.eff-card h4{font-size:12px;font-weight:700;color:var(--text-bright)}
+.eff-card p{font-size:11px;color:var(--text-dim);line-height:1.5}
+.eff-card .badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:4px;margin-top:4px}
+.badge.green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.badge.red{background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.badge.blue{background:rgba(77,142,240,.15);color:var(--blue-bright);border:1px solid rgba(77,142,240,.3)}
+.eff-comparison{background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:14px}
+.eff-comparison h4{font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px}
+.eff-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+.eff-row .lbl{flex:0 0 120px;color:var(--text-dim)}
+.eff-row .val{color:var(--text-bright);font-weight:700}
+.eff-ok{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:14px}
+.eff-ok h4{font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px}
+
+/* IMAGE GRID */
+.img-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.img-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.img-card img{width:100%;height:180px;object-fit:cover;display:block}
+.img-card .img-caption{padding:10px 12px;font-size:11px;color:var(--text-dim);line-height:1.4}
+
+/* CODE BLOCK */
+.code-block{background:#060b12;border:1px solid rgba(77,142,240,.25);border-radius:10px;padding:14px;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.7;overflow-x:auto;white-space:pre;margin-bottom:12px;color:#c9d4f7}
+.code-block .comment{color:#5a7aaa}
+.code-block .cmd{color:#58c3ff}
+.code-block .str{color:#a8e6a3}
+.code-block .kw{color:#c792ea}
+.code-block .val{color:#ffcb6b}
+.code-label{font:700 10px/1 ui-monospace,monospace;color:var(--blue-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+
+/* SCRIPT TABLE */
+.script-table{background:var(--glass);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.script-table table{width:100%;border-collapse:collapse;font-size:12px}
+.script-table th{background:rgba(77,142,240,.08);padding:9px 12px;text-align:left;font:700 10px/1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);border-bottom:1px solid var(--border)}
+.script-table td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;font-size:11.5px}
+.script-table tr:last-child td{border-bottom:none}
+.script-table .stage{font:700 9px/1 ui-monospace,monospace;color:var(--blue-bright);background:rgba(77,142,240,.1);padding:2px 6px;border-radius:4px;display:inline-block}
+.script-table .script-name{font-family:ui-monospace,monospace;color:var(--cyan);font-size:11px}
+.script-table .desc{color:var(--text-dim)}
+
+/* ROADMAP */
+.roadmap{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.roadmap-col{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:12px}
+.roadmap-col.done{border-color:rgba(16,185,129,.4)}
+.roadmap-col.active{border-color:rgba(77,142,240,.5);background:rgba(77,142,240,.05)}
+.roadmap-col h4{font-size:11px;font-weight:700;color:var(--text-bright);margin-bottom:6px}
+.roadmap-col p{font-size:11px;color:var(--text-dim);line-height:1.5}
+.roadmap-col .ver{font:700 9px/1 ui-monospace,monospace;padding:2px 6px;border-radius:4px;display:inline-block;margin-bottom:4px}
+.ver.done{background:rgba(16,185,129,.15);color:var(--green)}
+.ver.active{background:rgba(77,142,240,.15);color:var(--blue-bright)}
+.ver.future{background:rgba(167,139,250,.15);color:var(--purple)}
+
+/* CAPABILITIES */
+.cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.cap-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:5px}
+.cap-card h4{font-size:12px;font-weight:700;color:var(--text-bright)}
+.cap-card p{font-size:11px;color:var(--text-dim);line-height:1.5}
+.cap-card .cap-icon{font-size:18px;margin-bottom:3px}
+
+/* SUBJECT TYPES */
+.subject-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.subject-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.subject-card .sj-icon{font-size:24px;margin-bottom:6px}
+.subject-card .sj-name{font-size:12px;font-weight:700;color:var(--text-bright);margin-bottom:4px}
+.subject-card .sj-desc{font-size:10.5px;color:var(--text-dim);line-height:1.4}
+
+/* OUTPUT ARTIFACTS */
+.artifact-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.artifact-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:14px}
+.artifact-card h4{font-size:12px;font-weight:700;color:var(--text-bright);margin-bottom:6px;font-family:ui-monospace,monospace}
+.artifact-card p{font-size:11px;color:var(--text-dim);line-height:1.5}
+
+/* FOOTER */
+.footer{border-top:1px solid var(--border);padding-top:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.footer-left{display:flex;gap:14px;flex-wrap:wrap}
+.footer-link{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);padding:5px 10px;background:var(--glass);border:1px solid var(--border);border-radius:999px}
+.footer-link:hover{border-color:var(--border-bright);color:var(--text)}
+.footer-right{font-size:11px;color:var(--text-dim)}
+
+@media(max-width:640px){
+.hero{grid-template-columns:1fr}
+.hero-stats{padding:16px 20px 20px}
+.pipeline{grid-template-columns:1fr 1fr;gap:8px}
+.pipe-arrow{display:none}
+.eff-grid{grid-template-columns:1fr}
+.img-grid{grid-template-columns:1fr 1fr}
+.cap-grid{grid-template-columns:1fr 1fr}
+.subject-grid{grid-template-columns:1fr 1fr}
+.roadmap{grid-template-columns:1fr 1fr}
+.artifact-grid{grid-template-columns:1fr}
+.script-table{font-size:11px}
+}
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-copy">
+    <div class="kicker-row">
+      <span class="kicker green">★ 12,699 Stars</span>
+      <span class="kicker orange">Apache 2.0</span>
+      <span class="kicker purple">v1.4.4</span>
+    </div>
+    <h1>img2threejs</h1>
+    <p class="subtitle">将参考图以代码方式重建为可动画的 Three.js 程序化模型。Token 高效，零 pip 依赖，8-pass 质量门控，从单张图片生成可直接操控的 3D 程序化资产。</p>
+    <div class="x-buzz">
+      <div class="label">🎯 核心价值锚点</div>
+      <p>参考图片 → 程序化 Three.js TypeScript 代码 → 可动画 3D 资产。不同于 photogrammetry、mesh 提取或下载素材包，是真正的代码化 3D 重建。</p>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="stat-card"><span class="icon">⭐</span><div><div class="val">12,699</div><div class="lbl">GitHub Stars</div></div></div>
+    <div class="stat-card"><span class="icon">🍴</span><div><div class="val">1,024</div><div class="lbl">Forks</div></div></div>
+    <div class="stat-card"><span class="icon">🐍</span><div><div class="val">Python 3.10+</div><div class="lbl">纯 stdlib</div></div></div>
+    <div class="stat-card"><span class="icon">📦</span><div><div class="val">TypeScript</div><div class="lbl">输出语言</div></div></div>
+  </div>
+</div>
+
+<!-- SUBJECT TYPES -->
+<div class="section">
+  <div class="section-label">支持的重建对象</div>
+  <div class="subject-grid">
+    <div class="subject-card">
+      <div class="sj-icon">🔫</div>
+      <div class="sj-name">CS2 武器</div>
+      <div class="sj-desc">Glock-18 / M9 Bayonet / AWP 等，含涂装投影、组件合约、结构审查门</div>
+    </div>
+    <div class="subject-card">
+      <div class="sj-icon">📦</div>
+      <div class="sj-name">硬表面物体</div>
+      <div class="sj-desc">电子产品、工具、箱包等，带倒角/螺丝/接缝等细节枚举</div>
+    </div>
+    <div class="subject-card">
+      <div class="sj-icon">🧑</div>
+      <div class="sj-name">人形角色</div>
+      <div class="sj-desc">解剖学 track、头部单元比例、面部特征点、rigging 准备</div>
+    </div>
+    <div class="subject-card">
+      <div class="sj-icon">🏠</div>
+      <div class="sj-name">场景 / 迪拉斯</div>
+      <div class="sj-desc">等距场景、建筑物内部、室外环境（v1.6+）</div>
+    </div>
+  </div>
+</div>
+
+<!-- 8-PASS PIPELINE -->
+<div class="section">
+  <div class="section-label">8-Pass 重建管道</div>
+  <div class="pipeline">
+    <div class="pipe-step"><div class="pipe-icon">📸</div><div class="pipe-label">blockout</div><div class="pipe-desc">轮廓骨架初建</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="pipe-icon">🏗</div><div class="pipe-label">structural</div><div class="pipe-desc">结构件装配</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="pipe-icon">🎨</div><div class="pipe-label">form</div><div class="pipe-desc">形态细化</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="pipe-icon">🖌</div><div class="pipe-label">material</div><div class="pipe-desc">PBR 材质</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="pipe-icon">✨</div><div class="pipe-label">surface</div><div class="pipe-desc">表面处理</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="pipe-icon">💡</div><div class="pipe-label">lighting</div><div class="pipe-desc">光照环境</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="pipe-icon">🎮</div><div class="pipe-label">interaction</div><div class="pipe-desc">交互接口</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="pipe-icon">⚡</div><div class="pipe-label">optimization</div><div class="pipe-desc">性能优化</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.6">
+    每 pass 独立质量门控（quality gate）：必须通过视觉审核才能解锁下一 pass，自动化自纠正直到达到阈值。不合格直接 fail-closed，不生成代码。
+  </div>
+</div>
+
+<!-- TOKEN EFFICIENCY -->
+<div class="section">
+  <div class="section-label">Token 效率对比</div>
+  <div class="eff-grid">
+    <div>
+      <div class="eff-comparison">
+        <h4>❌ 普通方法（token 浪费场景）</h4>
+        <div class="eff-row"><span class="lbl">每次重读整个模型</span><span class="val" style="color:var(--red)">× N 次</span></div>
+        <div class="eff-row"><span class="lbl">像素级评分脚本</span><span class="val" style="color:var(--red)">token 密集</span></div>
+        <div class="eff-row"><span class="lbl">手动 JSON 验证</span><span class="val" style="color:var(--red)">token 浪费</span></div>
+        <div class="eff-row"><span class="lbl">多次重复已有步骤</span><span class="val" style="color:var(--red)">token 浪费</span></div>
+        <div class="eff-row"><span class="lbl">多张散点截图对比</span><span class="val" style="color:var(--red)">token 浪费</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="eff-ok">
+        <h4>✅ img2threejs 策略</h4>
+        <div class="eff-row"><span class="lbl">每次只生成当前 pass</span><span class="val" style="color:var(--green)">小而专注</span></div>
+        <div class="eff-row"><span class="lbl">Python 脚本做验证</span><span class="val" style="color:var(--green)">零 token</span></div>
+        <div class="eff-row"><span class="lbl">Fail-fast 提前拦截</span><span class="val" style="color:var(--green)">spec 阶段终止</span></div>
+        <div class="eff-row"><span class="lbl">每次一张对比图</span><span class="val" style="color:var(--green)">精确判断</span></div>
+        <div class="eff-row"><span class="lbl">纯 stdlib 无依赖</span><span class="val" style="color:var(--green)">零安装开销</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REFERENCE IMAGES (插图) -->
+<div class="section">
+  <div class="section-label">重建效果示意 — AWP Medusa</div>
+  <div class="img-grid">
+    <div class="img-card">
+      <img src="article-assets/awp-medusa-reference.png" alt="AWP Medusa 参考图" loading="lazy">
+      <div class="img-caption">原始参考图（游戏内截图）</div>
+    </div>
+    <div class="img-card">
+      <img src="article-assets/front-medusa.webp" alt="AWP Medusa 程序化重建正面" loading="lazy">
+      <div class="img-caption">Three.js 程序化重建 — 正面</div>
+    </div>
+    <div class="img-card">
+      <img src="article-assets/back-medusa.webp" alt="AWP Medusa 程序化重建背面" loading="lazy">
+      <div class="img-caption">Three.js 程序化重建 — 背面</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--text-dim);text-align:center;margin-top:-4px">图：CS2 AWP Medusa 皮肤 — 参考图 vs 程序化 Three.js 重建效果（来源：img2threejs-showcase）</div>
+</div>
+
+<!-- CORE CAPABILITIES -->
+<div class="section">
+  <div class="section-label">核心能力</div>
+  <div class="cap-grid">
+    <div class="cap-card">
+      <div class="cap-icon">🔍</div>
+      <h4>Detail-first 分析</h4>
+      <p>先枚举 identity-defining 细节：倒角/圆角/面板缝/紧固件/刻线/光泽度/磨损。无法映射到真实组件的细节直接丢弃，不虚假生成。</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">🎯</div>
+      <h4>严格质量门控</h4>
+      <p>strict-quality gate 在 spec 阶段拦截浅层规范，fail-closed 策略：不达标不生成代码，避免 token 浪费。</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">🎭</div>
+      <h4>角色识别分类</h4>
+      <p>object / character / hybrid 三分类。人形走解剖学 track（头部单元比例 + 面部特征点 + 姿势）。</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">🖌</div>
+      <h4>PBR 材质提取</h4>
+      <p>参考图裁剪 → registry 解析 → ObjectSculptSpec，每区域独立 confidence 报告，CIEDE2000 色差数学。</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">⚔️</div>
+      <h4>CS2 武器专项</h4>
+      <p>Family-specific 组件合约，projection-first 涂装，painted-region 覆盖报告，map-stripped 块体验证。</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">👤</div>
+      <h4>LikeMaximization</h4>
+      <p>人脸参数模板 + landmark 拟合 + 去光照 + 相机匹配 + 参考投影，按区域报告 confidence。</p>
+    </div>
+  </div>
+</div>
+
+<!-- HOW TO USE -->
+<div class="section">
+  <div class="section-label">快速使用</div>
+  <div class="code-label">安装（Claude Code / Codex / OpenCode）</div>
+  <div class="code-block"><span class="comment"># 放入 skills 目录</span>
+<span class="cmd">git clone https://github.com/img2threejs/img2threejs.git ~/.claude/skills/img2threejs</span>
+<span class="comment"># 多 host 共用同一 checkout（软链接）</span>
+<span class="cmd">ln -s ~/.claude/skills/img2threejs ~/.codex/skills/img2threejs</span></div>
+
+  <div class="code-label">调用命令</div>
+  <div class="code-block"><span class="comment"># 一句话启动（skill 自动分类、枚举细节、质量门控）</span>
+<span class="cmd">/img2threejs Rebuild this object as a Three.js model, keep the proportions, angles, and colours.</span>
+<span class="comment"># 完整控制版（指定各 pass 行为）</span>
+<span class="cmd">/img2threejs Rebuild the subject in this image as a procedural Three.js model.</span>
+<span class="comment">Fidelity   Hold proportions and silhouette to the reference.</span>
+<span class="comment">Materials  Derive the finish class from the reference pixels, not memory.</span>
+<span class="comment">Runtime    Expose pivots and sockets for whatever should move.</span>
+<span class="comment">Gates      Run --strict-quality, do not advance a pass until review passes.</span></div>
+
+  <div class="code-label">多会话重建（state 管理）</div>
+  <div class="code-block"><span class="cmd">python3 forge/state.py init --reference &lt;image&gt; --profile character --spec object-sculpt-spec.json</span>
+<span class="cmd">python3 forge/next.py --state .img2threejs/state.json</span></div>
+
+  <div class="code-label">脚本独立运行</div>
+  <div class="code-block"><span class="cmd">python3 forge/stage1_intake/probe_image.py &lt;image&gt;</span>
+<span class="cmd">python3 forge/stage2_spec/new_pre_spec_assessment.py "Name" --image &lt;image&gt; --out assessment.json</span>
+<span class="cmd">python3 forge/stage2_spec/new_sculpt_spec.py "Name" --image &lt;image&gt; --assessment assessment.json --out spec.json</span>
+<span class="cmd">python3 forge/stage2_spec/validate_sculpt_spec.py spec.json --strict-quality</span>
+<span class="cmd">python3 forge/stage3_build/generate_threejs_factory.py spec.json --out src/createObjectModel.ts</span></div>
+</div>
+
+<!-- SCRIPT REFERENCE -->
+<div class="section">
+  <div class="section-label">核心脚本参考</div>
+  <div class="script-table">
+    <table>
+      <thead><tr><th>Stage</th><th>Script</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><span class="stage">Intake</span></td><td class="script-name">probe_image.py</td><td class="desc">图像元数据与明显技术问题（不做视觉检查）</td></tr>
+        <tr><td><span class="stage">Intake</span></td><td class="script-name">build_detail_inventory.py</td><td class="desc">切分参考图区域，枚举 identity-defining 细节清单</td></tr>
+        <tr><td><span class="stage">Intake</span></td><td class="script-name">extract_landmarks.py</td><td class="desc">叠加 landmark 网格，人形解剖骨架（角色用）</td></tr>
+        <tr><td><span class="stage">Intake</span></td><td class="script-name">solve_camera_pose.py</td><td class="desc">估算参考图相机参数，供渲染侧相机匹配</td></tr>
+        <tr><td><span class="stage">Intake</span></td><td class="script-name">delight_albedo.py</td><td class="desc">从照片近似中性漫反射（纹理投影前处理）</td></tr>
+        <tr><td><span class="stage">Spec</span></td><td class="script-name">new_pre_spec_assessment.py</td><td class="desc">分类对象类型，评分复杂度，输出质量契约</td></tr>
+        <tr><td><span class="stage">Spec</span></td><td class="script-name">new_sculpt_spec.py</td><td class="desc">基于 assessment 生成 ObjectSculptSpec JSON</td></tr>
+        <tr><td><span class="stage">Spec</span></td><td class="script-name">validate_sculpt_spec.py</td><td class="desc">验证 spec；<span style="color:var(--red)">--strict-quality 拦截浅规范</span></td></tr>
+        <tr><td><span class="stage">Build</span></td><td class="script-name">generate_threejs_factory.py</td><td class="desc">为当前解锁 pass 生成 TypeScript THREE.Group 工厂，<span style="color:var(--red)">fail-closed</span></td></tr>
+        <tr><td><span class="stage">Review</span></td><td class="script-name">make_comparison_sheet.py</td><td class="desc">打包一张参考-vs-渲染对比图供审核</td></tr>
+        <tr><td><span class="stage">Review</span></td><td class="script-name">append_review.py</td><td class="desc">记录每 pass 审核结果：评分、决策、证据</td></tr>
+        <tr><td><span class="stage">Review</span></td><td class="script-name">cs2_review.py</td><td class="desc">CS2 武器专项审查：exactness tier、family identity、组件覆盖率</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- OUTPUT ARTIFACTS -->
+<div class="section">
+  <div class="section-label">输出产物</div>
+  <div class="artifact-grid">
+    <div class="artifact-card">
+      <h4>📄 ObjectSculptSpec.json</h4>
+      <p>完整组件树（components）、PBR 材质（materials）、重复系统（repetition systems）、socket 定义、pivot、collider、 DestructionGroup，以及每 pass 审核历史记录。</p>
+    </div>
+    <div class="artifact-card">
+      <h4>📦 createObjectNameModel.ts</h4>
+      <p>TypeScript 工厂函数 <code>createObjectNameModel(spec, options): THREE.Group</code>，root.userData.sculptRuntime 暴露 nodes / sockets / colliders / destructionGroups，可直接动画。</p>
+    </div>
+    <div class="artifact-card">
+      <h4>🎬 render + comparison sheets</h4>
+      <p>每 pass 渲染结果 + 并排对比图，记录该 pass 的保真度。可随时回溯哪个 pass 需要返工。</p>
+    </div>
+    <div class="artifact-card">
+      <h4>🎮 运行时分层</h4>
+      <p>pivot（旋转轴）、socket（装配口）、collider（碰撞体）、userData.tick（循环动画入口）——模型从一开始就为动画而生。</p>
+    </div>
+  </div>
+</div>
+
+<!-- VERSION ROADMAP -->
+<div class="section">
+  <div class="section-label">版本路线图</div>
+  <div class="roadmap">
+    <div class="roadmap-col done">
+      <span class="ver done">v1.4</span>
+      <h4>The Weapon Update</h4>
+      <p>CS2 图像匹配重建，family-specific adapters，结构审查门，涂装投影。</p>
+    </div>
+    <div class="roadmap-col active">
+      <span class="ver active">v1.5</span>
+      <h4>The Character Update</h4>
+      <p>人形重建，面部特征，rigging 准备拓扑，blendshape 准备，毛发和服装。</p>
+    </div>
+    <div class="roadmap-col">
+      <span class="ver future">v1.6</span>
+      <h4>The Environment Update</h4>
+      <p>建筑、室内、街道、植被、地形感知、多对象重建。</p>
+    </div>
+    <div class="roadmap-col">
+      <span class="ver future">v1.8</span>
+      <h4>The Animation Update</h4>
+      <p>auto rigging，auto skin weights，Mixamo 兼容，面部 rig。</p>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">
+    <a class="footer-link" href="https://github.com/img2threejs/img2threejs">⭐ GitHub</a>
+    <a class="footer-link" href="https://img2threejs.github.io/img2threejs-showcase/">🎮 Live Demo Gallery</a>
+    <a class="footer-link" href="https://github.com/img2threejs/img2threejs/blob/main/docs/ARCHITECTURE.md">📖 Architecture</a>
+    <a class="footer-link" href="https://github.com/img2threejs/img2threejs/blob/main/docs/TOKEN_COST.md">💰 Token Cost</a>
+  </div>
+  <div class="footer-right">来源：用户分享 · AG-雷达 · 2026-08-22</div>
+</div>
+
+</div>
+</body>
+</html>
