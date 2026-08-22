@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harness Engineering · Claude Code 架构拆解</title>
+  <meta name="description" content="wquguru/harness-books 用两本书拆解 Claude Code 运行时架构：控制面、Query Loop、工具权限、上下文治理、错误恢复、多代理验证，以及 Claude Code vs Codex 设计哲学对比。">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --red:#ff6b6b;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.16) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.18) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:300px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .pill.red{border-color:rgba(255,107,107,.32);background:rgba(255,107,107,.12);color:#ffd8d8}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:22px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}.mini-icon.green{color:var(--green)}.mini-icon.yellow{color:var(--yellow)}.mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .shell{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}
+    .panel-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .panel-title{margin:0;font-size:17px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .panel-row{display:grid;gap:8px}
+    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
+    .feat .label{font:900 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .feat .value{font-size:12.5px;font-weight:800;line-height:1.3;color:#eef4ff}
+    .feat .note{font-size:11px;line-height:1.5;color:#8897c4}
+    .section{margin-bottom:14px}
+    .section-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .section-no{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(74,120,255,.28),rgba(88,195,255,.18));border:1.5px solid rgba(88,195,255,.28);box-shadow:0 8px 20px rgba(88,195,255,.14);font:950 18px/1 Georgia,"Times New Roman",serif;color:#fff;flex:0 0 auto}
+    .section-label{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .loop-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px}
+    .loop-step{padding:10px 10px 9px;background:var(--panel);border:1.5px solid rgba(255,255,255,.09);border-radius:16px;display:grid;gap:6px;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+    .loop-step .num{display:block;font:950 20px/1 Georgia,"Times New Roman",serif}
+    .loop-step .t{font:900 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .loop-step .d{font-size:11px;line-height:1.45;color:#c9d4f7}
+    .loop-step:nth-child(1) .num{color:var(--cyan)}.loop-step:nth-child(2) .num{color:#53a3ff}.loop-step:nth-child(3) .num{color:var(--purple)}.loop-step:nth-child(4) .num{color:var(--green)}.loop-step:nth-child(5) .num{color:var(--yellow)}.loop-step:nth-child(6) .num{color:var(--red)}
+    .struct{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+    .struct-cell{padding:12px 10px 10px;border-right:1px solid rgba(255,255,255,.1);display:grid;gap:5px;min-width:0}
+    .struct-cell:last-child{border-right:none}
+    .struct-cell .n{display:block;font:950 18px/1 Georgia,"Times New Roman",serif}
+    .struct-cell .t{font:900 9px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase}
+    .struct-cell .d{font-size:11px;line-height:1.5;color:#8897c4}
+    .struct-cell:nth-child(1) .n{color:var(--cyan)}.struct-cell:nth-child(2) .n{color:var(--purple)}.struct-cell:nth-child(3) .n{color:var(--yellow)}.struct-cell:nth-child(4) .n{color:var(--green)}.struct-cell:nth-child(5) .n{color:var(--red)}
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .cmp{min-width:0;border-radius:18px;padding:14px;display:grid;gap:10px}
+    .cmp.ll{background:rgba(88,195,255,.06);border:1.5px solid rgba(88,195,255,.2)}
+    .cmp.cx{background:rgba(132,89,255,.06);border:1.5px solid rgba(132,89,255,.2)}
+    .cmp-head{font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase}
+    .cmp.ll .cmp-head{color:var(--cyan)}.cmp.cx .cmp-head{color:var(--purple)}
+    .cmp-item{font-size:12.5px;line-height:1.5;color:#c5d2f7;padding-left:14px;border-left:2px solid rgba(255,255,255,.1)}
+    .cmp.ll .cmp-item{border-left-color:rgba(88,195,255,.4)}.cmp.cx .cmp-item{border-left-color:rgba(132,89,255,.4)}
+    .topics{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+    .topic{display:inline-flex;align-items:center;padding:5px 10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4}
+    .topic.highlight{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.1);color:#d8f4ff}
+    .footer{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1.5px solid rgba(255,255,255,.09);background:rgba(9,12,22,.42);border-radius:18px;padding:12px 14px 10px;margin-bottom:14px;box-shadow:var(--shadow)}
+    .footer .brand{font-weight:900;color:#fff;font-size:15px;letter-spacing:-.02em}
+    .footer .links{display:flex;flex-wrap:wrap;gap:6px}
+    .footer .link-item{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;font-size:11px}
+    .footer .meta{font:800 11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#5a6380;text-align:right}
+    .save{position:fixed;right:18px;bottom:18px;z-index:999;border:0;border-radius:10px;padding:.82rem 1rem;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font:900 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;box-shadow:0 12px 28px rgba(74,120,255,.3);cursor:pointer}
+    @media(max-width:960px){.hero,.shell,.compare{grid-template-columns:1fr}.struct,.loop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:720px){.page{width:min(100% - 14px,1180px);padding:12px 0 82px}.hero,.shell,.struct,.loop-grid,.compare{grid-template-columns:1fr}h1{font-size:clamp(36px,10vw,64px)}.save{right:10px;bottom:10px;font-size:11.5px;padding:.72rem .88rem}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <span class="kicker">harness engineering / claude code / agent architecture</span>
+          <span class="source">github.com/wquguru/harness-books</span>
+        </div>
+        <h1 class="title">Harness Engineering · Claude Code 架构拆解</h1>
+        <p class="subtitle">想搞懂 Claude Code 底层怎么设计的，若直接看源码无从入手，而博客又讲得太零散。harness-books 用两本书把架构拆解讲清楚了。</p>
+        <p class="subcn">书①聚焦运行时骨架：控制面、Query Loop、工具权限、上下文治理、错误恢复、多代理验证。书②做 Claude Code vs Codex 设计哲学比较。</p>
+        <div class="pill-row">
+          <span class="pill cyan">Book ① Claude Code Design Guide</span>
+          <span class="pill purple">Book ② Codex Philosophy Compare</span>
+          <span class="pill yellow">Query Loop</span>
+          <span class="pill green">Tool Permissions</span>
+          <span class="pill red">Multi-Agent Verification</span>
+        </div>
+        <div class="hero-note">
+          <strong>一句话结论</strong>
+          <p>Claude Code 不是"调用 LLM 的脚本"，而是一套精密的运行时控制平面。harness-books 第一次把它的控制流、权限模型、上下文边界和验证机制用书的形式系统整理出来，比任何博客都完整。</p>
+        </div>
+      </div>
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">HE</div>
+          <div class="visual-meta">
+            <div class="big">wquguru</div>
+            <div class="small">GITHUB · HARNESS BOOKS</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <div class="mini-card"><div class="mini-icon cyan"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><div class="label">BOOK 1</div><div class="value">Claude Code Design Guide</div><div class="desc">运行时架构：控制面、Query Loop、权限、上下文、错误恢复</div></div>
+          <div class="mini-card"><div class="mini-icon purple"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg></div><div class="label">BOOK 2</div><div class="value">Codex vs Claude Code</div><div class="desc">两种控制面设计哲学：Query Loop vs Thread/State</div></div>
+          <div class="mini-card"><div class="mini-icon green"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 3"/></svg></div><div class="label">SOURCE</div><div class="value">GitHub + X 推荐</div><div class="desc">GitHub Daily (@GitHub_Daily) 长帖推荐</div></div>
+          <div class="mini-card"><div class="mini-icon yellow"><svg viewBox="0 0 24 24"><path d="M3 7h18v10H3zM7 3v4M17 3v4M7 17v4M17 17v4"/></svg></div><div class="label">FORMAT</div><div class="value">Books (PDF + Online)</div><div class="desc">可在线阅读，含 PDF 下载</div></div>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <section class="shell">
+      <article class="panel">
+        <div class="panel-head"><div class="panel-kicker">Book 1 · 运行时架构</div><h3 class="panel-title">Claude Code 设计指南</h3></div>
+        <div class="panel-row">
+          <div class="feat"><div class="label">核心对象</div><div class="value">用 Claude Code 当观察对象，拆解运行时骨架</div><div class="note">不是泛泛谈 AI 编程，而是聚焦 Claude Code 本身作为 Agent 运行时的一切设计决策。</div></div>
+          <div class="feat"><div class="label">关键主题</div><div class="value">控制面 · Query Loop · 工具权限 · 上下文治理 · 错误恢复</div><div class="note">覆盖从输入到输出的完整运行时路径，每一个节点都有设计文档支撑。</div></div>
+          <div class="feat"><div class="label">多代理与验证</div><div class="value">多代理验证 · 团队制度 · 委派验证</div><div class="note">不只是单 Agent 架构，还包含多代理协作时的验证机制和团队制度设计。</div></div>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><div class="panel-kicker">Book 2 · 哲学比较</div><h3 class="panel-title">Claude Code vs Codex</h3></div>
+        <div class="panel-row">
+          <div class="feat"><div class="label">比较维度</div><div class="value">控制面设计 · 工具/沙箱/策略 · Skill/Hook/本地规则</div><div class="note">两种主流 Agent 运行时在架构层面的全面对比，不是功能罗列，而是设计哲学对照。</div></div>
+          <div class="feat"><div class="label">核心差异</div><div class="value">Query Loop vs Thread/State · 委派验证模型</div><div class="note">最核心的差异在于：Claude Code 用 Query Loop 做控制流，而 Codex 用 Thread/State。这是两种完全不同的 Agent 运行时的根本分歧。</div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">01</div><div><div class="section-label">Book 1 · 核心章节地图</div></div></div>
+      <div class="loop-grid">
+        <div class="loop-step"><span class="num">Ch3</span><span class="t">Query Loop</span><span class="d">Agent 的核心控制流：输入→规划→执行→反馈→下一轮</span></div>
+        <div class="loop-step"><span class="num">Ch4</span><span class="t">Tool & Permission</span><span class="d">工具注册、权限边界、interrupt 与中止机制</span></div>
+        <div class="loop-step"><span class="num">Ch5</span><span class="t">Context Governance</span><span class="d">上下文治理：窗口管理、摘要策略、上下文预算</span></div>
+        <div class="loop-step"><span class="num">Ch6</span><span class="t">Error Recovery</span><span class="d">错误恢复：重试、降级、优雅退出与状态回滚</span></div>
+        <div class="loop-step"><span class="num">Ch7</span><span class="t">Multi-Agent</span><span class="d">多代理验证：子代理委派、交叉验证、团队制度</span></div>
+        <div class="loop-step"><span class="num">App</span><span class="t">Team制度</span><span class="d">Agent Team 的角色定义、任务分配与通信协议</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">02</div><div><div class="section-label">Book 2 · Claude Code vs Codex 设计哲学</div></div></div>
+      <div class="compare">
+        <div class="cmp ll">
+          <div class="cmp-head">Claude Code · Query Loop</div>
+          <div class="cmp-item">控制流：显式 Query Loop，显式中断点</div>
+          <div class="cmp-item">工具模型：Tool + Permission + Interrupt 三层</div>
+          <div class="cmp-item">上下文：窗口治理、摘要预算、上下文生命周期</div>
+          <div class="cmp-item">验证：多代理交叉验证 + Team 制度</div>
+          <div class="cmp-item">扩展：Skill / Hook / 本地规则文件</div>
+        </div>
+        <div class="cmp cx">
+          <div class="cmp-head">Codex · Thread/State</div>
+          <div class="cmp-item">控制流：Thread/State 隐式驱动</div>
+          <div class="cmp-item">工具模型：沙箱 + Policy 分层</div>
+          <div class="cmp-item">上下文：基于 Session 的状态管理</div>
+          <div class="cmp-item">验证：委派验证模型</div>
+          <div class="cmp-item">扩展：API-first + 外部 Hook 集成</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div class="section-no">03</div><div><div class="section-label">两本书共同覆盖的架构要素</div></div></div>
+      <div class="struct">
+        <div class="struct-cell"><span class="n">1</span><span class="t">Control Plane</span><span class="d">Agent 运行时大脑：决策点与控制流</span></div>
+        <div class="struct-cell"><span class="n">2</span><span class="t">Query Loop</span><span class="d">核心控制环：输入→规划→执行→反馈</span></div>
+        <div class="struct-cell"><span class="n">3</span><span class="t">Tool Perms</span><span class="d">工具注册、权限边界、中断与沙箱</span></div>
+        <div class="struct-cell"><span class="n">4</span><span class="t">Context</span><span class="d">上下文治理：窗口、摘要、生命周期</span></div>
+        <div class="struct-cell"><span class="n">5</span><span class="t">Multi-Agent</span><span class="d">多代理验证与团队制度设计</span></div>
+      </div>
+    </section>
+
+    <section class="topics">
+      <span class="topic highlight">Claude Code</span>
+      <span class="topic">Harness Engineering</span>
+      <span class="topic">Query Loop</span>
+      <span class="topic">Control Plane</span>
+      <span class="topic">Tool Permissions</span>
+      <span class="topic">Context Governance</span>
+      <span class="topic">Error Recovery</span>
+      <span class="topic">Multi-Agent</span>
+      <span class="topic">Codex</span>
+      <span class="topic">Agent Architecture</span>
+      <span class="topic">Runtime Design</span>
+      <span class="topic">GitHub Daily</span>
+    </section>
+
+    <footer class="footer">
+      <div class="brand">harness-books · Claude Code 架构深度拆解</div>
+      <div class="links">
+        <span class="link-item">github.com/wquguru/harness-books</span>
+        <span class="link-item">Book ① Design Guide</span>
+        <span class="link-item">Book ② vs Codex</span>
+      </div>
+      <div class="meta">来源：GitHub Daily @GitHub_Daily · 2026-08-21</div>
+    </footer>
+  </main>
+  <button class="save" onclick="saveAsPng()">&#x2B07; SAVE PNG</button>
+  <script>
+    async function saveAsPng(){
+      const el=document.querySelector('.page');
+      const canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#0c1020'});
+      const link=document.createElement('a');
+      link.download='harness-engineering-claude-code.png';
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
