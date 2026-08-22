@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="用 ~600 行纯标准库 Python 代码，还原 Cordis / deepseek-harness 的 5 种核心 Agent 架构机制：一切皆插件、Context 服务仓库、inject 依赖注入、五种事件分发、注册即可逆副作用。配 Fake LLM EchoAdapter，零第三方依赖。" />
+  <title>Cordis Mini — Python 实现 AI Agent 插件架构 5 大核心机制</title>
+  <style>
+    :root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#0a0a0a;--red:#c8102e;--soft-red:#fff5f6;--line:#0a0a0a;--shadow:6px 6px 0 rgba(10,10,10,.10)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6}
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+    /* TOPBAR */
+    .topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:8px;overflow:hidden}
+    .topbar-hero{padding:18px 18px 14px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+    .topbar-meta{padding:9px 14px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto auto;gap:0;align-content:start;background:#f6f1f1}
+    .meta-row-high{display:grid;grid-template-columns:1.4fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-low{display:grid;grid-template-columns:1.2fr 1fr 0.8fr;gap:5px}
+    .meta-pill-lg{border:2px solid var(--line);padding:7px 9px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1}
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-md{border:2px solid var(--line);border-left:4px solid var(--red);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25}
+    .meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+    .meta-pill-sm{border:2px solid var(--line);border-left:4px solid #666;padding:3px 7px 3px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3}
+    .meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+    h1.demo-title{margin:10px 0 6px;font-size:clamp(20px,3.2vw,36px);font-weight:800;letter-spacing:-.03em;line-height:1.05}
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+    /* STATS */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+    /* PILLS */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+    /* SECTION */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:10px 12px}
+    /* GRID */
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .card h4{font-size:13px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+    .card p{margin:0;font-size:12px;line-height:1.62;color:#333}
+    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+    /* CODE */
+    .code-block{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:10px 12px;margin-bottom:10px;overflow-x:auto}
+    .code-block .l{font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:6px}
+    .code-block pre{margin:0;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+    /* MECHANISM CARDS */
+    .mech-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .mech-card{border:2px solid var(--line);background:#fff;padding:10px 12px;min-width:0;position:relative}
+    .mech-card .num{position:absolute;top:8px;right:10px;font-size:22px;font-weight:900;color:var(--red);line-height:1;opacity:.18}
+    .mech-card .m-title{font-size:12px;font-weight:900;margin-bottom:4px;color:var(--ink);letter-spacing:-.01em}
+    .mech-card .m-sub{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--red);margin-bottom:5px}
+    .mech-card p{font-size:11.5px;line-height:1.58;color:#444;margin:0}
+    /* FLOW */
+    .flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
+    .flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:11px;background:#fff}
+    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+    /* BOTTOM BAR */
+    .bottom-bar{border-top:3px solid var(--line);padding:10px 0;margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+    .bottom-bar .source{font-size:11px;color:#666;font-weight:700}
+    /* RULE */
+    .rule{height:3px;background:var(--ink);margin:10px 0}
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+    /* PYCOMPARE TABLE */
+    .py-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:10px;box-shadow:var(--shadow)}
+    .py-table th,.py-table td{padding:6px 10px;border:1.5px solid var(--line);text-align:left}
+    .py-table th{background:var(--ink);color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    .py-table tr:nth-child(even) td{background:#faf8f4}
+    .py-table code{font-size:10.5px}
+    /* RESPONSIVE */
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .mech-grid{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:480px){
+      .mech-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-hero">
+      <div class="kicker">PYTHON AGENT · TUTORIAL</div>
+      <h1 class="demo-title">Cordis Mini</h1>
+      <p class="sub-line">用 ~600 行纯标准库 Python，还原 Cordis Agent 架构 5 种核心机制</p>
+      <div class="tagline">零第三方依赖 · Python 3.11+</div>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">20<span class="sub">GitHub Stars</span></div>
+        <div class="meta-pill-lg">~600<span class="sub">行代码</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">Python<span class="sub">语言</span></div>
+        <div class="meta-pill-md">5<span class="sub">种机制</span></div>
+        <div class="meta-pill-sm">REDSWISS<span class="sub">红黑</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- STATS -->
+  <div class="stats" aria-label="项目关键指标">
+    <div class="stat"><strong>~600</strong><span>行代码</span></div>
+    <div class="stat"><strong>5</strong><span>核心机制</span></div>
+    <div class="stat"><strong>0</strong><span>第三方依赖</span></div>
+    <div class="stat"><strong>Python 3.11+</strong><span>运行时</span></div>
+    <div class="stat"><strong>EchoAdapter</strong><span>Fake LLM</span></div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="section" style="margin-bottom:10px">
+    <div class="sec-head"><span class="num">★</span><span class="label">项目概述</span></div>
+    <div class="sec-body">
+      <p style="font-size:12.5px;line-height:1.72;color:#333;margin-bottom:8px">
+        Cordis Mini 是用 <strong>~600 行纯标准库 Python</strong> 代码教学性质的开源项目，目标是还原 <strong>Cordis / deepseek-harness</strong> 的 5 种核心 Agent 架构机制。无需真实 LLM API，内置 <strong>EchoAdapter（Fake LLM）</strong>，直接运行。适合想理解 Agent 底层架构、插件系统、事件分发的 Python 开发者。
+      </p>
+      <div class="pills">
+        <span class="pill red">Agent 架构</span>
+        <span class="pill dark">插件系统</span>
+        <span class="pill">依赖注入</span>
+        <span class="pill soft">事件分发</span>
+        <span class="pill">副作用管理</span>
+        <span class="pill">教学代码</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIVE MECHANISMS -->
+  <div class="section">
+    <div class="sec-head"><span class="num">01</span><span class="label">5 种核心机制</span></div>
+    <div class="sec-body">
+      <div class="mech-grid">
+        <div class="mech-card">
+          <div class="num">1</div>
+          <div class="m-sub">一切皆插件</div>
+          <div class="m-title">Plugin System</div>
+          <p>所有功能类继承 <code>Service</code> 基类，通过 <code>apply()</code> 函数注册为插件。插件可叠加、替换，无需修改核心代码。</p>
+        </div>
+        <div class="mech-card">
+          <div class="num">2</div>
+          <div class="m-sub">Context 是服务仓库</div>
+          <div class="m-title">Service Registry</div>
+          <p><code>ProxyContext.__getattr__</code> 实现动态服务查找，所有服务挂载在同一上下文中，按名访问，无需 import。</p>
+        </div>
+        <div class="mech-card">
+          <div class="num">3</div>
+          <div class="m-sub">inject 声明依赖</div>
+          <div class="m-title">DI + Topo Sort</div>
+          <p><code>@inject</code> 装饰器声明依赖，由 <code>Loader._topo_sort</code> 执行 Kahn 算法拓扑排序，保证加载顺序无环。</p>
+        </div>
+        <div class="mech-card">
+          <div class="num">4</div>
+          <div class="m-sub">5 种事件分发</div>
+          <div class="m-title">Event Dispatch</div>
+          <p><code>emit</code>（广播）、<code>parallel</code>（并发）、<code>serial</code>（串行）、<code>bail</code>（短路）、<code>waterfall</code>（链式）。</p>
+        </div>
+        <div class="mech-card">
+          <div class="num">5</div>
+          <div class="m-sub">注册即可逆副作用</div>
+          <div class="m-title">Disposable Effects</div>
+          <p><code>fiber.effect</code> 注册副作用，<code>_disposables</code> 逆序清理。资源用完即退，无需手动释放。</p>
+        </div>
+        <div class="mech-card">
+          <div class="num">⚙</div>
+          <div class="m-sub">底层 Fake LLM</div>
+          <div class="m-title">EchoAdapter</div>
+          <p>EchoAdapter 将输入原样返回，模拟 LLM 对话。无需 API Key，直接运行，降低学习门槛。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORE CODE -->
+  <div class="section">
+    <div class="sec-head"><span class="num">02</span><span class="label">核心代码片段</span></div>
+    <div class="sec-body">
+      <div class="code-block">
+        <div class="l">// 机制 1: 一切皆插件 — Service 基类 + apply()</div>
+        <pre>class Service:
+    def apply(self, context: 'Context') -> None:
+        """插件挂载到 Context 的入口，子类实现具体逻辑"""
+        raise NotImplementedError
+
+# 使用 apply 注册插件
+context.apply(MyPlugin())</pre>
+      </div>
+      <div class="code-block">
+        <div class="l">// 机制 2: ProxyContext.__getattr__ 动态查找</div>
+        <pre>class ProxyContext:
+    def __getattr__(self, name: str):
+        # 运行时按名查找服务，无需预声明
+        return self._services[name]
+
+# 等价于 Django middleware 的 process_request</pre>
+      </div>
+      <div class="code-block">
+        <div class="l">// 机制 3: inject + _topo_sort Kahn 算法</div>
+        <pre>def inject(dep: str):
+    """声明对某服务的依赖"""
+    def wrapper(fn):
+        fn._deps = fn._deps + (dep,) if hasattr(fn, '_deps') else (dep,)
+        return fn
+    return wrapper
+
+# Loader._topo_sort 执行 Kahn 算法拓扑排序
+def _topo_sort(self) -> list[Service]:
+    # 保证所有 @inject 依赖在被依赖者之后加载
+    ...</pre>
+      </div>
+      <div class="code-block">
+        <div class="l">// 机制 4: 5 种事件分发模式</div>
+        <pre>emit(event)       # 广播给所有监听者
+parallel(events)  # 并发执行，等所有结果
+serial(events)    # 串行执行，依次等待
+bail(events)      # 短路：遇首个成功即返回
+waterfall(events) # 链式：前一个输出作下一个输入</pre>
+      </div>
+      <div class="code-block">
+        <div class="l">// 机制 5: fiber.effect 注册 + _disposables 逆序清理</div>
+        <pre>with fiber.effect(lambda: open_resource("db")) as resource:
+    # 资源随 fiber 生命周期自动管理
+    use(resource)
+
+# fiber 退出时逆序调用所有注册的清理函数
+# 等价于 pytest fixture 的 teardown 或 contextmanager 栈</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- PYTHON CONCEPT MAPPING -->
+  <div class="section">
+    <div class="sec-head"><span class="num">03</span><span class="label">Python 概念对照</span></div>
+    <div class="sec-body">
+      <table class="py-table">
+        <tr><th>Cordis 机制</th><th>Python 对应概念</th><th>典型框架</th></tr>
+        <tr><td>一切皆插件</td><td><code>__init__.py</code> 自动发现 / entry points</td><td>Django MIDDLEWARE</td></tr>
+        <tr><td>Context 服务仓库</td><td>全局注册表 / <code>globals()</code></td><td>Flask app.context</td></tr>
+        <tr><td>@inject 依赖注入</td><td>装饰器 + 拓扑排序</td><td>pytest fixture 依赖图</td></tr>
+        <tr><td>5 种事件分发</td><td>同步 / asyncio.gather / 协程</td><td>asyncio.TaskGroup</td></tr>
+        <tr><td>fiber.effect</td><td><code>contextmanager</code> / <code>try/finally</code></td><td>pytest fixture teardown</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE FLOW -->
+  <div class="section">
+    <div class="sec-head"><span class="num">04</span><span class="label">Cordis Mini 运行流程</span></div>
+    <div class="sec-body">
+      <div class="flow">
+        <div class="flow-item">定义 Service</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">@inject 声明依赖</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">Loader 拓扑排序</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item red">Context 注册</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">事件分发</div>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">START</div>
+          <h4>定义 Service 子类</h4>
+          <p>继承 <code>Service</code>，实现 <code>apply(context)</code>，用 <code>@inject("svc_name")</code> 声明依赖。</p>
+        </div>
+        <div class="card">
+          <div class="lead">LOAD</div>
+          <h4>Loader 注入 &amp; 排序</h4>
+          <p>Kahn 算法拓扑排序，解析所有 <code>@inject</code> 依赖图，生成安全加载顺序。</p>
+        </div>
+        <div class="card">
+          <div class="lead">RUN</div>
+          <h4>Context + 事件分发</h4>
+          <p>所有 Service 挂载 Context，按需触发 emit/parallel/serial/bail/waterfall 事件。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar">
+    <span class="source">adpanru/cordis-mini · GitHub · MIT License</span>
+    <span class="source">Python 3.11+ · 纯标准库 · EchoAdapter Fake LLM</span>
+  </div>
+
+  <div class="rule"></div>
+  <p class="source-note">Cordis Mini · ~600 行 Python 代码还原 Cordis Agent 5 大核心架构机制 · redswiss</p>
+</main>
+</body>
+</html>
