@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pi 生态周报 #2 · 0.84.x 三连发 + 缓存经济学</title>
+  <meta name="description" content="Pi 生态周报第二期：0.84.x 三连发（0.84.0/0.84.1/0.84.2），DeepSeek V4 Flash 缓存命中率 99.93%，$2.65 ≈ 10亿 token，思考按需化新技巧。">
+  <link rel="stylesheet" href="../theme/darkblue.css">
+  <style>
+    :root{--bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);--cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--shadow:0 18px 42px rgba(0,0,0,.34);--grid:rgba(88,195,255,.10)}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);background:linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%)}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .panel-head .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#dfe8ff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .version-card{border:1.5px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2131,#171c2b);padding:11px 12px;border-radius:14px;display:grid;gap:6px}
+    .version-card .ver{font-size:13px;font-weight:900;color:#fff}
+    .version-card .date{font-size:11px;color:#9fb0de;letter-spacing:.04em}
+    .version-card ul{margin:0;padding-left:16px;font-size:12px;line-height:1.6;color:#d9e2ff}
+    .version-card li{margin-bottom:3px}
+    .status{border:1.5px solid rgba(255,255,255,.08);background:#0f1424;padding:9px 10px;border-radius:12px;display:grid;gap:4px;font-size:12px;color:#d8e2ff}
+    .status .left{display:grid;gap:2px}
+    .status .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
+    .term{background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#111831;border-bottom:1px solid rgba(255,255,255,.08);color:#dfe8ff;font-size:11px}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8f59f;font-size:12px;line-height:1.7;min-height:120px;white-space:pre-wrap}
+    .editor{background:#0f1524;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .editor-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#131a2d;border-bottom:1px solid rgba(255,255,255,.08);color:#fff;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .code{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dbe5ff;font-size:11.8px;line-height:1.7;white-space:pre-wrap}
+    .code .kw{color:#7ad9ff}
+    .code .fn{color:#f4c84c}
+    .feature-row{margin-top:14px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+    .feature{background:#171c2b;border:1.5px solid rgba(255,255,255,.08);border-radius:16px;padding:11px 9px;color:#e8edf8;text-align:center;display:grid;gap:7px;min-width:0}
+    .icon{width:28px;height:28px;margin:0 auto;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;font-size:14px;color:#fff}
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+    .footer{margin-top:14px;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#dfe8ff;font-size:12px;flex-wrap:wrap}
+    .footer .stars{font-weight:900}
+    /* Architecture diagram */
+    .arch-diagram{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .arch-panel{background:#171c2b;border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;display:grid;gap:10px}
+    .arch-title{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#9fb0de;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:8px;margin-bottom:2px}
+    .arch-layer{display:grid;gap:6px}
+    .layer-card{background:linear-gradient(135deg,rgba(88,195,255,.15),rgba(132,89,255,.12));border:1.5px solid rgba(88,195,255,.25);border-radius:12px;padding:10px 12px;display:grid;gap:3px}
+    .layer-card.tool{background:linear-gradient(135deg,rgba(45,179,106,.15),rgba(88,195,255,.10));border-color:rgba(45,179,106,.30)}
+    .layer-card.provider{background:linear-gradient(135deg,rgba(244,200,76,.15),rgba(132,89,255,.10));border-color:rgba(244,200,76,.30)}
+    .layer-card.model{background:linear-gradient(135deg,rgba(132,89,255,.15),rgba(88,195,255,.10));border-color:rgba(132,89,255,.30)}
+    .layer-name{font-size:13px;font-weight:900;color:#fff}
+    .layer-desc{font-size:11.5px;color:#c9d4f7;line-height:1.45}
+    .layer-examples{font-size:11px;color:#9fb0de;font-family:ui-monospace,monospace}
+    .arch-arrow{display:flex;align-items:center;justify-content:center;color:#4a78ff;font-size:20px;font-weight:900}
+    /* Cache economics section */
+    .cache-section{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .cache-card{background:#171c2b;border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;display:grid;gap:10px}
+    .cache-metric{display:grid;gap:6px}
+    .cache-metric .big-num{font-size:clamp(32px,5vw,56px);font-weight:950;letter-spacing:-.04em;background:linear-gradient(135deg,var(--cyan),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .cache-metric .label{font-size:12px;font-weight:700;color:#9fb0de;text-transform:uppercase;letter-spacing:.08em}
+    .cache-metric .sub{font-size:11.5px;color:#c9d4f7}
+    .price-table{width:100%;border-collapse:collapse;font-size:12px}
+    .price-table th{text-align:left;padding:7px 10px;background:#111831;color:#9fb0de;font-weight:900;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)}
+    .price-table td{padding:7px 10px;color:#d8e2ff;border-bottom:1px solid rgba(255,255,255,.05)}
+    .price-table tr:last-child td{border-bottom:none}
+    .price-table .highlight{color:#7ad9ff;font-weight:900}
+    /* Tip section */
+    .tip-section{margin-top:14px;background:linear-gradient(135deg,rgba(244,200,76,.12),rgba(132,89,255,.10));border:1.5px solid rgba(244,200,76,.30);border-radius:18px;padding:14px 16px;display:grid;gap:10px}
+    .tip-title{font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#fff0bf;display:flex;align-items:center;gap:8px}
+    .tip-title::before{content:"💡";font-size:16px}
+    .tip-body{display:grid;gap:6px}
+    .tip-body p{margin:0;font-size:13px;line-height:1.65;color:#edf2ff}
+    .tip-body code{font-family:ui-monospace,monospace;color:#7ad9ff;font-size:12px;background:rgba(122,217,255,.12);padding:2px 6px;border-radius:4px}
+    @media(max-width:1080px){.hero,.shell,.arch-diagram,.cache-section{grid-template-columns:1fr}.feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:720px){.page{width:min(100% - 16px,1180px);padding:10px 0 58px}.hero{gap:12px}.title{font-size:clamp(34px,13vw,54px)}.subtitle{font-size:14px}.subcn{font-size:13px}.shell{padding:10px;gap:10px}.feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}.arch-diagram,.cache-section{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Hero bar -->
+  <div class="hero-bar"></div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker">🌀 Pi Ecosystem Weekly · #2</span>
+        <span class="source">@yibie · 2026-08-22</span>
+      </div>
+      <h1 class="title">0.84.x<br>三连发</h1>
+      <p class="subtitle">一周三个版本推送，Provider API 重构、订阅制模型目录上线、DeepSeek 兼容修复——以及一个用户跑出来的缓存经济学数据。</p>
+      <p class="subcn">DeepSeek V4 Flash 缓存命中率 99.93%，$2.65 ≈ 10亿 token；新插件体系蓄势；思考从强制开销变成按需工具。</p>
+      <div class="pill-row">
+        <span class="pill cyan">DeepSeek V4 Flash</span>
+        <span class="pill green">99.93% 缓存命中</span>
+        <span class="pill yellow">$2.65 / 10亿 token</span>
+        <span class="pill purple">0.84.x 三版本</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">π</div>
+        <div class="visual-meta">
+          <div class="big">Pi · AI Coding Agent</div>
+          <div class="small">github.com/earendil-works/pi</div>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <div class="mini-card">
+          <div class="label">缓存命中率</div>
+          <div class="value">99.93%</div>
+          <div class="desc">DeepSeek V4 Flash 实测</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">输出成本</div>
+          <div class="value">$0.87/M</div>
+          <div class="desc">token 输出价格</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">缓存命中</div>
+          <div class="value">$0.25/M</div>
+          <div class="desc">仅为输出的 29%</div>
+        </div>
+        <div class="mini-card">
+          <div class="label">10亿 token</div>
+          <div class="value">≈ $2.65</div>
+          <div class="desc">综合费用实测</div>
+        </div>
+      </div>
+      <div class="visual-strip"></div>
+    </div>
+  </div>
+
+  <!-- Architecture diagram -->
+  <div class="arch-diagram">
+    <div class="arch-panel">
+      <div class="arch-title">Pi 三层架构</div>
+      <div class="arch-layer">
+        <div class="layer-card tool">
+          <div class="layer-name">🛠️ Tool 层</div>
+          <div class="layer-desc">Agent 调用工具的统一抽象，MCP 协议兼容</div>
+          <div class="layer-examples">Bash / Edit / Glob / Read / WebSearch ...</div>
+        </div>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-layer">
+        <div class="layer-card provider">
+          <div class="layer-name">🔌 Provider 层</div>
+          <div class="layer-desc">统一接口对接多模型厂商，Transforms 标准化请求/响应</div>
+          <div class="layer-examples">DeepSeek / Gemini / OpenAI / Qwen / Kimi / Fireworks GLM ...</div>
+        </div>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-layer">
+        <div class="layer-card model">
+          <div class="layer-name">🤖 Model 层</div>
+          <div class="layer-desc">具体模型实例，Streaming / Tool Call / Context 管理</div>
+          <div class="layer-examples">DeepSeek-V4-Flash / Gemini-2.5 / GPT-4o / Qwen-72B ...</div>
+        </div>
+      </div>
+    </div>
+    <div class="arch-panel">
+      <div class="arch-title">缓存经济学</div>
+      <div class="cache-metric">
+        <div class="big-num">99.93%</div>
+        <div class="label">缓存命中率</div>
+        <div class="sub">用户实测 DeepSeek V4 Flash，创始人亲自转推</div>
+      </div>
+      <table class="price-table">
+        <thead>
+          <tr><th>操作</th><th>价格</th><th>备注</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>输出 token</td>
+            <td class="highlight">$0.87 / M</td>
+            <td>标准计费</td>
+          </tr>
+          <tr>
+            <td>缓存命中</td>
+            <td class="highlight">$0.25 / M</td>
+            <td>仅输出价的 29%</td>
+          </tr>
+          <tr>
+            <td>10亿 token</td>
+            <td class="highlight">≈ $2.65</td>
+            <td>综合费用</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="tip-body">
+        <p>核心洞察：高频 Agent 场景（如代码补全、重复重构）天然产生大量缓存命中，将思考（Thinking）从强制开销变为<strong>按需工具调用</strong>，可显著降低实际成本。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three versions -->
+  <div class="shell">
+    <div class="panel">
+      <div class="panel-head">
+        <h3>🔖 0.84.0</h3>
+        <span class="badge">2026-08-06</span>
+      </div>
+      <div class="panel-body">
+        <div class="version-card">
+          <div class="ver">Provider API 重构</div>
+          <div class="date">breaking change</div>
+          <ul>
+            <li><code class="kw">ModelsRequestTransforms</code> 替换 <code class="kw">ModelsStreamTransforms</code></li>
+            <li>统一请求/响应标准化路径</li>
+            <li>Fireworks GLM 5.2 缓存修复</li>
+          </ul>
+        </div>
+        <div class="version-card">
+          <div class="ver">事务性 Context 模型</div>
+          <div class="date">新 API</div>
+          <ul>
+            <li><code class="fn">context.stored</code> 存储中间状态</li>
+            <li><code class="fn">context.publish()</code> 提交变更</li>
+            <li>原子化操作避免状态污染</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>🔖 0.84.1</h3>
+        <span class="badge">2026-08-07</span>
+      </div>
+      <div class="panel-body">
+        <div class="version-card">
+          <div class="ver">Qwen Token Plan Individual</div>
+          <div class="date">new provider</div>
+          <ul>
+            <li>新增订阅制模型目录 Provider</li>
+            <li>支持 Qwen 全系订阅模型</li>
+            <li>Token Plan 订阅用户可直接接入</li>
+          </ul>
+        </div>
+        <div class="version-card">
+          <div class="ver">DeepSeek 兼容修复</div>
+          <div class="date">bugfix</div>
+          <ul>
+            <li>大写 <code class="kw">Hostname</code> 兼容问题修复</li>
+            <li>DeepSeek API 端点解析正确</li>
+            <li>V4/V3 全系兼容</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>🔖 0.84.2</h3>
+        <span class="badge">2026-08-14</span>
+      </div>
+      <div class="panel-body">
+        <div class="version-card">
+          <div class="ver">Kimi Coding User-Agent</div>
+          <div class="date">header fix</div>
+          <ul>
+            <li>Kimi Coding 请求改用 <code class="kw">runtime User-Agent</code></li>
+            <li>绕过某些接口的爬虫检测</li>
+            <li>提升 Kimi 模型可用性</li>
+          </ul>
+        </div>
+        <div class="version-card">
+          <div class="ver">严格 Tool Schema 兼容</div>
+          <div class="date">schema normalization</div>
+          <ul>
+            <li>严格工具 schema 自动转 provider 兼容 <code class="kw">closed objects</code></li>
+            <li>避免 schema 冲突导致的调用失败</li>
+            <li>DeepSeek <code class="kw">max_tokens</code> 字段修复</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New plugins -->
+  <div class="tip-section">
+    <div class="tip-title">新插件体系</div>
+    <div class="tip-body">
+      <p>Pi 本体在 0.84.x 周期内同步推进插件体系，支持更多第三方集成。新插件通过统一插件接口注册，自动获得 Tool / Provider / Model 三层能力，无需重复适配。</p>
+      <p>具体插件列表请参考 <code>github.com/earendil-works/pi/releases</code> 近期 Release 详情。Pi 插件市场正在建设中，预计下周周报将有更完整覆盖。</p>
+    </div>
+  </div>
+
+  <!-- Thinking on-demand tip -->
+  <div class="tip-section">
+    <div class="tip-title">小技巧：思考按需化</div>
+    <div class="tip-body">
+      <p>将思考（Thinking）从强制开销变成<strong>按需工具调用</strong>——在高频、轻量任务（如代码补全、简单重构）中禁用 Thinking；在复杂推理、多步规划时显式启用。</p>
+      <p>效果：实测在 DeepSeek V4 Flash 下，思考按需化可进一步提升缓存命中率，因为每次请求的 Prompt 前缀更稳定、更容易被缓存命中。</p>
+    </div>
+  </div>
+
+  <!-- Feature row -->
+  <div class="feature-row">
+    <div class="feature">
+      <div class="icon">🛠️</div>
+      <span>MCP 协议兼容</span>
+    </div>
+    <div class="feature">
+      <div class="icon">🔌</div>
+      <span>统一 Provider</span>
+    </div>
+    <div class="feature">
+      <div class="icon">🤖</div>
+      <span>多模型支持</span>
+    </div>
+    <div class="feature">
+      <div class="icon">💾</div>
+      <span>上下文存储</span>
+    </div>
+    <div class="feature">
+      <div class="icon">⚡</div>
+      <span>按需 Thinking</span>
+    </div>
+    <div class="feature">
+      <div class="icon">🔗</div>
+      <span>插件体系</span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>
+      <span class="stars">⭐ 本地优先 · 多模型统一接口</span> · github.com/earendil-works/pi
+    </div>
+    <div>Pi Ecosystem Weekly #2 · 2026-08-22 · @yibie</div>
+  </div>
+
+</div>
+</body>
+</html>
