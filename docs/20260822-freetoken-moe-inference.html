@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FreeToken — 边缘原生 MoE 推理引擎，让 RTX 4060 跑大模型</title>
+  <meta name="description" content="FreeToken：UC Berkeley / MIT / UT Austin 联合开源的边缘原生 MoE 推理引擎，RTX 4060 笔记本跑 35B @ 39.3 tok/s，支持 20+ MoE 模型，Stars 594，论文 arXiv:2608.16157。">
+  <style>
+    :root{
+      --bg:#080d1a;
+      --bg-2:#0c1428;
+      --panel:#10183a;
+      --panel-2:#09101f;
+      --ink:#eef4ff;
+      --muted:#8ba3d8;
+      --line:rgba(255,255,255,.10);
+      --cyan:#5cc8ff;
+      --blue:#4a7eff;
+      --green:#2ed882;
+      --yellow:#f4c84c;
+      --purple:#9b6dff;
+      --red:#ff6b6b;
+      --shadow:0 18px 42px rgba(0,0,0,.40);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 15% 8%, rgba(92,200,255,.18) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 6%, rgba(155,109,255,.20) 0 9%, transparent 10%),
+        radial-gradient(circle at 75% 75%, rgba(46,216,130,.12) 0 13%, transparent 14%),
+        radial-gradient(circle at 20% 82%, rgba(244,200,76,.09) 0 11%, transparent 12%),
+        linear-gradient(180deg,#070c1a 0%,#0e1730 48%,#070c1a 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .kicker .star{color:var(--yellow);font-weight:900}
+    .source{max-width:320px;text-align:right;font:800 10px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#9fb4e0;overflow-wrap:anywhere;font-size:10px}
+    .title{margin:0;font-size:clamp(38px,6.5vw,82px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(14px,1.9vw,19px);line-height:1.55;color:#dde6fb}
+    .subcn{margin:0;max-width:980px;font-size:clamp(12px,1.5vw,15px);line-height:1.65;color:#9fb4d8}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(92,200,255,.32);background:rgba(92,200,255,.12);color:#d8f5ff}
+    .pill.green{border-color:rgba(46,216,130,.32);background:rgba(46,216,130,.12);color:#ccffec}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(155,109,255,.35);background:rgba(155,109,255,.12);color:#ede3ff}
+    .pill.red{border-color:rgba(255,107,107,.32);background:rgba(255,107,107,.12);color:#ffd8d8}
+    .pill.blue{border-color:rgba(74,126,255,.35);background:rgba(74,126,255,.12);color:#d8e4ff}
+
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.15);background:linear-gradient(135deg,rgba(74,126,255,.25),rgba(92,200,255,.14) 45%,rgba(155,109,255,.20));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+
+    .hero-visual{min-width:0;background:rgba(8,13,26,.6);border:1.5px solid rgba(255,255,255,.11);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.38) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(92,200,255,.28), inset 0 1px 0 rgba(255,255,255,.2);display:grid;place-items:center;color:#fff;font-size:22px;font-weight:950;letter-spacing:-.08em;flex-shrink:0}
+    .orb-inner{font-size:28px;line-height:1}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 10px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#9fb4d8;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:7px;box-shadow:0 12px 26px rgba(0,0,0,.22)}
+    .mini-card .label{font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8fa4c8}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11px;line-height:1.45;color:#a8b8d8}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08);flex-shrink:0}
+    .mini-icon.cyan{color:var(--cyan)}.mini-icon.green{color:var(--green)}.mini-icon.yellow{color:var(--yellow)}.mini-icon.purple{color:var(--purple)}.mini-icon.blue{color:var(--blue)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(92,200,255,.18)}
+    .visual-strip2{height:8px;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+
+    /* PERF TABLE */
+    .perf-section{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:rgba(8,13,26,.4);border:1.5px solid rgba(255,255,255,.09);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .perf-panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px}
+    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:10px}
+    .panel-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .panel-title{margin:0;font-size:16px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .panel-row{display:grid;gap:7px}
+    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
+    .feat-head{display:flex;align-items:center;gap:7px}
+    .feat-icon{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.10),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.09);color:var(--cyan);flex-shrink:0}
+    .feat-icon svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .feat-icon.green{color:var(--green)}.feat-icon.yellow{color:var(--yellow)}.feat-icon.purple{color:var(--purple)}.feat-icon.blue{color:var(--blue)}
+    .feat-label{font-size:12px;font-weight:900;color:#fff;line-height:1.3}
+    .feat-body{font-size:11.5px;line-height:1.55;color:#a8b8d8}
+    .perf-table{width:100%;border-collapse:collapse;font-size:12px}
+    .perf-table th{font:900 10px/1 ui-monospace;letter-spacing:.1em;text-transform:uppercase;color:#7a90c0;padding:5px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+    .perf-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+    .perf-table tr:last-child td{border-bottom:none}
+    .gpu{font-weight:800;color:#dde6ff;white-space:nowrap}
+    .model{color:#9fb4d8}
+    .toks{font:900 13px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#2ed882;white-space:nowrap}
+    .badge{display:inline-flex;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:900;letter-spacing:.04em}
+    .badge.green{background:rgba(46,216,130,.18);border:1px solid rgba(46,216,130,.32);color:#2ed882}
+    .badge.yellow{background:rgba(244,200,76,.18);border:1px solid rgba(244,200,76,.32);color:#f4c84c}
+    .badge.cyan{background:rgba(92,200,255,.18);border:1px solid rgba(92,200,255,.32);color:#5cc8ff}
+    .badge.purple{background:rgba(155,109,255,.18);border:1px solid rgba(155,109,255,.32);color:#9b6dff}
+
+    /* DEEP DIVES */
+    .shell{display:grid;gap:12px;background:rgba(8,13,26,.38);border:1.5px solid rgba(255,255,255,.09);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .deep-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .feat-list{display:grid;gap:7px}
+    .feat-row{display:grid;grid-template-columns:36px 1fr;gap:9px;align-items:start}
+    .feat-num{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,rgba(74,126,255,.28),rgba(92,200,255,.16));border:1.5px solid rgba(92,200,255,.22);display:grid;place-items:center;font:900 13px/1 ui-monospace;color:#5cc8ff;flex-shrink:0}
+    .feat-row-label{font-size:12.5px;font-weight:900;color:#fff;line-height:1.3;padding-top:3px}
+    .feat-row-body{font-size:11.5px;line-height:1.55;color:#9fb4d0}
+
+    .model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+    .model-card{min-width:0;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:11px 12px 10px;display:grid;gap:5px}
+    .model-name{font-size:13px;font-weight:900;color:#fff}
+    .model-size{font:800 11px/1.4 ui-monospace;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em}
+    .model-note{font-size:11px;color:#8fa4c0;line-height:1.5}
+
+    .api-row{display:flex;flex-wrap:wrap;gap:8px}
+    .api-chip{min-height:30px;padding:6px 12px;border:1.5px solid rgba(92,200,255,.25);background:rgba(92,200,255,.10);border-radius:999px;color:#d8f4ff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;gap:6px}
+    .api-chip.partial{border-color:rgba(244,200,76,.25);background:rgba(244,200,76,.08);color:#fff0bf}
+
+    .bottom-pills{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 0}
+    .bottom-chip{min-height:28px;padding:5px 10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);border-radius:999px;color:#9fb4d0;font-size:11.5px;font-weight:700}
+
+    @media(max-width:700px){
+      .hero{grid-template-columns:1fr}
+      .perf-section{grid-template-columns:1fr}
+      .deep-cols{grid-template-columns:1fr}
+      .visual-top{flex-wrap:wrap}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker"><span class="star">★</span>&nbsp;594 · FlashML-org / FreeToken</span>
+        <span class="kicker">arXiv:2608.16157</span>
+        <span class="source">UC Berkeley · MIT · UT Austin<br>Shuo Yang · Xiaoze Fan · Melissa Pan · Haocheng Xi · Zhe Wang · Shanlin Sun · Kurt Keutzer · Song Han · Matei Zaharia · Chenfeng Xu · Ion Stoica</span>
+      </div>
+      <h1 class="title">FreeToken</h1>
+      <p class="subtitle">让 RTX 4060 跑大模型的 MoE 推理框架</p>
+      <p class="subcn">边缘原生 MoE 推理引擎 — 个人电脑（游戏显卡 / 笔记本）跑 290B+ 前沿 MoE 模型，UC Berkeley · MIT · UT Austin 联合研究</p>
+      <div class="pill-row">
+        <span class="pill cyan">边缘推理</span>
+        <span class="pill green">MoE 原生</span>
+        <span class="pill yellow">RTX 4060 · 39.3 tok/s</span>
+        <span class="pill purple">20+ MoE 模型</span>
+        <span class="pill blue">论文开源</span>
+        <span class="pill">OpenAI / Anthropic 兼容</span>
+      </div>
+      <div class="hero-note">
+        <strong>RTX 4060 笔记本实测：35B MoE 模型跑到 39.3 tok/s，超过 Codex 中位速度 33 tok/s</strong>
+        <p>FreeToken 通过 q* policy 动态调度、专家缓存和 FTW 权重量化，让消费级显卡流畅跑 290B+ 前沿 MoE 模型。游戏台式 32GB 显存可实时推理 284B 参数。</p>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="visual-top">
+        <div class="orb"><span class="orb-inner">⚡</span></div>
+        <div class="visual-meta">
+          <span class="big">FreeToken</span>
+          <span class="small">边缘原生 MoE 引擎</span>
+          <span class="small">Stars · 594</span>
+        </div>
+      </div>
+      <div class="visual-strip"></div>
+      <div class="visual-grid">
+        <div class="mini-card">
+          <span class="label">RTX 4060 笔记本</span>
+          <span class="value">35B @ 39.3 tok/s</span>
+          <span class="desc">超过 Codex 中位速度</span>
+        </div>
+        <div class="mini-card">
+          <span class="label">RTX 5090</span>
+          <span class="value">Qwen3.6 · 77-83 tok/s</span>
+          <span class="desc">桌面旗舰实测</span>
+        </div>
+        <div class="mini-card">
+          <span class="label">游戏台式 32GB</span>
+          <span class="value">284B 实时推理</span>
+          <span class="desc">消费级硬件上限</span>
+        </div>
+        <div class="mini-card">
+          <span class="label">RTX PRO 6000</span>
+          <span class="value">GLM-5.2 · 2× llama.cpp</span>
+          <span class="desc">单卡 753B MoE</span>
+        </div>
+      </div>
+      <div class="visual-strip2"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:grid;gap:4px">
+          <span style="font:900 10px/1 ui-monospace;color:#7a90c0;text-transform:uppercase;letter-spacing:.08em">TTFT 延迟</span>
+          <span style="font:900 16px/1;color:#2ed882">44s</span>
+          <span style="font-size:10.5px;color:#8fa4c0">vs 竞品 150s+ worst-case</span>
+        </div>
+        <div style="display:grid;gap:4px">
+          <span style="font:900 10px/1 ui-monospace;color:#7a90c0;text-transform:uppercase;letter-spacing:.08em">竞品对比</span>
+          <span style="font:900 16px/1;color:#5cc8ff">1.5-2.3×</span>
+          <span style="font-size:10.5px;color:#8fa4c0">vs llama.cpp / Ollama / KTransformers</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERFORMANCE TABLE -->
+  <div class="perf-section">
+    <div class="perf-panel">
+      <div class="panel-head">
+        <span class="panel-kicker">Benchmark</span>
+        <h2 class="panel-title">性能实测数据</h2>
+      </div>
+      <table class="perf-table">
+        <thead>
+          <tr>
+            <th>GPU</th>
+            <th>模型</th>
+            <th>吞吐</th>
+            <th>量化</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="gpu">RTX 5090</td>
+            <td class="model">Qwen3.6-35B-A3B</td>
+            <td class="toks">77–83 tok/s</td>
+            <td><span class="badge green">MXFP4</span></td>
+          </tr>
+          <tr>
+            <td class="gpu">RTX 5090</td>
+            <td class="model">DeepSeek-V4-Flash</td>
+            <td class="toks">22–25 tok/s</td>
+            <td><span class="badge cyan">NVFP4</span></td>
+          </tr>
+          <tr>
+            <td class="gpu">RTX 4060 笔记本</td>
+            <td class="model">35B MoE</td>
+            <td class="toks">39.3 tok/s</td>
+            <td><span class="badge yellow">FP8</span></td>
+          </tr>
+          <tr>
+            <td class="gpu">RTX PRO 6000</td>
+            <td class="model">GLM-5.2 (753B)</td>
+            <td class="toks">2× llama.cpp</td>
+            <td><span class="badge purple">BF16</span></td>
+          </tr>
+          <tr>
+            <td class="gpu">游戏台式 32GB</td>
+            <td class="model">284B MoE</td>
+            <td class="toks">实时推理</td>
+            <td><span class="badge green">MXFP4</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="perf-panel">
+      <div class="panel-head">
+        <span class="panel-kicker">Latency</span>
+        <h2 class="panel-title">TTFT 延迟对比</h2>
+      </div>
+      <table class="perf-table">
+        <thead>
+          <tr>
+            <th>系统</th>
+            <th>Worst-case TTFT</th>
+            <th>评级</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="gpu">FreeToken</td>
+            <td class="toks">&lt; 44s</td>
+            <td><span class="badge green">最优</span></td>
+          </tr>
+          <tr>
+            <td class="model">llama.cpp</td>
+            <td style="color:#f4c84c;font-weight:800">&gt; 150s</td>
+            <td><span class="badge yellow">慢</span></td>
+          </tr>
+          <tr>
+            <td class="model">Ollama</td>
+            <td style="color:#ff8888;font-weight:800">&gt; 200s</td>
+            <td><span class="badge red">极慢</span></td>
+          </tr>
+          <tr>
+            <td class="model">KTransformers</td>
+            <td style="color:#f4c84c;font-weight:800">&gt; 150s</td>
+            <td><span class="badge yellow">慢</span></td>
+          </tr>
+          <tr>
+            <td class="model">MoE-Infinity</td>
+            <td style="color:#f4c84c;font-weight:800">&gt; 160s</td>
+            <td><span class="badge yellow">慢</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 4 CORE TECH FEATURES -->
+  <div class="shell">
+    <div class="panel-head">
+      <span class="panel-kicker">Core Tech</span>
+      <h2 class="panel-title">四大核心技术特性</h2>
+    </div>
+    <div class="deep-cols">
+      <div class="panel">
+        <div class="feat-list">
+          <div class="feat-row">
+            <div class="feat-num">1</div>
+            <div>
+              <div class="feat-row-label">q* Policy · 带宽自适应调度</div>
+              <div class="feat-row-body">CPU-GPU 协同执行策略，根据实时带宽动态分配计算负载，笔记本和台式机自适应，无需手动调参。</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-num">2</div>
+            <div>
+              <div class="feat-row-label">全局 LRU 专家缓存 + FTW 量化</div>
+              <div class="feat-row-body">专家参数全局 LRU 缓存 + FTW 快权格式（Fast Token-wise Weight），减少重复加载，降低显存占用。</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-num">3</div>
+            <div>
+              <div class="feat-row-label">语义感知 KV + 专家缓存</div>
+              <div class="feat-row-body">KV Cache 与专家缓存联动，增量重算支持 thinking / tool-call 边界的语义切分，降低首 token 延迟。</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-num">4</div>
+            <div>
+              <div class="feat-row-label">弹性 VRAM 内存管理</div>
+              <div class="feat-row-body">运行时动态在专家缓存和 KV 内存之间重分配显存，无需重启引擎，显存利用率最大化。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head" style="border-bottom:none;padding-bottom:0;margin-bottom:0">
+          <span class="panel-kicker">Quantization</span>
+          <h2 class="panel-title">量化格式支持</h2>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="mini-card">
+            <span class="label">MXFP4</span>
+            <span class="value">4-bit 混合精度</span>
+            <span class="desc">主流高效率量化</span>
+          </div>
+          <div class="mini-card">
+            <span class="label">NVFP4</span>
+            <span class="value">NVIDIA FP4</span>
+            <span class="desc">Blackwell 架构</span>
+          </div>
+          <div class="mini-card">
+            <span class="label">FP8</span>
+            <span class="value">8-bit 浮点</span>
+            <span class="desc">延迟敏感场景</span>
+          </div>
+          <div class="mini-card">
+            <span class="label">BF16</span>
+            <span class="value">深度学习格式</span>
+            <span class="desc">高精度推理</span>
+          </div>
+        </div>
+        <div class="panel-head" style="border-bottom:none;padding-bottom:0;margin-bottom:0;margin-top:4px">
+          <span class="panel-kicker">API</span>
+          <h2 class="panel-title">兼容协议</h2>
+        </div>
+        <div class="api-row">
+          <span class="api-chip">✓ OpenAI API</span>
+          <span class="api-chip">✓ Anthropic</span>
+          <span class="api-chip">✓ Codex</span>
+          <span class="api-chip">✓ Claude Code</span>
+          <span class="api-chip">✓ OpenCode</span>
+          <span class="api-chip">✓ OpenClaw</span>
+          <span class="api-chip">✓ DeepSeek Harness</span>
+          <span class="api-chip partial">vLLM（规划中）</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUPPORTED MODELS -->
+  <div class="shell">
+    <div class="panel-head">
+      <span class="panel-kicker">Models</span>
+      <h2 class="panel-title">支持 20+ MoE 模型</h2>
+    </div>
+    <div class="model-grid">
+      <div class="model-card">
+        <span class="model-name">DeepSeek-V4-Flash</span>
+        <span class="model-size">前沿 MoE</span>
+        <span class="model-note">NVFP4 量化，RTX 5090 实测 22–25 tok/s</span>
+      </div>
+      <div class="model-card">
+        <span class="model-name">Qwen3.6-35B-A3B</span>
+        <span class="model-size">35B MoE · MXFP4</span>
+        <span class="model-note">RTX 5090 跑出 77–83 tok/s，RTX 4060 39.3 tok/s</span>
+      </div>
+      <div class="model-card">
+        <span class="model-name">GLM-5.2</span>
+        <span class="model-size">753B MoE · BF16</span>
+        <span class="model-note">RTX PRO 6000 单卡 2× llama.cpp 吞吐</span>
+      </div>
+      <div class="model-card">
+        <span class="model-name">LLaMA MoE</span>
+        <span class="model-size">开源 MoE 族</span>
+        <span class="model-note">全面支持 Mixtral / Qwen-MoE 系列</span>
+      </div>
+      <div class="model-card">
+        <span class="model-name">Mistral MoE</span>
+        <span class="model-size">欧洲开源 MoE</span>
+        <span class="model-note">FP8 量化适配，中等硬件友好</span>
+      </div>
+      <div class="model-card">
+        <span class="model-name">更多 20+ MoE</span>
+        <span class="model-size">持续接入</span>
+        <span class="model-note">包括 DBRX、Mixtral-8x22B、Qwen2-MoE 等</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HARDWARE & SCENARIOS -->
+  <div class="shell">
+    <div class="deep-cols">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-kicker">Hardware</span>
+          <h2 class="panel-title">支持的硬件</h2>
+        </div>
+        <div style="display:grid;gap:7px">
+          <div class="feat" style="grid-template-columns:1fr">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+              <div class="mini-card" style="gap:5px">
+                <span class="label">RTX 30 系列</span>
+                <span class="value">8-24GB</span>
+                <span class="desc">入门级 MoE</span>
+              </div>
+              <div class="mini-card" style="gap:5px">
+                <span class="label">RTX 40 系列</span>
+                <span class="value">8-24GB</span>
+                <span class="desc">4060 及以上</span>
+              </div>
+              <div class="mini-card" style="gap:5px">
+                <span class="label">RTX 50 系列</span>
+                <span class="value">16-48GB</span>
+                <span class="desc">5090 旗舰</span>
+              </div>
+            </div>
+          </div>
+          <div class="feat" style="grid-template-columns:1fr">
+            <div style="display:grid;gap:5px">
+              <span style="font:900 11px/1;color:#9fb4d0;text-transform:uppercase;letter-spacing:.07em">适用场景</span>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <span class="pill blue">8GB 笔记本 GPU</span>
+                <span class="pill green">游戏台式</span>
+                <span class="pill purple">单卡工作站</span>
+                <span class="pill cyan">多卡集群</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-kicker">Use Cases</span>
+          <h2 class="panel-title">适用人群</h2>
+        </div>
+        <div class="feat-list">
+          <div class="feat-row">
+            <div class="feat-icon purple"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+            <div>
+              <div class="feat-row-label">个人开发者 / 独立研究者</div>
+              <div class="feat-row-body">笔记本跑 35B MoE，本地开发测试，无需云端 API 费用。</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-icon cyan"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+            <div>
+              <div class="feat-row-label">Codex / Claude Code / OpenClaw 用户</div>
+              <div class="feat-row-body">OpenAI 兼容 API，直接替换后端，本地运行，成本为零。</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-icon green"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+            <div>
+              <div class="feat-row-label">AI 应用工程师 / 嵌入式部署</div>
+              <div class="feat-row-body">边缘原生设计，支持 thinking / tool-call，适合本地化 AI 产品。</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-icon yellow"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+            <div>
+              <div class="feat-row-label">学术研究者 / MoE 方向</div>
+              <div class="feat-row-body">论文开源 (arXiv:2608.16157)，支持 MXFP4/NVFP4/FP8/BF16 多种格式实验。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LINKS -->
+  <div class="pill-row" style="padding:10px 0 0">
+    <a class="pill cyan" href="https://github.com/FlashML-org/FreeToken" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+      &nbsp;GitHub · FlashML-org/FreeToken
+    </a>
+    <a class="pill purple" href="https://arxiv.org/abs/2608.16157" target="_blank" rel="noopener">
+      📄 arXiv:2608.16157
+    </a>
+    <a class="pill green" href="https://flashml.ai" target="_blank" rel="noopener">
+      🌐 flashml.ai
+    </a>
+  </div>
+
+</div>
+</body>
+</html>
