@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>specops /implement — 多 Agent TDD 流水线，让 Claude Code 自己跑完功能开发</title>
+  <meta name="description" content="meganide/specops：Claude Code 多 Agent TDD 流水线 Skill，0 Stars，MIT。Lead 从不写代码，Explorer 探索代码库，Teammate 按 RED-GREEN-REFACTOR 干活，Reviewer 两阶段验证。你走开，agent team 自己跑完。">
+  <style>
+    :root{
+      --bg:#080d1a;
+      --bg-2:#0c1428;
+      --panel:#10183a;
+      --panel-2:#09101f;
+      --ink:#eef4ff;
+      --muted:#8ba3d8;
+      --line:rgba(255,255,255,.10);
+      --cyan:#5cc8ff;
+      --blue:#4a7eff;
+      --green:#2ed882;
+      --yellow:#f4c84c;
+      --purple:#9b6dff;
+      --red:#ff6b6b;
+      --shadow:0 18px 42px rgba(0,0,0,.40);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 15% 8%, rgba(92,200,255,.18) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 6%, rgba(155,109,255,.20) 0 9%, transparent 10%),
+        radial-gradient(circle at 75% 75%, rgba(46,216,130,.12) 0 13%, transparent 14%),
+        radial-gradient(circle at 20% 82%, rgba(244,200,76,.09) 0 11%, transparent 12%),
+        linear-gradient(180deg,#070c1a 0%,#0e1730 48%,#070c1a 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:18px 0 82px}
+
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .kicker .star{color:var(--yellow);font-weight:900}
+    .source{max-width:320px;text-align:right;font:800 10px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#9fb4e0;overflow-wrap:anywhere;font-size:10px}
+    .title{margin:0;font-size:clamp(38px,6.5vw,82px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(14px,1.9vw,19px);line-height:1.55;color:#dde6fb}
+    .subcn{margin:0;max-width:980px;font-size:clamp(12px,1.5vw,15px);line-height:1.65;color:#9fb4d8}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(92,200,255,.32);background:rgba(92,200,255,.12);color:#d8f5ff}
+    .pill.green{border-color:rgba(46,216,130,.32);background:rgba(46,216,130,.12);color:#ccffec}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(155,109,255,.35);background:rgba(155,109,255,.12);color:#ede3ff}
+    .pill.red{border-color:rgba(255,107,107,.32);background:rgba(255,107,107,.12);color:#ffd8d8}
+    .pill.blue{border-color:rgba(74,126,255,.35);background:rgba(74,126,255,.12);color:#d8e4ff}
+
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.15);background:linear-gradient(135deg,rgba(74,126,255,.25),rgba(92,200,255,.14) 45%,rgba(155,109,255,.20));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+
+    .hero-visual{min-width:0;background:rgba(8,13,26,.6);border:1.5px solid rgba(255,255,255,.11);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.38) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(92,200,255,.28), inset 0 1px 0 rgba(255,255,255,.2);display:grid;place-items:center;color:#fff;font-size:22px;font-weight:950;letter-spacing:-.08em;flex-shrink:0}
+    .orb-inner{font-size:28px;line-height:1}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 10px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#9fb4d8;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:7px;box-shadow:0 12px 26px rgba(0,0,0,.22)}
+    .mini-card .label{font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8fa4c8}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11px;line-height:1.45;color:#a8b8d8}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08);flex-shrink:0}
+    .mini-icon.cyan{color:var(--cyan)}.mini-icon.green{color:var(--green)}.mini-icon.yellow{color:var(--yellow)}.mini-icon.purple{color:var(--purple)}.mini-icon.blue{color:var(--blue)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(92,200,255,.18)}
+    .visual-strip2{height:8px;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+
+    /* AGENT FLOW */
+    .flow-section{display:grid;gap:12px;background:rgba(8,13,26,.4);border:1.5px solid rgba(255,255,255,.09);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .flow-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .agent-card{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:8px}
+    .agent-card.lead{border-color:rgba(92,200,255,.35);background:linear-gradient(135deg,rgba(92,200,255,.08),rgba(74,126,255,.05))}
+    .agent-card.explorer{border-color:rgba(46,216,130,.35);background:linear-gradient(135deg,rgba(46,216,130,.08),rgba(46,216,130,.03))}
+    .agent-card.teammate{border-color:rgba(244,200,76,.35);background:linear-gradient(135deg,rgba(244,200,76,.08),rgba(244,200,76,.03))}
+    .agent-card.reviewer{border-color:rgba(155,109,255,.35);background:linear-gradient(135deg,rgba(155,109,255,.08),rgba(155,109,255,.03))}
+    .agent-card.fixer{border-color:rgba(255,107,107,.35);background:linear-gradient(135deg,rgba(255,107,107,.08),rgba(255,107,107,.03))}
+    .agent-role{display:flex;align-items:center;gap:8px}
+    .agent-badge{height:28px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;flex-shrink:0}
+    .agent-badge.lead{background:rgba(92,200,255,.22);border:1px solid rgba(92,200,255,.4);color:#5cc8ff}
+    .agent-badge.explorer{background:rgba(46,216,130,.22);border:1px solid rgba(46,216,130,.4);color:#2ed882}
+    .agent-badge.teammate{background:rgba(244,200,76,.22);border:1px solid rgba(244,200,76,.4);color:#f4c84c}
+    .agent-badge.reviewer{background:rgba(155,109,255,.22);border:1px solid rgba(155,109,255,.4);color:#9b6dff}
+    .agent-badge.fixer{background:rgba(255,107,107,.22);border:1px solid rgba(255,107,107,.4);color:#ff6b6b}
+    .agent-name{font-size:13px;font-weight:900;color:#fff}
+    .agent-desc{font-size:11.5px;line-height:1.55;color:#9fb4d0}
+    .agent-rule{font-size:11px;color:var(--cyan);font-style:italic;padding:6px 10px;background:rgba(92,200,255,.06);border-radius:8px;border-left:2px solid var(--cyan)}
+
+    /* PANELS */
+    .perf-section{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:rgba(8,13,26,.4);border:1.5px solid rgba(255,255,255,.09);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .perf-panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px}
+    .panel-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:10px}
+    .panel-kicker{font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+    .panel-title{margin:0;font-size:16px;font-weight:900;line-height:1.08;letter-spacing:-.03em}
+    .panel-row{display:grid;gap:7px}
+    .feat{display:grid;gap:5px;padding:8px 10px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px}
+    .feat-head{display:flex;align-items:center;gap:7px}
+    .feat-icon{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.10),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.09);color:var(--cyan);flex-shrink:0}
+    .feat-icon svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .feat-icon.green{color:var(--green)}.feat-icon.yellow{color:var(--yellow)}.feat-icon.purple{color:var(--purple)}.feat-icon.blue{color:var(--blue)}.feat-icon.red{color:var(--red)}
+    .feat-label{font-size:12px;font-weight:900;color:#fff;line-height:1.3}
+    .feat-body{font-size:11.5px;line-height:1.55;color:#a8b8d8}
+    .perf-table{width:100%;border-collapse:collapse;font-size:12px}
+    .perf-table th{font:900 10px/1 ui-monospace;letter-spacing:.1em;text-transform:uppercase;color:#7a90c0;padding:5px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+    .perf-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+    .perf-table tr:last-child td{border-bottom:none}
+    .badge{display:inline-flex;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:900;letter-spacing:.04em}
+    .badge.green{background:rgba(46,216,130,.18);border:1px solid rgba(46,216,130,.32);color:#2ed882}
+    .badge.yellow{background:rgba(244,200,76,.18);border:1px solid rgba(244,200,76,.32);color:#f4c84c}
+    .badge.cyan{background:rgba(92,200,255,.18);border:1px solid rgba(92,200,255,.32);color:#5cc8ff}
+    .badge.purple{background:rgba(155,109,255,.18);border:1px solid rgba(155,109,255,.32);color:#9b6dff}
+    .badge.red{background:rgba(255,107,107,.18);border:1px solid rgba(255,107,107,.32);color:#ff6b6b}
+
+    /* DEEP DIVES */
+    .shell{display:grid;gap:12px;background:rgba(8,13,26,.38);border:1.5px solid rgba(255,255,255,.09);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .deep-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .panel{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;display:grid;gap:10px}
+    .feat-list{display:grid;gap:7px}
+    .feat-row{display:grid;grid-template-columns:36px 1fr;gap:9px;align-items:start}
+    .feat-num{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,rgba(74,126,255,.28),rgba(92,200,255,.16));border:1.5px solid rgba(92,200,255,.22);display:grid;place-items:center;font:900 13px/1 ui-monospace;color:#5cc8ff;flex-shrink:0}
+    .feat-row-label{font-size:12.5px;font-weight:900;color:#fff;line-height:1.3;padding-top:3px}
+    .feat-row-body{font-size:11.5px;line-height:1.55;color:#9fb4d0}
+
+    /* TDD FLOW */
+    .tdd-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .tdd-step{min-width:0;background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:10px 10px 9px;display:grid;gap:6px;text-align:center}
+    .tdd-step.red-step{border-color:rgba(255,107,107,.4);background:linear-gradient(180deg,rgba(255,107,107,.12),rgba(255,107,107,.04))}
+    .tdd-step.green-step{border-color:rgba(46,216,130,.4);background:linear-gradient(180deg,rgba(46,216,130,.12),rgba(46,216,130,.04))}
+    .tdd-step.refactor-step{border-color:rgba(244,200,76,.4);background:linear-gradient(180deg,rgba(244,200,76,.12),rgba(244,200,76,.04))}
+    .tdd-step.verify-step{border-color:rgba(92,200,255,.4);background:linear-gradient(180deg,rgba(92,200,255,.12),rgba(92,200,255,.04))}
+    .tdd-label{font:900 13px/1 ui-monospace;letter-spacing:.05em;text-transform:uppercase}
+    .tdd-step.red-step .tdd-label{color:#ff6b6b}
+    .tdd-step.green-step .tdd-label{color:#2ed882}
+    .tdd-step.refactor-step .tdd-label{color:#f4c84c}
+    .tdd-step.verify-step .tdd-label{color:#5cc8ff}
+    .tdd-sub{font-size:10.5px;color:#9fb4d0;line-height:1.4}
+    .tdd-rule{font-size:10px;color:#7a90c0;font-style:italic}
+
+    /* SKILL STRUCTURE */
+    .skill-tree{font:800 11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#9fb4d8;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px}
+    .skill-tree .dir{color:#5cc8ff}
+    .skill-tree .file{color:#9fb4d0}
+    .skill-tree .comment{color:#5a6a8a;font-style:italic}
+
+    /* BOTTOM */
+    .bottom-pills{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 0}
+    .bottom-chip{min-height:28px;padding:5px 10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);border-radius:999px;color:#9fb4d0;font-size:11.5px;font-weight:700}
+
+    @media(max-width:700px){
+      .hero{grid-template-columns:1fr}
+      .perf-section{grid-template-columns:1fr}
+      .flow-row{grid-template-columns:1fr}
+      .deep-cols{grid-template-columns:1fr}
+      .visual-top{flex-wrap:wrap}
+      .tdd-flow{grid-template-columns:1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker"><span class="star">★</span>&nbsp;0 · meganide / specops</span>
+        <span class="kicker">MIT License</span>
+        <span class="source">GitHub · meganide/specops<br>/implement Skill · Claude Code</span>
+      </div>
+      <h1 class="title">specops</h1>
+      <p class="subtitle">多 Agent TDD 流水线，让 Claude Code 自己跑完功能开发</p>
+      <p class="subcn">不是新的 coding agent，是一套完整的 multi-agent 开发流水线——/interview 采集需求，/implement 驱动 agent team 按 RED-GREEN-REFACTOR 跑完 TDD，Reviewer 两阶段验证，Fixer 修复问题。你走开，agent team 自己跑完。</p>
+      <div class="pill-row">
+        <span class="pill cyan">/implement Skill</span>
+        <span class="pill green">Claude Code</span>
+        <span class="pill yellow">TDD 纪律</span>
+        <span class="pill purple">Multi-Agent</span>
+        <span class="pill blue">0 Stars · 新兴</span>
+        <span class="pill">两阶段 Review</span>
+      </div>
+      <div class="hero-note">
+        <strong>它不是 coding agent，而是一套编排逻辑：Lead 从不写代码，只读 spec、协调任务</strong>
+        <p>传统 coding agent 的问题：单一 context 污染、self-report bias、无独立验证。specops 的解法：每个 agent 独立 session，非阻塞任务并行执行，TDD 强制测试先行，两阶段 review 互相抓 bug。</p>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="visual-top">
+        <div class="orb"><span class="orb-inner">⚙</span></div>
+        <div class="visual-meta">
+          <span class="big">specops</span>
+          <span class="small">Multi-Agent TDD</span>
+          <span class="small">Stars · 0 · MIT</span>
+        </div>
+      </div>
+      <div class="visual-strip"></div>
+      <div class="visual-grid">
+        <div class="mini-card">
+          <span class="label">核心 Skill</span>
+          <span class="value">/implement</span>
+          <span class="desc">Claude Code agent team</span>
+        </div>
+        <div class="mini-card">
+          <span class="label">前置 Skill</span>
+          <span class="value">/interview</span>
+          <span class="desc">结构化需求采集</span>
+        </div>
+        <div class="mini-card">
+          <span class="label">TDD 纪律</span>
+          <span class="value">RED→GREEN</span>
+          <span class="desc">强制测试先行</span>
+        </div>
+        <div class="mini-card">
+          <span class="label">Review</span>
+          <span class="value">两阶段验证</span>
+          <span class="desc">spec + quality</span>
+        </div>
+      </div>
+      <div class="visual-strip2"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:grid;gap:4px">
+          <span style="font:900 10px/1 ui-monospace;color:#7a90c0;text-transform:uppercase;letter-spacing:.08em">vs JarvusInnovations</span>
+          <span style="font:900 16px/1;color:#5cc8ff">不同 Skill</span>
+          <span style="font-size:10.5px;color:#8fa4c0">spec-driven plan protocol</span>
+        </div>
+        <div style="display:grid;gap:4px">
+          <span style="font:900 10px/1 ui-monospace;color:#7a90c0;text-transform:uppercase;letter-spacing:.08em">Token 效率</span>
+          <span style="font:900 16px/1;color:#2ed882">独立 Session</span>
+          <span style="font-size:10.5px;color:#8fa4c0">不污染主会话 context</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGENT FLOW -->
+  <div class="flow-section">
+    <div class="panel-head">
+      <span class="panel-kicker">Agent Team</span>
+      <h2 class="panel-title">6 个角色构成的开发机器</h2>
+    </div>
+    <div class="flow-row">
+      <div class="agent-card lead">
+        <div class="agent-role">
+          <span class="agent-badge lead">Lead</span>
+          <span class="agent-name">总指挥 Agent</span>
+        </div>
+        <p class="agent-desc">读 spec.md、分解任务、协调一切。从不写代码，只做决策和调度。</p>
+        <p class="agent-rule">"我从不写代码。我只读 spec，决定做什么，分配给谁。"</p>
+      </div>
+      <div class="agent-card explorer">
+        <div class="agent-role">
+          <span class="agent-badge explorer">Explorer</span>
+          <span class="agent-name">代码库勘探 Agent</span>
+        </div>
+        <p class="agent-desc">扫描代码库，报告模式、约定、集成点、依赖关系。为 Teammate 提供上下文。</p>
+        <p class="agent-rule">"我来摸清代码库的脾性，告诉 Teammate 哪里能动，哪里不能动。"</p>
+      </div>
+      <div class="agent-card teammate">
+        <div class="agent-role">
+          <span class="agent-badge teammate">Teammate</span>
+          <span class="agent-name">TDD 执行 Agent（×N）</span>
+        </div>
+        <p class="agent-desc">按 RED-GREEN-REFACTOR 干活：先写失败测试，再写实现代码，再重构。非阻塞任务并行执行。</p>
+        <p class="agent-rule">"测试先行，实现次之，重构最后。我不能给自己写评价。"</p>
+      </div>
+      <div class="agent-card reviewer">
+        <div class="agent-role">
+          <span class="agent-badge reviewer">Reviewer</span>
+          <span class="agent-name">两阶段验证 Agent</span>
+        </div>
+        <p class="agent-desc">Stage 1：spec compliance——是否符合 plan。Stage 2：code quality——代码健康度。两者互相抓不同的 bug。</p>
+        <p class="agent-rule">"第一阶段看对不对，第二阶段看好不好。两把刀，缺一不可。"</p>
+      </div>
+      <div class="agent-card fixer">
+        <div class="agent-role">
+          <span class="agent-badge fixer">Fixer</span>
+          <span class="agent-name">问题修复 Agent</span>
+        </div>
+        <p class="agent-desc">接收 Reviewer 发现的问题，逐一修复，然后重审。修复后再次提交 Review 闭环。</p>
+        <p class="agent-rule">"我修一个问题，Reviewer 重新审一个问题，直到全部 green。"</p>
+      </div>
+      <div class="agent-card" style="border-color:rgba(74,126,255,.2);background:linear-gradient(135deg,rgba(74,126,255,.05),rgba(74,126,255,.02))">
+        <div class="agent-role">
+          <span class="agent-badge" style="background:rgba(74,126,255,.22);border:1px solid rgba(74,126,255,.4);color:#5cc8ff">Verify</span>
+          <span class="agent-name">集成验证</span>
+        </div>
+        <p class="agent-desc">全量测试 + lint + 类型检查。所有 agent commit 后执行，确保整体可集成。</p>
+        <p class="agent-rule">"每个人都说自己好了，最后我来跑全套验证。"</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TDD FLOW -->
+  <div class="shell">
+    <div class="panel-head">
+      <span class="panel-kicker">TDD Discipline</span>
+      <h2 class="panel-title">RED → GREEN → REFACTOR → 循环</h2>
+    </div>
+    <div class="tdd-flow">
+      <div class="tdd-step red-step">
+        <span class="tdd-label">RED</span>
+        <span class="tdd-sub">写一个失败测试</span>
+        <span class="tdd-rule">Teammate 先写测试<br>功能代码不存在</span>
+      </div>
+      <div class="tdd-step green-step">
+        <span class="tdd-label">GREEN</span>
+        <span class="tdd-sub">让测试通过</span>
+        <span class="tdd-rule">用最小代码通过测试<br>不求完美，只求可用</span>
+      </div>
+      <div class="tdd-step refactor-step">
+        <span class="tdd-label">REFACTOR</span>
+        <span class="tdd-sub">改善代码结构</span>
+        <span class="tdd-rule">测试保持 green<br>逐步消除重复</span>
+      </div>
+      <div class="tdd-step verify-step">
+        <span class="tdd-label">VERIFY</span>
+        <span class="tdd-sub">集成验证</span>
+        <span class="tdd-rule">全量测试 + lint<br>+ 类型检查</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERF / COMPARISON -->
+  <div class="perf-section">
+    <div class="perf-panel">
+      <div class="panel-head">
+        <span class="panel-kicker">Token Efficiency</span>
+        <h2 class="panel-title">vs 单会话 Self-Report</h2>
+      </div>
+      <table class="perf-table">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>单会话 Agent</th>
+            <th>specops Team</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Context 污染</td>
+            <td><span class="badge red">严重</span></td>
+            <td><span class="badge green">隔离</span></td>
+          </tr>
+          <tr>
+            <td>Self-report bias</td>
+            <td><span class="badge red">存在</span></td>
+            <td><span class="badge green">消除</span></td>
+          </tr>
+          <tr>
+            <td>独立验证</td>
+            <td><span class="badge red">无</span></td>
+            <td><span class="badge green">两阶段</span></td>
+          </tr>
+          <tr>
+            <td>并行执行</td>
+            <td><span class="badge yellow">受限</span></td>
+            <td><span class="badge green">非阻塞并行</span></td>
+          </tr>
+          <tr>
+            <td>TDD 纪律</td>
+            <td><span class="badge yellow">弱</span></td>
+            <td><span class="badge green">强制 RED 先</span></td>
+          </tr>
+          <tr>
+            <td>任务专注度</td>
+            <td><span class="badge yellow">分散</span></td>
+            <td><span class="badge green">单一职责</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="perf-panel">
+      <div class="panel-head">
+        <span class="panel-kicker">Use Cases</span>
+        <h2 class="panel-title">适用场景</h2>
+      </div>
+      <div class="feat-list">
+        <div class="feat">
+          <div class="feat-head">
+            <div class="feat-icon cyan">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <span class="feat-label">复杂多文件功能</span>
+          </div>
+          <p class="feat-body">跨越多个文件、模块、边界的功能实现，需要 Explorer 预先扫描代码库拓扑。</p>
+        </div>
+        <div class="feat">
+          <div class="feat-head">
+            <div class="feat-icon green">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <span class="feat-label">长程任务</span>
+          </div>
+          <p class="feat-body">传统 agent 跑久了 context 膨胀、质量下降。specops 每个 agent 独立 session，维持质量。</p>
+        </div>
+        <div class="feat">
+          <div class="feat-head">
+            <div class="feat-icon yellow">
+              <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <span class="feat-label">多人协作代码库</span>
+          </div>
+          <p class="feat-body">需要遵守既有约定、集成点、测试规范的新功能，Explorer 确保不破坏现有结构。</p>
+        </div>
+        <div class="feat">
+          <div class="feat-head">
+            <div class="feat-icon purple">
+              <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <span class="feat-label">TDD 纪律要求高的项目</span>
+          </div>
+          <p class="feat-body">强制 RED→GREEN，Reviewer 两阶段验证，确保测试覆盖率和不退化。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SKILL STRUCTURE & WORKFLOW -->
+  <div class="shell">
+    <div class="panel-head">
+      <span class="panel-kicker">Skills Directory</span>
+      <h2 class="panel-title">skills/ 目录结构</h2>
+    </div>
+    <div class="deep-cols">
+      <div class="panel">
+        <div class="skill-tree">
+<span class="dir">skills/</span>
+  <span class="dir">interview/</span>
+    <span class="file">SKILL.md</span>  <span class="comment"># 需求采集 & spec 生成</span>
+  <span class="dir">implement/</span>
+    <span class="file">SKILL.md</span>                  <span class="comment"># Lead agent 编排 & 工作流</span>
+    <span class="file">explorer-prompt.md</span>      <span class="comment"># Explorer agent</span>
+    <span class="file">teammate-prompt.md</span>      <span class="comment"># TDD 实现 agent</span>
+    <span class="file">spec-reviewer-prompt.md</span> <span class="comment"># Stage 1: spec 合规</span>
+    <span class="file">quality-reviewer-prompt.md</span> <span class="comment"># Stage 2: 代码质量</span>
+    <span class="file">fixer-prompt.md</span>         <span class="comment"># 问题修复 agent</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head" style="border-bottom:none;padding-bottom:0;margin-bottom:6px">
+          <span class="panel-kicker">Usage Flow</span>
+          <h2 class="panel-title">完整使用流程</h2>
+        </div>
+        <div class="feat-list">
+          <div class="feat-row">
+            <div class="feat-num">1</div>
+            <div>
+              <div class="feat-row-label">/interview</div>
+              <div class="feat-row-body">结构化提问 → 采集需求 → 生成 <code style="color:#5cc8ff">specs/&lt;name&gt;/spec.md</code></div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-num">2</div>
+            <div>
+              <div class="feat-row-label">/implement</div>
+              <div class="feat-row-body">启动 agent team → Lead 读 spec → Explorer 扫描 → Teammate TDD → Reviewer 两阶段验证</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-num">3</div>
+            <div>
+              <div class="feat-row-label">RED-GREEN-REFACTOR</div>
+              <div class="feat-row-body">Teammate 强制 RED 先写测试 → 实现通过 → 重构优化，循环直到所有测试 green</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-num">4</div>
+            <div>
+              <div class="feat-row-label">Fixer 修复闭环</div>
+              <div class="feat-row-body">Reviewer 发现问题 → Fixer 逐一修复 → 重新 Review → 全部 green 后进入集成验证</div>
+            </div>
+          </div>
+          <div class="feat-row">
+            <div class="feat-num">5</div>
+            <div>
+              <div class="feat-row-label">集成验证</div>
+              <div class="feat-row-body">全量测试 + lint + 类型检查 → 通过后 agent team 汇报结果 → 你回来看完成结果</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- vs OTHER SPECOPS -->
+  <div class="shell">
+    <div class="panel-head">
+      <span class="panel-kicker">Differentiation</span>
+      <h2 class="panel-title">meganide/specops vs JarvusInnovations/specops</h2>
+    </div>
+    <div class="perf-section" style="grid-template-columns:1fr">
+      <div class="perf-panel">
+        <table class="perf-table">
+          <thead>
+            <tr>
+              <th>维度</th>
+              <th>meganide/specops /implement</th>
+              <th>JarvusInnovations/specops</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>核心定位</td>
+              <td><span class="badge cyan">Multi-agent TDD workflow</span></td>
+              <td><span class="badge purple">Spec-driven plan protocol</span></td>
+            </tr>
+            <tr>
+              <td>Skill 数量</td>
+              <td>2 个：/interview + /implement</td>
+              <td>多个：spec + plan + review</td>
+            </tr>
+            <tr>
+              <td>Agent 架构</td>
+              <td>Lead + Explorer + Teammate + Reviewer ×2 + Fixer</td>
+              <td>Human-in-the-loop spec 协作</td>
+            </tr>
+            <tr>
+              <td>TDD 流程</td>
+              <td><span class="badge green">强制 RED→GREEN</span></td>
+              <td><span class="badge yellow">可选</span></td>
+            </tr>
+            <tr>
+              <td>两阶段 Review</td>
+              <td><span class="badge green">spec compliance + code quality</span></td>
+              <td>单阶段 plan review</td>
+            </tr>
+            <tr>
+              <td>适用场景</td>
+              <td>自动化功能开发流水线</td>
+              <td>人类参与的 spec 迭代</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-pills">
+    <span class="bottom-chip">/implement Skill</span>
+    <span class="bottom-chip">Claude Code</span>
+    <span class="bottom-chip">Multi-Agent</span>
+    <span class="bottom-chip">TDD</span>
+    <span class="bottom-chip">RED-GREEN-REFACTOR</span>
+    <span class="bottom-chip">Lead Agent</span>
+    <span class="bottom-chip">Explorer Agent</span>
+    <span class="bottom-chip">两阶段 Review</span>
+    <span class="bottom-chip">Fixer</span>
+    <span class="bottom-chip">独立 Session</span>
+    <span class="bottom-chip">MIT License</span>
+    <span class="bottom-chip">0 Stars · 新兴</span>
+  </div>
+
+</div>
+</body>
+</html>
