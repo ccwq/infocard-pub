@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LongHorizon-Harness · MEA 循环让 AI Agent 几十小时不跑偏</title>
+  <style>
+    :root{--bg:#070b18;--bg2:#0c1430;--panel:#111a33;--panel2:#0b1124;--ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.13);--cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--red:#ff5b6e}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 15% 5%,rgba(88,195,255,.28),transparent 34%),radial-gradient(circle at 88% 4%,rgba(132,89,255,.24),transparent 34%),linear-gradient(180deg,var(--bg),#040713);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}body{padding:26px 14px}.wrap{width:min(1120px,100%);margin:0 auto;display:grid;gap:18px}
+    /* Hero */
+    .hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:28px;background:linear-gradient(135deg,rgba(17,26,51,.94),rgba(11,17,36,.86));box-shadow:0 30px 90px rgba(0,0,0,.45);padding:28px}
+    .hero:before{content:"";position:absolute;inset:-40%;background:conic-gradient(from 210deg,transparent,rgba(88,195,255,.18),transparent,rgba(132,89,255,.18),transparent);animation:spin 18s linear infinite}
+    .hero>*{position:relative}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .top{display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:stretch}
+    .kicker{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:rgba(255,255,255,.06);color:var(--cyan);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    .title{margin:18px 0 12px;font-size:clamp(40px,7vw,82px);line-height:1.08;font-weight:950;letter-spacing:-.06em}
+    .title span{display:block;background:linear-gradient(90deg,#fff,var(--cyan),var(--purple));-webkit-background-clip:text;color:transparent}
+    .lead{max-width:660px;color:var(--muted);font-size:17px;line-height:1.72}
+    .pills{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}
+    .pill{border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:rgba(255,255,255,.06);font-size:12px;color:#dbe7ff}
+    .pill.hot{background:linear-gradient(90deg,var(--blue),var(--purple));color:#fff;border:0}
+    .pill.green-pill{background:rgba(45,179,106,.18);border-color:rgba(45,179,106,.4);color:#7fe1a2}
+    /* Hero visual panel */
+    .orb-card{display:grid;grid-template-rows:auto 1fr;gap:14px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(135deg,rgba(17,26,51,.7),rgba(11,17,36,.6));padding:16px}
+    .orb-row{display:flex;gap:14px;align-items:center}
+    .orb{width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,var(--cyan),var(--blue) 45%,var(--purple));display:grid;place-items:center;font-size:22px;font-weight:950;letter-spacing:-.05em;color:#fff;box-shadow:0 8px 24px rgba(88,195,255,.28)}
+    .orb-label{font-size:13px;font-weight:900;color:#fff}
+    .orb-sub{font-size:11px;color:var(--muted);margin-top:2px}
+    .mea-flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:4px;align-items:center;margin-top:8px}
+    .mea-node{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 6px;text-align:center}
+    .mea-node .role{font-size:11px;font-weight:900;color:var(--cyan);letter-spacing:.06em;text-transform:uppercase}
+    .mea-node .desc{font-size:10px;color:var(--muted);margin-top:3px}
+    .mea-arrow{color:rgba(255,255,255,.3);font-size:16px}
+    .stat-mini{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+    .stat-box{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 10px}
+    .stat-box .val{font-size:20px;font-weight:950;color:#fff;letter-spacing:-.03em}
+    .stat-box .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+    .stat-box .up{color:var(--green);font-size:11px;font-weight:800}
+    /* Section */
+    .section{border:1px solid var(--line);border-radius:20px;background:linear-gradient(135deg,rgba(17,26,51,.8),rgba(11,17,36,.75));padding:22px 24px}
+    .section h2{margin:0 0 16px;font-size:14px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+    /* Problem cards */
+    .prob-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .prob-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
+    .prob-card .num{font-size:26px;font-weight:950;color:rgba(88,195,255,.3);letter-spacing:-.04em}
+    .prob-card h3{font-size:13px;font-weight:900;color:#fff;margin:6px 0 5px}
+    .prob-card p{font-size:12px;color:var(--muted);line-height:1.55;margin:0}
+    /* MEA Loop Diagram */
+    .loop-diagram{border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(10,14,26,.6);padding:20px;margin-bottom:16px}
+    .loop-row{display:flex;justify-content:center;align-items:center;gap:0}
+    .loop-node{background:linear-gradient(135deg,rgba(88,195,255,.15),rgba(132,89,255,.12));border:1.5px solid rgba(88,195,255,.35);border-radius:16px;padding:14px 18px;text-align:center;min-width:120px}
+    .loop-node.manager{background:linear-gradient(135deg,rgba(88,195,255,.2),rgba(74,120,255,.15));border-color:rgba(88,195,255,.5)}
+    .loop-node.executor{background:linear-gradient(135deg,rgba(45,179,106,.18),rgba(88,195,255,.1));border-color:rgba(45,179,106,.4)}
+    .loop-node.auditor{background:linear-gradient(135deg,rgba(132,89,255,.18),rgba(244,200,76,.1));border-color:rgba(132,89,255,.4)}
+    .loop-node .role{font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#fff}
+    .loop-node .role-label{font-size:10px;color:var(--muted);margin-top:3px}
+    .loop-arrow{font-size:28px;color:rgba(255,255,255,.25);padding:0 8px}
+    .loop-center{font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.6}
+    /* Matrix */
+    .matrix{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+    .matrix .row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0}
+    .matrix .row.head{background:rgba(255,255,255,.06)}
+    .matrix .row span{display:flex;align-items:center;padding:10px 12px;font-size:12px;border-right:1px solid var(--line)}
+    .matrix .row span:last-child{border-right:none}
+    .matrix .row.head span{font-weight:900;color:#fff;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
+    .matrix .row:not(.head) span{color:var(--muted);border-top:1px solid var(--line)}
+    .matrix .row:not(.head) span:first-child{color:#dbe7ff;font-weight:600}
+    .ok{color:var(--green);font-weight:900}
+    .no{color:rgba(255,255,255,.2)}
+    /* Perf table */
+    .perf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .perf-card{border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .perf-head{padding:10px 14px;background:rgba(255,255,255,.05);border-bottom:1px solid var(--line);font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--cyan)}
+    .perf-body{padding:12px 14px;display:grid;gap:8px}
+    .perf-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .perf-row .name{font-size:12px;color:#dbe7ff}
+    .perf-row .baseline{font-size:11px;color:rgba(255,255,255,.3);text-decoration:line-through}
+    .perf-row .lh{font-size:13px;font-weight:900;color:var(--green)}
+    .perf-row .delta{font-size:11px;font-weight:800;color:var(--yellow);background:rgba(244,200,76,.12);border:1px solid rgba(244,200,76,.3);padding:2px 7px;border-radius:999px}
+    /* vs section */
+    .vs-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .vs-card{border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;background:rgba(255,255,255,.03)}
+    .vs-card h3{font-size:12px;font-weight:900;color:#fff;margin:0 0 6px}
+    .vs-card p{font-size:11.5px;color:var(--muted);line-height:1.55;margin:0 0 8px}
+    .vs-card .tag{display:inline-block;border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:3px 8px;font-size:10px;color:var(--muted)}
+    /* Install */
+    .cmds{display:grid;gap:8px}
+    .cmd{background:#060a14;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;color:#a8f59f;white-space:pre-wrap;line-height:1.6}
+    .cmd .cm{color:#7ad9ff}
+    /* Footer */
+    .footer{border:1px solid var(--line);border-radius:14px;background:rgba(11,17,36,.6);padding:14px 18px;display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+    .footer .src{font-size:12px;color:var(--muted);line-height:1.6}
+    .footer .src a{color:var(--cyan)}
+    .footer .badges{display:flex;flex-wrap:wrap;gap:8px}
+    .badge{display:inline-block;border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:4px 10px;font-size:11px;color:var(--muted);background:rgba(255,255,255,.04)}
+    /* Responsive */
+    @media(max-width:860px){.top{grid-template-columns:1fr}.prob-grid{grid-template-columns:1fr}.vs-grid{grid-template-columns:1fr}.perf-grid{grid-template-columns:1fr}.mea-flow{grid-template-columns:1fr 1fr}.loop-row{flex-wrap:wrap}}
+    @media(max-width:600px){.matrix .row{grid-template-columns:1fr 1fr}.matrix .row.head span:nth-child(3),.matrix .row:not(.head) span:nth-child(3){display:none}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="top">
+        <div>
+          <div class="kicker">DARKBLUE · LOOP ENGINEERING · AMAP/高德</div>
+          <h1 class="title">Long<span>Horizon Harness</span></h1>
+          <p class="lead">Manage–Execute–Audit 循环框架，让 Claude Code / Codex / OpenClaw 在桌面和终端上连续工作几十小时不跑偏。任务状态外部化，只接受独立验证事实。</p>
+          <div class="pills">
+            <span class="pill hot">903 Stars · MIT</span>
+            <span class="pill green-pill">Hugging Face 周论榜首</span>
+            <span class="pill">arXiv:2608.01964</span>
+            <span class="pill">Loop Engineering</span>
+            <span class="pill">Fresh-Context Execution</span>
+            <span class="pill">独立验证事实</span>
+          </div>
+        </div>
+        <div class="orb-card">
+          <div class="orb-row">
+            <div class="orb">LH</div>
+            <div>
+              <div class="orb-label">LongHorizon-Harness</div>
+              <div class="orb-sub">AMAP-ML · MIT · 2026</div>
+            </div>
+          </div>
+          <div class="mea-flow">
+            <div class="mea-node">
+              <div class="role">Manager</div>
+              <div class="desc">读状态·定子任务</div>
+            </div>
+            <div class="mea-arrow">→</div>
+            <div class="mea-node">
+              <div class="role">Executor</div>
+              <div class="desc">干净 context 执行</div>
+            </div>
+            <div class="mea-arrow">→</div>
+            <div class="mea-node">
+              <div class="role">Auditor</div>
+              <div class="desc">只读核查环境</div>
+            </div>
+            <div class="mea-arrow">↺</div>
+          </div>
+          <div class="stat-mini">
+            <div class="stat-box">
+              <div class="val">80.7%</div>
+              <div class="lbl">WeaveBench</div>
+              <div class="up">+28.9pp ↑</div>
+            </div>
+            <div class="stat-box">
+              <div class="val">34.3%</div>
+              <div class="lbl">OSWorld Opus</div>
+              <div class="up">+14.3pp ↑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROBLEM -->
+    <section class="section">
+      <h2>现有 Harness 的两个结构缺陷</h2>
+      <div class="prob-grid">
+        <div class="prob-card">
+          <div class="num">01</div>
+          <h3>Context 腐烂</h3>
+          <p>任务执行和状态管理共用同一个不断膨胀的 context，历史越长，关键信息越难检索，性能急剧下降。</p>
+        </div>
+        <div class="prob-card">
+          <div class="num">02</div>
+          <h3>自我评估耦合</h3>
+          <p>任务执行和完成评估耦合在同一 session，Agent 自己判断是否完成——错误判断会污染后续所有决策。</p>
+        </div>
+        <div class="prob-card">
+          <div class="num">03</div>
+          <h3>错误累积</h3>
+          <p>未验证的前提一旦进入记录，每个后续步骤都继承它。早期小错误逐渐放大，最终任务完全偏离原始目标。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- MEA LOOP -->
+    <section class="section">
+      <h2>MEA 循环 · Manage · Execute · Audit</h2>
+      <div class="loop-diagram">
+        <div class="loop-row">
+          <div class="loop-node manager">
+            <div class="role">Manager</div>
+            <div class="role-label">读取任务状态，定义下一子任务<br>含依赖 / 约束 / 验收标准</div>
+          </div>
+          <div class="loop-arrow">→</div>
+          <div class="loop-node executor">
+            <div class="role">Executor</div>
+            <div class="role-label">全新干净 context<br>执行当前子任务</div>
+          </div>
+          <div class="loop-arrow">→</div>
+          <div class="loop-node auditor">
+            <div class="role">Auditor</div>
+            <div class="role-label">只读检查环境<br>确定完成/未完成项</div>
+          </div>
+          <div class="loop-arrow">↺</div>
+        </div>
+      </div>
+      <div class="loop-center">
+        <strong style="color:#fff">核心原则：</strong>任务状态作为外部明确记录，只用独立验证过的事实更新。<br>
+        每次 round 后 Executor 交互历史被丢弃，只保留紧凑的验证报告。
+      </div>
+    </section>
+
+    <!-- SUPPORT MATRIX -->
+    <section class="section">
+      <h2>支持矩阵 · AgentAdapter 轻量适配器</h2>
+      <div class="matrix">
+        <div class="row head">
+          <span>角色</span><span>Claude Code</span><span>Codex CLI</span><span>OpenClaw</span>
+        </div>
+        <div class="row">
+          <span>Executor（执行器）</span>
+          <span class="ok">●</span><span class="ok">●</span><span class="ok">●</span>
+        </div>
+        <div class="row">
+          <span>Manager（管理器）</span>
+          <span class="ok">●</span><span class="ok">●</span><span class="ok">●</span>
+        </div>
+        <div class="row">
+          <span>Auditor（审计员）</span>
+          <span class="ok">●</span><span class="ok">●</span><span class="ok">●</span>
+        </div>
+        <div class="row head" style="margin-top:8px">
+          <span>模型</span><span>Claude Opus</span><span>GPT 系列</span><span>Qwen 3.7-Plus</span>
+        </div>
+        <div class="row">
+          <span>跨模型任意填充三角色</span>
+          <span class="ok">●</span><span class="ok">●</span><span class="ok">●</span>
+        </div>
+      </div>
+      <p style="margin:14px 0 0;font-size:12px;color:var(--muted);line-height:1.6">
+        <strong style="color:#fff">三种角色 interchangeable backends：</strong>Manager / Executor / Auditor 可混用不同 Agent 后端，Claude Code / Codex CLI / OpenClaw / Hermes Agent 均可填充任意角色，支撑 Opus / GPT / Qwen 任意混搭。
+      </p>
+    </section>
+
+    <!-- PERFORMANCE -->
+    <section class="section">
+      <h2>性能数据 · WeaveBench / Terminal-Bench / OSWorld</h2>
+      <div class="perf-grid">
+        <div class="perf-card">
+          <div class="perf-head">WeaveBench（114 任务，Qwen 3.7-Plus + Claude Code）</div>
+          <div class="perf-body">
+            <div class="perf-row">
+              <span class="name">Baseline</span>
+              <span class="baseline">51.8%</span>
+            </div>
+            <div class="perf-row">
+              <span class="name">LongHorizon-Harness</span>
+              <span class="lh">80.7%</span>
+            </div>
+            <div class="perf-row">
+              <span class="name">提升幅度</span>
+              <span class="delta">+28.9pp</span>
+            </div>
+          </div>
+        </div>
+        <div class="perf-card">
+          <div class="perf-head">Terminal-Bench 2.1（Qwen 3.7-Plus + Claude Code）</div>
+          <div class="perf-body">
+            <div class="perf-row">
+              <span class="name">Baseline</span>
+              <span class="baseline">69.7%</span>
+            </div>
+            <div class="perf-row">
+              <span class="name">LongHorizon-Harness</span>
+              <span class="lh">77.2%</span>
+            </div>
+            <div class="perf-row">
+              <span class="name">提升幅度</span>
+              <span class="delta">+7.5pp</span>
+            </div>
+          </div>
+        </div>
+        <div class="perf-card">
+          <div class="perf-head">OSWorld 2.0 完整集（Qwen 3.7-Plus）</div>
+          <div class="perf-body">
+            <div class="perf-row">
+              <span class="name">Baseline</span>
+              <span class="baseline">2.8%</span>
+            </div>
+            <div class="perf-row">
+              <span class="name">LongHorizon-Harness</span>
+              <span class="lh">8.3%</span>
+            </div>
+            <div class="perf-row">
+              <span class="name">提升幅度</span>
+              <span class="delta">3.0×</span>
+            </div>
+          </div>
+        </div>
+        <div class="perf-card">
+          <div class="perf-head">OSWorld 2.0 34任务子集（Claude Opus 4.7）</div>
+          <div class="perf-body">
+            <div class="perf-row">
+              <span class="name">Baseline</span>
+              <span class="baseline">20.0%</span>
+            </div>
+            <div class="perf-row">
+              <span class="name">LongHorizon-Harness</span>
+              <span class="lh">34.3%</span>
+            </div>
+            <div class="perf-row">
+              <span class="name">提升幅度</span>
+              <span class="delta">+14.3pp</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:14px 0 0;font-size:12px;color:var(--muted)">
+        同模型、同执行后端，仅换 harness 框架，所有基准线同向移动。<strong style="color:#fff">Codex + GPT-5.6 Luna</strong> 在 Terminal-Bench 2.1 达 <strong style="color:#7fe1a2">83.1%</strong>。
+      </p>
+    </section>
+
+    <!-- VS PRO-LONG / SWE-MeM -->
+    <section class="section">
+      <h2>定位区分 · 与 PRO-LONG / SWE-MeM 的差异</h2>
+      <div class="vs-grid">
+        <div class="vs-card">
+          <h3>PRO-LONG</h3>
+          <p>程序化记忆框架，解决 context 管理 tradeoff，目标场景为 ARC-AGI-3 游戏任务。</p>
+          <span class="tag">程序化记忆 · 游戏任务</span>
+        </div>
+        <div class="vs-card">
+          <h3>SWE-MeM</h3>
+          <p>自适应记忆管理训练框架，针对 SWE-Bench Verified 进行微调训练，不适用通用场景。</p>
+          <span class="tag">训练式微调 · SWE任务</span>
+        </div>
+        <div class="vs-card" style="border-color:rgba(88,195,255,.3);background:rgba(88,195,255,.05)">
+          <h3 style="color:var(--cyan)">LongHorizon-Harness</h3>
+          <p>通用 MEA 循环，跨 GUI-CLI 桌面工作流、命令行、跨界面协调，无需训练，开箱即用。</p>
+          <span class="tag" style="border-color:rgba(88,195,255,.3);color:var(--cyan)">通用 · MEA循环 · 开箱即用</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- KEY CONCEPTS -->
+    <section class="section">
+      <h2>关键概念</h2>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px">
+          <div style="font-size:12px;font-weight:900;color:var(--cyan);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px">Fresh-Context Execution</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.55">Executor 每次在全新干净 context 中执行子任务，执行历史在 round 结束后丢弃，不向下一轮传递。</div>
+        </div>
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px">
+          <div style="font-size:12px;font-weight:900;color:var(--cyan);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px">Durable Verified State</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.55">任务状态作为外部明确记录存在于执行之外，只接受 Auditor 独立验证过的事实，不接受 Agent 自我报告。</div>
+        </div>
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px">
+          <div style="font-size:12px;font-weight:900;color:var(--cyan);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px">Independent Auditing</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.55">Auditor 只读检查环境，从不看到 Executor 的推理或自我评估，验证不能改变被检查的结果。</div>
+        </div>
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px">
+          <div style="font-size:12px;font-weight:900;color:var(--cyan);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px">Recoverable Progress</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.55">每次执行错误要么被下次审计暴露，要么永远不会进入记录，错误被限制在单轮内，不向后续轮次扩散。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INSTALL -->
+    <section class="section">
+      <h2>安装与运行</h2>
+      <div class="cmds">
+        <div class="cmd"><span class="cm"># 安装（需要 Python 3.10+）</span>
+uv tool install lh-harness</div>
+        <div class="cmd"><span class="cm"># 一行命令运行任务（--dashboard 可视化 MEA 循环）</span>
+lh-harness run --task "Summarise the files in this directory." \
+  --agent claude_code --model qwen3.7-plus --max-rounds 2 --dashboard</div>
+        <div class="cmd"><span class="cm"># 支持多种 Agent 后端和模型混搭</span>
+lh-harness run --task @task.md \
+  --manager claude --executor codex --auditor openclaw \
+  --manager-model qwen3.7-plus --executor-model gpt-5.6-luna</div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <section class="footer">
+      <div class="src">
+        <strong>来源</strong><br>
+        X <a href="https://x.com/Ryrenz/status/2091322231997571450">@Ryrenz</a> ·
+        GitHub <a href="https://github.com/AMAP-ML/LongHorizon-Harness">AMAP-ML/LongHorizon-Harness</a> ·
+        arXiv <a href="https://arxiv.org/abs/2608.01964">2608.01964</a> ·
+        Website <a href="https://lh-harness.pages.dev">lh-harness.pages.dev</a><br>
+        作者：Ziyu Ma, Hailang Huang, Shun Zou, Yong Wang, Shidong Yang, Yiming Hu, Fei Wei, XiangXiang Chu（AMAP/高德）
+      </div>
+      <div class="badges">
+        <span class="badge">MEA 循环</span>
+        <span class="badge">Claude Code</span>
+        <span class="badge">Codex CLI</span>
+        <span class="badge">OpenClaw</span>
+        <span class="badge">Loop Engineering</span>
+        <span class="badge">长时程 Agent</span>
+        <span class="badge">MIT</span>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
