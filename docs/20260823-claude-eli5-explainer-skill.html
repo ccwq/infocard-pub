@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELI5 — Anthropic Thariq 的 Explain-Like-I'm-Five Skill for Claude Code</title>
+  <style>
+    :root {
+      --bg: #0d1b2a;
+      --bg2: #1b2d45;
+      --bg3: #243b55;
+      --accent: #4da8da;
+      --accent2: #7ec8e3;
+      --text: #e8f4f8;
+      --text2: #a8c9e8;
+      --text3: #6a9fc2;
+      --gold: #f0c040;
+      --green: #52b788;
+      --tag-bg: rgba(77, 168, 218, 0.12);
+      --tag-border: rgba(77, 168, 218, 0.35);
+      --radius: 12px;
+      --card-bg: #132840;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+      line-height: 1.7;
+      min-height: 100vh;
+      padding: 24px 16px 80px;
+    }
+
+    .container { max-width: 720px; margin: 0 auto; }
+
+    /* ── TOPBADGE ── */
+    .topbadge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--tag-bg);
+      border: 1px solid var(--tag-border);
+      border-radius: 999px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: var(--accent2);
+      margin-bottom: 20px;
+    }
+    .topbadge-dot {
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(135deg, var(--bg2) 0%, var(--bg3) 100%);
+      border: 1px solid rgba(77,168,218,0.2);
+      border-radius: var(--radius);
+      padding: 36px 32px 32px;
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, rgba(77,168,218,0.08) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .hero-eyebrow {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .hero h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent2);
+    }
+    .hero-sub {
+      font-size: 14px;
+      color: var(--text2);
+      margin-bottom: 24px;
+    }
+    .hero-stats {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .stat-chip {
+      background: rgba(77,168,218,0.1);
+      border: 1px solid rgba(77,168,218,0.25);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--accent2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-chip .num {
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    /* ── INTRO ── */
+    .intro {
+      background: var(--card-bg);
+      border: 1px solid rgba(77,168,218,0.15);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .intro p {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.8;
+    }
+    .intro .highlight {
+      color: var(--accent2);
+      font-weight: 600;
+    }
+    .intro .source-tag {
+      display: inline-block;
+      margin-top: 14px;
+      font-size: 11px;
+      color: var(--text3);
+      background: rgba(77,168,218,0.08);
+      border-radius: 6px;
+      padding: 4px 10px;
+    }
+
+    /* ── SECTION LABEL ── */
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      padding-left: 4px;
+    }
+
+    /* ── COMMAND TABLE ── */
+    .table-wrap {
+      background: var(--card-bg);
+      border: 1px solid rgba(77,168,218,0.15);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead tr {
+      background: rgba(77,168,218,0.08);
+    }
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      color: var(--accent2);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 1px;
+      border-bottom: 1px solid rgba(77,168,218,0.15);
+    }
+    td {
+      padding: 11px 16px;
+      color: var(--text2);
+      border-bottom: 1px solid rgba(77,168,218,0.07);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(77,168,218,0.04); }
+    code.cmd {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      background: rgba(77,168,218,0.12);
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 12px;
+      color: var(--accent2);
+      white-space: nowrap;
+    }
+    .cmd-desc { color: var(--text2); font-size: 12px; }
+    .cmd-audience {
+      font-size: 11px;
+      color: var(--text3);
+      background: rgba(77,168,218,0.07);
+      border-radius: 4px;
+      padding: 2px 6px;
+      white-space: nowrap;
+    }
+
+    /* ── ANALOGY CARD ── */
+    .analogy-section {
+      margin-bottom: 20px;
+    }
+    .analogy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 560px) {
+      .analogy-grid { grid-template-columns: 1fr; }
+    }
+    .analogy-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(77,168,218,0.15);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .analogy-card .level-tag {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .analogy-card blockquote {
+      font-size: 12.5px;
+      color: var(--text2);
+      line-height: 1.7;
+      border-left: 2px solid var(--accent);
+      padding-left: 12px;
+      font-style: normal;
+    }
+
+    /* ── RULES ── */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 560px) {
+      .rules-grid { grid-template-columns: 1fr; }
+    }
+    .rule-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(77,168,218,0.12);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .rule-num {
+      width: 22px;
+      height: 22px;
+      background: rgba(77,168,218,0.15);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .rule-text {
+      font-size: 12px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+    .rule-text strong { color: var(--accent2); }
+
+    /* ── HOOKS ── */
+    .hooks-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 560px) {
+      .hooks-grid { grid-template-columns: 1fr; }
+    }
+    .hook-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(77,168,218,0.15);
+      border-radius: var(--radius);
+      padding: 16px 14px;
+      text-align: center;
+    }
+    .hook-icon {
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+    .hook-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent2);
+      margin-bottom: 6px;
+    }
+    .hook-when {
+      font-size: 10px;
+      color: var(--accent);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .hook-desc {
+      font-size: 11.5px;
+      color: var(--text3);
+      line-height: 1.6;
+    }
+
+    /* ── INSTALL ── */
+    .install-box {
+      background: var(--card-bg);
+      border: 1px solid rgba(77,168,218,0.15);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .install-box h3 {
+      font-size: 13px;
+      color: var(--accent2);
+      margin-bottom: 12px;
+    }
+    .install-box pre {
+      background: rgba(0,0,0,0.35);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: var(--green);
+      overflow-x: auto;
+      line-height: 1.7;
+      margin-bottom: 8px;
+    }
+    .install-box .note {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 8px;
+    }
+
+    /* ── SCENES ── */
+    .scenes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 560px) {
+      .scenes-grid { grid-template-columns: 1fr; }
+    }
+    .scene-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(77,168,218,0.12);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .scene-card .scene-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent2);
+      margin-bottom: 5px;
+    }
+    .scene-card .scene-desc {
+      font-size: 11.5px;
+      color: var(--text3);
+      line-height: 1.6;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      text-align: center;
+      padding: 20px 0 0;
+      border-top: 1px solid rgba(77,168,218,0.1);
+    }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .footer-links a {
+      font-size: 12px;
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--accent2); }
+    .footer-copy {
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    /* ── CATEGORY HEADER ── */
+    .cat-header {
+      background: rgba(77,168,218,0.06);
+      border: 1px solid rgba(77,168,218,0.12);
+      border-radius: 10px;
+      padding: 10px 16px;
+      margin: 16px 0 8px;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- TOPBADGE -->
+  <div class="topbadge">
+    <div class="topbadge-dot"></div>
+    Claude Code Skill &nbsp;·&nbsp; Anthropic Thariq Shihipar &nbsp;·&nbsp; MIT License
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">✨ Claude Code Skill</div>
+    <h1>ELI5 — 让 AI 学会讲<em>通俗故事</em></h1>
+    <div class="hero-sub">22 条命令，让 AI 用 5岁 / 10岁 / 青少年 / 成人 / 专家级类比解释任何概念。告别术语墙，拥抱真实理解。</div>
+    <div class="hero-stats">
+      <div class="stat-chip"><span class="num">22</span> 条命令</div>
+      <div class="stat-chip"><span class="num">5</span> 级受众</div>
+      <div class="stat-chip"><span class="num">MIT</span> 许可</div>
+      <div class="stat-chip"><span class="num">20★</span> GitHub</div>
+      <div class="stat-chip"><span class="num">~1,325t</span> 每20轮</div>
+    </div>
+  </div>
+
+  <!-- INTRO -->
+  <div class="intro">
+    <p class="section-label">Core定位</p>
+    <p>
+      大多数 AI 工具让你<em class="highlight">更懂一个话题</em>；ELI5 Skill 让你<em class="highlight">更擅长解释任何事</em>。
+      它把 Claude Code 从「术语输出机器」变成「会讲通俗故事的解释者」——
+      22 条斜杠命令，覆盖学习、写作、团队 onboarding、自我理解验证全场景。
+    </p>
+    <p style="margin-top:12px;">
+      源自 Anthropic Claude Code 团队工程师 <strong style="color:var(--accent2)">Thariq Shihipar</strong> 的内部方法论，
+      由 <strong style="color:var(--accent2)">kavyabhand</strong> 实现为开源 Skill。
+      三个 Hook 注入规则，AI 在每轮对话中自动保持通俗风格，不会「漂移」。
+    </p>
+    <div class="source-tag">📦 github.com/kavyabhand/claude-eli5 &nbsp;·&nbsp; ⭐ 20 &nbsp;·&nbsp; 🍴 6 Forks</div>
+  </div>
+
+  <!-- FIVE LEVELS TABLE -->
+  <div class="section-label">层级命令 — 5级受众</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>命令</th>
+          <th>受众</th>
+          <th>风格</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code class="cmd">/eli5</code></td>
+          <td><span class="cmd-audience">5岁</span></td>
+          <td class="cmd-desc">玩具、食物、动物；每句约 15 词</td>
+        </tr>
+        <tr>
+          <td><code class="cmd">/eli-kid</code></td>
+          <td><span class="cmd-audience">10岁</span></td>
+          <td class="cmd-desc">学校类比，因果关系，追问「为什么？」</td>
+        </tr>
+        <tr>
+          <td><code class="cmd">/eli-teen</code></td>
+          <td><span class="cmd-audience">15岁</span></td>
+          <td class="cmd-desc">游戏/流行文化类比，尖锐不耐烦</td>
+        </tr>
+        <tr>
+          <td><code class="cmd">/eli-adult</code></td>
+          <td><span class="cmd-audience">聪明外行</span></td>
+          <td class="cmd-desc">真实世界类比，无术语，假设生活经验</td>
+        </tr>
+        <tr>
+          <td><code class="cmd">/eli-expert</code></td>
+          <td><span class="cmd-audience">其他领域专家</span></td>
+          <td class="cmd-desc">跨领域桥梁 — 医生？律师？厨师？AI 会反问你的职业</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- NAV -->
+  <div class="section-label">导航命令</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>命令</th><th>功能</th></tr></thead>
+      <tbody>
+        <tr><td><code class="cmd">/eli-deeper</code></td><td class="cmd-desc">技术深度 +1，重新解释上一概念</td></tr>
+        <tr><td><code class="cmd">/eli-simpler</code></td><td class="cmd-desc">技术深度 -1，重新解释上一概念</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ANALOGY EXAMPLE: OAuth across 4 levels -->
+  <div class="section-label">OAuth 示例 — 4个层级的类比对比</div>
+  <div class="analogy-grid">
+    <div class="analogy-card">
+      <div class="level-tag">/eli5 — 5岁</div>
+      <blockquote>想象你有一把信箱钥匙。OAuth 就是一把<strong style="color:var(--accent2)">超小特制钥匙</strong>，只能打开信箱，打不开房子。你把它交给邮递员，但他永远进不了你家。</blockquote>
+    </div>
+    <div class="analogy-card">
+      <div class="level-tag">/eli-teen — 15岁</div>
+      <blockquote>你知道在 App 里能「用 Google 登录」吗？OAuth 就是让这个过程work的东西。Google 给 App 一个<strong style="color:var(--accent2)">特殊腕带</strong>——入场通行证，不等于你拥有这个场馆。</blockquote>
+    </div>
+    <div class="analogy-card">
+      <div class="level-tag">/eli-adult — 聪明外行</div>
+      <blockquote>OAuth 让你在不分享密码的情况下，授权一个 App 访问另一个服务。想象<strong style="color:var(--accent2)">停车代客钥匙</strong>：他能泊车，打不开手套箱。</blockquote>
+    </div>
+    <div class="analogy-card">
+      <div class="level-tag">/eli-expert — 医生视角</div>
+      <blockquote>想象转诊信。你的全科医生不会把完整病历发给专科——只发一封<strong style="color:var(--accent2)">授权转诊</strong>，写明需要什么。OAuth 就是这样：限定范围、限时、不暴露全部信息。</blockquote>
+    </div>
+  </div>
+
+  <!-- ALL 22 COMMANDS GROUPED -->
+  <div class="cat-header">学习工具 — 5条命令</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>命令</th><th>功能</th></tr></thead>
+      <tbody>
+        <tr><td><code class="cmd">/eli-compare X vs Y</code></td><td class="cmd-desc">同域并排比较：同一类比域、一个关键差异、一个「选X场景 / 选Y场景」</td></tr>
+        <tr><td><code class="cmd">/eli-prereqs [topic]</code></td><td class="cmd-desc">真实学习路径 — 不是「先学编程基础」，而是真正的前置知识清单</td></tr>
+        <tr><td><code class="cmd">/eli-teach [topic]</code></td><td class="cmd-desc">苏格拉底式问答 — 通过提问引导你自己发现答案，记得更牢</td></tr>
+        <tr><td><code class="cmd">/eli-quiz</code></td><td class="cmd-desc">2~3 道分级测试题，每次一道，用 ELI5 风格反馈</td></tr>
+        <tr><td><code class="cmd">/eli-recap</code></td><td class="cmd-desc">本会话概念摘要，保存到 .claude/eli5-concepts.json，供未来 session 复用</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cat-header">格式变体 — 3条命令</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>命令</th><th>功能</th></tr></thead>
+      <tbody>
+        <tr><td><code class="cmd">/eli-brief [topic]</code></td><td class="cmd-desc">3 句话，每句 ≤20 词 — 安全发给老板 / 客户 / 董事会</td></tr>
+        <tr><td><code class="cmd">/eli-tweet [topic]</code></td><td class="cmd-desc">≤280 字符；显示字符数；140 字符挑战。说不清楚 = 没真正理解</td></tr>
+        <tr><td><code class="cmd">/eli-tldr [topic]</code></td><td class="cmd-desc">恰好 3 条 bullet：是什么 / 为什么重要 / 关键点。无散文。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cat-header">工作流工具 — 4条命令</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>命令</th><th>功能</th></tr></thead>
+      <tbody>
+        <tr><td><code class="cmd">/eli-pr</code></td><td class="cmd-desc">读取 git diff main...HEAD，生成 PR 描述（给 manager / PM / 设计师）</td></tr>
+        <tr><td><code class="cmd">/eli-commit</code></td><td class="cmd-desc">读取 staged changes，写 commit message — 专注 why，不只是 what</td></tr>
+        <tr><td><code class="cmd">/eli-remember</code></td><td class="cmd-desc">保存自定义类比到 custom-analogies.md，每次 session 最优先查表</td></tr>
+        <tr><td><code class="cmd">/eli-save</code></td><td class="cmd-desc">导出本 session 所有解释到 eli5-notes.md</td></tr>
+        <tr><td><code class="cmd">/eli-doc</code></td><td class="cmd-desc">扫描代码库，写 ELI5.md — 全员可读的 codebase 术语表</td></tr>
+        <tr><td><code class="cmd">/eli-doc --team</code></td><td class="cmd-desc">同上，加「新成员入门」章节，commit 到仓库</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 8 RULES -->
+  <div class="section-label">8条行为规则 — 每次响应必须遵守</div>
+  <div class="rules-grid">
+    <div class="rule-card">
+      <div class="rule-num">1</div>
+      <div class="rule-text"><strong>类比优先</strong> — 从不定义，总是类比</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-num">2</div>
+      <div class="rule-text"><strong>消灭术语</strong> — 替换需要解释的词，不解释它们</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-num">3</div>
+      <div class="rule-text"><strong>短句</strong> — 每句只含一个想法</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-num">4</div>
+      <div class="rule-text"><strong>保持准确</strong> — 更简单不等于更错误</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-num">5</div>
+      <div class="rule-text"><strong>具体 > 抽象</strong> — 食物/玩具/建筑，不用「系统」和「范式」</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-num">6</div>
+      <div class="rule-text"><strong>不居高临下</strong> — 禁用 "simply" / "obviously"</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-num">7</div>
+      <div class="rule-text"><strong>持久性</strong> — 每轮响应保持风格直到关闭；漂移是 bug</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-num">8</div>
+      <div class="rule-text"><strong>安全第一</strong> — 破坏性/不可逆操作用通俗语言警告</div>
+    </div>
+  </div>
+
+  <!-- THREE HOOKS -->
+  <div class="section-label">3 Hook 工作原理</div>
+  <div class="hooks-grid">
+    <div class="hook-card">
+      <div class="hook-icon">🚀</div>
+      <div class="hook-name">SessionStart</div>
+      <div class="hook-when">一次性</div>
+      <div class="hook-desc">运行时读取 core-rules.md，注入全部规则 + .eli5rc 自动激活<br><br><code style="font-size:10px;color:var(--accent)">~675t once</code></div>
+    </div>
+    <div class="hook-card">
+      <div class="hook-icon">⚡</div>
+      <div class="hook-name">UserPromptSubmit</div>
+      <div class="hook-when">每轮</div>
+      <div class="hook-desc">25 token 加强 + 层级切换检测 + 关闭检测<br><br><code style="font-size:10px;color:var(--accent)">~25t/turn</code></div>
+    </div>
+    <div class="hook-card">
+      <div class="hook-icon">🏷️</div>
+      <div class="hook-name">Statusline</div>
+      <div class="hook-when">每轮</div>
+      <div class="hook-desc">渲染 [ELI5] / [ELI5:TEEN] 徽章<br><br><code style="font-size:10px;color:var(--accent)">0t</code></div>
+    </div>
+  </div>
+
+  <!-- TOKEN EFFICIENCY -->
+  <div class="table-wrap" style="margin-bottom:20px;">
+    <table>
+      <thead><tr><th>版本</th><th>级别 stub</th><th>每轮开销</th><th>漂移重激活</th><th>20轮总计</th></tr></thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--text2);font-size:12px;">v2（规则 baked in）</td>
+          <td style="font-size:12px;color:var(--text2);">~450t</td>
+          <td style="font-size:12px;color:var(--text2);">0</td>
+          <td style="font-size:12px;color:var(--text2);">1 次（~450t）</td>
+          <td style="font-size:12px;color:var(--gold);font-weight:700;">~1,575t</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent2);font-size:12px;font-weight:600;">v3+（per-turn hook）</td>
+          <td style="font-size:12px;color:var(--text2);">~150t</td>
+          <td style="font-size:12px;color:var(--text2);">25t × 20 = 500t</td>
+          <td style="font-size:12px;color:var(--green);">0（预防）</td>
+          <td style="font-size:12px;color:var(--green);font-weight:700;">~1,325t ✓</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- INSTALL -->
+  <div class="section-label">安装方式</div>
+  <div class="install-box">
+    <h3>Mac / Linux</h3>
+    <pre>git clone https://github.com/kavyabhand/claude-eli5.git
+cd claude-eli5
+./install.sh</pre>
+    <h3 style="margin-top:14px;">Windows (PowerShell)</h3>
+    <pre>git clone https://github.com/kavyabhand/claude-eli5.git
+cd claude-eli5
+.\install.ps1</pre>
+    <div class="note">💡 开始新 Claude Code session，22 条命令全部激活。更新：`./update.sh`</div>
+  </div>
+
+  <!-- SCENES -->
+  <div class="section-label">适用场景</div>
+  <div class="scenes-grid">
+    <div class="scene-card">
+      <div class="scene-title">📚 学习新知识</div>
+      <div class="scene-desc">/eli-prereqs 展示真实学习路径，/eli-teach 苏格拉底式问答引导你自行发现答案</div>
+    </div>
+    <div class="scene-card">
+      <div class="scene-title">✍️ 写给非技术人群</div>
+      <div class="scene-desc">/eli-pr 写 PR 描述，/eli-brief 发 Slack 给 manager，/eli-commit 写 commit message</div>
+    </div>
+    <div class="scene-card">
+      <div class="scene-title">🧪 自我理解验证</div>
+      <div class="scene-desc">/eli-tweet 压缩到 280 字符，/eli-quiz 测试，/eli-tldr 三条精华 — 说不清楚 = 没真正理解</div>
+    </div>
+    <div class="scene-card">
+      <div class="scene-title">👥 团队 Onboarding</div>
+      <div class="scene-desc">/eli-doc --team 扫描代码库生成 ELI5.md，新成员入门 + 术语表，直接 commit 到仓库</div>
+    </div>
+  </div>
+
+  <!-- AUTO-ACTIVATE -->
+  <div class="intro" style="margin-bottom:20px;">
+    <p class="section-label">项目级自动激活</p>
+    <p style="font-size:13px;">
+      在项目根目录放一个 <code class="cmd">.eli5rc</code> 文件，eli5-mode 自动激活，无需每次输入命令。
+      支持配置默认层级、专家领域、passive_mode（每轮自动解释陌生术语）和 proactive（主动提示最陌生的词）。
+    </p>
+    <pre style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:11.5px;color:var(--green);margin-top:10px;overflow-x:auto;"># .eli5rc
+level=eli-adult
+passive_mode=true
+proactive=true</pre>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-links">
+      <a href="https://github.com/kavyabhand/claude-eli5" target="_blank">GitHub</a>
+      <a href="https://x.com/mylifcc/status/2090998309662171573" target="_blank">X @mylifcc</a>
+      <a href="https://x.com/thariq" target="_blank">X @thariq</a>
+    </div>
+    <div class="footer-copy">信息卡 &nbsp;·&nbsp; 2026-08-23 &nbsp;·&nbsp; style: darkblue &nbsp;·&nbsp; PUBLISHED_PENDING_VISUAL</div>
+  </div>
+
+</div>
+</body>
+</html>
