@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Headroom：本地优先上下文压缩层 · 60–95% fewer tokens for JSON</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+      --grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{
+      min-width:0;
+      display:grid;
+      gap:10px;
+      align-content:start;
+      padding:12px 0 0;
+    }
+    .kicker-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:fit-content;
+      padding:5px 10px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);
+      backdrop-filter:blur(10px);
+      color:#fff;
+      font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      border-radius:999px;
+    }
+    .source{
+      max-width:280px;
+      text-align:right;
+      font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#b8c8f5;
+      overflow-wrap:anywhere;
+    }
+    .title{
+      margin:0;
+      font-size:clamp(40px,7vw,88px);
+      line-height:.92;
+      letter-spacing:-.07em;
+      font-weight:950;
+    }
+    .subtitle{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(15px,2vw,20px);
+      line-height:1.55;
+      color:#e8eefc;
+    }
+    .subcn{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(13px,1.6vw,16px);
+      line-height:1.65;
+      color:#c5d2f7;
+    }
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.05);
+      border-radius:999px;
+      color:#fff;
+      font-size:12px;
+      font-weight:850;
+      letter-spacing:.01em;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .pill.red{border-color:rgba(244,84,84,.32);background:rgba(244,84,84,.12);color:#ffd1d1}
+    .hero-note{
+      display:grid;
+      gap:8px;
+      border:1.5px solid rgba(255,255,255,.16);
+      background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+      padding:14px 16px 12px;
+      border-radius:18px;
+      box-shadow:var(--shadow);
+    }
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{
+      min-width:0;
+      background:rgba(10,12,22,.5);
+      border:1.5px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:14px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+    .visual-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .orb{
+      width:66px;
+      height:66px;
+      border-radius:22px;
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+        linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+      box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      display:grid;
+      place-items:center;
+      color:#fff;
+      font-size:26px;
+      font-weight:950;
+      letter-spacing:-.08em;
+    }
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .mini-card{
+      min-width:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1.5px solid rgba(255,255,255,.09);
+      border-radius:16px;
+      padding:10px 10px 9px;
+      display:grid;
+      gap:8px;
+      box-shadow:0 12px 26px rgba(0,0,0,.2);
+    }
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .visual-strip{
+      height:12px;
+      border-radius:999px;
+      background:
+        linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);
+      box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16);
+    }
+    .section{margin:18px 0;padding:18px 20px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(20,28,52,.78), rgba(12,18,38,.82));box-shadow:0 14px 30px rgba(0,0,0,.34)}
+    .section-head{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .section-no{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#f4f9ff;background:linear-gradient(135deg,#3aa8ff,#4a78ff 60%,#8459ff);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 8px 18px rgba(74,120,255,.30)}
+    .section-no.b{background:linear-gradient(135deg,#8459ff,#4a78ff)}
+    .section-no.k{background:linear-gradient(135deg,#2db36a,#3aa8ff)}
+    .section-meta .label{font-size:12px;color:#9fb0e0;letter-spacing:.08em;margin-bottom:4px}
+    .section-meta h2{margin:0 0 6px;font-size:24px;color:#f4f9ff}
+    .section-meta p{margin:0;color:#b8c4e8;font-size:13px}
+    .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+    .grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+    .card,.mini,.risk{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));box-shadow:0 8px 18px rgba(0,0,0,.24)}
+    .card h3,.risk h4,.mini h4{margin:6px 0 8px;font-size:16px;color:#f4f9ff}
+    .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+    .tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#cfd9f5;background:rgba(255,255,255,.05)}
+    .tag.red{border-color:rgba(244,84,84,.45);color:#ffd1d1;background:rgba(244,84,84,.12)}
+    .tag.blue{border-color:rgba(88,195,255,.45);color:#d8f4ff;background:rgba(88,195,255,.12)}
+    .tag.green{border-color:rgba(45,179,106,.45);color:#ddffe8;background:rgba(45,179,106,.12)}
+    .tag.yellow{border-color:rgba(244,200,76,.45);color:#fff0bf;background:rgba(244,200,76,.12)}
+    .tag.dark{border-color:rgba(132,89,255,.45);color:#ede3ff;background:rgba(132,89,255,.14)}
+    .tag.cyan{border-color:rgba(88,195,255,.45);color:#d8f4ff;background:rgba(88,195,255,.12)}
+    .lead{font-size:11px;letter-spacing:.08em;color:#9fb0e0;margin-bottom:4px}
+    .lead.red{color:#ffd1d1}.lead.blue{color:#d8f4ff}.lead.dark{color:#ede3ff}.lead.green{color:#ddffe8}
+    .quote-line{margin:0;color:#cfd9f5;font-size:13px;line-height:1.5}
+    .code-box{
+      background:#0d1220;
+      border:1.5px solid rgba(255,255,255,.09);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .code-top{
+      padding:9px 12px;
+      background:#13192c;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#fff;
+    }
+    .code{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#dbe5ff;
+      font-size:11.8px;
+      line-height:1.7;
+      white-space:pre-wrap;
+    }
+    .code .kw{color:#7ad9ff}
+    .code .cmt{color:#6a7a9a;font-style:italic}
+    .code .str{color:#90f0a8}
+    .flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .flow-item{padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+    .flow-item .t{font-weight:700;color:#f4f9ff;font-size:13px}
+    .flow-item .c{color:#9fb0e0;font-size:12px;margin-top:2px}
+    .flow-item.red{border-color:rgba(244,84,84,.4);background:rgba(244,84,84,.10)}
+    .flow-item.blue{border-color:rgba(88,195,255,.4);background:rgba(88,195,255,.10)}
+    .flow-item.green{border-color:rgba(45,179,106,.4);background:rgba(45,179,106,.10)}
+    .flow-item.purple{border-color:rgba(132,89,255,.4);background:rgba(132,89,255,.10)}
+    .flow-item.yellow{border-color:rgba(244,200,76,.4);background:rgba(244,200,76,.10)}
+    .flow-item.dark{border-color:rgba(132,89,255,.4);background:rgba(132,89,255,.10)}
+    .matrix{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+    .mini{padding:12px}
+    .rule{height:1px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);margin:18px 0}
+    .source-note{margin:0;color:#9fb0e0;font-size:12px;line-height:1.7}
+    .highlight-box{
+      background:linear-gradient(135deg,rgba(244,200,76,.10),rgba(88,195,255,.08));
+      border:1.5px solid rgba(244,200,76,.28);
+      border-radius:14px;
+      padding:14px 16px;
+      display:grid;
+      gap:8px;
+    }
+    .highlight-box .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#f4c84c}
+    .highlight-box p{margin:0;font-size:12.8px;line-height:1.66;color:#e8eefc}
+    .footer{
+      margin-top:14px;
+      background:#0b1020;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      color:#dfe8ff;
+      font-size:12px;
+      flex-wrap:wrap;
+    }
+    .footer .stars{font-weight:900}
+    @media (max-width:1080px){
+      .hero,.shell{grid-template-columns:1fr}
+    }
+    @media (max-width:768px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px);line-height:1.28;letter-spacing:-.02em}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .grid-2,.grid-3,.matrix{grid-template-columns:1fr !important}
+      .section-head{grid-template-columns:48px 1fr}
+      .section-no{width:48px;height:48px;font-size:16px;border-radius:12px}
+      .section-meta h2{font-size:18px}
+      p,li,.quote-line{overflow-wrap:anywhere;word-break:break-word}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+      .source{text-align:left;max-width:none}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="hero-bar"></div>
+    <header class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <div class="kicker">AI · Context Compression · 2026-08</div>
+          <div class="source">GitHub · headroomlabs-ai/headroom</div>
+        </div>
+        <h1 class="title">Headroom</h1>
+        <p class="subtitle">The context compression layer for AI agents</p>
+        <p class="subcn">将 tool outputs、logs、RAG chunks、files 和对话历史压缩后再送入 LLM，本地优先，可逆，精确恢复原文。</p>
+        <div class="pill-row">
+          <span class="pill cyan">Apache-2.0</span>
+          <span class="pill green">Local-First</span>
+          <span class="pill yellow">Reversible CCR</span>
+          <span class="pill purple">Python</span>
+          <span class="pill red">67k ★</span>
+        </div>
+      </div>
+      <aside class="hero-visual">
+        <div class="visual-strip"></div>
+        <div class="visual-grid">
+          <div class="mini-card">
+            <div class="label">⭐ Stars</div>
+            <div class="value">67,122</div>
+            <div class="desc">GitHub · 2026-08-23</div>
+          </div>
+          <div class="mini-card">
+            <div class="label">🍴 Forks</div>
+            <div class="value">5,173</div>
+            <div class="desc">Community</div>
+          </div>
+          <div class="mini-card">
+            <div class="label">License</div>
+            <div class="value">Apache-2.0</div>
+            <div class="desc">Commercial use OK</div>
+          </div>
+          <div class="mini-card">
+            <div class="label">Lang</div>
+            <div class="value">Python</div>
+            <div class="desc">TypeScript SDK</div>
+          </div>
+        </div>
+      </aside>
+    </header>
+
+    <div class="highlight-box">
+      <div class="label">⚡ Token 节省（官方 Benchmark）</div>
+      <p>
+        <strong>JSON 数据：</strong>60–95% fewer tokens &nbsp;|&nbsp;
+        <strong>Coding agents：</strong>15–20% fewer tokens &nbsp;|&nbsp;
+        精度保持：GSM8K ±0.000、TruthfulQA +0.030、SQuAD v2 97%、BFCL 97%
+      </p>
+      <p>
+        <strong>真实工作负载实测：</strong>Code search 92% · SRE incident 92% · GitHub issue triage 73% · Codebase exploration 47%
+      </p>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER · 安装</div>
+          <h2>pip / uv / npm 三种入口</h2>
+          <p>Python CLI（pip/uv）、TypeScript SDK（npm），按需选择。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="code-box">
+          <div class="code-top">pip install</div>
+          <div class="code"><span class="cmt"># Python 包 + CLI（推荐）</span>
+<span class="kw">pip</span> install <span class="str">"headroom-ai[all]"</span>
+
+<span class="cmt"># 粒度可选</span>
+<span class="kw">pip</span> install <span class="str">"headroom-ai[proxy]"</span>    <span class="cmt"># 代理模式</span>
+<span class="kw">pip</span> install <span class="str">"headroom-ai[mcp]"</span>      <span class="cmt"># MCP server</span>
+<span class="kw">pip</span> install <span class="str">"headroom-ai[code]"</span>     <span class="cmt"># 代码压缩</span>
+<span class="kw">pip</span> install <span class="str">"headroom-ai[memory]"</span>   <span class="cmt"># 跨 Agent 记忆</span></div>
+        </div>
+        <div class="code-box">
+          <div class="code-top">uv / npm</div>
+          <div class="code"><span class="cmt"># uv 全局工具（隔离环境）</span>
+<span class="kw">uv</span> tool install --python 3.13 \
+  <span class="str">"headroom-ai[all]"</span>
+
+<span class="cmt"># npm TypeScript SDK（仅库，无 CLI）</span>
+<span class="kw">npm</span> install headroom-ai
+<span class="cmt"># import { compress } from 'headroom-ai'</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">CHAPTER · 四种部署模式</div>
+          <h2>Library · Proxy · Agent Wrap · MCP</h2>
+          <p>按场景选择入口，无需全量安装。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag cyan">Library</span></div>
+          <h3>Python / TypeScript</h3>
+          <p class="quote-line">from headroom import compress(messages)，内联到任何应用。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">Proxy</span></div>
+          <h3>零代码改动</h3>
+          <p class="quote-line">headroom proxy --port 8787，透明拦截所有 LLM 请求。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag purple">Agent Wrap</span></div>
+          <h3>一键封装</h3>
+          <p class="quote-line">headroom wrap claude，自动配置 Serena + Proxy。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag green">MCP Server</span></div>
+          <h3>通用 MCP 工具</h3>
+          <p class="quote-line">headroom_compress / headroom_retrieve / headroom_stats。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag yellow">Cross-agent Memory</span></div>
+          <h3>跨 Agent 共享记忆</h3>
+          <p class="quote-line">Claude、Codex、Gemini、Grok 之间共享上下文，自动去重。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">Output Shaper</span></div>
+          <h3>输出 token 优化</h3>
+          <p class="quote-line">HEADROOM_OUTPUT_SHAPER=1 减少模型的冗余输出（5× 成本优势）。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">CHAPTER · Agent 兼容</div>
+          <h2>支持的 Coding Agent</h2>
+          <p>headroom wrap 一行命令封装以下 Agent：</p>
+        </div>
+      </div>
+      <div class="flow">
+        <div class="flow-item blue"><div class="t">Claude Code</div><div class="c">headroom wrap claude</div></div>
+        <div class="flow-item purple"><div class="t">OpenAI Codex</div><div class="c">headroom wrap codex</div></div>
+        <div class="flow-item green"><div class="t">Grok</div><div class="c">headroom wrap grok</div></div>
+        <div class="flow-item yellow"><div class="t">Cursor</div><div class="c">headroom wrap cursor</div></div>
+        <div class="flow-item red"><div class="t">Aider</div><div class="c">headroom wrap aider</div></div>
+        <div class="flow-item"><div class="t">OpenCode</div><div class="c">headroom wrap opencode</div></div>
+        <div class="flow-item blue"><div class="t">Cline</div><div class="c">headroom wrap cline</div></div>
+        <div class="flow-item purple"><div class="t">OpenClaw</div><div class="c">headroom wrap openclaw</div></div>
+        <div class="flow-item green"><div class="t">Continue / Goose / OMP</div><div class="c">headroom wrap &lt;name&gt;</div></div>
+        <div class="flow-item yellow"><div class="t">Undo wrap</div><div class="c">headroom unwrap &lt;name&gt;</div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER · CLI 命令速查</div>
+          <h2>headroom CLI 核心命令</h2>
+          <p>安装后直接使用。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="code-box">
+          <div class="code-top">wrap / unwrap</div>
+          <div class="code"><span class="cmt"># 封装一个 Agent（自动起 Proxy）</span>
+<span class="kw">headroom</span> wrap claude
+<span class="kw">headroom</span> wrap codex
+<span class="kw">headroom</span> wrap cursor
+
+<span class="cmt"># 解除封装</span>
+<span class="kw">headroom</span> unwrap claude</div>
+        </div>
+        <div class="code-box">
+          <div class="code-top">proxy / doctor / perf</div>
+          <div class="code"><span class="cmt"># 独立代理模式（零代码改动）</span>
+<span class="kw">headroom</span> proxy --port 8787
+
+<span class="cmt"># 健康检查</span>
+<span class="kw">headroom</span> doctor
+<span class="kw">headroom</span> perf
+
+<span class="cmt"># 实时节省面板</span>
+<span class="kw">headroom</span> dashboard
+<span class="kw">headroom</span> stats</div>
+        </div>
+        <div class="code-box">
+          <div class="code-top">mcp / learn</div>
+          <div class="code"><span class="cmt"># 安装为 MCP Server</span>
+<span class="kw">headroom</span> mcp install
+
+<span class="cmt"># 自动学习失败会话</span>
+<span class="kw">headroom</span> learn
+<span class="cmt"># → 写入 CLAUDE.local.md / AGENTS.md</span>
+
+<span class="cmt"># Turnkey 本地部署</span>
+<span class="kw">headroom</span> deploy</div>
+        </div>
+        <div class="code-box">
+          <div class="code-top">输出压缩（Output Shaper）</div>
+          <div class="code"><span class="cmt"># 减少模型输出的冗余 token</span>
+<span class="cmt"># （5× 成本优势，Output 费用高于 Input）</span>
+<span class="kw">export</span> HEADROOM_OUTPUT_SHAPER=1
+
+<span class="cmt"># Verbosity steering：追加"简洁模式"</span>
+<span class="cmt"># Effort routing：降低工具结果恢复时的思考量</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">CHAPTER · 架构</div>
+          <h2>ContentRouter → Compressors → CCR</h2>
+          <p>ContentRouter 自动识别内容类型，选择对应压缩器。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <article class="mini">
+          <div class="lead blue">JSON 压缩</div>
+          <h4>SmartCrusher</h4>
+          <p class="quote-line">结构化 JSON 60–95% 压缩率。</p>
+        </article>
+        <article class="mini">
+          <div class="lead green">代码压缩</div>
+          <h4>CodeCompressor (AST)</h4>
+          <p class="quote-line">保留语义的结构化代码压缩。</p>
+        </article>
+        <article class="mini">
+          <div class="lead purple">文本压缩</div>
+          <h4>Kompress-v2-base (HF)</h4>
+          <p class="quote-line">HuggingFace 开源模型。</p>
+        </article>
+        <article class="mini">
+          <div class="lead">CacheAligner</div>
+          <h4>KV Cache 保护</h4>
+          <p class="quote-line">检测 volatile 内容，避免 KV cache prefix bust。</p>
+        </article>
+        <article class="mini">
+          <div class="lead red">CCR</div>
+          <h4>Reversible</h4>
+          <p class="quote-line">原文本地缓存，按需调用 headroom_retrieve 恢复。</p>
+        </article>
+        <article class="mini">
+          <div class="lead yellow">Cross-agent</div>
+          <h4>共享记忆</h4>
+          <p class="quote-line">Claude/Codex/Gemini/Grok 跨 Agent 上下文共享。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">06</div>
+        <div class="section-meta">
+          <div class="label k">CHAPTER · Benchmark 精度</div>
+          <h2>官方基准 vs 真实工作负载</h2>
+          <p>注意区分官方 benchmark（15–20% coding agents）与真实工作负载数据。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag green">官方 Benchmark</span></div>
+          <h3>Coding Agents</h3>
+          <p class="quote-line" style="color:#ddffe8">15–20% fewer tokens</p>
+          <p class="quote-line">官方对 coding agents 的声明节省。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag cyan">官方 Benchmark</span></div>
+          <h3>JSON 数据</h3>
+          <p class="quote-line" style="color:#d8f4ff">60–95% fewer tokens</p>
+          <p class="quote-line">结构化 JSON 的压缩率区间。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag yellow">真实工作负载</span></div>
+          <h3>Code search (100 results)</h3>
+          <p class="quote-line" style="color:#fff0bf">17,765 → 1,408 tokens · 92% ↓</p>
+          <p class="quote-line">Headroom 官方实测。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">真实工作负载</span></div>
+          <h3>SRE incident debugging</h3>
+          <p class="quote-line" style="color:#ffd1d1">65,694 → 5,118 tokens · 92% ↓</p>
+          <p class="quote-line">Headroom 官方实测。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">真实工作负载</span></div>
+          <h3>GitHub issue triage</h3>
+          <p class="quote-line">54,174 → 14,761 tokens · 73% ↓</p>
+          <p class="quote-line">Headroom 官方实测。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">真实工作负载</span></div>
+          <h3>Codebase exploration</h3>
+          <p class="quote-line">78,502 → 41,254 tokens · 47% ↓</p>
+          <p class="quote-line">Headroom 官方实测。</p>
+        </article>
+      </div>
+      <div style="margin-top:12px" class="highlight-box">
+        <div class="label">⚠ Benchmark 精度保持</div>
+        <p>GSM8K ±0.000 · TruthfulQA +0.030 · SQuAD v2 97% · BFCL 97%</p>
+        <p>可复现：<code style="color:#d8f4ff">python -m headroom.evals suite --tier 1</code></p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">07</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER · MCP 集成</div>
+          <h2>MCP Server 工具</h2>
+          <p>headroom mcp install 后任意 MCP 客户端调用。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag cyan">MCP Tool</span></div>
+          <h3>headroom_compress</h3>
+          <p class="quote-line">压缩任意消息列表，返回节省量统计。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag green">MCP Tool</span></div>
+          <h3>headroom_retrieve</h3>
+          <p class="quote-line">按 key 恢复原始内容（CCR reversibility）。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag yellow">MCP Tool</span></div>
+          <h3>headroom_stats</h3>
+          <p class="quote-line">当前会话 token 节省统计。</p>
+        </article>
+      </div>
+      <div class="code-box" style="margin-top:12px">
+        <div class="code-top">MCP 配置（uv 全局工具路径）</div>
+        <div class="code"><span class="cmt"># Codex / 全局 MCP 安装</span>
+<span class="kw">uv</span> tool install "headroom-ai[all]"
+<span class="kw">command</span> -v headroom
+
+<span class="cmt"># 复制返回路径填入 MCP 配置</span>
+<span class="cmt"># ~/.cursor/mcp.json 或对应客户端配置</span>
+{
+  <span class="kw">"mcp_servers"</span>: {
+    <span class="kw">"headroom"</span>: {
+      <span class="kw">"command"</span>: <span class="str">"/path/from/command-v/headroom"</span>,
+      <span class="kw">"args"</span>: [<span class="str">"mcp"</span>, <span class="str">"serve"</span>]
+    }
+  }
+}</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">08</div>
+        <div class="section-meta">
+          <div class="label b">CHAPTER · 注意事项</div>
+          <h2>关键约束</h2>
+          <p>避免把官方 benchmark 覆盖范围扩展到所有场景。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">⚠ Benchmark 覆盖范围</span></div>
+          <h3>15–20% ≠ 全部场景</h3>
+          <p class="quote-line">Coding agents 节省 15–20% 是官方 benchmark 结论。</p>
+          <p class="quote-line">JSON 数据 60–95% 是另一独立 benchmark。</p>
+          <p class="quote-line">真实工作负载实测最高 92%，最低 47%，不可外推。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag yellow">⚠ Serena 默认安装</span></div>
+          <h3>wrap 时自动安装 Serena</h3>
+          <p class="quote-line">headroom wrap claude 会安装 Serena 到 ~/.claude.json（user scope）。</p>
+          <p class="quote-line">--code-memory none 可跳过。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">⚠ Python 版本</span></div>
+          <h3>需要 Python 3.10+</h3>
+          <p class="quote-line">pip install 和 uv tool install 均要求 Python 3.10 及以上。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag green">⚠ npm 无 CLI</span></div>
+          <h3>npm 包是 SDK，非 CLI</h3>
+          <p class="quote-line">npm install headroom-ai 只能 import compress()，不提供 headroom 命令行。</p>
+          <p class="quote-line">CLI 功能需 pip install 或 uv tool install。</p>
+        </article>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">
+      数据来源：GitHub API (2026-08-23) · Official README · headroom-docs.vercel.app · HuggingFace kompress-v2-base
+      · X @the_osps
+    </p>
+  </main>
+</body>
+</html>
