@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="blue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>claude-obsidian · Obsidian 自主知识中枢 — Karpathy LLM Wiki 工业级实现</title>
+  <meta name="description" content="AgriciDaniel/claude-obsidian：连接 Claude Code / Codex / Gemini 到 Obsidian 本地知识库，Multi-Agent 事务提交（SHA-256）、Source & Claim Ledger、15+ Agent Skills（BM25 检索、AutoResearch、Canvas 可视化），纯 Markdown+JSON 存储。">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{overflow-x:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#111;color:#111;font-size:13px;line-height:1.6}
+    .page{width:min(1180px, calc(100% - 20px));margin:0 auto;padding:18px 0 88px}
+
+    /* hero */
+    .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:0;border:3px solid #111;background:#fff;overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:12px;background:#111;border-bottom:3px solid #111;position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:200px;background:#1f63ff}
+    .hero-copy{padding:18px 18px 14px;border-right:3px solid #111;display:grid;gap:8px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:6px;width:fit-content;border:2px solid #111;background:#fff;padding:4px 8px;font-size:10px;font-weight:900;letter-spacing:.15em;text-transform:uppercase}
+    .kicker::before{content:"■";color:#1f63ff;font-size:9px}
+    h1.demo-title{margin:0;font-size:clamp(20px,3.2vw,38px);line-height:1.05;letter-spacing:-.04em;font-weight:900}
+    .subtitle{color:#444;font-size:12.5px;line-height:1.55}
+    .badge-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+    .badge{display:inline-flex;align-items:center;min-height:26px;padding:4px 8px;border:2px solid #111;background:#fff;font-size:10px;font-weight:700}
+    .badge.blue{background:#1f63ff;color:#fff}
+    .badge.red{background:#d80018;color:#fff}
+    .badge.green{background:#15803d;color:#fff}
+    .hero-visual{padding:16px;display:grid;align-content:center;gap:8px;background:#fff}
+    .hero-visual .loop-img{width:100%;max-width:260px;display:block;border:2px solid #111}
+
+    /* sections */
+    section{padding:14px 0 0}
+    h2{font-size:14px;font-weight:900;margin:0 0 8px;color:#111;border-bottom:3px solid #1f63ff;padding-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+
+    /* intro grid */
+    .intro-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;border:2px solid #111;background:#fff;padding:14px;margin-bottom:12px}
+    .intro-item{display:grid;gap:4px}
+    .intro-item h3{font-size:12px;font-weight:900;color:#1f63ff;text-transform:uppercase;letter-spacing:.08em}
+    .intro-item p{font-size:12px;color:#333;line-height:1.55}
+
+    /* capability table */
+    table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px;border:2px solid #111}
+    th,td{padding:7px 10px;border:1.5px solid #111;text-align:left}
+    th{background:#111;color:#fff;font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}
+    tr:nth-child(even) td{background:#eef4ff}
+    .check{color:#15803d;font-weight:900;font-size:13px}
+    .cross{color:#c8102e;font-weight:900;font-size:13px}
+    .warn-tag{color:#d97706;font-weight:700;font-size:10px}
+
+    /* skills grid */
+    .skills-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:12px}
+    .skill-card{border:2px solid #111;padding:10px 12px;background:#fff;display:grid;gap:4px}
+    .skill-card h4{font-size:11.5px;font-weight:900;color:#1f63ff;text-transform:uppercase;letter-spacing:.07em}
+    .skill-card p{font-size:11px;color:#444;line-height:1.5}
+
+    /* steps flow */
+    .steps{display:flex;margin-bottom:12px;border:2px solid #111}
+    .step{flex:1;padding:10px 10px 8px;border-right:2px solid #111;position:relative}
+    .step:last-child{border-right:none}
+    .step-n{font-size:20px;font-weight:900;color:#1f63ff;line-height:1}
+    .step-label{font-size:10px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+    .step.active{background:#1f63ff;color:#fff}
+    .step.active .step-n,.step.active .step-label{color:#fff}
+
+    /* code blocks */
+    pre{background:#111;color:#e8e8e8;padding:11px 13px;border-radius:6px;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto;margin-bottom:12px;border:2px solid #111}
+    code{font-family:ui-monospace,monospace;font-size:11.5px;background:#eef4ff;padding:1px 5px;border-radius:3px;color:#0036a3}
+    .cmd{display:block;background:#0a0a0a;color:#a8d8ff;padding:9px 12px;border-radius:5px;font-size:11px;font-family:ui-monospace,monospace;margin-bottom:10px;border-left:4px solid #1f63ff}
+
+    /* multi-agent flow */
+    .ma-flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;border:2px solid #111;background:#fff;padding:14px;margin-bottom:12px}
+    .ma-step{border:2px solid #1f63ff;padding:9px 10px;display:grid;gap:3px}
+    .ma-step h4{font-size:11px;font-weight:900;color:#1f63ff;text-transform:uppercase;letter-spacing:.06em}
+    .ma-step p{font-size:10.5px;color:#555;line-height:1.45}
+    .ma-arrow{font-size:16px;color:#1f63ff;font-weight:900;display:flex;align-items:center;justify-content:center}
+
+    /* warning */
+    .warn{border-left:4px solid #d80018;padding:9px 12px;background:#fde9eb;margin-bottom:12px;font-size:12px;line-height:1.6}
+    .warn strong{color:#d80018}
+    .note{border-left:4px solid #1f63ff;padding:9px 12px;background:#eef4ff;margin-bottom:12px;font-size:12px;line-height:1.6}
+    .note strong{color:#1f63ff}
+
+    /* agents table */
+    .agent-row{display:grid;grid-template-columns:100px 1fr;gap:0;border:2px solid #111;margin-bottom:8px;background:#fff}
+    .agent-name{padding:8px 10px;border-right:2px solid #111;background:#1f63ff;color:#fff;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center}
+    .agent-desc{padding:8px 10px;font-size:11.5px;color:#333;line-height:1.5}
+
+    /* chips */
+    .chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .chip{padding:3px 8px;border:1.5px solid #111;font-size:10px;font-weight:700}
+    .chip.blue{border-color:#1f63ff;color:#1f63ff;background:#eef4ff}
+
+    /* footer */
+    footer{text-align:center;padding:16px 0 0;font-size:11px;color:#666;border-top:2px solid #111;margin-top:16px}
+    a{color:#1f63ff;text-decoration:underline}
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<div class="hero" style="margin-bottom:14px">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">AgriciDaniel / claude-obsidian · MIT License</div>
+    <h1 class="demo-title">Obsidian 自主知识中枢</h1>
+    <p class="subtitle">Karpathy LLM Wiki 工业级开源实现——连接 Claude Code / Codex / Gemini 到 Obsidian 本地知识库，Multi-Agent 事务提交（SHA-256）、Source &amp; Claim Ledger、15+ Agent Skills，纯 Markdown+JSON，你永远拥有自己的数据。</p>
+    <div class="badge-row">
+      <span class="badge blue">LLM Wiki</span>
+      <span class="badge red">Multi-Agent TX</span>
+      <span class="badge green">Local-First</span>
+      <span class="badge">SHA-256 验证</span>
+      <span class="badge">BM25 检索</span>
+      <span class="badge">Canvas 可视化</span>
+    </div>
+  </div>
+  <div class="hero-visual" style="grid-column:1/-1;padding:12px 18px 14px;border-top:3px solid #111;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <img class="loop-img" src="https://raw.githubusercontent.com/AgriciDaniel/claude-obsidian/main/assets/diagrams/knowledge-loop.svg" alt="claude-obsidian knowledge loop" onerror="this.style.display='none'">
+    <div style="flex:1;min-width:200px">
+      <div class="chips">
+        <span class="chip blue">Claude Code 接入</span>
+        <span class="chip blue">Codex 接入</span>
+        <span class="chip blue">Gemini 接入</span>
+        <span class="chip blue">15+ Skills</span>
+        <span class="chip blue">AutoResearch</span>
+      </div>
+      <p style="font-size:11.5px;color:#444;margin-top:6px">来源：X @AISuperDomain · <a href="https://x.com/AISuperDomain/status/2091472259315630129">2091472259315630129</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- WHAT IS IT -->
+<section>
+  <h2>■ 核心概念：LLM Wiki 与 Karpathy 起源</h2>
+  <div class="intro-grid">
+    <div class="intro-item">
+      <h3>什么是 LLM Wiki？</h3>
+      <p>一种让 LLM 自主维护、扩展和查询本地知识库的架构模式。LLM 不是在对话中临时生成答案，而是把知识固化到可验证的 Markdown 页面，并维护可溯源的 Source &amp; Claim Ledger。</p>
+    </div>
+    <div class="intro-item">
+      <h3>Karpathy 的开创性</h3>
+      <p>Andrej Karpathy 在 2022 年提出的 "LLM Wiki" 概念（见 <a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">karpathy/gist</a>），核心思路：用 LLM 构建、管理、查询自建知识库，使 AI 成为真正的第二大脑，而非一次性聊天。</p>
+    </div>
+    <div class="intro-item">
+      <h3>claude-obsidian 的工业级实现</h3>
+      <p>在 Karpathy 原型基础上，claude-obsidian 加入了 Multi-Agent 事务机制（SHA-256 写验证）、Source &amp; Claim Ledger（高风险声明双源）、BM25 回退语义检索、15+ Agent Skills、Obsidian Canvas 可视化面板。</p>
+    </div>
+    <div class="intro-item">
+      <h3>本地优先存储</h3>
+      <p>纯 Markdown + JSON 格式，所有内容存储在你的 Obsidian Vault 中。无插件缓存、无云数据库、无静默上传。JSON 用于事务元数据（Source Ledger、Claim Ledger、事务 ID），Markdown 用于知识页面本身。</p>
+    </div>
+  </div>
+</section>
+
+<!-- CAPABILITY MATRIX -->
+<section>
+  <h2>■ 能力矩阵</h2>
+  <table>
+    <tr><th>能力</th><th>状态</th><th>说明</th></tr>
+    <tr><td>本地文件系统源捕获</td><td class="check">✓ 实现</td><td>有界、内容寻址字节捕获</td></tr>
+    <tr><td>Markdown + JSON 本地存储</td><td class="check">✓ 实现</td><td>Vault 即普通文件目录</td></tr>
+    <tr><td>Multi-Agent 事务提交（SHA-256）</td><td class="check">✓ 实现</td><td>并行 workers → 单次可检查事务</td></tr>
+    <tr><td>Source &amp; Claim Ledger</td><td class="check">✓ 实现</td><td>权威性/新鲜度/矛盾/置信度记录</td></tr>
+    <tr><td>BM25 语义检索（回退）</td><td class="check">✓ 实现</td><td>确定性，无需外部模型</td></tr>
+    <tr><td>15+ Agent Skills</td><td class="check">✓ 实现</td><td>wiki / save / wiki-ingest / wiki-query / wiki-lint / autoresearch / canvas / defuddle / wiki-fold / wiki-mode / wiki-retrieve / wiki-cli 等</td></tr>
+    <tr><td>Obsidian Canvas 可视化</td><td class="check">✓ 实现</td><td>知识地图、工作流面板</td></tr>
+    <tr><td>Claude Code 插件</td><td class="check">✓ 实现</td><td>命名空间调用 /claude-obsidian:wiki</td></tr>
+    <tr><td>Codex / OpenCode 接入</td><td class="check">✓ 实现</td><td>bin/setup-multi-agent.sh</td></tr>
+    <tr><td>Gemini 接入</td><td class="check">✓ 实现</td><td>GEMINI.md 指南</td></tr>
+    <tr><td>高风险声明双源验证</td><td class="check">✓ 实现</td><td>矛盾证据保留，拒绝虚构引用</td></tr>
+    <tr><td>PDF / EPUB 元数据</td><td class="check">✓ 实现</td><td>哈希、大小、维度</td></tr>
+    <tr><td>OCR 支持</td><td><span class="warn-tag">需外部 Runner</span></td><td>需配置外部 OCR runner</td></tr>
+    <tr><td>远程 embedding 检索</td><td><span class="warn-tag">可选</span></td><td>需明确出口流量授权</td></tr>
+  </table>
+</section>
+
+<!-- MULTI-AGENT TRANSACTION -->
+<section>
+  <h2>■ Multi-Agent 事务提交（SHA-256 验证）</h2>
+  <div class="ma-flow">
+    <div class="ma-step">
+      <h4>Step 1 · 读源</h4>
+      <p>读取所有目标文件，预先记录每个文件的预期 SHA-256 哈希</p>
+    </div>
+    <div class="ma-step">
+      <h4>Step 2 · Worker 并行</h4>
+      <p>并行 workers 返回草稿和证据（不直接写 vault）</p>
+    </div>
+    <div class="ma-step">
+      <h4>Step 3 · Merge</h4>
+      <p>将完整变更合并为一个操作包（operation bundle）</p>
+    </div>
+    <div class="ma-step">
+      <h4>Step 4 · 检查</h4>
+      <p>检查操作包，SHA-256 验证变更前的文件哈希</p>
+    </div>
+    <div class="ma-step">
+      <h4>Step 5 · Apply</h4>
+      <p>一次性应用变更，写入 vault，报告操作 ID 和变更路径</p>
+    </div>
+  </div>
+  <div class="warn"><strong>事务保证：</strong>核心持有单一进程生命周期 vault 锁，日志化备份，原子替换。如果 apply 无法完成则回滚到之前状态。变更目标 = 冲突，从不静默覆盖。Git checkpoints、破坏性修复、出口流量、权威研究合并均为显式操作。</div>
+  <div class="note"><strong>Source &amp; Claim Ledger：</strong>每个声明记录权威性（Authority）、新鲜度（Freshness）、支持（Support）、矛盾（Contradiction）、置信度（Confidence）和审查状态（Review State）。高风险声明要求两个独立来源。</div>
+</section>
+
+<!-- 15+ AGENT SKILLS -->
+<section>
+  <h2>■ 15+ Agent Skills</h2>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-bottom:12px">
+    <div class="agent-row"><div class="agent-name">wiki</div><div class="agent-desc">初始化或接管 vault，诊断就绪状态，路由工作流</div></div>
+    <div class="agent-row"><div class="agent-name">save</div><div class="agent-desc">保存一个限定答案或洞察——从不自动转录</div></div>
+    <div class="agent-row"><div class="agent-name">wiki-ingest</div><div class="agent-desc">将捕获的源转换为链接页面和溯源记录</div></div>
+    <div class="agent-row"><div class="agent-name">wiki-query</div><div class="agent-desc">从相关 vault 证据中读取答案</div></div>
+    <div class="agent-row"><div class="agent-name">wiki-lint</div><div class="agent-desc">报告死链、孤儿、元数据缺口、过期索引、空段落</div></div>
+    <div class="agent-row"><div class="agent-name">autoresearch</div><div class="agent-desc">有界 Web 研究，有显式出口流量和独立权威合并</div></div>
+    <div class="agent-row"><div class="agent-name">canvas</div><div class="agent-desc">Wiki 范围的 Obsidian Canvas 创建与维护</div></div>
+    <div class="agent-row"><div class="agent-name">defuddle</div><div class="agent-desc">在摄入前清洗网页内容为可读文本</div></div>
+    <div class="agent-row"><div class="agent-name">wiki-fold</div><div class="agent-desc">操作日志的可追踪提取汇总</div></div>
+    <div class="agent-row"><div class="agent-name">wiki-mode</div><div class="agent-desc">通用、LYT、PARA 或 Zettelkasten 分类约定</div></div>
+    <div class="agent-row"><div class="agent-name">wiki-retrieve</div><div class="agent-desc">上下文前缀 + BM25 + 可选余弦重排</div></div>
+    <div class="agent-row"><div class="agent-name">wiki-cli</div><div class="agent-desc">Obsidian CLI 读取搜索 + 事务安全写入</div></div>
+    <div class="agent-row"><div class="agent-name">obsidian-markdown</div><div class="agent-desc">正确 Obsidian 风味 Markdown、链接、嵌入、callouts</div></div>
+    <div class="agent-row"><div class="agent-name">obsidian-bases</div><div class="agent-desc">原生 .base 表格、卡片、过滤器、公式、汇总</div></div>
+    <div class="agent-row"><div class="agent-name">think</div><div class="agent-desc">结构化观察→倾听→连接→创造→成长回顾循环</div></div>
+  </div>
+
+  <div class="warn"><strong>BM25 回退语义检索：</strong>当 embedding 或重排阶段无法信任时，模型检索自动回退到确定性 BM25。不依赖外部 embedding 服务。</div>
+</section>
+
+<!-- INTEGRATION METHODS -->
+<section>
+  <h2>■ Claude Code / Codex / Gemini 接入方式</h2>
+
+  <h3 style="font-size:12px;font-weight:900;color:#1f63ff;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em">Claude Code</h3>
+  <div class="cmd">claude --plugin-dir /absolute/path/to/claude-obsidian</div>
+  <div style="font-size:12px;color:#333;margin-bottom:10px;line-height:1.6">进入 vault 后用命名空间调用：<code>/claude-obsidian:wiki</code> 初始化 → <code>/claude-obsidian:wiki-ingest</code> 摄入源 → <code>/claude-obsidian:save</code> 保存答案 → <code>/claude-obsidian:wiki-query</code> 查询。</div>
+
+  <h3 style="font-size:12px;font-weight:900;color:#1f63ff;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em">Codex / OpenCode</h3>
+  <div class="cmd">bash bin/setup-multi-agent.sh --host codex
+bash bin/setup-multi-agent.sh --host codex --apply</div>
+  <div style="font-size:12px;color:#333;margin-bottom:10px;line-height:1.6">预览并应用 portable skill links，参考 <code>GEMINI.md</code> 文档对 Gemini 主机执行相同流程。</div>
+
+  <h3 style="font-size:12px;font-weight:900;color:#1f63ff;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em">Cursor / Windsurf</h3>
+  <div style="font-size:12px;color:#333;margin-bottom:10px;line-height:1.6">使用 workspace-local skill 发现机制，按 <code>docs/install-guide.md</code> 进行 marketplace 设置。所有支持主机的详细安装步骤均在该指南中。</div>
+
+  <h3 style="font-size:12px;font-weight:900;color:#1f63ff;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em">Gemini</h3>
+  <div class="cmd">bash bin/setup-multi-agent.sh --host gemini --apply</div>
+  <div style="font-size:12px;color:#333;line-height:1.6">参考仓库根目录 <code>GEMINI.md</code> 获取完整接入指南。</div>
+</section>
+
+<!-- INSTALLATION -->
+<section>
+  <h2>■ 安装与快速开始</h2>
+  <div class="steps" style="margin-bottom:12px">
+    <div class="step active"><div class="step-n">1</div><div class="step-label">克隆</div></div>
+    <div class="step"><div class="step-n">2</div><div class="step-label">初始化 Vault</div></div>
+    <div class="step"><div class="step-n">3</div><div class="step-label">打开 Obsidian</div></div>
+    <div class="step"><div class="step-n">4</div><div class="step-label">运行 Claude</div></div>
+  </div>
+
+  <pre>git clone https://github.com/AgriciDaniel/claude-obsidian.git
+cd claude-obsidian</pre>
+
+  <h3 style="font-size:12px;font-weight:900;color:#1f63ff;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em">初始化独立 Vault（推荐）</h3>
+  <pre>export GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+export OPERATION_ID="init-reviewed"
+
+# 预览操作计划
+python3 scripts/claude-obsidian.py init "$HOME/Documents/MyKnowledgeVault" \
+  --generated-at "$GENERATED_AT" --operation-id "$OPERATION_ID"
+
+# 审查 JSON 计划，复制 approved_plan_sha256，然后应用
+python3 scripts/claude-obsidian.py init "$HOME/Documents/MyKnowledgeVault" \
+  --generated-at "$GENERATED_AT" --operation-id "$OPERATION_ID" \
+  --approved-plan-sha256 "&lt;sha256-from-the-plan&gt;" --apply</pre>
+
+  <h3 style="font-size:12px;font-weight:900;color:#1f63ff;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em">启动 Claude Code</h3>
+  <pre>cd "$HOME/Documents/MyKnowledgeVault"
+claude --plugin-dir /absolute/path/to/claude-obsidian</pre>
+
+  <div class="note"><strong>信任边界：</strong>产品从不将源代码 checkout、插件缓存或贡献者状态视为默认 vault。Vault 通过 <code>CLAUDE_OBSIDIAN_VAULT</code>、最近的 <code>.claude-obsidian.json</code> 或一个明确的初始化祖先目录来显式选择。Vault 选择不确定时，命令退出不写入。</div>
+
+  <div class="warn"><strong>平台要求：</strong>Python 3.11+（核心）；Obsidian（视觉体验，可选）；Bash（安装脚本和测试套件）；Git（仅用于开发/发布/显式知识检查点）。Native Windows 需 WSL 执行 vault 写入操作。</div>
+</section>
+
+<!-- SKILL REFERENCE -->
+<section>
+  <h2>■ wiki-mode 方法论模式</h2>
+  <table style="margin-bottom:12px">
+    <tr><th>模式</th><th>分类原则</th></tr>
+    <tr><td><strong>Generic</strong></td><td>Sources / Concepts / Entities / Sessions（默认）</td></tr>
+    <tr><td><strong>LYT</strong></td><td>Maps of Content + 链接原子笔记</td></tr>
+    <tr><td><strong>PARA</strong></td><td>Projects / Areas / Resources / Archives</td></tr>
+    <tr><td><strong>Zettelkasten</strong></td><td>稳定标识符 + 原子笔记 + 密集链接</td></tr>
+  </table>
+  <div style="font-size:12px;color:#555;line-height:1.6">切换模式改变新笔记的路由方式，不静默重组旧笔记。参考 <code>docs/methodology-modes-guide.md</code>。</div>
+</section>
+
+<!-- REPO INFO -->
+<section>
+  <h2>■ 仓库信息</h2>
+  <div style="border:2px solid #111;background:#fff;padding:14px;margin-bottom:12px;display:grid;gap:8px">
+    <div style="display:grid;grid-template-columns:90px 1fr;gap:6px;font-size:12px">
+      <span style="font-weight:900;color:#1f63ff">仓库</span><span><a href="https://github.com/AgriciDaniel/claude-obsidian">AgriciDaniel/claude-obsidian</a></span>
+      <span style="font-weight:900;color:#1f63ff">协议</span><span>MIT License</span>
+      <span style="font-weight:900;color:#1f63ff">版本</span><span>v2.1.0</span>
+      <span style="font-weight:900;color:#1f63ff">核心依赖</span><span>Python 3.11+ · Obsidian（可选）· Bash · Git</span>
+      <span style="font-weight:900;color:#1f63ff">参考架构</span><span><a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">Karpathy LLM Wiki gist</a> · <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a></span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>claude-obsidian 信息卡 · 基于 <a href="https://github.com/AgriciDaniel/claude-obsidian">AgriciDaniel/claude-obsidian</a> · X 来源：<a href="https://x.com/AISuperDomain/status/2091472259315630129">@AISuperDomain</a></p>
+  <p style="margin-top:4px">数据来源：X post 2091472259315630129 · README.md (main) · SKILLS.md · 仓库文件结构 API</p>
+</footer>
+
+</div>
+</body>
+</html>
