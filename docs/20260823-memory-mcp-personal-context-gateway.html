@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memory-MCP · 个人上下文网关 — 25工具本地知识中枢</title>
+  <meta name="description" content="Shaktisinhchavda/memory-mcp：本地优先个人上下文 MCP 网关，接入笔记/浏览器历史/代码活动/Claude&ChatGPT导出/日历；ChromaDB语义搜索 + Neo4j知识图谱 + FastAPI+LangGraph 统一网关，25工具，含 semantic_search/graph_search/save_note/incremental indexing。">
+  <link rel="stylesheet" href="../theme/darkblue.html">
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+    }
+    html,body{margin:0;overflow-x:hidden;background:var(--bg)}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;color:var(--ink);font-size:12.5px;line-height:1.65}
+    a{color:var(--cyan);text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:48px 0 80px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,255,255,.04) 0,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.03) 0,transparent 1px);background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08),0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{font-size:clamp(34px,5.6vw,68px);font-weight:900;line-height:1.08;letter-spacing:-.04em;color:#fff;margin:0}
+    .desc{font-size:13.5px;color:var(--muted);line-height:1.7;margin:0}
+    .hero-stat{display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+    .stat-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+    .stat-row:last-child{border-bottom:none}
+    .stat-label{font:700 10px/1 ui-monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+    .stat-value{font:800 12px/1 ui-monospace;color:var(--cyan)}
+    .stat-value.green{color:var(--green)}.stat-value.yellow{color:var(--yellow)}.stat-value.purple{color:var(--purple)}
+    .divider{height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent);margin:0 0 14px}
+    .section{margin-bottom:18px}
+    .section-title{font:800 10px/1 ui-monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+    .section-title::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+    .grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+    .card-title{font:800 11px/1.3 ui-monospace;color:var(--ink);margin-bottom:6px}
+    .card-desc{font-size:11.5px;color:var(--muted);line-height:1.65}
+    .quote{background:var(--panel-2);border:1px solid rgba(88,195,255,.2);border-left:3px solid var(--cyan);border-radius:10px;padding:14px 16px;margin-bottom:14px;font-size:12px;color:var(--ink);line-height:1.8}
+    .quote cite{display:block;font:700 10px/1 ui-monospace;color:var(--cyan);margin-bottom:4px;letter-spacing:.08em}
+    .tool-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-bottom:18px}
+    .tool-tag{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;background:rgba(88,195,255,.08);border:1px solid rgba(88,195,255,.18);border-radius:6px;font:700 10px/1 ui-monospace;color:var(--cyan);letter-spacing:.06em}
+    .tool-tag.purple{background:rgba(132,89,255,.08);border-color:rgba(132,89,255,.18);color:var(--purple)}
+    .tool-tag.green{background:rgba(45,179,106,.08);border-color:rgba(45,179,106,.18);color:var(--green)}
+    .tool-tag.yellow{background:rgba(244,200,76,.08);border-color:rgba(244,200,76,.18);color:var(--yellow)}
+    .arch-box{background:var(--panel);border:1px solid rgba(88,195,255,.18);border-radius:14px;padding:18px;margin-bottom:14px;font-size:11px;overflow-x:auto}
+    .arch-box pre{margin:0;font:700 10px/1.7 ui-monospace;color:var(--cyan);white-space:pre}
+    .arch-box .comment{color:var(--muted)}
+    .arch-box .key{color:var(--yellow)}
+    .arch-box .val{color:var(--green)}
+    .table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);margin-bottom:18px}
+    table{width:100%;border-collapse:collapse;font-size:11.5px}
+    th{background:var(--panel-2);padding:9px 12px;text-align:left;font:800 10px/1 ui-monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);white-space:nowrap}
+    td{padding:8px 12px;border-bottom:1px solid var(--line);color:var(--ink);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+    tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+    .q{background:rgba(88,195,255,.07);border:1px solid rgba(88,195,255,.15);border-radius:8px;padding:9px 12px;margin-bottom:8px;font-weight:700;color:var(--ink);font-size:12px}
+    .a{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin-bottom:12px;color:var(--muted);font-size:11.5px;line-height:1.7}
+    .footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding-top:16px;border-top:1px solid var(--line);margin-top:4px}
+    .footer a{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(88,195,255,.1);border:1px solid rgba(88,195,255,.25);border-radius:8px;font:700 11px/1 ui-monospace;color:var(--cyan);letter-spacing:.05em;transition:background .2s}
+    .footer a:hover{background:rgba(88,195,255,.18)}
+    .brand{font:900 11px/1 ui-monospace;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+    .visual-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font:700 10px/1 ui-monospace;letter-spacing:.1em;text-transform:uppercase}
+    .badge-mcp{background:rgba(45,179,106,.15);border:1px solid rgba(45,179,106,.35);color:var(--green)}
+    .badge-local{background:rgba(88,195,255,.1);border:1px solid rgba(88,195,255,.25);color:var(--cyan)}
+    .badge-neo4j{background:rgba(132,89,255,.1);border:1px solid rgba(132,89,255,.25);color:var(--purple)}
+    @media(max-width:768px){
+      .hero{grid-template-columns:1fr}
+      .hero-stat{order:-1}
+      .title{font-size:clamp(28px,9vw,48px);line-height:1.1}
+      .grid-3,.tool-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="hero-bar"></div>
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker">🤖 MCP · Local-First · 2026</span>
+        <span class="source">github.com/Shaktisinhchavda/memory-mcp · MIT</span>
+      </div>
+      <h1 class="title">Memory-MCP<br>个人上下文网关</h1>
+      <p class="desc">本地优先 MCP 网关，把你的笔记、浏览器历史、代码活动、Claude/ChatGPT 导出对话和日历全部打通——让 AI Agent 接入后立刻「认识你」。ChromaDB 语义搜索 + Neo4j 知识图谱 + FastAPI + LangGraph，25 工具，开箱即用。</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <span class="visual-badge badge-mcp">✓ stdio MCP</span>
+        <span class="visual-badge badge-local">✓ 100% 本地</span>
+        <span class="visual-badge badge-neo4j">Neo4j · ChromaDB</span>
+      </div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-row"><span class="stat-label">GitHub</span><span class="stat-value">Shaktisinhchavda</span></div>
+      <div class="stat-row"><span class="stat-label">License</span><span class="stat-value green">MIT</span></div>
+      <div class="stat-row"><span class="stat-label">Language</span><span class="stat-value purple">Python 3.11+</span></div>
+      <div class="stat-row"><span class="stat-label">Tools</span><span class="stat-value yellow">25</span></div>
+      <div class="stat-row"><span class="stat-label">MCP Servers</span><span class="stat-value">6</span></div>
+      <div class="stat-row"><span class="stat-label">Data Sources</span><span class="stat-value green">6</span></div>
+      <div class="stat-row"><span class="stat-label">Vector DB</span><span class="stat-value purple">ChromaDB</span></div>
+      <div class="stat-row"><span class="stat-label">Graph DB</span><span class="stat-value purple">Neo4j</span></div>
+      <div class="stat-row"><span class="stat-label">Gateway</span><span class="stat-value yellow">FastAPI + LangGraph</span></div>
+      <div class="stat-row"><span class="stat-label">Cloud API</span><span class="stat-value green">✗ None</span></div>
+      <div class="stat-row"><span class="stat-label">隐私</span><span class="stat-value green">✓ 100% 本地优先</span></div>
+      <div class="stat-row"><span class="stat-label">索引</span><span class="stat-value yellow">增量索引</span></div>
+    </div>
+  </div>
+  <div class="divider"></div>
+
+  <div class="section">
+    <div class="section-title">📌 项目定位</div>
+    <div class="quote">
+      <cite>X @the_osps · Personal Context Gateway</cite>
+      A modular, local-first infrastructure that exposes your personal data — files, notes, browser history, code activity, conversations — as unified semantic context via the Model Context Protocol (MCP). Any AI agent can plug into this and instantly know you.
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">🎯 解决的问题</div>
+        <div class="card-desc">每个 AI Agent 都要重新了解用户背景，token 浪费严重、上下文噪声大。Memory-MCP 把个人数据统一索引，Agent 接入即「懂你」。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔧 技术路径</div>
+        <div class="card-desc">ChromaDB 向量语义搜索 + Neo4j 知识图谱双引擎，LangGraph 统一编排多源查询，FastAPI HTTP 网关 + MCP stdio 双入口。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🛡️ 隐私保证</div>
+        <div class="card-desc">100% 本地运行，无需任何云 API。嵌入、搜索、图谱全在本地处理。数据目录 git-ignored，凭证文件永不提交。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">⚡ 25 工具速览（6 个 MCP Server）</div>
+    <div class="tool-grid">
+      <span class="tool-tag">read_notes</span>
+      <span class="tool-tag">semantic_search</span>
+      <span class="tool-tag">save_note</span>
+      <span class="tool-tag">append_note</span>
+      <span class="tool-tag">get_recent_activity</span>
+      <span class="tool-tag">index_stats</span>
+      <span class="tool-tag purple">read_local_file</span>
+      <span class="tool-tag purple">list_local_files</span>
+      <span class="tool-tag purple">search_local_files</span>
+      <span class="tool-tag green">recent_browsing_history</span>
+      <span class="tool-tag green">search_browsing_history</span>
+      <span class="tool-tag green">most_visited_sites</span>
+      <span class="tool-tag green">browsing_stats</span>
+      <span class="tool-tag green">detected_browsers</span>
+      <span class="tool-tag yellow">recent_commits</span>
+      <span class="tool-tag yellow">commit_details</span>
+      <span class="tool-tag yellow">git_status</span>
+      <span class="tool-tag yellow">repo_statistics</span>
+      <span class="tool-tag yellow">vscode_recent</span>
+      <span class="tool-tag">list_conversation_exports</span>
+      <span class="tool-tag">read_conversations</span>
+      <span class="tool-tag">search_in_conversations</span>
+      <span class="tool-tag">upcoming_events</span>
+      <span class="tool-tag">todays_schedule</span>
+      <span class="tool-tag">search_events</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🏗️ 架构图</div>
+    <div class="arch-box">
+<pre>┌─────────────────────────────────────────────────────┐
+│         Unified Gateway  <span class="comment">:8000</span>                    │
+│   FastAPI + LangGraph  analyze→execute→aggregate    │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │  Core MCP │ │ Files MCP │ │   Browser MCP    │   │
+│  │ notes/search│ │ PDF/DOCX  │ │ Chrome/Edge/Firefox│ │
+│  │save/write  │ │           │ │                  │   │
+│  └──────────┘ └──────────┘ └──────────────────┘   │
+│                                                     │
+│  ┌──────────────────┐  ┌──────────────────────┐   │
+│  │ Conversations MCP │  │  Knowledge Graph MCP  │   │
+│  │Claude/ChatGPT JSON│  │ Entity extraction    │   │
+│  │ export search     │  │ Neo4j graph search   │   │
+│  └──────────────────┘  └──────────────────────┘   │
+│                                                     │
+│  ┌────────────┐ ┌────────────────────────────┐    │
+│  │  Code MCP  │  │     Calendar MCP          │    │
+│  │Git/VSCode  │  │ Google Calendar OAuth     │    │
+│  └────────────┘  └────────────────────────────┘    │
+├─────────────────────────────────────────────────────┤
+│   ChromaDB (vectors)  │  Neo4j (graph)  │ SQLite   │
+└─────────────────────────────────────────────────────┘</pre>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔍 6 大数据源详情</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>数据源</th>
+            <th>工具数</th>
+            <th>技术实现</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>📝 笔记</b></td>
+            <td>6</td>
+            <td>ChromaDB + sentence-transformers</td>
+            <td>语义搜索、本地增量索引、写回笔记</td>
+          </tr>
+          <tr>
+            <td><b>📁 本地文件</b></td>
+            <td>3</td>
+            <td>PDF/DOCX/TXT reader</td>
+            <td>按需读取磁盘任意文件</td>
+          </tr>
+          <tr>
+            <td><b>🌐 浏览器历史</b></td>
+            <td>5</td>
+            <td>Chrome / Edge / Firefox 浏览器检测</td>
+            <td>自动检测已安装浏览器，查询历史记录</td>
+          </tr>
+          <tr>
+            <td><b>💻 代码活动</b></td>
+            <td>5</td>
+            <td>Git + VSCode recent files API</td>
+            <td>commit 历史、仓库统计、最近打开文件</td>
+          </tr>
+          <tr>
+            <td><b>💬 对话导出</b></td>
+            <td>3</td>
+            <td>Claude / ChatGPT JSON 解析</td>
+            <td>导出 JSON 后放入 data/conversations/</td>
+          </tr>
+          <tr>
+            <td><b>📅 日历</b></td>
+            <td>3</td>
+            <td>Google Calendar OAuth 2.0</td>
+            <td>一次性 Google Cloud 配置后自动运行</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🧠 知识图谱特性</div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">🔎 graph_search</div>
+        <div class="card-desc">查询实体及其所有关联关系，在 Neo4j 图谱中检索命名实体（人物、技术、项目、主题）。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔗 find_connection</div>
+        <div class="card-desc">找两个实体间的最短路径，理解概念之间的关联距离。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 graph_stats</div>
+        <div class="card-desc">查看节点/关系统计，了解知识图谱的规模与覆盖度。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🧬 ingest_file</div>
+        <div class="card-desc">将文件内容提取为实体后写入 Neo4j，支持正则结构化抽取（无需 LLM）。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">👤 实体识别</div>
+        <div class="card-desc">正则 + 模式匹配：识别人名（大小写规则）、技术词（56 个关键词库）、主题（MD 标题）、项目名、任务（checkbox）。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📈 增量图谱</div>
+        <div class="card-desc">增量索引：只处理新增或修改文件，不做全量重建，manifest 记录文件修改时间。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🚀 快速上手</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>步骤</th><th>命令</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1. 克隆安装</td><td><code>git clone https://github.com/Shaktisinhchavda/memory-mcp.git && cd memory-mcp && uv sync</code></td><td>需要 uv 包管理器</td></tr>
+          <tr><td>2. 配置</td><td><code>cp .env.example .env</code></td><td>默认配置开箱即用</td></tr>
+          <tr><td>3. 添加笔记</td><td><code>echo "# My Ideas" &gt; data/notes/ideas.md</code></td><td>放入 Markdown 笔记</td></tr>
+          <tr><td>4. 索引笔记</td><td><code>uv run python scripts/index_notes.py</code></td><td>增量索引到 ChromaDB</td></tr>
+          <tr><td>5. 启动图谱</td><td><code>docker compose up -d</code></td><td>运行 Neo4j 容器</td></tr>
+          <tr><td>6. 构建图谱</td><td><code>uv run python scripts/build_graph.py</code></td><td>从笔记提取实体到 Neo4j</td></tr>
+          <tr><td>7. 运行 MCP</td><td><code>uv run python core_mcp/server.py</code></td><td>MCP stdio 服务（Claude Desktop 用）</td></tr>
+          <tr><td>8. HTTP 网关</td><td><code>uv run uvicorn gateway.server:app --port 8000</code></td><td>FastAPI HTTP 网关，Swagger 文档在 /docs</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🎛️ Claude Desktop 配置</div>
+    <div class="arch-box">
+<pre>{
+  <span class="key">"mcpServers"</span>: {
+    <span class="key">"memory-mcp"</span>: { <span class="key">"command"</span>: <span class="val">"uv"</span>, <span class="key">"args"</span>: [<span class="val">"--directory"</span>, <span class="val">"/path/to/memory-mcp"</span>, <span class="val">"run"</span>, <span class="val">"python"</span>, <span class="val">"core_mcp/server.py"</span>] },
+    <span class="key">"files-mcp"</span>:       { <span class="key">"command"</span>: <span class="val">"uv"</span>, <span class="key">"args"</span>: [<span class="val">"--directory"</span>, <span class="val">"/path/to/memory-mcp"</span>, <span class="val">"run"</span>, <span class="val">"python"</span>, <span class="val">"connectors/files_mcp/server.py"</span>] },
+    <span class="key">"browser-mcp"</span>:     { <span class="key">"command"</span>: <span class="val">"uv"</span>, <span class="key">"args"</span>: [<span class="val">"--directory"</span>, <span class="val">"/path/to/memory-mcp"</span>, <span class="val">"run"</span>, <span class="val">"python"</span>, <span class="val">"connectors/browser_mcp/server.py"</span>] },
+    <span class="key">"code-mcp"</span>:        { <span class="key">"command"</span>: <span class="val">"uv"</span>, <span class="key">"args"</span>: [<span class="val">"--directory"</span>, <span class="val">"/path/to/memory-mcp"</span>, <span class="val">"run"</span>, <span class="val">"python"</span>, <span class="val">"connectors/code_mcp/server.py"</span>] },
+    <span class="key">"conversations-mcp"</span>:{ <span class="key">"command"</span>: <span class="val">"uv"</span>, <span class="key">"args"</span>: [<span class="val">"--directory"</span>, <span class="val">"/path/to/memory-mcp"</span>, <span class="val">"run"</span>, <span class="val">"python"</span>, <span class="val">"connectors/conversations_mcp/server.py"</span>] },
+    <span class="key">"graph-mcp"</span>:       { <span class="key">"command"</span>: <span class="val">"uv"</span>, <span class="key">"args"</span>: [<span class="val">"--directory"</span>, <span class="val">"/path/to/memory-mcp"</span>, <span class="val">"run"</span>, <span class="val">"python"</span>, <span class="val">"knowledge_graph/server.py"</span>] }
+  }
+}</pre>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">❓ FAQ</div>
+    <div class="q">Q: 和其他 Memory MCP 有什么不同？</div>
+    <div class="a">不是单一功能 MCP，而是个人数据全链路整合平台。25 工具 + 6 种数据源 + 统一 LangGraph 网关，从笔记语义搜索到知识图谱路径查找全覆盖。</div>
+    <div class="q">Q: 是否需要云服务？</div>
+    <div class="a">完全不需要。嵌入模型（sentence-transformers）、ChromaDB、Neo4j 全在本地运行。唯一可选的是 Google Calendar OAuth（一次性配置）。</div>
+    <div class="q">Q: 支持实时同步对话吗？</div>
+    <div class="a">不支持实时同步。Claude 和 ChatGPT 需要导出 JSON 后放入 data/conversations/ 目录。README 说明了这是 API 限制导致的导出依赖。</div>
+    <div class="q">Q: 增量索引是怎么工作的？</div>
+    <div class="a">scripts/index_notes.py 和 scripts/build_graph.py 维护 manifest 文件记录每个文件的修改时间，只有新增或变化的文件才会被重新处理。使用 --force 可以强制全量重建。</div>
+    <div class="q">Q: 实体抽取准确吗？</div>
+    <div class="a">当前使用正则 + 结构化模式（词数、大小写、关键词库）做启发式抽取，无需 LLM。README 建议对精度要求高的场景可替换为 spaCy NER 或 LLM 抽取器。</div>
+  </div>
+
+  <div class="footer">
+    <div class="brand">memory-mcp · 2026-05 · MIT</div>
+    <div>
+      <a href="https://github.com/Shaktisinhchavda/memory-mcp">📦 GitHub</a>
+      <a href="https://x.com/the_osps/status/2091422706109710771">🐦 X Source</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>
