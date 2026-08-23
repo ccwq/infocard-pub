@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="blue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dembrandt · 一键从任意 URL 提取设计 Token</title>
+  <meta name="description" content="dembrandt/dembrandt：开源 CLI，一键从任意 URL 提取设计 token（颜色/字体/间距/边框/阴影/动效/组件/断点/图标），支持 JSON/Tailwind/DTCG 格式、WCAG 检查与暗色模式，Playwright 渲染 + 置信度评分，MIT License。">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{overflow-x:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#111;color:#111;font-size:13px;line-height:1.6}
+    .page{width:min(1180px, calc(100% - 20px));margin:0 auto;padding:18px 0 88px}
+
+    /* hero */
+    .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:0;border:3px solid #111;background:#fff;overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:12px;background:#111;border-bottom:3px solid #111;position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:200px;background:#1f63ff}
+    .hero-copy{padding:18px 18px 14px;border-right:3px solid #111;display:grid;gap:8px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:6px;width:fit-content;border:2px solid #111;background:#fff;padding:4px 8px;font-size:10px;font-weight:900;letter-spacing:.15em;text-transform:uppercase}
+    .kicker::before{content:"■";color:#1f63ff;font-size:9px}
+    h1.demo-title{margin:0;font-size:clamp(20px,3.2vw,38px);line-height:1.05;letter-spacing:-.04em;font-weight:900}
+    .subtitle{color:#444;font-size:12.5px;line-height:1.55}
+    .badge-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+    .badge{display:inline-flex;align-items:center;min-height:26px;padding:4px 8px;border:2px solid #111;background:#fff;font-size:10px;font-weight:700}
+    .badge.blue{background:#1f63ff;color:#fff}
+    .badge.red{background:#d80018;color:#fff}
+    .badge.green{background:#15803d;color:#fff}
+    .hero-visual{padding:16px;display:grid;align-content:center;gap:8px;background:#fff}
+    .hero-visual .loop-img{width:100%;max-width:260px;display:block;border:2px solid #111}
+
+    /* sections */
+    section{padding:14px 0 0}
+    h2{font-size:14px;font-weight:900;margin:0 0 8px;color:#111;border-bottom:3px solid #1f63ff;padding-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+
+    /* intro grid */
+    .intro-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;border:2px solid #111;background:#fff;padding:14px;margin-bottom:12px}
+    .intro-item{display:grid;gap:4px}
+    .intro-item h3{font-size:12px;font-weight:900;color:#1f63ff;text-transform:uppercase;letter-spacing:.08em}
+    .intro-item p{font-size:12px;color:#333;line-height:1.55}
+
+    /* capability table */
+    table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px;border:2px solid #111}
+    th,td{padding:7px 10px;border:1.5px solid #111;text-align:left}
+    th{background:#111;color:#fff;font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}
+    tr:nth-child(even) td{background:#eef4ff}
+    .check{color:#15803d;font-weight:900;font-size:13px}
+    .cross{color:#c8102e;font-weight:900;font-size:13px}
+
+    /* features grid */
+    .feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:12px}
+    .feat-card{border:2px solid #111;padding:10px 12px;background:#fff;display:grid;gap:4px}
+    .feat-card h4{font-size:11.5px;font-weight:900;color:#1f63ff;text-transform:uppercase;letter-spacing:.07em}
+    .feat-card p{font-size:11px;color:#444;line-height:1.5}
+
+    /* steps flow */
+    .steps{display:flex;margin-bottom:12px;border:2px solid #111}
+    .step{flex:1;padding:10px 10px 8px;border-right:2px solid #111;position:relative}
+    .step:last-child{border-right:none}
+    .step-n{font-size:20px;font-weight:900;color:#1f63ff;line-height:1}
+    .step-label{font-size:10px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+    .step.active{background:#1f63ff;color:#fff}
+    .step.active .step-n,.step.active .step-label{color:#fff}
+
+    /* code blocks */
+    pre{background:#111;color:#e8e8e8;padding:11px 13px;border-radius:6px;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto;margin-bottom:12px;border:2px solid #111}
+    code{font-family:ui-monospace,monospace;font-size:11.5px;background:#eef4ff;padding:1px 5px;border-radius:3px;color:#0036a3}
+    .cmd{display:block;background:#0a0a0a;color:#a8d8ff;padding:9px 12px;border-radius:5px;font-size:11px;font-family:ui-monospace,monospace;margin-bottom:10px;border-left:4px solid #1f63ff}
+
+    /* note */
+    .note{border-left:4px solid #1f63ff;padding:9px 12px;background:#eef4ff;margin-bottom:12px;font-size:12px;line-height:1.6}
+    .note strong{color:#1f63ff}
+
+    /* warning */
+    .warn{border-left:4px solid #d80018;padding:9px 12px;background:#fde9eb;margin-bottom:12px;font-size:12px;line-height:1.6}
+    .warn strong{color:#d80018}
+
+    /* chips */
+    .chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .chip{padding:3px 8px;border:1.5px solid #111;font-size:10px;font-weight:700}
+    .chip.blue{border-color:#1f63ff;color:#1f63ff;background:#eef4ff}
+
+    /* footer */
+    footer{text-align:center;padding:16px 0 0;font-size:11px;color:#666;border-top:2px solid #111;margin-top:16px}
+    a{color:#1f63ff;text-decoration:underline}
+
+    /* mobile overrides */
+    @media(max-width:640px){
+      .hero{display:flex!important;flex-direction:column!important}
+      .hero-copy{border-right:none!important;border-bottom:3px solid #111!important}
+      .intro-grid{grid-template-columns:1fr!important}
+      .steps{flex-direction:column}
+      .step{border-right:none!important;border-bottom:2px solid #111!important}
+      .feat-grid{grid-template-columns:1fr!important}
+      .chips{flex-wrap:wrap!important}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<div class="hero" style="margin-bottom:14px">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">dembrandt / dembrandt · MIT License</div>
+    <h1 class="demo-title">dembrandt</h1>
+    <p class="subtitle">一键从任意 URL 提取完整设计 Token——颜色、字体、间距、边框、阴影、动效、组件、断点、图标，输出 JSON/Tailwind/DTCG 格式，支持 WCAG 检查与暗色模式。</p>
+    <div class="badge-row">
+      <span class="badge blue">★ 2,765</span>
+      <span class="badge green">MIT License</span>
+      <span class="badge">Playwright 渲染</span>
+      <span class="badge">Design Tokens</span>
+      <span class="badge">CLI</span>
+    </div>
+  </div>
+  <div class="hero-visual" style="grid-column:1/-1;padding:12px 18px 14px;border-top:3px solid #111;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      <div class="chips">
+        <span class="chip blue">颜色提取</span>
+        <span class="chip blue">字体提取</span>
+        <span class="chip blue">间距/边框</span>
+        <span class="chip blue">阴影/动效</span>
+        <span class="chip blue">组件识别</span>
+        <span class="chip blue">断点分析</span>
+        <span class="chip blue">图标提取</span>
+        <span class="chip blue">WCAG 检查</span>
+      </div>
+      <p style="font-size:11.5px;color:#444;margin-top:6px">来源：X @冰河（@binghe） · <a href="https://x.com/binghe/status/2091195130095272088">2091195130095272088</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- WHAT IS IT -->
+<section>
+  <h2>■ 是什么：一行命令，还原设计系统</h2>
+  <div class="intro-grid">
+    <div class="intro-item">
+      <h3>定位</h3>
+      <p>开源 CLI 工具，通过 Playwright 渲染真实页面，从 DOM 计算样式中提取设计 Token，支持多种输出格式，直接用于设计系统或代码生成。</p>
+    </div>
+    <div class="intro-item">
+      <h3>核心价值</h3>
+      <p>不用 Figma 插件、不用手动整理——给一个 URL，就能拿到颜色、字体、间距、阴影、动效、组件、图标、响应式断点等完整设计语言。</p>
+    </div>
+    <div class="intro-item">
+      <h3>技术栈</h3>
+      <p>Node.js + Playwright + DOM API，MIT License，零商业依赖。</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section>
+  <h2>■ 工作原理：渲染 → 计算 → 评分</h2>
+  <div class="steps">
+    <div class="step active">
+      <div class="step-n">1</div>
+      <div class="step-label">Playwright 渲染</div>
+      <p style="font-size:10.5px;color:#666;margin-top:4px">真实浏览器渲染页面，执行 JS，加载字体与图片</p>
+    </div>
+    <div class="step">
+      <div class="step-n">2</div>
+      <div class="step-label">DOM 样式遍历</div>
+      <p style="font-size:10.5px;color:#666;margin-top:4px">遍历所有元素，收集 computedStyle，提取颜色/字体/间距/边框等</p>
+    </div>
+    <div class="step">
+      <div class="step-n">3</div>
+      <div class="step-label">置信度评分</div>
+      <p style="font-size:10.5px;color:#666;margin-top:4px">对每个 Token 评分，过滤噪音，返回高置信度结果</p>
+    </div>
+    <div class="step">
+      <div class="step-n">4</div>
+      <div class="step-label">多格式输出</div>
+      <p style="font-size:10.5px;color:#666;margin-top:4px">JSON / Tailwind / DTCG / brand-guide / design.md</p>
+    </div>
+  </div>
+  <div class="note">
+    <strong>为什么用 Playwright？</strong>很多设计工具只能抓静态 HTML，但真实页面的字体、颜色、阴影往往通过 CSS 变量、calc()、JS 注入——Playwright 能拿到渲染后的实际 computed value。
+  </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section>
+  <h2>■ 提取能力矩阵</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Token 类型</th>
+        <th>说明</th>
+        <th>输出格式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>颜色（Color）</td><td>主色、辅色、背景、文字、边框、渐变</td><td>HEX / RGB / HSL</td></tr>
+      <tr><td>字体（Typography）</td><td>字体族、字号、字重、行高、字间距</td><td>CSS / Tailwind token</td></tr>
+      <tr><td>间距（Spacing）</td><td>内边距、外边距，归纳为设计系统尺度</td><td>数值 + 单位</td></tr>
+      <tr><td>边框（Border）</td><td>宽度、样式、圆角、颜色</td><td>CSS token</td></tr>
+      <tr><td>阴影（Shadow）</td><td>box-shadow、text-shadow，分层归纳</td><td>shadow token</td></tr>
+      <tr><td>动效（Animation）</td><td>transition、animation、缓动函数</td><td>duration / easing</td></tr>
+      <tr><td>组件（Components）</td><td>按钮、卡片、导航等模式识别</td><td>JSON 结构</td></tr>
+      <tr><td>断点（Breakpoints）</td><td>响应式断点与对应布局特征</td><td>CSS media query</td></tr>
+      <tr><td>图标（Icons）</td><td>SVG 内联图标、icon font 提取</td><td>SVG / sprite</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- CLI USAGE -->
+<section>
+  <h2>■ 命令行用法</h2>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <h4>基础提取</h4>
+      <pre>dembrandt dembrandt.com</pre>
+    </div>
+    <div class="feat-card">
+      <h4>仅输出 JSON</h4>
+      <pre>dembrandt url --json-only</pre>
+    </div>
+    <div class="feat-card">
+      <h4>保存到文件</h4>
+      <pre>dembrandt url --save-output</pre>
+    </div>
+    <div class="feat-card">
+      <h4>DTCG 格式</h4>
+      <pre>dembrandt url --dtcg</pre>
+    </div>
+    <div class="feat-card">
+      <h4>暗色模式</h4>
+      <pre>dembrandt url --dark-mode</pre>
+    </div>
+    <div class="feat-card">
+      <h4>移动端渲染</h4>
+      <pre>dembrandt url --mobile</pre>
+    </div>
+    <div class="feat-card">
+      <h4>慢速动画</h4>
+      <pre>dembrandt url --slow</pre>
+    </div>
+    <div class="feat-card">
+      <h4>品牌指南</h4>
+      <pre>dembrandt url --brand-guide</pre>
+    </div>
+    <div class="feat-card">
+      <h4>Design.md</h4>
+      <pre>dembrandt url --design-md</pre>
+    </div>
+    <div class="feat-card">
+      <h4>深度爬取</h4>
+      <pre>dembrandt url --crawl N</pre>
+    </div>
+    <div class="feat-card">
+      <h4>WCAG 可访问性</h4>
+      <pre>dembrandt url --wcag</pre>
+    </div>
+    <div class="feat-card">
+      <h4>Tailwind 输出</h4>
+      <pre>dembrandt url --tailwind</pre>
+    </div>
+  </div>
+  <div class="note">
+    <strong>安装：</strong><code>npm install -g dembrandt</code> — 全局安装，无需项目依赖。
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section>
+  <h2>■ 安装与快速上手</h2>
+  <div class="cmd">npm install -g dembrandt</div>
+  <div class="cmd">dembrandt dembrandt.com</div>
+  <div class="cmd">dembrandt https://example.com --json-only --save-output</div>
+  <div class="warn">
+    <strong>注意：</strong>darkblue 不是有效主题。dembrandt 支持暗色模式抓取（--dark-mode），但这是指提取暗色主题页面的 Token，而非输出报告主题色。
+  </div>
+</section>
+
+<!-- OUTPUT FORMATS -->
+<section>
+  <h2>■ 输出格式对比</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>格式</th>
+        <th>用途</th>
+        <th>对应 Flag</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>JSON</td><td>程序化消费、设计系统存储</td><td>--json-only / --save-output</td></tr>
+      <tr><td>DTCG（Design Token Community Group）</td><td>跨工具互操作，Style Dictionary 等</td><td>--dtcg</td></tr>
+      <tr><td>Tailwind Config</td><td>直接注入 Tailwind CSS 项目</td><td>--tailwind</td></tr>
+      <tr><td>Brand Guide</td><td>品牌视觉规范文档</td><td>--brand-guide</td></tr>
+      <tr><td>Design.md</td><td>Markdown 格式，人类可读的设计文档</td><td>--design-md</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- WCAG -->
+<section>
+  <h2>■ WCAG 可访问性检查</h2>
+  <div class="intro-grid">
+    <div class="intro-item">
+      <h3>颜色对比度</h3>
+      <p>自动检测前景/背景颜色对比是否满足 WCAG AA（4.5:1）或 AAA（7:1）标准。</p>
+    </div>
+    <div class="intro-item">
+      <h3>文本大小</h3>
+      <p>检查最小字体大小是否达到可访问性要求。</p>
+    </div>
+    <div class="intro-item">
+      <h3>交互元素</h3>
+      <p>按钮、链接等可交互元素的尺寸与间距是否满足触摸友好标准。</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>dembrandt / dembrandt · MIT License · <a href="https://github.com/dembrandt/dembrandt">GitHub</a></p>
+  <p>来源：<a href="https://x.com/binghe/status/2091195130095272088">X @冰河</a> · 2026-08-23</p>
+</footer>
+
+</div>
+</body>
+</html>
