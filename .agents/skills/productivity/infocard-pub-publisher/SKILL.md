@@ -18,7 +18,7 @@ Load infocard-publish-sop/references/infocard-publish-protocol-v3.md before any 
 
 1. Locate the declared .docs/<card>/ directory from the bundle. Confirm it is inside the authorized repository, ignored by the repository convention, and owned by the current run.
 2. Validate publish-bundle.json and promotion-manifest.json as single JSON documents.
-3. Resolve every manifest source relative to .docs/<card>/ and every target relative to the repository root. Reject absolute paths, .., duplicate targets, missing sources, undeclared assets, bundle/evidence files, and targets outside docs/ or assets/.
+3. Resolve every manifest source relative to `.docs/<run-id>/<slug>/` and every target relative to the primary repository root. Reject absolute paths, `..`, duplicate targets, missing sources, undeclared assets, bundle/evidence files, generated indexes, any `/tmp/infocard*` or clone/worktree path, and targets outside `docs/` or `assets/`. Confirm the current checkout is the primary repository checkout, not a worktree or detached HEAD.
 4. Validate each sidecar before promotion. It must be one YAML mapping with slug, path, category, title, desc, date, updated, and tags; path must equal the manifest target.
 5. Confirm the authoring directory contains no process artifact, secret, screenshot, or generated index intended for publication.
 

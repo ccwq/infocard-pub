@@ -1,7 +1,7 @@
 ---
 name: authorized-infocard-execution
-description: "Use for authorized infocard runs after tool failures."
-version: 1.0.0
+description: Use for authorized infocard runs after tool failures.
+version: 2.0.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -12,51 +12,57 @@ metadata:
 
 # Authorized Infocard Execution
 
-Execution companion for an explicitly authorized infocard creation-and-publish run. The main publishing SOP owns route selection, bundle schema, content gates, and release semantics; this skill owns execution discipline, resource fallback, evidence diagnosis, and closeout behavior.
+Execution companion for an explicitly authorized infocard creation-and-publish run. The publishing SOP owns route selection, bundle schema, content gates, and release semantics; this skill owns execution discipline, resource fallback, evidence diagnosis, and closeout behavior.
 
 ## Authorization persists
 
-When the user says “创建并发布信息卡”, “开始”, or “继续” during the same run, treat authoring, build, visual verification, commit, push, and public verification as one authorized critical path. Do not ask for phase-by-phase confirmation.
+When the user says “创建并发布信息卡”, “开始”, or “继续” during the same run, treat authoring, promotion, build, visual verification, commit, push, and public verification as one authorized critical path. Do not ask for phase-by-phase confirmation.
 
-Pause only if the next action changes the requested target, sends to another platform, deletes/resets unrelated work, exposes a secret, or requires a substantive editorial choice not inferable from the brief. A failed script, timeout, provider capacity error, stale tab, or missing screenshot is not itself a new decision boundary.
+Pause only if the target changes, another platform is added, unrelated work would be deleted/reset, a secret would be exposed, or an unresolved editorial choice changes the requested artifact.
+
+## Workspace and ownership boundary
+
+Use only the primary repository checkout:
+
+```text
+Author: .docs/<run-id>/<slug>/ candidate artifacts + facts + manifest + evidence
+Publisher: validate manifest → promote declared files to docs/assets → gates → Git → Pages
+```
+
+Record the primary checkout's ambient `git status --short`, preserve it, and exclude it from staging. Do not create or use Git worktrees, detached HEAD, temporary clones, `/tmp/infocard*`, force-push, reset, stash, or clean to isolate an infocard run.
+
+Authors do not write formal `docs/`/`assets/`, generated indexes, or Git state. Publishers alone promote, build, commit, and push from the primary checkout.
 
 ## Execution sequence
 
-1. Preserve ambient state with a fresh worktree from current `origin/main`; never reset or stage unrelated changes.
-2. Author only the declared card bundle and sidecars.
-3. Run build/index and card-scoped static checks.
-4. Run the visual gate per card at desktop and 390px mobile.
-5. Repair only observable critical/major defects; after every HTML/CSS edit, invalidate and regenerate visual evidence.
-6. Commit and push with the named worktree's explicit ref (`git push origin HEAD:main` when direct main delivery is authorized).
-7. Verify repository delivery, Pages workflow, exact public URLs, and content fingerprints separately.
-8. Close out only run-created processes/worktrees; do not delete ambient state.
+1. Record ambient state and validate the `.docs` bundle, sidecars, theme decision, and promotion manifest.
+2. Promote only declared HTML, sidecar, and assets into `docs/`/`assets/`.
+3. Run card-scoped static checks and desktop/390px visual gate.
+4. Repair only verified critical/major defects; each formal HTML/CSS edit invalidates visual evidence.
+5. Run build/index/taxonomy/leak gates in the primary checkout.
+6. Inspect the staged allowlist, commit, and non-force push from primary `main`.
+7. Verify Git delivery, Pages workflow, exact public URL, release fingerprint, and fresh public visual evidence separately.
+8. Retain `.docs` authoring material; do not perform any worktree cleanup.
 
 ## Resource recovery ladder
 
-When one automation path fails, use the next available path without asking the user to choose:
+When one automation path fails, use the next available path without a new user decision:
 
-1. Existing Chrome CDP 9222 and browser-native CDP evaluation.
+1. Existing Chrome CDP 9222 and browser-native evaluation.
 2. Existing local HTTP preview server and browser navigation.
-3. System Chrome headless screenshots, one card and one viewport per command.
+3. System Chrome headless screenshot using a unique non-repository temporary profile.
 4. Direct terminal checks: HTTP status, DOM dimensions, raw GitHub content, workflow status, and Git state.
 5. An approved differentiated visual fallback.
 
-Do not retry the exact same blocked one-shot batch command. Reduce scope to one card, one viewport, and one evidence artifact while keeping the authorized critical path moving.
+Reduce scope to one card, one viewport, and one evidence artifact; do not repeat blocked batch commands.
 
-## Screenshot diagnosis: canvas versus page
+## Screenshot diagnosis
 
-An oversized viewport screenshot is not reliable full-page evidence. Before treating a visual report as a CSS defect:
-
-- read `document.documentElement.scrollHeight` and `document.body.scrollHeight`;
-- record `scrollWidth` and `clientWidth` at 390px;
-- compare screenshot content height with DOM height;
-- distinguish first-screen viewport cropping, artificial canvas padding, and genuine content clipping.
-
-If vision reports a clipped footer or huge blank region, recapture at the actual page height or by region before editing CSS. Do not patch layout from a screenshot artifact alone.
+Before treating a visual report as a CSS defect, inspect page `scrollHeight`, `scrollWidth`, `clientWidth`, relevant element geometry, and actual capture region. Distinguish a viewport crop, artificial canvas padding, and genuine clipping. If vision and DOM conflict, recapture the exact region once before editing.
 
 ## Visual evidence record
 
-For each card, retain one desktop and one 390px mobile capture and an explicit disposition:
+For each card retain desktop and 390px evidence with:
 
 ```text
 card: <slug>
@@ -65,35 +71,32 @@ mobile: critical=0 major=0 minor=<n>
 page_scroll_width: <number>
 viewport_width: <number>
 visual_status: VISUAL_PASSED | VISUAL_PENDING | VISUAL_BLOCKED
+html_sha256: <sha256>
 ```
 
-DOM checks are necessary but insufficient for visual PASS. A screenshot-provider failure remains `VISUAL_PENDING` unless an approved fallback produces structured findings. It must not stop the whole authorized batch; continue static/public work and report per-card status accurately.
-
-When vision disagrees with DOM geometry, perform one diagnostic recapture before changing CSS. If the discrepancy is screenshot geometry, preserve the card and correct the evidence method.
+DOM checks are necessary but insufficient for visual PASS. Screenshot-provider failure remains `VISUAL_PENDING` unless an approved fallback produces structured findings.
 
 ## Build and push order
 
-1. `npm run build`
-2. stage generated `_index.yaml` and `index.html`
-3. run `node scripts/verify-index.js`
-4. stage declared HTML and sidecars
-5. run card-scoped leak checks and inspect the staged diff
-6. commit
-7. push the explicit ref
+```text
+promotion → local visual gate → npm run build → stage generated indexes
+→ npm run verify / taxonomy / leak → stage declared HTML/sidecars/assets/evidence
+→ inspect staged diff → commit → git push origin main
+```
 
-Do not call a card publicly accessible from raw GitHub 200 alone. Verify the Pages workflow commit SHA, Pages source configuration when available, exact public path, and a release-specific content fingerprint. If an assumed Pages path returns 404, report the mismatch; do not silently substitute another URL.
+If remote advances, fetch/reconcile once in the primary checkout, regenerate affected outputs and evidence, and retry without force. Do not substitute raw GitHub 200 for Pages evidence.
 
 ## Communication discipline
 
-During an authorized run, do not narrate routine steps or ask the user to select fallback A/B/C. Report only a real blocker requiring a new decision, a corrected deviation, or final deliverables with evidence and exceptions. If the run was unnecessarily paused, acknowledge it briefly and resume immediately.
+During an authorized run, do not narrate routine steps. Report only a real blocker, a corrected deviation, or final deliverables with evidence and exceptions.
 
-## Validated pitfalls and recovery patterns
+## Validated pitfalls
 
-- **Verify the actual branch after worktree creation.** `git worktree add` can appear to succeed while the target directory still points at a dirty ambient branch or a reused worktree. Immediately check `git branch --show-current`, `git rev-parse --show-toplevel`, and `git status --short`; if unrelated files are present, abandon that directory and create a clean worktree from `origin/main` rather than checking out over dirty state.
-- **Build scripts may mutate generated indexes and refresh timestamps.** Treat `_index.yaml` and `index.html` as declared generated outputs, inspect their diff, and do not mistake a long build timeout for a failed build. Re-run the repository's direct build entrypoint with a bounded tail and verify generated index presence afterward.
-- **Run leak checks on the exact new HTML and inspect false positives.** The repository scanner can flag benign resource labels containing `user-` as UUID-like identifiers. Confirm the full line and context before editing; remove or rephrase only the offending benign token, never bypass the high-risk gate blindly.
-- **Do not infer missing lower-page content from a first-viewport screenshot.** If a visual reviewer says a later section or image is missing, inspect the DOM/source and asset URLs and recapture at the relevant scroll region. A desktop 1440×900 capture only proves the visible viewport, not the whole long card.
-- **For media, verify both DOM presence and public asset delivery.** A black/loading video frame may be normal before playback; check the `<video>` source, local HTTP response, and deployed asset HTTP status separately. Keep the issue as a media-loading note unless the source or public asset is actually missing.
-- **Pages deployment is asynchronous.** A successful Actions run or a 200 home page does not prove the new card is live. Poll the exact card URL and each critical local asset after deployment; allow propagation time and report the exact status codes.
+- Build scripts can refresh timestamps and generated indexes; inspect exact diffs and re-read sidecars after fixers.
+- Run leak checks on the exact promoted HTML; investigate false positives rather than bypassing high-risk findings.
+- First-viewport screenshots do not prove lower-page content exists or is clipped; inspect source/DOM and relevant regions.
+- Pages deployment is asynchronous. Verify exact public card URL and critical assets after propagation.
+- Author timeout is recovered from `.docs/<run-id>/<slug>/`, not from detached commits or worktrees.
+- Existing worktree inventory/cleanup remains a separately authorized maintenance task, never a publishing fallback.
 
-See `references/authorized-run-resource-recovery-20260809.md` for the compact incident pattern and diagnostic commands.
+See `references/authorized-run-resource-recovery-20260809.md` for compact diagnostics; interpret any historical worktree wording there as incident context, not an active instruction.

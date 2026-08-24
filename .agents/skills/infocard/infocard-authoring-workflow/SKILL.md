@@ -50,7 +50,38 @@ See `references/vscode-marketplace-card-build-notes.md` for the VS Code Marketpl
 
 ## Direct authoring rule
 
-Write all task artifacts directly into the primary repository checkout. This is the correct and only location.
+Authoring happens only inside the primary repository checkout's `.docs/<run-id>/<slug>/` directory. This is the correct and only authoring location.
+
+The Author must not directly write `docs/`, `assets/`, `_index.yaml`, `index.html`, Git state, `/tmp/infocard*`, a clone, or any Git worktree. Create candidate HTML, sidecar, facts, visual evidence, and `promotion-manifest.json` in `.docs`; `infocard-pub-publisher` is the only role that promotes declared files to formal public paths.
+
+## Poster-shell rebuild and responsive repair
+
+Use a rebuild rather than repeated patches when CSS rules duplicate/override each other, grid and flex rules conflict, two repair rounds failed, or the user explicitly asks for a rebuild. Rebuild only the `.docs/<run-id>/<slug>/card.html` candidate; retain every required content section and let Publisher promote it after visual evidence passes.
+
+### Structural contract
+
+For a numbered poster-shell card, keep the number, stripe, and body structurally separate:
+
+```css
+.skill-card { display:grid; grid-template-columns:100px 1fr; position:relative; min-height:96px; }
+.card-num { grid-column:1; grid-row:1; align-self:center; text-align:right; padding-right:28px; }
+.card-stripe { position:absolute; left:96px; top:18px; bottom:18px; width:1px; }
+.card-body { grid-column:2; grid-row:1; min-width:0; padding:14px 22px 14px 18px; }
+@media (max-width:720px) {
+  .skill-card { grid-template-columns:68px 1fr; }
+  .card-num { padding-right:16px; }
+  .card-stripe { left:64px; top:14px; bottom:14px; }
+  .card-body { grid-column:2; min-width:0; padding:10px 10px 10px 14px; }
+}
+```
+
+Do not let a body fall into the number column. If the mobile variant switches to flex, verify that the body has an explicit usable width; a generic `flex:1` patch may lose to a more-specific media rule. For every rebuild, inspect DOM parentage before changing CSS: a prematurely closed tag can turn a description into a grid sibling, which no overflow rule can fix.
+
+### Required verification
+
+At desktop and 390px mobile, inspect `scrollWidth`, `clientWidth`, body geometry, number/card center alignment, computed display, and relevant `grid-column`/flex values. Then capture fresh visual evidence. A structural or CSS change invalidates every prior screenshot and manifest.
+
+Never use a worktree, branch, clone, force-push, or `/tmp/infocard*` for a poster-shell rebuild.
 
 ## Repo-local skill placement
 
@@ -74,17 +105,19 @@ Use this sequence:
 
 This keeps project-specific workflows separate from the global skill library and makes later consolidation easier.
 
-**Preflight:** run `git status` to confirm the primary checkout is clean before writing. Write directly via `write_file`.
+**Preflight:** record `git status --short` in the primary checkout before writing. Ambient changes are preserved and excluded from this run; a dirty checkout is not permission to create a worktree, reset, stash, clean, or stage unrelated files.
 
-**No worktree for authoring.** Write directly into the primary repository checkout using `write_file`. The primary checkout IS the correct location. Use `git status` to confirm no unrelated changes before staging.
+**No worktree for authoring.** Use `write_file` only under `.docs/<run-id>/<slug>/`. The Publisher later verifies the manifest and promotes the declared public files. Authors never stage.
 
 ## Core workflow (6 steps)
 
 ### Step 1 · Template prep
 
-1. Confirm the target path: `docs/<slug>.html` in the primary repository checkout.
-2. Copy the theme template: `cp theme/<style>.html docs/<slug>.html`
-3. Verify the file landed: `ls -la docs/<slug>.html`
+1. Create the authoring root: `.docs/<run-id>/<slug>/`.
+2. Set candidate targets: `.docs/<run-id>/<slug>/card.html` and `.docs/<run-id>/<slug>/card.html.meta.yaml`.
+3. Read `theme/<style>.html` as skeleton input; write the derived candidate only under `.docs`.
+4. Create `.docs/<run-id>/<slug>/promotion-manifest.json` mapping candidate sources to final `docs/<slug>.html`, matching sidecar, and declared `assets/` targets.
+5. Verify the candidate and manifest landed under `.docs`; do not create formal `docs/` files in the Author phase.
 
 ### Theme selection (light-route lookup)
 

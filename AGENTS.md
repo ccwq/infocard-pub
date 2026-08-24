@@ -1,5 +1,28 @@
 # Repository Guidelines
 
+## 信息卡工作区硬边界（最高优先级）
+
+信息卡的创作、修复、主题迁移、视觉审查、构建与发布只使用这个主仓库 checkout；**禁止**为信息卡创建、复用、进入、合并、删除或清理 Git worktree，也禁止用临时 clone 作为信息卡仓库。
+
+唯一允许的生命周期：
+
+```text
+.docs/<run-id>/<slug>/ 生成候选稿、事实、证据、截图与 promotion-manifest.json
+→ Publisher 按 manifest 精确提升声明的 HTML / sidecar / assets 到 docs/ 与 assets/
+→ 主 checkout 本地视觉门禁、build、verify、commit、push
+→ 公网复核
+```
+
+硬规则：
+
+- Author 只能写 `.docs/<run-id>/<slug>/`，不得直接写 `docs/`、`assets/`、`_index.yaml`、`index.html` 或 Git 状态。
+- Publisher 是唯一能 promotion、build、commit、push 的角色，且只在当前主 checkout 执行。
+- 禁止使用 `git worktree add/remove/prune`、`git clone`、detached HEAD、`git push --force`、`/tmp/infocard*`、`/tmp/infocard-worktree` 作为新信息卡流程的一部分。
+- 现有 `/tmp` worktree 的盘点、备份或清理是独立的破坏性任务，需要单独、目录级授权；普通信息卡发布不得触发这些操作。
+- 当前 checkout 的 ambient dirty/untracked 文件必须记录并排除在 staged allowlist 外；不得 reset、stash、clean、顺带提交或以 worktree 规避它们。
+
+该边界覆盖项目内、全局和历史 reference 中的任何冲突发布建议。
+
 ## Infocard 发布前视觉门禁（硬规则）
 
 任何信息卡创建、修复、重建、发布或 push 前，必须先读取并执行项目内流程：
@@ -8,14 +31,15 @@
 - `.agents/skills/productivity/visual-verification-gate/SKILL.md`
 - `.agents/skills/infocard-styles/infocard-visual-evidence-grounding/SKILL.md`
 
-顺序是硬门禁：**本地渲染 → 桌面与移动截图 → critical/major/minor 结论 → `npm run verify:visual-gate -- docs/<slug>.html` → build/verify → commit → push → 公网重新截图复核**。
+顺序是硬门禁：**`.docs` authoring → manifest promotion → 本地渲染 → 桌面与移动截图 → critical/major/minor 结论 → `npm run verify:visual-gate -- docs/<slug>.html` → build/verify → commit → push → 公网重新截图复核**。
 
 禁止把 `HTTP 200`、`npm run build`、DOM/CSS token、或单端截图当作视觉通过。任何 HTML/CSS/结构/内容改动都会使旧截图与旧 manifest 失效。不得在 `docs/*.html` 中把 `theme/*.html` 当作 stylesheet 引用。
 
-
 ## 项目结构与内容模型
 
-本仓库通过 GitHub Pages 发布静态信息卡。主要内容放在 `docs/`：使用 `docs/YYYYMMDD-slug.html` 或 `docs/YYYYMMDD-slug/index.html`。每张已发布卡片都必须有同名 `.meta.yaml`，其中的 `path` 必须与实际发布路径完全一致。
+本仓库通过 GitHub Pages 发布静态信息卡。正式内容放在 `docs/`：使用 `docs/YYYYMMDD-slug.html` 或 `docs/YYYYMMDD-slug/index.html`。每张已发布卡片都必须有同名 `.meta.yaml`，其中的 `path` 必须与实际发布路径完全一致。
+
+`.docs/` 是不发布的 authoring/process 区：每个运行使用 `.docs/<run-id>/<slug>/`；其中可保留 source HTML、sidecar、facts、manifest、视觉证据和声明资产。只有 promotion manifest 中声明的 HTML、sidecar、assets 可被 Publisher 提升到正式路径。
 
 `scripts/` 存放 Node 构建、校验、taxonomy 与发布辅助脚本；`scripts/test/` 是 Node 原生测试。复用资源位于 `assets/`，视觉模板位于 `theme/`，PWA 入口为 `sw.js` 与 `manifest.json`。
 
@@ -36,7 +60,7 @@
 
 ## 测试与发布
 
-修改卡片或元数据后，依次运行 `npm run build`、`npm run verify`、`npm run verify-taxonomy` 与 `npm run check-leak`。修改脚本行为时，在 `scripts/test/` 补充或更新聚焦的 `*.test.js`。提交 PR 前确认本地卡片路径可访问、首页可见。
+修改卡片或元数据后，按 manifest allowlist 在主 checkout 依次运行 `npm run build`、`npm run verify`、`npm run verify-taxonomy` 与 `npm run check-leak`。修改脚本行为时，在 `scripts/test/` 补充或更新聚焦的 `*.test.js`。提交 PR 前确认本地卡片路径可访问、首页可见。
 
 ## 提交与 Pull Request
 

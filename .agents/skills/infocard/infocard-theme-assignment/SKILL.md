@@ -1,7 +1,7 @@
 ---
 name: infocard-theme-assignment
-description: "Use when choosing an infocard theme before authoring."
-version: 1.0.0
+description: Use when choosing an infocard theme before .docs authoring.
+version: 2.0.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -10,279 +10,127 @@ metadata:
     related_skills: [infocard-publish-sop, infocard-style-man-skill, infocard-authoring-workflow, any2card]
 ---
 
-# infocard-theme-assignment · 信息卡主题分配
+# 信息卡主题分配
 
-## When to use
+## 适用场景
 
-- 写卡前需要选 `style` / theme
-- 用户问“主题分配标准是什么 / 有多少主题 / 为什么全是 hardblue”
-- batch 发布出现同主题塌缩
-- 用户未指定主题，需要自动选型并保留依据
+- 写卡前需要选 `style` / theme；
+- 用户询问主题分配标准、主题库存或批量主题塌缩；
+- 用户未指定主题，需要自动选型并保留依据；
+- 已有卡需要主题重建。
 
-不要用本 skill 替代具体 `infocard-*-style` 的 token/组件规范；选完主题后仍必须 load 对应 style skill 并读 `theme/<name>.html`。
+本 skill 只负责选择与验证主题契约；不替代具体 `infocard-*-style` 的 token/组件规范。选定后仍必须读取对应 style skill 与 `theme/<theme>.html`。
 
-## Discovery that created this skill (2026-08-03)
+## Authoring 与发布边界
 
-Last 24h cards were all hardblue. Root cause was **execution collapse**, not a one-theme inventory:
+主题选择遵循信息卡唯一工作区模型：
 
-- technical / open-source / tool was over-mapped to hardblue
-- light-route shortlist + single-tool default overrode multi-theme governance
-- batch publish did not force per-card content-shape reclassification
+```text
+.docs/<run-id>/<slug>/theme-decision.txt + candidate artifacts
+→ promotion manifest
+→ Publisher 在主 checkout 提升到 docs/assets、视觉门禁、build、commit、push
+```
+
+禁止 theme assignment 创建、复用、进入或清理 Git worktree；禁止 `/tmp/infocard*`、临时 clone、detached HEAD、发布分支和 force-push。主题选择不直接写 `docs/`、`assets/`、Git state 或生成索引。
 
 ## Inventory baseline
 
-- `_themes.yaml` registered: **20** themes
-- `theme/*.html` templates: **21** (`codex-notebook` exists as template outside the registered 20)
-- Historical usage is multi-theme; hardblue is frequent, not exclusive
+注册主题以 `_themes.yaml` 和 `theme/*.html` 实测为准。当前常用注册 family：
 
-Registered family (normalized):
-`q`, `green`, `black-head`, `main`, `blue-technical-manual`, `darkblue`, `hardblue`, `redswiss`, `color-material`, `wood`, `handline`, `darkgreen`, `bigwhite`, `white-purple`, `graph-paper`, `pixelstack`, `scrapbook`, `archive-green`, `sage-swiss`, `crayon`
+```text
+q, green, black-head, main, blue-technical-manual, darkblue,
+hardblue, redswiss, color-material, wood, handline, darkgreen,
+bigwhite, white-purple, graph-paper, pixelstack, scrapbook,
+archive-green, sage-swiss, crayon
+```
 
-## Hard rules
+硬规则：
 
-1. `meta.yaml.style` is **declaration only**, never proof of theme application.
-2. Only use registered themes. Do not invent a one-off visual system for a single card.
-3. Before HTML: classify content shape → choose primary+fallback → load style skill → read theme demo → rebuild from that skeleton.
-4. Never treat “tool” in the title as automatic hardblue or redswiss.
+1. `meta.yaml.style` 是声明，不是主题已生效的证据。
+2. 只能使用已注册主题；不得为单卡虚构视觉系统。
+3. 先分类内容形态，再选择 primary/fallback，再读 style skill 与 theme skeleton。
+4. 技术、开源、tool 字样不是 hardblue/redswiss 的自动映射。
+5. 用户禁止 `darkblue` 时，必须从其他注册主题中选，不得把 hardblue 与 darkblue 混同。
 
-## Content-shape → theme matrix
+## 内容形态 → 主题矩阵
 
-| Content shape | Primary | Fallback | Do NOT default to |
+| 内容形态 | Primary | Fallback | 不要默认成 |
 |---|---|---|---|
-| Single technical tool / CLI / implementation manual / agent workflow | hardblue | redswiss | redswiss just because title contains “tool” |
-| Multi-tool catalog / CLI ecosystem map / comparison gallery | redswiss | main | hardblue for multi-tool catalogs |
-| AI architecture / agent methodology / paradigm shift / system design | darkblue | wood | hardblue just because technical |
-| UI component / React library with live demo as core value | darkblue | hardblue | redswiss just because "tool" in name |
-| X-origin agent framework / harness / control-plane separation / benchmark report | darkblue | hardblue | hardblue when the card is a plain tool manual; darkblue when the story is about state separation, audit loops, or multi-stage workbench design. |
-| Code architecture / dependency graph / knowledge network | graph-paper | darkblue | hardblue |
-| Security / hardening / monitoring / zero-trust | darkgreen | hardblue | darkblue by habit |
-| Investigation / public-opinion / conclusion-first deconstruction | black-head | hardblue | q / crayon |
-| Tutorial / note-style methodology | white-purple or blue-technical-manual | main | hardblue by default |
-| Reading / blog interpretation / longform analysis | paper-warm or bigwhite | wood | hardblue |
+| 单一技术工具 / CLI / 实施手册 / agent workflow | hardblue | redswiss | 标题含 tool 就选 redswiss |
+| 多工具目录 / CLI ecosystem / 对比图库 | redswiss | main | hardblue |
+| AI 架构 / agent 方法论 / paradigm / 系统设计 | darkblue | wood | 仅因技术就 hardblue |
+| UI component / React library，live demo 是核心 | darkblue | hardblue | 标题含 tool 就 redswiss |
+| X-origin agent framework / harness / control plane | darkblue | hardblue | 把架构叙事误降成普通工具手册 |
+| 代码架构 / dependency graph / knowledge network | graph-paper | darkblue | hardblue |
+| Security / hardening / monitoring / zero trust | darkgreen | hardblue | darkblue |
+| Investigation / conclusion-first deconstruction | black-head | hardblue | q / crayon |
+| Tutorial / note-style methodology | white-purple 或 blue-technical-manual | main | hardblue |
+| Reading / longform interpretation | paper-warm 或 bigwhite | wood | hardblue |
 | Hand-drawn process / parallel scheduling sketch | handline | crayon | hardblue |
 | Pixel / retro / game stacking | pixelstack | crayon | hardblue |
 | Light overview / sticker-like comparison | q / crayon / scrapbook | main | black-head |
 | Simon-Willison-like agentic engineering prose | wood | darkblue | redswiss |
 | Brand-green platform product | green | main | hardblue |
-| Unknown / mixed / low-confidence | main | hardblue | invent unregistered theme |
+| Unknown / mixed / low-confidence | main | hardblue | 未注册主题 |
 
-## Pre-authoring gate (mandatory)
+## Pre-authoring gate
 
-Emit these four lines into run evidence before writing HTML:
+在写候选 HTML 前，把以下内容保存在 `.docs/<run-id>/<slug>/theme-decision.txt` 或 frozen bundle：
 
 ```text
 content_shape: <matrix row>
 theme_primary: <registered theme>
 theme_fallback: <registered theme>
-theme_reject: <why nearby popular themes were rejected>
+theme_reject: <why nearby themes were rejected>
 ```
 
-Missing this block = incomplete theme selection.
+缺少任一行即 `THEME_BLOCKED`。作者不能静默覆盖研究/主题建议；任何 override 必须记录理由，并重新按选中主题 skeleton 检查。
 
 ## Batch diversity gate
 
-If a batch has **>= 2** cards:
+批量 `>= 2` 张卡时：
 
-- Every card must run an independent content-shape classification and record `theme_primary`, `theme_fallback`, and `theme_reject` before authoring.
-- Reusing one theme across the batch is **blocked by default**. It is allowed only when every card truly shares the same content shape, reader scenario, and information density, or the user explicitly authorizes a monochrome batch.
-- If the same theme is retained, the bundle must contain an explicit `same_theme_exception` with the three-part rationale; otherwise the release is `THEME_BLOCKED`.
-- Research/author theme recommendations cannot be silently overridden. Any override requires a recorded reason and re-check against the selected theme's actual skeleton.
-- Mixed shapes force per-card re-selection.
+- 每张卡独立记录 `content_shape`、`theme_primary`、`theme_fallback`、`theme_reject`；
+- 同一主题复用默认阻塞；只有所有卡片确实具有相同内容形态、读者场景和信息密度，或用户明确授权单色批次时才可保留；
+- 同主题例外必须在 bundle 记录 `same_theme_exception` 三部分理由；
+- Publisher promotion/build/push 仍在一个主 checkout 串行进行，不能为每卡创建 worktree。
 
 ## Mechanical theme implementation gate
 
-Before build/push, each card must pass all four checks:
+Publisher promotion 后、build 前，每张卡必须验证：
 
-1. `meta.yaml.style` normalizes to the registered bare theme slug;
-2. HTML contains matching `data-theme="<bare-slug>"`;
-3. the target theme's CSS token signature is present;
-4. at least two target structural signatures are present (for example hardblue: `hero-bar` + `section-no`; redswiss: `topbar-hero` + `sec-head`).
+1. sidecar `style` 规范化后对应已注册 bare theme；
+2. HTML 有匹配 `data-theme="<bare-slug>"`；
+3. 目标主题 CSS token signature 存在；
+4. 至少两个目标 structural signatures 存在。
 
-A metadata-only style change is invalid. If declaration and implementation disagree, or a batch has unapproved same-theme reuse, stop with `THEME_BLOCKED` before build/push.
+声明与实现不一致、主题未注册或批量复用未获批准时，停止为 `THEME_BLOCKED`。
 
-## 2026-08-03 counterexamples
+## Existing card theme rebuild
 
-| Card | Executed | Better primary |
-|---|---|---|
-| AirLLM layerwise inference | hardblue | hardblue (acceptable) |
-| BrowserAct browser ops layer | hardblue | hardblue (acceptable) |
-| SpecJudge local model recommender | hardblue | hardblue or darkblue |
-| AutoResearch agent loop | hardblue | darkblue or hardblue |
-| Graph Engineering paradigm migration | hardblue | **darkblue** |
+主题重建不是 metadata 换色。正确流程：
 
-## Decision tree (short)
+1. 只读已有 `docs/<slug>.html`、sidecar 与 target `theme/<theme>.html`；
+2. 将原内容和新主题 decision 写入 `.docs/<run-id>/<slug>/`；
+3. 从目标主题 skeleton 重建 `.docs` 中 candidate HTML，保留所有原始内容模块；
+4. 更新 `.docs` sidecar candidate 的 canonical `style`；
+5. 创建 promotion manifest，仅声明正式 HTML、sidecar 与必要 assets；
+6. Publisher 在主 checkout promotion 后执行新一轮桌面/移动视觉门禁、build、verify、commit、非强推 push 与公网复核。
 
-```text
-code architecture / knowledge graph?
-  yes → graph-paper
-  no ↓
-architecture / methodology / paradigm / workbench?
-  yes → darkblue
-  no ↓
-UI component library / React with live demo?
-  yes → darkblue + 去 mockup + 紧凑 SVG 示意（见 infocard-authoring-workflow）
-  no ↓
-multi-tool catalog / ecosystem compare?
-  yes → redswiss
-  no ↓
-single tool / CLI / implementation manual?
-  yes → hardblue
-  no ↓
-security / monitoring?
-  yes → darkgreen
-  no ↓
-investigation / conclusion-first?
-  yes → black-head
-  no ↓
-tutorial / notes?
-  yes → white-purple or blue-technical-manual
-  no ↓
-main as safe default
-```
-
-## Theme rebuild pattern (existing card → new theme)
-
-When an existing card changes theme (not a new publish), follow this direct-rebuild workflow:
-
-### When to use this pattern
-- Card already exists with Theme A, user wants Theme B
-- Content is unchanged; only the visual skin changes
-- Not a new card — no research, no new sources needed
-
-### Six-step rebuild sequence
-
-```
-1. read_file docs/<slug>.html          — preserve all original content
-2. read_file theme/<target>.html       — get target theme skeleton
-3. skill_view infocard-<target>-style  — get token palette + component rules
-4. write_file with new tokens           — preserve ALL original content sections,
-                                          swap only CSS variables + shell structure
-5. patch meta.yaml style → infocard-<target>-style
-6. git add + commit + push + curl 200
-```
-
-### CSS variable swap (the actual rebuild operation)
-
-```css
-/* Source: darkblue tokens (--bg:#0c1020, --accent:#58c3ff etc.)
-   Target: white-purple tokens (--bg:#f7f7fb, --accent:#8a5cf5 etc.) */
-
-/* Replace in :root { ... } block only — preserve all class/structure rules */
-:root {
-  --bg: #f7f7fb;        /* was #0c1020 */
-  --paper: #ffffff;
-  --ink: #111111;
-  --accent: #8a5cf5;     /* was #58c3ff */
-  --accent-deep: #5b49ff;
-  /* ... all other target tokens ... */
-}
-```
-
-### Content preservation rule
-**Keep every `<section>`, `<div class="hero">`, `<div class="shell">`, `<div class="panel">`, `<div class="code-block">`, `<footer>` verbatim.** Only replace:
-- `:root` CSS variables
-- `<body>` background gradient
-- Shell/glass-card wrappers that use the old tokens
-- Footer badge values (`style: darkblue` → `style: white-purple`)
-- `html2canvas` background color in the save button script
-
-Do NOT rewrite prose content, code block text, comparison items, or author cards.
-
-### Build may timeout but files are written
-`npm run build` can timeout on large repos (816+ meta files). The build process writes files incrementally — if `_index.yaml` and `index.html` were regenerated before timeout, the card HTML is already correct. Verify with:
-```bash
-grep -c '<slug>' _index.yaml    # should show the card
-grep -c '<slug>' index.html     # should show the card
-```
-If both show the card, proceed to git add+commit+push. Do NOT re-run build.
-
-### Append change comment to HTML
-```html
-<!-- 变更说明 YYYY-MM-DD: 主题从 <old> 更改为 <new>（矩阵：<row> → <new>），原始内容保留 -->
-```
-Place it at the very end of the file, after `</html>`.
-
-### Git commit for rebuild (not new card)
-```bash
-git add docs/<slug>.html docs/<slug>.html.meta.yaml
-git commit -m "feat: rebuild <slug> with <target> style (<old> → <target>)"
-git push   # or git push origin HEAD:refs/heads/main for worktree
-```
-
-### Verified case (2026-08-19)
-`best-rules`: darkblue → white-purple. Matrix row: `tutorial/methodology → white-purple`. All original content (hero, Implementation rules, three-layer structure, comparison, author cards) preserved. HTML written in one `write_file` call (~30KB). Build timed out but files correct. HTTP 200 confirmed.
-
-## Batch incident reference
-
-The 2026-08-16 batch-theme collapse and its verified correction are recorded in `references/batch-theme-collapse-20260816.md`. Use it when two or more cards are published together or when a research handoff recommends a different theme than the batch default.
+不得使用工作树、临时分支、force-push 或“只改 meta.style”的伪重建。任何 HTML/CSS/结构变更都会使先前视觉证据失效。
 
 ## After selection
 
-1. `skill_view(name='infocard-<theme>-style')` when the style skill exists
-2. Read `theme/<theme>.html` in infocard-pub
-3. Write HTML from that skeleton
-4. Set `meta.style` only if implementation matches
-5. Verify `:root` tokens + >=2 structural signatures
+1. 读取 `infocard-<theme>-style`（存在时）；
+2. 读取 `theme/<theme>.html`；
+3. 在 `.docs` 写候选 HTML；
+4. 写 formal sidecar candidate 与 promotion manifest；
+5. 由 Publisher 完成 mechanical gate 与正式发布。
 
 ## Closeout must report
 
-- content_shape
-- theme_primary / theme_fallback
-- style skill loaded (or “theme-only”)
+- `content_shape`
+- `theme_primary` / `theme_fallback`
+- style skill loaded（或 theme-only）
 - token/signature verification result
-
-## Republish / push lessons (2026-08-03)
-
-When correcting a theme on an existing card, the release path must distinguish implementation delivery from Pages deployment:
-
-1. Create a fresh named worktree from the current `origin/main`; keep ambient changes out of the candidate.
-2. Rebuild the HTML around the selected theme's real skeleton and signature components; changing only `meta.style` or a few colors is not a valid correction.
-3. Add `data-theme="<bare-slug>"` to HTML and normalize it against canonical `meta.style: infocard-<slug>-style`.
-4. Run build/static gates and 390px CDP checks before commit. Record `innerWidth`, `scrollWidth`, page height, and overflow for every changed card.
-5. Stage generated `_index.yaml` and `index.html` with the card and sidecar in the same commit.
-6. Push a named branch and verify both the remote ref and raw branch content. A pushed branch is not a GitHub Pages deployment; if Pages still serves the old content, report `已推送分支，公网主站待合并/部署`, not `已发布`.
-
-DOM/theme markers, computed styles, overflow metrics, or screenshot bytes alone do not constitute visual PASS. A successful screenshot must still receive a critical/major/minor review; otherwise report `VISUAL_PENDING`.
-
-See `references/theme-rebuild-branch-delivery-lessons-20260803.md` for the evidence record and verification template.
-
-## Related (may be user-owned / need adopt)
-
-- `infocard-publish-sop` — publish orchestrator; currently user-owned, cannot be auto-patched
-- `infocard-style-man-skill` — style governance admin; currently user-owned
-- `infocard-authoring-workflow` — light-route shortlist (4 defaults); incomplete alone
-
-If those umbrella skills should absorb this permanently, run:
-
-```text
-hermes curator adopt infocard-publish-sop
-hermes curator adopt infocard-style-man-skill
-```
-
-then merge this decision tree into them.
-
-## Graph-Paper 公众号兼容正文样稿工作流（2026-08-04）
-
-**输入**：`gzh-design` 技能的 reference 手册（如 `theme-graph-paper-manual.md`）  
-**输出**：公众号可直接粘贴的 `.wechat.html` 文件
-
-### 标准步骤
-
-1. **读取 reference 手册** — 位于 `~/.agents/skills/gzh-design/references/theme-<name>-manual.md`，包含所有组件的参数化 HTML snippet  
-2. **写 `.wechat.html`** — 放在 `/tmp/redswiss-stage/` 下，主体是 `<section style="max-width:677px;margin:0 auto;padding:10px;background:#纸底色;">`  
-3. **公众号化规则**：
-   - 不使用 `<style>` 标签、class、id、grid、position:absolute/fixed、var()、clamp()、vw/vh/rem
-   - 所有样式用 `style="..."` 内联
-   - 嵌套 `<span leaf="">` 包裹每段可替换文字（即使有多层样式也要层层包裹）
-   - Hero 顶栏也套入白色 `<section style="background:#fff;border:1px solid #E0DDD0;border-radius:4px;padding:14px;">` 使之与节点卡视觉统一
-4. **校验**：`python3 .agents/skills/gzh-design/scripts/validate_gzh_html.py <output.html>` → 必须输出 `✅ 完全合规`
-5. **二次检查**：用 skill 内置脚本 `scripts/check_gzh_inline.py <output.html>`：
-   - 禁用属性（position/gradient/var/clamp/vw/vh/rem）：0 处
-   - `span leaf=` 包裹数量充足（正文段落每段 ≥1 处）
-   - 仅含允许标签（section/span/p/h2/h3/h4/ul/li/strong/em/br）
-6. **严格交付前自检**：只保留用户声明的标签子集，不要把示例、调试文字或临时占位内容写入成品；用 HTMLParser 检查所有非空文本节点都在带 `leaf` 属性的 `span` 内，并检查真实标签集合。禁用 CSS 扫描必须匹配真正的 `transform:`（例如 `(?<![\\w-])transform\\s*:`），不要把合法的 `text-transform:` 误报为禁用项；扫描发现任何命中都必须修复后再交付。
-
-## References
-
-- `references/2026-08-03-hardblue-collapse-session.md` — discovery evidence and matrix detail
-- `scripts/check_gzh_inline.py` — 公众号 HTML 禁用属性 + 标签白名单 + span leaf 计数验证脚本
+- `.docs` authoring path 与 manifest source-to-target mapping
