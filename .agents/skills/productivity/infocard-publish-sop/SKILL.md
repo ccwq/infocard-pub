@@ -107,14 +107,22 @@ Infrastructure-only capture failure remains `VISUAL_PENDING`; it is never visual
 
 ## Main-checkout gates and release
 
+**Terminal output truncation workaround**: each command's stdout is truncated to ~1 line. Use OUT-OF-BAND verification after each step — do NOT rely on the command's own output as the exit condition.
+
 Run, in the primary checkout:
 
 ```bash
 npm run build
+# OUT-OF-BAND: curl -s _index.yaml | python3 -c "import yaml,sys; d=yaml.safe_load(sys.stdin); print('cards:', len(d['cards']))"
+
 npm run verify
+# OUT-OF-BAND: echo $? == 0
+
 npm run fix-taxonomy
-npm run verify-taxonomy
+# OUT-OF-BAND: npm run verify-taxonomy && echo $? == 0
+
 npm run check-leak
+# OUT-OF-BAND: echo $? == 0
 ```
 
 Then inspect every mutation. Stage only promoted artifacts, declared assets, current visual evidence, `_index.yaml`, and `index.html`; never use `git add -A`.
