@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navop — Rust 编写的 all-in-one 运维工作站</title>
+<style>
+/* ===== RESET ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ===== CSS TOKENS ===== */
+:root {
+  --black:   #0a0a0a;
+  --white:   #f5f2ec;
+  --red:     #c8102e;
+  --blue:    #0036a3;
+  --green:   #006b3c;
+  --yellow:  #e8c200;
+  --gray-3:  #d0ccc5;
+  --gray-5:  #b5b0a8;
+  --gray-6:  #888480;
+}
+
+/* ===== BASE ===== */
+body {
+  background: var(--black);
+  font-family: 'PingFang SC','Microsoft YaHei', sans-serif;
+  text-align: center;
+  color: var(--black);
+}
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--white);
+  padding: 0 0 80px 0;
+  text-align: left;
+}
+.card {
+  border: 3px solid var(--red);
+  background: var(--white);
+  overflow: hidden;
+}
+
+/* ===== .header — 黑头红渐变 ===== */
+.header {
+  background: linear-gradient(135deg, #c8102e 0%, #a90f27 100%);
+  padding: .85rem 1.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex: 1 1 100%;
+}
+.header-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: .05em;
+}
+.header-version {
+  font-size: .7rem;
+  color: rgba(255,255,255,.75);
+  background: rgba(0,0,0,.25);
+  padding: .15rem .5rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  margin-left: auto;
+}
+.header-sub {
+  font-size: .85rem;
+  color: rgba(255,255,255,.88);
+  flex: 1 1 100%;
+  margin-top: .1rem;
+}
+.header-pills {
+  display: flex;
+  gap: .35rem;
+  flex-wrap: wrap;
+  flex: 1 1 100%;
+}
+.pill {
+  padding: .2rem .55rem;
+  border-radius: 3px;
+  font-size: .72rem;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #fff;
+}
+.pill-blue  { background: var(--blue); }
+.pill-red   { background: var(--red); }
+.pill-green { background: var(--green); }
+.pill-yellow { background: var(--yellow); color: #333; }
+
+/* ===== .stats — 四列数字锚点 ===== */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--black);
+  border-bottom: 3px solid var(--red);
+}
+.stat {
+  padding: .6rem .4rem;
+  text-align: center;
+  border-right: 1px solid #222;
+}
+.stat:last-child { border-right: none; }
+.stat-num {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--red);
+  font-family: 'Courier New', monospace;
+}
+.stat-label {
+  font-size: .7rem;
+  color: #aaa;
+  margin-top: .1rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+/* ===== .warning-box — 红竖条警告框 ===== */
+.warning-box {
+  display: flex;
+  background: #fff5f5;
+  border-bottom: 1px solid var(--red);
+  font-size: .82rem;
+}
+.warning-bar {
+  width: 4px;
+  background: var(--red);
+  flex-shrink: 0;
+}
+.warning-text {
+  padding: .6rem .8rem;
+  color: var(--red);
+  line-height: 1.55;
+}
+
+/* ===== .section — 编号章节 ===== */
+.section {
+  display: flex;
+  border-bottom: 1px solid #ddd;
+}
+.section-num {
+  width: 2.8rem;
+  background: var(--red);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 900;
+  display: flex;
+  align-items: flex-start;
+  padding: .6rem .4rem;
+  flex-shrink: 0;
+  font-family: 'Courier New', monospace;
+}
+.section-body {
+  flex: 1;
+  padding: .6rem .8rem;
+}
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: .3rem;
+}
+.section-content {
+  font-size: .85rem;
+  line-height: 1.65;
+  color: #333;
+}
+.section-content p { margin-bottom: .5rem; }
+.section-content p:last-child { margin-bottom: 0; }
+
+/* ===== .code-box — 代码块 ===== */
+.code-box {
+  background: #1a1a2e;
+  padding: .8rem 1rem;
+  margin: .5rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+.code-box pre { margin: 0; white-space: pre; }
+.code-box code {
+  color: #e0e0e0;
+  font-size: .78rem;
+  font-family: 'Courier New', monospace;
+  line-height: 1.6;
+}
+.code-label {
+  font-size: .68rem;
+  color: var(--gray-5);
+  font-family: 'Courier New', monospace;
+  margin-bottom: .4rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+/* ===== .param-table — 配置参数表格 ===== */
+.param-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .8rem;
+  margin: .4rem 0;
+  overflow-x: auto;
+  display: block;
+}
+.param-table th {
+  background: var(--blue);
+  color: #fff;
+  padding: .4rem .6rem;
+  text-align: left;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.param-table td {
+  padding: .4rem .6rem;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+.param-table tr:last-child td { border-bottom: none; }
+.param-name {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: var(--blue);
+  white-space: nowrap;
+}
+.param-desc { color: #444; }
+.param-default {
+  font-family: 'Courier New', monospace;
+  font-size: .72rem;
+  color: var(--gray-6);
+}
+
+/* ===== .tag-grid — 特性标签网格 ===== */
+.tag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin: .4rem 0;
+}
+.tag-item {
+  background: var(--white);
+  border: 1px solid var(--gray-3);
+  border-left: 3px solid var(--blue);
+  padding: .25rem .6rem;
+  border-radius: 2px;
+  font-size: .75rem;
+  color: #333;
+  font-family: 'Courier New', monospace;
+}
+.tag-item.db  { border-left-color: var(--blue); }
+.tag-item.net { border-left-color: var(--green); }
+.tag-item.ai  { border-left-color: var(--yellow); }
+
+/* ===== .flow-box — SVG 流程图 ===== */
+.flow-box {
+  padding: .6rem .8rem;
+  background: #f8f8f8;
+  overflow-x: auto;
+}
+
+/* ===== .grid2 — 双列对照 ===== */
+.grid2 {
+  display: grid;
+  gap: 8px;
+  margin: .4rem 0;
+}
+.grid2-inner {
+  display: grid !important;
+  grid-template-columns: calc(50% - 4px) calc(50% - 4px) !important;
+  gap: 8px !important;
+}
+.grid-item {
+  background: var(--white);
+  padding: .7rem .9rem;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--gray-3);
+}
+.grid-item-fit { border-left: 3px solid var(--green); }
+.grid-item-not  { border-left: 3px solid var(--red); }
+.grid-item-title {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: .3rem;
+  color: var(--black);
+}
+.grid-item-content {
+  font-size: .82rem;
+  line-height: 1.55;
+  color: #333;
+}
+.grid-item-content li { margin-bottom: .2rem; }
+
+/* ===== .box — 普通强调框 ===== */
+.box {
+  background: #f0f4ff;
+  border: 1px solid var(--blue);
+  border-left: 4px solid var(--blue);
+  padding: .6rem .8rem;
+  margin: .4rem 0;
+  font-size: .82rem;
+  line-height: 1.55;
+}
+
+/* ===== .footer ===== */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .7rem 1rem;
+  background: #eee;
+  font-size: .72rem;
+  color: #666;
+}
+.footer a { color: var(--blue); text-decoration: none; }
+.save-btn {
+  background: linear-gradient(135deg, #c8102e, #a90f27);
+  color: #fff;
+  border: none;
+  padding: .4rem .9rem;
+  border-radius: 6px;
+  font-size: .75rem;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  position: relative;
+  display: inline-block;
+  margin: .8rem 1rem;
+  bottom: auto;
+  right: auto;
+  z-index: 999;
+}
+.save-btn:hover { opacity: .88; }
+@media (max-width: 720px) {
+  .save-btn { display: block; text-align: center; margin: .8rem auto; }
+}
+
+/* ===== mobile ===== */
+@media (max-width: 720px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats .stat:nth-child(2) { border-right: none; }
+  .grid2-inner { grid-template-columns: 1fr !important; }
+  .section-num { width: 2rem; font-size: .9rem; }
+  .header { padding: .7rem .8rem; }
+  .header-title { font-size: 1.3rem; }
+  .save-btn { display: block; text-align: center; margin: .8rem auto; }
+  .param-table { font-size: .72rem; }
+  .page { overflow-x: hidden; max-width: 100vw; width: 100%; }
+  .card { overflow-x: hidden; max-width: 390px; width: 100%; box-sizing: border-box; }
+  .section { flex-wrap: nowrap; }
+  .section-num { width: 2rem !important; min-width: 2rem !important; flex-shrink: 0; font-size: .9rem !important; padding: .6rem .25rem; }
+  .section-body { padding: .6rem .5rem; min-width: 0; flex: 1; overflow: hidden; }
+  .code-box { overflow-x: auto; max-width: 100%; }
+  .code-box code { font-size: .68rem; }
+  .param-table { font-size: .68rem; }
+  .param-name { font-size: .65rem; white-space: nowrap; }
+}
+@media (max-width: 400px) {
+  .page { padding: 0; }
+  .stat-num { font-size: 1.1rem; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="card">
+
+  <!-- ════ HEADER ════ -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-title">Navop</div>
+      <div class="header-version">v2026 · Rust</div>
+    </div>
+    <div class="header-sub">Rust 编写的 all-in-one 运维工作站 · 数据库 · SSH · SFTP · 终端 · 远程桌面 · AI 助手</div>
+    <div class="header-pills">
+      <span class="pill pill-blue">运维工具</span>
+      <span class="pill pill-green">开源</span>
+      <span class="pill pill-yellow">Rust</span>
+      <span class="pill pill-red">All-in-One</span>
+    </div>
+  </div>
+
+  <!-- ════ STATS ════ -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num">555</div>
+      <div class="stat-label">Stars</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">67</div>
+      <div class="stat-label">Forks</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">8+</div>
+      <div class="stat-label">数据库</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">2026</div>
+      <div class="stat-label">创建年份</div>
+    </div>
+  </div>
+
+  <!-- ════ WARNING ════ -->
+  <div class="warning-box">
+    <div class="warning-bar"></div>
+    <div class="warning-text">
+      <strong>上手前提：</strong>需要访问 MySQL / PostgreSQL / Redis / SSH 等目标服务；Windows/macOS/Linux 均可运行。
+    </div>
+  </div>
+
+  <!-- ════ 01 安装 ════ -->
+  <div class="section">
+    <div class="section-num">01</div>
+    <div class="section-body">
+      <div class="section-title">安装</div>
+      <div class="section-content">
+        <p>支持 Windows / macOS / Linux，提供安装包和便携版。</p>
+        <div class="code-label">macOS — Homebrew</div>
+        <div class="code-box"><pre><code>brew install navop</code></pre></div>
+        <div class="code-label">Linux / macOS — 一键脚本</div>
+        <div class="code-box"><pre><code>curl -sL https://navop.dev/install.sh | bash</code></pre></div>
+        <div class="code-label">Windows — 下载地址</div>
+        <div class="code-box"><pre><code># 官网下载 .exe 安装包
+https://navop.dev/download</code></pre></div>
+        <div class="code-label">Docker（可选）</div>
+        <div class="code-box"><pre><code>docker pull navop/navop:latest</code></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ 02 初步使用 ════ -->
+  <div class="section">
+    <div class="section-num">02</div>
+    <div class="section-body">
+      <div class="section-title">初步使用</div>
+      <div class="section-content">
+        <p>启动后，在左侧栏选择要连接的服务类型，填入连接参数即可开始使用。</p>
+        <div class="code-label">启动命令</div>
+        <div class="code-box"><pre><code>navop</code></pre></div>
+        <p>启动后界面左侧展示支持的模块入口：数据库、SSH 终端、SFTP 文件管理、远程桌面、AI 助手。</p>
+        <div class="box">
+          <strong>首次连接数据库示例：</strong><br/>
+          1. 点击「数据库」→「新建连接」<br/>
+          2. 选择 MySQL / PostgreSQL / Redis 等类型<br/>
+          3. 填入 Host、端口、用户名、密码<br/>
+          4. 点击「连接」，即可在图形界面中执行查询
+        </div>
+        <div class="code-label">SSH 连接示例</div>
+        <div class="code-box"><pre><code># 在 Navop 中新建 SSH 连接，填入 Host / 端口 / 用户名
+# 支持密钥认证和密码认证</code></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ 03 配置参数 ════ -->
+  <div class="section">
+    <div class="section-num">03</div>
+    <div class="section-body">
+      <div class="section-title">配置参数</div>
+      <div class="section-content">
+        <p>配置文件位于 <code>~/.navop/config.yaml</code>，支持以下核心参数：</p>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>参数</th>
+              <th>说明</th>
+              <th>默认值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">host</td>
+              <td class="param-desc">Navop 服务监听地址</td>
+              <td class="param-default">127.0.0.1</td>
+            </tr>
+            <tr>
+              <td class="param-name">port</td>
+              <td class="param-desc">服务端口号</td>
+              <td class="param-default">7687</td>
+            </tr>
+            <tr>
+              <td class="param-name">theme</td>
+              <td class="param-desc">界面主题（light / dark / auto）</td>
+              <td class="param-default">auto</td>
+            </tr>
+            <tr>
+              <td class="param-name">ssh.timeout</td>
+              <td class="param-desc">SSH 连接超时（秒）</td>
+              <td class="param-default">30</td>
+            </tr>
+            <tr>
+              <td class="param-name">db.pool_size</td>
+              <td class="param-desc">数据库连接池大小</td>
+              <td class="param-default">10</td>
+            </tr>
+            <tr>
+              <td class="param-name">ai.provider</td>
+              <td class="param-desc">AI 助手 Provider（openai / gemini / claude）</td>
+              <td class="param-default">openai</td>
+            </tr>
+            <tr>
+              <td class="param-name">ai.model</td>
+              <td class="param-desc">AI 模型名称</td>
+              <td class="param-default">gpt-4o</td>
+            </tr>
+            <tr>
+              <td class="param-name">log.level</td>
+              <td class="param-desc">日志级别（debug / info / warn / error）</td>
+              <td class="param-default">info</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="box">
+          <strong>启用 AI 助手：</strong>在配置中设置 <code>ai.api_key</code> 和 <code>ai.provider</code>，Navop 可在终端操作时自动调用 AI 生成建议。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ 04 支持特性 ════ -->
+  <div class="section">
+    <div class="section-num">04</div>
+    <div class="section-body">
+      <div class="section-title">支持特性一览</div>
+      <div class="section-content">
+        <p>Navop 内置 8 类核心能力，统一入口，无需切换多个工具：</p>
+        <div class="tag-grid">
+          <span class="tag-item db">MySQL</span>
+          <span class="tag-item db">PostgreSQL</span>
+          <span class="tag-item db">Redis</span>
+          <span class="tag-item db">MongoDB</span>
+          <span class="tag-item db">Oracle</span>
+          <span class="tag-item db">ClickHouse</span>
+          <span class="tag-item net">SSH</span>
+          <span class="tag-item net">SFTP</span>
+          <span class="tag-item net">Terminal</span>
+          <span class="tag-item net">Remote Desktop</span>
+          <span class="tag-item ai">AI 助手</span>
+          <span class="tag-item ai">服务器监控</span>
+        </div>
+        <p style="margin-top:.5rem;">支持同时管理多个连接，数据源之间可快速切换，适合运维人员管理多台服务器的场景。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ 05 适用场景 ════ -->
+  <div class="section">
+    <div class="section-num">05</div>
+    <div class="section-body">
+      <div class="section-title">适用场景</div>
+      <div class="section-content">
+        <div class="grid2">
+          <div class="grid2-inner" style="display: grid !important; grid-template-columns: calc(50% - 4px) calc(50% - 4px) !important; gap: 8px !important;">
+            <div class="grid-item grid-item-fit">
+              <div class="grid-item-title">✅ 适合</div>
+              <div class="grid-item-content">
+                <ul>
+                  <li>运维人员管理多台 VPS / 数据库</li>
+                  <li>需要同时操作多种数据库</li>
+                  <li>SSH + SFTP + 终端一体化需求</li>
+                  <li>服务器监控 + 远程桌面</li>
+                  <li>希望用 AI 辅助运维命令</li>
+                </ul>
+              </div>
+            </div>
+            <div class="grid-item grid-item-not">
+              <div class="grid-item-title">❌ 不适合</div>
+              <div class="grid-item-content">
+                <ul>
+                  <li>仅需要单一数据库 GUI 工具</li>
+                  <li>需要 Web 界面 / 团队协作</li>
+                  <li>大规模集群管理（需专业 CMDB）</li>
+                  <li>移动端远程运维</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ FOOTER ════ -->
+  <div class="footer">
+    <span>来源：@娜美知识库 · X · 2026-08-25 &nbsp;|&nbsp; <a href="https://github.com/feigeCode/navop" target="_blank">GitHub</a> &nbsp;|&nbsp; <a href="https://navop.dev" target="_blank">官网</a></span>
+  </div>
+
+  <!-- ════ SAVE BUTTON ════ -->
+  <div style="text-align:center; padding: .8rem 1rem 1.5rem;">
+    <button class="save-btn" onclick="saveCard()" style="position:relative;bottom:auto;right:auto;display:inline-block;margin:0;">保存 PNG</button>
+  </div>
+
+</div><!-- .card -->
+</div><!-- .page -->
+<script>
+function saveCard() {
+  const card = document.querySelector('.card');
+  if (!card) return;
+  import('https://html2canvas.hertzen.com/dist/html2canvas.min.js').then(() => {
+    window.html2canvas(card, { scale: 2, backgroundColor: '#f5f2ec' }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'navop-infocard.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  }).catch(() => {
+    alert('截图功能需要在联网环境下加载 html2canvas');
+  });
+}
+</script>
+</body>
+</html>
