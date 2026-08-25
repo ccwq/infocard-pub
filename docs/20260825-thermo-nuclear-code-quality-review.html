@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="blue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thermo-Nuclear Code Quality Review：把代码审查推到结构级</title>
+<meta name="description" content="Cursor 官方插件仓库中的严格代码质量审查技能：从抽象、文件规模、分支复杂度和边界设计入手，优先删除复杂度。">
+<style>
+:root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111;--muted:#5f5950;--blue:#1f63ff;--red:#d80018;--green:#15803d;--line:#111;--soft-blue:#eef4ff;--soft-red:#fde9eb;--soft-green:#dcfce7}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.65}
+a{color:inherit} code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:100%;max-width:720px;margin:0 auto;padding:0 0 76px}
+header{background:var(--ink);color:#fff;padding:14px;border-bottom:4px solid var(--red)}
+.kicker{display:inline-block;padding:3px 8px;border:1.5px solid #fff;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+h1{margin:0;font-size:clamp(27px,6vw,44px);line-height:1.08;letter-spacing:-.035em}
+.sub{margin-top:7px;color:#d7d7d7;font-size:13px;line-height:1.6}
+.band{background:var(--blue);color:#fff;padding:10px 14px;font-weight:800;display:flex;align-items:center;gap:8px}
+.band::before{content:'▶';font-size:10px}
+section{padding:14px 14px 0}
+.steps{display:flex;margin-bottom:14px;overflow:hidden}
+.step{flex:1;min-width:0;border:2px solid var(--blue);padding:8px 4px 7px;text-align:center;margin-right:-2px;background:var(--paper)}
+.step:last-child{margin-right:0}.step.active{background:var(--blue);color:#fff}.step .n{display:block;font-size:18px;font-weight:900;line-height:1}.step .label{display:block;font-size:10px;font-weight:800;margin-top:4px;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{border:2px solid var(--line);background:var(--paper);padding:12px;min-width:0;box-shadow:5px 5px 0 rgba(17,17,17,.12)}
+.card h2,.card h3{margin:0 0 7px;line-height:1.22;letter-spacing:-.02em}.card h2{font-size:21px}.card h3{font-size:16px}.card p,.card li{margin:0;font-size:13px;line-height:1.68;color:#292929}.card ul{margin:7px 0 0;padding-left:19px}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.tag{display:inline-flex;align-items:center;padding:3px 7px;border:1.5px solid var(--line);font-size:10.5px;font-weight:800;line-height:1.2}.tag.blue{border-color:var(--blue);color:var(--blue);background:var(--soft-blue)}.tag.red{border-color:var(--red);color:var(--red);background:var(--soft-red)}.tag.green{border-color:var(--green);color:var(--green);background:var(--soft-green)}
+.warn{border-left:4px solid var(--red);padding:10px 12px;background:var(--soft-red);margin-top:12px;font-size:13px;line-height:1.68}.warn strong{color:var(--red)}
+pre{margin:0;background:var(--ink);color:#eee;padding:12px;border:2px solid var(--ink);border-radius:5px;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:11.5px;line-height:1.62}
+footer{margin:14px 14px 0;padding:12px;background:var(--ink);color:#fff;border-top:4px solid var(--red)}.footer-title{font-weight:900;margin-bottom:5px}.footer-meta{font:11px/1.7 ui-monospace,monospace;color:#ddd;word-break:break-word}.footer-meta a{color:#fff}
+@media (max-width:720px){.page{max-width:min(720px,100vw);margin:0 auto}.grid{grid-template-columns:1fr}.step{padding-left:2px;padding-right:2px}.step .label{font-size:9.5px}.card{box-shadow:4px 4px 0 rgba(17,17,17,.1)}}
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+  <div class="kicker">SKILLS · CODE QUALITY</div>
+  <h1>Thermo-Nuclear Code Quality Review</h1>
+  <div class="sub">把代码审查从“能不能跑”推到“结构是否值得长期维护”</div>
+</header>
+<div class="band">五步读懂：显式调用、结构简化、严格门槛、边界清晰、拒绝复杂度转移</div>
+<section>
+  <div class="steps">
+    <div class="step active"><span class="n">1</span><span class="label">定位</span></div>
+    <div class="step"><span class="n">2</span><span class="label">审查</span></div>
+    <div class="step"><span class="n">3</span><span class="label">重构</span></div>
+    <div class="step"><span class="n">4</span><span class="label">门禁</span></div>
+    <div class="step"><span class="n">5</span><span class="label">交付</span></div>
+  </div>
+  <div class="grid">
+    <article class="card"><div class="tagrow"><span class="tag blue">Cursor plugins</span><span class="tag">官方仓库</span></div><h2>不是普通 code review</h2><p>这是一个极严格的可维护性审查技能，关注抽象质量、巨型文件、分支复杂度和代码库健康，而不只检查功能是否通过。</p></article>
+    <article class="card"><div class="tagrow"><span class="tag red">核心动作</span><span class="tag">Code Judo</span></div><h2>优先删除复杂度</h2><p>审查的关键问题是：能否通过重构让整段分支、helper、mode 或条件判断直接消失，而不是把同一套复杂度换个位置。</p></article>
+  </div>
+</section>
+<section>
+  <div class="card"><div class="tagrow"><span class="tag blue">审查范围</span><span class="tag green">可维护性</span></div><h2>它具体盯什么？</h2><ul><li>结构性回归：模块是否更耦合、更难扫描。</li><li>分支与特殊情况：是否把一次性 if 继续塞进忙碌流程。</li><li>边界与契约：是否滥用 any、unknown、cast、可选参数掩盖真实不变量。</li><li>文件规模：没有充分理由，不应把文件从 1,000 行以下推过 1,000 行。</li><li>层次归属：逻辑应放在真正拥有该概念的 canonical layer。</li></ul></div>
+</section>
+<section>
+  <div class="grid">
+    <article class="card"><div class="tagrow"><span class="tag red">硬门槛</span></div><h3>不因“能工作”就批准</h3><p>通过测试只是起点。若实现保留了明显的偶然复杂度、特殊分支或薄包装，仍应要求结构性改写。</p></article>
+    <article class="card"><div class="tagrow"><span class="tag blue">输出优先级</span></div><h3>先结构，后细节</h3><p>先看结构回归与简化机会，再看分支、边界、拆分、模块化和可读性，避免被低价值命名建议淹没。</p></article>
+  </div>
+  <div class="warn"><strong>使用边界：</strong>该技能在官方 SKILL.md 中标记为 <code>disable-model-invocation: true</code>。它适合显式发起的严格审查，不应被模型自动触发。</div>
+</section>
+<section>
+  <div class="card"><div class="tagrow"><span class="tag green">初步使用</span><span class="tag">Cursor / Skills</span></div><h2>如何调用</h2><pre>/thermo-nuclear-code-quality-review
+
+# 适用请求
+对当前分支做一次严格的可维护性审查：
+- 找结构性回归
+- 找能删除复杂度的 code-judo 重构
+- 检查 1k-line、spaghetti、边界与层次问题
+- 不因测试通过而降低批准标准</pre></div>
+</section>
+<section>
+  <div class="grid">
+    <article class="card"><div class="tagrow"><span class="tag blue">适合</span></div><p>合并前的分支审查、复杂重构、代码质量专项、担心文件膨胀或特殊分支失控的项目。</p></article>
+    <article class="card"><div class="tagrow"><span class="tag red">不适合</span></div><p>只想快速确认语法、格式或单个运行时错误时，不需要使用这套高强度维护性门禁。</p></article>
+  </div>
+</section>
+<footer><div class="footer-title">来源与第一方定位</div><div class="footer-meta">X · Viking<br>项目：cursor/plugins / cursor-team-kit / skills / thermo-nuclear-code-quality-review<br><a href="https://github.com/cursor/plugins/tree/main/cursor-team-kit/skills/thermo-nuclear-code-quality-review">GitHub 官方仓库路径</a><br>许可证：MIT · 主题：blue</div></footer>
+</div>
+</body>
+</html>
