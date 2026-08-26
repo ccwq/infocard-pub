@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { validateBundle, bundleAllowlist } = require('./publish-bundle');
+const { validateThemeContract } = require('./theme-contract');
 
 function error(field, message) { return { field, message }; }
 
@@ -123,6 +124,8 @@ function validatePromotionManifest(manifest, root, manifestPath = '') {
       errors.push(error('files[' + entry.index + '].sha256', 'source hash mismatch'));
     }
   }
+  const themeResult = validateThemeContract({ root, bundle: manifest.bundle, entries });
+  errors.push(...themeResult.errors.map((item) => error('theme.' + item.field, item.message)));
   return { valid: errors.length === 0, errors, entries: errors.length ? [] : entries };
 }
 

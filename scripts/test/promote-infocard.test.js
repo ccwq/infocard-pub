@@ -25,6 +25,8 @@ function writeFile(root, relativePath, content) {
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'promote-infocard-'));
+  fs.mkdirSync(path.join(root, 'theme'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'theme', 'darkblue.html'), '<html></html>');
   const card = 'copy-card';
   const bundle = {
     slug: card,
@@ -39,8 +41,8 @@ function fixture() {
     wiki: { raw_path: 'raw/copy.md', knowledge_path: 'concepts/copy.md' },
   };
   const files = [
-    { source: '.docs/' + card + '/docs/20260820-copy-card.html', destination: bundle.html_path, body: '<!doctype html><title>copy</title>' },
-    { source: '.docs/' + card + '/docs/20260820-copy-card.html.meta.yaml', destination: bundle.meta_path, body: 'slug: copy-card\npath: docs/20260820-copy-card.html\n' },
+    { source: '.docs/' + card + '/docs/20260820-copy-card.html', destination: bundle.html_path, body: '<!doctype html><html data-theme="darkblue"><style>:root{--cyan:var(--accent)}body{color:var(--cyan)}</style><title>copy</title>' },
+    { source: '.docs/' + card + '/docs/20260820-copy-card.html.meta.yaml', destination: bundle.meta_path, body: 'slug: copy-card\npath: docs/20260820-copy-card.html\nstyle: darkblue\n' },
     { source: '.docs/' + card + '/assets/img/copy-card/manifest.json', destination: bundle.manifest_path, body: '{"images":[]}' },
   ];
   const manifest = { card, bundle, files: files.map((file) => ({
