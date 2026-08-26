@@ -13,9 +13,10 @@ function main(argv = process.argv.slice(2), cwd = process.cwd()) {
   const absolute = path.resolve(cwd, argv[bundlePath + 1]);
   try {
     const manifest = JSON.parse(fs.readFileSync(absolute, 'utf8'));
+    const manifestDir = path.dirname(absolute);
     const entries = manifest.files.map((entry) => ({
       ...entry,
-      sourceAbsolute: path.resolve(cwd, entry.source),
+      sourceAbsolute: path.resolve(manifestDir, entry.source),
     }));
     const result = validateThemeContract({ root: cwd, bundle: manifest.bundle, entries });
     return { code: result.valid ? 0 : 1, output: result };
