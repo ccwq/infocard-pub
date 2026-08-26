@@ -39,7 +39,7 @@ function loadPromotionManifest(manifestPath) {
   return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 }
 
-function validatePromotionManifest(manifest, root) {
+function validatePromotionManifest(manifest, root, manifestPath = '') {
   const errors = [];
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
     return { valid: false, errors: [error('manifest', 'must be an object')], entries: [] };
@@ -53,7 +53,13 @@ function validatePromotionManifest(manifest, root) {
     errors.push(error('files', 'must be a non-empty array'));
   }
 
-  const sourceRoot = typeof manifest.card === 'string' ? '.docs/' + manifest.card : '';
+  // Sources are scoped to the directory containing the manifest. This supports
+  // run-scoped authoring paths such as .docs/<run-id>/<slug>/ while keeping
+  // promotion bounded to the declared candidate directory.
+  const manifestRelative = path.relative(root, path.resolve(root, manifestPath));
+  const sourceRoot = manifestRelative && !manifestRelative.startsWith('..')
+    ? path.posix.dirname(manifestRelative)
+    : (typeof manifest.card === 'string' ? '.docs/' + manifest.card : '');
   const destinationSeen = new Map();
   const entries = [];
   if (Array.isArray(manifest.files)) {
@@ -65,7 +71,9 @@ function validatePromotionManifest(manifest, root) {
       }
       const source = normalizeRelative(entry.source);
       const destination = normalizeRelative(entry.destination);
-      if (!source || !sourceRoot || !isInsideRelative(sourceRoot, source)) {
+      const sourceFromRoot = source && sourceRoot && isInsideRelative(sourceRoot, source);
+      const sourceFromManifest = source && sourceRoot && !source.startsWith('.docs/') && !path.posix.isAbsolute(source);
+      if (!source || !sourceRoot || (!sourceFromRoot && !sourceFromManifest)) {
         errors.push(error(prefix + '.source', 'must be inside .docs/<card>/'));
       }
       if (!destination) {
@@ -88,7 +96,8 @@ function validatePromotionManifest(manifest, root) {
       }
 
       if (!source || !destination) return;
-      const sourceAbsolute = path.resolve(root, source);
+      const sourceRelative = sourceFromRoot ? source : path.posix.join(sourceRoot, source);
+      const sourceAbsolute = path.resolve(root, sourceRelative);
       const destinationAbsolute = path.resolve(root, destination);
       try {
         const sourceStat = fs.lstatSync(sourceAbsolute);
@@ -126,7 +135,7 @@ function promoteInfocard({ root = process.cwd(), manifestPath } = {}) {
   } catch (cause) {
     return { valid: false, errors: [error('manifest', cause.message)], copied: [] };
   }
-  const validation = validatePromotionManifest(manifest, resolvedRoot);
+  const validation = validatePromotionManifest(manifest, resolvedRoot, manifestPath);
   if (!validation.valid) return { valid: false, errors: validation.errors, copied: [] };
 
   const copied = [];

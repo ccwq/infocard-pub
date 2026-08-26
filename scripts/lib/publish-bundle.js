@@ -7,6 +7,7 @@ const ALLOWED_STYLES = new Set([
   'darkblue', 'redswiss', 'hardblue', 'main-style', 'darkgreen',
   'graph-paper', 'handline', 'wood', 'black-head', 'pixelstack',
   'q-style', 'paper-warm', 'white-purple', 'color-material',
+  'green', 'blue',
 ]);
 
 function loadBundle(bundlePath) {
