@@ -43,7 +43,15 @@ Record the URL/path, cache-busting token, viewport width/height, whether the ima
 
 A `1440×900` or `390×844` viewport screenshot is a crop. Do not call a long page or table truncated solely because it continues below the image boundary.
 
-### 2. Run mechanical checks first
+### 2. Capture via web-capture
+
+**Use `web-capture` — not `browser_exec` cdp() or Python WebSocket CDP (confirmed timeout-prone 2026-08-26).**
+
+`web-capture` is the only approved screenshot gate. It wraps `agent-browser --cdp 9222`, handles tab selection, viewport switching, geometry checks, and PNG output.
+
+Desktop / mobile / tablet capture are selected by the `web-capture` preset.
+
+### 3. Run mechanical checks first
 
 At minimum inspect:
 

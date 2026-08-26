@@ -1,8 +1,8 @@
 ---
 name: visual-verification-gate
 description: "Use before publishing any card or cheatsheet."
-version: 1.0.0
-date: "2026-07-28"
+version: 1.1.0
+date: "2026-08-26"
 ---
 
 # Visual Verification Gate
@@ -53,8 +53,14 @@ Any HTML/CSS/structure/content change invalidates all prior visual evidence. Re-
 
 1. Render the target HTML at **desktop (1280px)** AND **mobile (480px / 720px)**.
 2. For a long page, capture evidence by region rather than trusting one full-height image: Hero, ordinary body, every table/matrix/risk region, and page end/control. A full-height capture may be retained as supplementary evidence but is not the sole review input.
-3. Use an isolated `google-chrome --headless --screenshot` instance under the `chrome-automation-safety` baseline; each run needs its own `--user-data-dir`, and normal exit requires no process cleanup.
-4. Run `vision_analyze` or an actually available equivalent on each screenshot. Demand an explicit `critical / major / minor` defect list. Screenshot delivery to the user is evidence-sharing or requested human review; it never substitutes for the Agent's disposition.
+3. Route screenshot capture through `web-capture`. **Do NOT use `browser_exec` built-in `cdp()`** — it repeatedly times out on `Page.captureScreenshot` calls (confirmed 2026-08-26 across 5+ cards).
+
+   Desktop capture via `web-capture` preset `pc` or `desktop`.
+   Mobile capture via `web-capture` preset `mobile`.
+   Tablet capture via `web-capture` preset `tablet` when needed.
+   `web-capture` owns the `agent-browser --cdp 9222` tab selection, viewport switch, geometry checks, and PNG output path.
+
+4. Run `vision_analyze` on each screenshot. Demand an explicit `critical / major / minor` defect list. Screenshot delivery to the user is evidence-sharing or requested human review; it never substitutes for the Agent's disposition.
 
    Classify only observable release defects as critical/major: clipping, overlap, missing text, unreadable contrast, broken responsive layout, unintended overflow, or controls obscuring content. Treat subjective suggestions (different shadow, border weight, or stylistic preference) as minor unless they produce one of those observable failures. If an assessment is ambiguous, recapture the affected region at the same viewport and ask a narrow, defect-specific question before editing; do not let fluctuating aesthetic commentary trigger unbounded CSS churn.
 5. If vision infrastructure fails, retry up to five times with a different strategy each time: split the image/region, reduce size, recapture the affected region, or switch to an actually available visual entrypoint. Do not spend retries merely rephrasing the same prompt. From the second failure, record input, strategy, error category, and outcome in run-local evidence.
@@ -102,6 +108,17 @@ Or prefer the `patch` tool for targeted CSS edits — its diff makes success/fai
 ### Release-specific fingerprint
 
 After build, verify `dist/docs/<slug>.html` contains a newly introduced, release-specific phrase or structural token. After Pages propagation, fetch the public URL and verify the same fingerprint. HTTP 200 and build success prove transport, not that the current revision is being served.
+
+### Verification checklist — screenshot capture (2026-08-26)
+
+All screenshots use **`agent-browser --cdp 9222`**:
+
+```bash
+# Desktop 1280×900
+agent-browser --cdp 9222 tab <id> && set viewport 1280 900 && screenshot <path>/desktop.png
+# Mobile 390×844
+agent-browser --cdp 9222 tab <id> && set viewport 390 844 && screenshot <path>/mobile.png
+```
 
 - [ ] desktop 1280px screenshot: no critical/major
 - [ ] mobile 720px screenshot: no critical/major, grids collapsed to single column
