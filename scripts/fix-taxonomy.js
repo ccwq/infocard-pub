@@ -47,15 +47,23 @@ function arrayEq(a, b) {
   return sa.every((v, i) => String(v) === String(sb[i]));
 }
 
+function dimensionValues(value) {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null || value === '') return [];
+  return [value];
+}
+
 function diffTaxonomy(existing, next) {
   const dims = ['tech_stack', 'topics', 'tool_types', 'stages', 'interaction', 'content_type', 'source', 'style', 'risk'];
   const changes = [];
   for (const dim of dims) {
-    if (!arrayEq(existing[dim], next[dim])) {
+    const existingValues = dimensionValues(existing[dim]);
+    const nextValues = dimensionValues(next[dim]);
+    if (!arrayEq(existingValues, nextValues)) {
       changes.push({
         dim,
-        from: existing[dim] || [],
-        to: next[dim] || [],
+        from: dimensionValues(existing[dim]),
+        to: dimensionValues(next[dim]),
       });
     }
   }
@@ -189,4 +197,6 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { arrayEq, dimensionValues, diffTaxonomy };
