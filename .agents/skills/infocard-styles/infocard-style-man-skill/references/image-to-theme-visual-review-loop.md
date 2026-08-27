@@ -31,17 +31,9 @@ Structure the CSS with `:root` custom properties for all extracted tokens. Inclu
 - Mobile responsive rules (720px breakpoint minimum)
 - A complete demo page using real content (not placeholder text)
 
-### Step 3: Start Local Preview Server
+### Step 3: Prepare a local preview
 
-```bash
-REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1; cd "$REPO_ROOT"
-npx live-server --port=5588 --host=0.0.0.0 --no-browser
-```
-
-Verify the server is listening:
-```bash
-ss -tlnp | grep 5588
-```
+Use the repository's existing preview entrypoint. This document does not prescribe a browser, port, CDP route, screenshot implementation, or delivery URL.
 
 ### Step 4: Visual Review Loop (up to N rounds)
 
@@ -49,22 +41,21 @@ User may specify the maximum number of review rounds (e.g., "at most 5 rounds").
 
 Each round:
 
-1. **Navigate**: `browser_navigate` to `http://10.6.8.14:5588/theme/{slug}.html`
-2. **Screenshot**: `browser_vision` with a critical comparison question
-3. **Analyze**: `vision_analyze` on the screenshot with a structured prompt:
+1. **Render** the local theme preview through the project's approved visual-verification skill.
+2. **Analyze** the rendered evidence with a structured prompt:
    - Ask specifically about fidelity to the reference (color accuracy, spacing, typography)
    - Ask for a numerical fidelity rating (1-10)
    - Ask for specific actionable changes
-4. **Patch**: Apply all identified fixes in a single batch of `patch` calls
-5. **Re-screenshot**: Navigate again and take a new screenshot for the next round
+3. **Patch** only the highest-impact theme-specific fixes.
+4. **Re-render** for the next round.
 
 ### Step 5: Register Theme
 
 After visual review passes (typically 9.0+ fidelity):
 
-1. Add entry to `_themes.yaml` (slug, css_class, pill, position, title, subtitle, description, keywords, swatch, preview_url, ref_links, note)
-2. Add TOC entry + theme card to `themes.html` (or run `python3 scripts/rebuild_themes.py` if available)
-3. Verify in browser that the theme appears in the gallery
+1. Add the theme entry to `_themes.yaml` (slug, `css_class`, position and display metadata).
+2. Run the repository's gallery rebuild command; do not hand-edit `themes.html`.
+3. Hand off formal visual and delivery verification to the project's dedicated skills.
 
 ### Step 6: Update Memory
 
@@ -88,7 +79,7 @@ Specifically check:
 
 ## Common Adjustments by Round
 
-Based on sessions creating darkblue, graph-paper, and archive-green themes:
+These are generic review dimensions, not theme-specific prescriptions:
 
 **Round 1 → Round 2 typical fixes:**
 - Accent color saturation (usually needs desaturating)
@@ -107,8 +98,8 @@ Based on sessions creating darkblue, graph-paper, and archive-green themes:
 
 ## Session Examples
 
-- **darkblue** (2026-06-12): Nezha dashboard image → deep blue glass-panel workbench. See `references/darkblue-style-creation-pattern.md` for extracted tokens.
-- **archive-green** (2026-06-24): Obsidian AI Skills infographic → Swiss information layout with sage green accent. 3 rounds: 8.5→9.5→9.6. Key adjustments: green desaturated from `#4a7856` to `#5f7e62`, background warmed from `#f4f4f0` to `#f6f4ee`, dark blocks shifted from `#1a1a1a` to `#1d2520` (tinted charcoal-green).
+- 具体主题案例应放在对应的 `infocard-xxx-style/references/`，本公共文档不维护主题专属 token 或案例链接。
+- Specific theme cases belong in the corresponding `infocard-xxx-style/references/`; this public document does not maintain theme-specific tokens or session records.
 
 ## Pitfalls
 
@@ -117,19 +108,11 @@ Based on sessions creating darkblue, graph-paper, and archive-green themes:
 - **Don't over-iterate.** If round 2 reaches 9.5+, remaining changes are subjective. Stop unless the user asks for more.
 - **Don't forget themes.html registration.** Building the theme file is not enough; it must be registered in `_themes.yaml` and rebuilt via `scripts/rebuild_themes.py`.
 
-### ⚠️ Platform UI dark mode can deceive visual extraction
+### Platform chrome and cached evidence
 
-**Problem**: Reference images from Xiaohongshu (小红书) or Douyin display inside the platform's dark-mode UI chrome. The surrounding app shell is dark, but the **content card background itself** may be warm cream/paper — and the vision model may misinterpret the platform chrome as part of the content background.
+Reference-image platform chrome, cached screenshots, and browser/CDP evidence handling belong to the project's visual-verification skills. This document only defines the design-to-review loop.
 
-**Symptom**: You extract what you think is a "dark background" from the image, but after implementation the background looks wrong compared to the reference.
+The reference image must be separated from platform chrome before extracting design tokens.
 
-**Correct verification**: After `vision_analyze` gives color estimates, use `curl` to fetch the raw HTML of the reference page (if it's a web page) or cross-check against known content card palettes. For 小红书 posts specifically, assume the background is warm/cream unless confirmed otherwise by page source.
+Do not treat a screenshot or model estimate as the sole source of truth for a rendered theme.
 
-**Correct verification chain** (always do in this order):
-```
-1. curl HTML → grep CSS token or background color  ← ground truth
-2. screenshot → vision analysis                   ← only after step 1 passes
-3. user browser sees wrong color → CDN cache issue → Ctrl+Shift+R
-```
-
-Never present a screenshot as evidence until step 1 confirms the CSS is correct. The vision model may be deceived by the platform chrome.

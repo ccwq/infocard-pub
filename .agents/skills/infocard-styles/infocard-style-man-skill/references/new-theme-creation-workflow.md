@@ -1,6 +1,6 @@
 # infocard-style-man-skill · 新主题创建完整流程
 
-本文档记录从 0 到发布一个 infocard 新主题的完整步骤。
+本文档记录从 0 到纳管一个 infocard 新主题的主题管理步骤。正式信息卡发布不属于本文档。
 
 ## 触发条件
 
@@ -107,29 +107,21 @@ python3 scripts/rebuild_themes.py
 - 详见 `references/image-to-theme-visual-review-loop.md` 的 Platform UI dark mode 段落
 验证输出：`Written themes.html with N themes`
 
-### 步骤 5：提交
+### 步骤 5：交接验证
 
-```bash
-git add _themes.yaml themes.html theme/{slug}.html
-git commit -m "feat: add infocard-{slug}-style — {一句话描述}"
-git push
-```
+主题文件、注册表和生成的总览页交给项目规定的主题验证流程处理。本文档不执行正式信息卡发布、`commit` 或 `push`。
 
 **注意**：主题变更不修改 `_index.yaml` 和 `index.html`（这两个只由新卡发布驱动），所以不需要包含它们。
 
 ### 步骤 6：验证
 
 ```bash
-sleep 88
-curl -sI https://ccwq.github.io/infocard-pub/theme/{slug}.html | head -3
-curl -s https://ccwq.github.io/infocard-pub/themes.html | grep -c 'infocard-{slug}-style'
+# 通过项目统一的主题预览和视觉验证流程检查本地预览页与主题总览。
 ```
 
-## PITFALL：创建 Skill ≠ 自动进 themes.html（2026-06-14 教训）
+## 常见错误：创建 Skill ≠ 自动进 themes.html
 
 **创建 skill 只是第一步**。如果不执行步骤 2–4，新风格不会出现在 `themes.html` 预览页里。
-
-本会话教训：我创建了 `infocard-darkgreen-style` skill 后直接告知用户"已有预览界面"，但实际上 `_themes.yaml` 没有注册、`theme/darkgreen.html` 还不存在。用户纠正："新的infocard style都有在_themes.yaml中登记 这是标准流程"。
 
 **正确认知**：风格 skill（`skills/`）和风格预览页（`theme/` + `_themes.yaml`）是两套独立文件，必须同时完成。
 
@@ -142,33 +134,3 @@ window.parent.postMessage({type:'theme-height',slug:'darkgreen',height:h},'*');
 // slug:'darkgreen' ← 必须等于 css_class: darkgreen（不是 darkgreen-style）
 ```
 
-## Avatar/资源子目录的 git 陷阱
-
-如果在创建卡片时同时下载了 avatar 或其他图片到 `docs/assets/images/{slug}/`，**单独提交 avatar.png 不会自动包含在第一次卡片的 commit 里**，因为 git add 的路径是精确的：
-
-```bash
-# 第一次 commit（错误做法）
-git add docs/{slug}.html docs/{slug}.html.meta.yaml _index.yaml index.html
-# avatar.png 没有被 add！
-
-# 正确做法：包含资源目录
-git add docs/{slug}.html docs/{slug}.html.meta.yaml \
-       docs/assets/images/{slug}/ \
-       _index.yaml index.html
-```
-
-**或者分两次 commit**（如果第一次忘了）：
-```bash
-# 第二次 commit 只补 avatar
-git add docs/assets/images/{slug}/avatar.png
-git commit -m "fix: add missing avatar.png for {slug}"
-git push
-```
-
-详见 `infocard-pub-publisher/references/git-add-glob-and-missing-html-commit-20260611.md`
-
-## 本次会话记录
-
-- **2026-06-12**：创建 `infocard-darkblue-style`（深蓝渐变风），position 6，参考 Nezha 视觉语言
-- **关键决策**：darkblue 不进已有主题序列，用独立 position；hardblue 从 position 6 移到 position 7
-- **踩坑**：第一次 commit 忘了 add avatar.png，分开补提交（commit `65d6189`）

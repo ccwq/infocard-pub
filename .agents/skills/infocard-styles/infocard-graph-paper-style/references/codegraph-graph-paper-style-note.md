@@ -25,3 +25,10 @@ This session corrected the gap between a `graph-paper` card implementation and t
 - `SKILL.md`
 - `theme/graph-paper.html`
 - `docs/20260603-codegraph.html`
+
+## Naming and alignment decision
+
+- 主题名采用 `infocard-graph-paper-style`，slug 为 `graph-paper-style`。
+- 采用通用 graph-paper 命名，不绑定具体站点或品牌。
+- 视觉方向确定为纸感研究手册：图谱是主视觉，正文使用系统 sans，路径、版本和节点标签使用 monospace。
+- 主题创建前应先对齐视觉家族、布局骨架、强调色强度，以及图谱是否承担主叙事。

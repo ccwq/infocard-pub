@@ -52,9 +52,9 @@
 - 最终裁定（修复/保留）由主线程裁判决定
 - 修复项上限 2-3 个（优先级排序），避免无限迭代
 
-### 教训 4：worktree + 本地修改冲突时用 stash
-- 当 worktree 合并时本地有未同步修改：`git stash` → merge → push
-- stash 后记得恢复或丢弃
+### 教训 4：主 checkout 边界
+- 信息卡和主题工作只在当前主 checkout 进行，不创建或进入 worktree。
+- 当前脏文件必须记录并排除在本次变更范围外；不得 reset、stash、clean 或顺带提交。
 
 ## crayon 主题注册信息
 
