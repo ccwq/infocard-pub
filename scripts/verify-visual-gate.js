@@ -89,19 +89,122 @@ function numberField(value) {
   return null;
 }
 
-function checkDisposition(item, fieldPrefix) {
+function checkDisposition(item, fieldPrefix, allowNonZero = false) {
   const errors = [];
   if (!item) return [error(fieldPrefix, 'required visual disposition is missing')];
   const critical = numberField(item.critical);
   const major = numberField(item.major);
   if (critical === null) errors.push(error(fieldPrefix + '.critical', 'must be a number'));
   if (major === null) errors.push(error(fieldPrefix + '.major', 'must be a number'));
-  if (critical !== null && critical > 0) errors.push(error(fieldPrefix + '.critical', 'must be 0 before push'));
-  if (major !== null && major > 0) errors.push(error(fieldPrefix + '.major', 'must be 0 before push'));
+  if (critical !== null && !allowNonZero && critical > 0) {
+    errors.push(error(fieldPrefix + '.critical', 'must be 0 before push'));
+  }
+  if (major !== null && !allowNonZero && major > 0) {
+    errors.push(error(fieldPrefix + '.major', 'must be 0 before push'));
+  }
   const screenshot = item.screenshot_path || item.screenshot || item.path;
   if (typeof screenshot !== 'string' || screenshot.trim() === '') {
     errors.push(error(fieldPrefix + '.screenshot_path', 'must point to the reviewed PNG'));
   }
+  return errors;
+}
+
+/**
+ * Validate a single repair-round record.
+ * Returns an array of error objects.
+ */
+function checkRepairRound(round, index, htmlHash, htmlTextHash) {
+  const errors = [];
+  const prefix = `manifest.repair_rounds[${index}]`;
+
+  if (!round || typeof round !== 'object') {
+    return [error(prefix, 'repair round must be an object')];
+  }
+
+  // A completed repair must explicitly record a real change. When before/after
+  // hashes are supplied, they must also prove that the content changed.
+  const changed = round.change_made === true || round.changed === true || round.repair_changed === true;
+  if (!changed) {
+    errors.push(error(prefix + '.change_made', 'must be true for a completed repair round'));
+  }
+  const beforeHash = round.before_html_sha256 || round.previous_html_sha256 || round.before_html_hash;
+  const roundHash = round.html_sha256 || round.source_sha256 || round.html_hash;
+  if (beforeHash && roundHash && beforeHash === roundHash) {
+    errors.push(error(prefix + '.before_html_sha256', 'before and after HTML hashes must differ'));
+  }
+  if (!roundHash || (roundHash !== htmlHash && roundHash !== htmlTextHash)) {
+    errors.push(error(prefix + '.html_sha256', 'must match current HTML sha256'));
+  }
+  if (round.repair_completed !== true) {
+    errors.push(error(prefix + '.repair_completed', 'must be true for a completed repair round'));
+  }
+  if (typeof round.attempt !== 'number' || round.attempt !== index + 1) {
+    errors.push(error(prefix + '.attempt', `must equal ${index + 1}`));
+  }
+
+  // Each round must have desktop and mobile evidence
+  const desktop = viewportDisposition(round, 'desktop') || viewportDisposition(round, 'desktop_1280') || viewportDisposition(round, 'desktop_1440');
+  const mobile = viewportDisposition(round, 'mobile') || viewportDisposition(round, 'mobile_390') || viewportDisposition(round, 'mobile_480');
+  errors.push(...checkDisposition(desktop, prefix + '.desktop', true));
+  errors.push(...checkDisposition(mobile, prefix + '.mobile', true));
+
+  if (!round.review || typeof round.review !== 'object') {
+    errors.push(error(prefix + '.review', 'fresh review disposition is required'));
+  } else {
+    const reviewCritical = numberField(round.review.critical);
+    const reviewMajor = numberField(round.review.major);
+    if (reviewCritical === null) errors.push(error(prefix + '.review.critical', 'must be a number'));
+    if (reviewMajor === null) errors.push(error(prefix + '.review.major', 'must be a number'));
+    if (typeof round.review.disposition !== 'string' && typeof round.review.review_id !== 'string') {
+      errors.push(error(prefix + '.review', 'must identify the fresh review disposition'));
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Validate the VISUAL_EXCEPTION_AFTER_MAX_REPAIRS disposition.
+ * Returns an array of error objects.
+ */
+function checkVisualException(manifest, htmlHash, htmlTextHash) {
+  const errors = [];
+
+  if (!Array.isArray(manifest.visual_failure_attempts)) {
+    errors.push(error('manifest.visual_failure_attempts', 'must be an array for VISUAL_EXCEPTION_AFTER_MAX_REPAIRS'));
+    return errors;
+  }
+
+  if (manifest.visual_failure_attempts.length < 3) {
+    errors.push(error('manifest.visual_failure_attempts', 'must contain at least 3 recorded visual failure attempts'));
+  }
+
+  for (let i = 0; i < manifest.visual_failure_attempts.length; i++) {
+    const attempt = manifest.visual_failure_attempts[i];
+    const prefix = `manifest.visual_failure_attempts[${i}]`;
+    if (!attempt || typeof attempt !== 'object') {
+      errors.push(error(prefix, 'visual failure attempt must be an object'));
+      continue;
+    }
+    if (typeof attempt.name !== 'string' || attempt.name.trim() === '') errors.push(error(prefix + '.name', 'must be a non-empty deterministic name'));
+    if (!['visual_defect', 'infrastructure_failure'].includes(attempt.type)) errors.push(error(prefix + '.type', 'must be visual_defect or infrastructure_failure'));
+    if (typeof attempt.outcome !== 'string' || attempt.outcome.trim() === '') errors.push(error(prefix + '.outcome', 'must record the attempt outcome'));
+    if (attempt.type === 'infrastructure_failure') {
+      if (attempt.evidence_gap !== true) errors.push(error(prefix + '.evidence_gap', 'must be true for infrastructure failure'));
+      if (typeof attempt.error_category !== 'string' || attempt.error_category.trim() === '') errors.push(error(prefix + '.error_category', 'must record the infrastructure error category'));
+      if (attempt.screenshot_path || attempt.screenshot || attempt.review) errors.push(error(prefix, 'infrastructure failure must not fabricate screenshot or review evidence'));
+    } else if (attempt.evidence_gap === true) {
+      errors.push(error(prefix + '.evidence_gap', 'visual defect attempt must have evidence unless explicitly an infrastructure failure'));
+    }
+  }
+
+  if (manifest.repair_rounds !== undefined && !Array.isArray(manifest.repair_rounds)) {
+    errors.push(error('manifest.repair_rounds', 'must be an array when present'));
+  }
+  for (let i = 0; i < (Array.isArray(manifest.repair_rounds) ? manifest.repair_rounds.length : 0); i++) {
+    errors.push(...checkRepairRound(manifest.repair_rounds[i], i, htmlHash, htmlTextHash));
+  }
+
   return errors;
 }
 
@@ -123,14 +226,20 @@ function checkManifest(manifestPath, htmlRelative, htmlHash, htmlTextHash) {
   }
 
   const status = manifest.review_status || manifest.status || manifest.visual_status;
-  if (status && !['VISUAL_PASSED', 'PASSED', 'passed'].includes(status)) {
-    errors.push(error('manifest.review_status', 'must be VISUAL_PASSED before push'));
-  }
 
-  const desktop = viewportDisposition(manifest, 'desktop') || viewportDisposition(manifest, 'desktop_1280') || viewportDisposition(manifest, 'desktop_1440');
-  const mobile = viewportDisposition(manifest, 'mobile') || viewportDisposition(manifest, 'mobile_390') || viewportDisposition(manifest, 'mobile_480');
-  errors.push(...checkDisposition(desktop, 'manifest.desktop'));
-  errors.push(...checkDisposition(mobile, 'manifest.mobile'));
+  if (status === 'VISUAL_EXCEPTION_AFTER_MAX_REPAIRS') {
+    // Exception path: require exactly 3 completed repair rounds with fresh evidence
+    errors.push(...checkVisualException(manifest, htmlHash, htmlTextHash));
+  } else if (status) {
+    // Existing path: strict 0 critical / 0 major
+    if (!['VISUAL_PASSED', 'PASSED', 'passed'].includes(status)) {
+      errors.push(error('manifest.review_status', 'must be VISUAL_PASSED before push'));
+    }
+    const desktop = viewportDisposition(manifest, 'desktop') || viewportDisposition(manifest, 'desktop_1280') || viewportDisposition(manifest, 'desktop_1440');
+    const mobile = viewportDisposition(manifest, 'mobile') || viewportDisposition(manifest, 'mobile_390') || viewportDisposition(manifest, 'mobile_480');
+    errors.push(...checkDisposition(desktop, 'manifest.desktop', false));
+    errors.push(...checkDisposition(mobile, 'manifest.mobile', false));
+  }
 
   if (manifest.theme_match === false) {
     errors.push(error('manifest.theme_match', 'must not be false'));
@@ -180,4 +289,4 @@ if (require.main === module) {
   process.exitCode = outcome.code;
 }
 
-module.exports = { main, verifyFile, checkNoBrokenThemeHtmlStylesheet, checkManifest };
+module.exports = { main, verifyFile, checkNoBrokenThemeHtmlStylesheet, checkManifest, checkDisposition, checkRepairRound, checkVisualException };
