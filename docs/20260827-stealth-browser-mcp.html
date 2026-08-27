@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stealth Browser MCP：AI Agent 隐身浏览器 + 97工具绕过反爬</title>
+<meta name="description" content="Stealth Browser MCP 用真实 Chrome 内核 + nodriver 实现反爬绕过，支持 97 个工具（可精简至 20 个）、CDP 命令、UI 克隆、网络拦截，兼容 Claude MCP / FastMCP，适合 AI Agent 自动化场景。">
+<style>
+:root{
+  --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+  --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+  --shadow:8px 8px 0 rgba(17,17,17,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  color:var(--ink);line-height:1.58;
+  background:
+    linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+    linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+    radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+    radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+    var(--bg);
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+/* ============ HERO ============ */
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";color:var(--red);font-size:10.5px}
+.demo-title{margin:0;max-width:820px;font-size:clamp(20px,3.2vw,36px);line-height:.98;letter-spacing:-.05em}
+.subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+.badge-row{display:flex;flex-wrap:wrap;gap:6px}
+.badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+.badge.red{background:var(--red);color:#fff}
+.badge.blue{background:var(--blue);color:#fff}
+.badge.dark{background:#111;color:#fff}
+.badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+.alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+.alert strong{display:block;font-size:13.5px;line-height:1.35}
+.alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+.hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+.hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+.panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+.panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+.flow{display:grid;gap:8px}
+.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+.flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+.flow-item.red .c{color:var(--red)}
+.flow-item.blue .c{color:var(--blue)}
+.flow-item.dark .c{color:#111}
+
+/* ============ SECTIONS ============ */
+.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+.section-no.b{background:var(--blue)}
+.section-no.k{background:#111}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+.section-meta .label.b{color:var(--blue)}
+.section-meta .label.k{color:#111}
+.section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+.section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+/* ============ GRIDS ============ */
+.grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+.card,.mini{padding:14px}
+.card{display:grid;gap:10px}
+.card h3,.mini h4{margin:0;letter-spacing:-.02em}
+.card h3{font-size:17px;line-height:1.16}
+.card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+.card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+.card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+.tag.red{background:var(--soft-red)}
+.tag.blue{background:var(--soft-blue)}
+.tag.dark{background:#111;color:#fff}
+
+/* ============ MATRIX ============ */
+.matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.matrix .mini{display:grid;gap:8px}
+.mini h4{font-size:15px;line-height:1.2}
+.mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.mini .red{color:var(--red)}
+.mini .blue{color:var(--blue)}
+.mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+.quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+.quote-block b{color:#111}
+pre{margin:0;background:#111;color:#e8e8e8;padding:14px;border:2px solid var(--line);overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.72}
+.rule{height:3px;background:#111;margin:8px 0 0}
+.source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+.footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+.footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+.footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+.footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+.footer-block .meta{font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px}
+
+/* style table */
+.style-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:0}
+.style-table th{padding:8px 12px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;text-align:left}
+.style-table td{padding:8px 12px;border:2px solid var(--line);vertical-align:top}
+.style-table tr:nth-child(even) td{background:var(--soft-ink)}
+.style-table .style-id{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--blue);font-weight:700}
+.style-table .style-tag{display:inline-flex;padding:2px 6px;border:1.5px solid var(--line);background:#fff;font-size:10.5px;font-weight:850}
+.style-table .cover-tag{display:inline-flex;padding:2px 6px;background:var(--soft-blue);border:1.5px solid var(--blue);font-size:10.5px;font-weight:850;color:var(--blue)}
+.style-table .feat-tag{display:inline-flex;padding:2px 6px;background:var(--soft-red);border:1.5px solid var(--red);font-size:10.5px;font-weight:850;color:var(--red)}
+
+@media(max-width:1080px){
+  .hero{grid-template-columns:1fr}
+  .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+  .grid-4,.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+  .hero{display:flex;flex-direction:column}
+  .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+  .grid-4,.grid-3,.grid-2,.matrix{grid-template-columns:1fr}
+  .section-head{grid-template-columns:1fr;gap:10px}
+  .section-no{width:72px;height:72px;font-size:28px}
+  .style-table{font-size:11px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">BROWSER AUTOMATION · MCP · 反爬绕过</div>
+    <h1 class="demo-title">Stealth Browser MCP</h1>
+    <p class="subtitle">AI Agent 专用隐身浏览器：用真实 Chrome 内核 + nodriver 绕过 Cloudflare 和反爬检测，97 个工具支持 CDP、UI 克隆与网络拦截，兼容 Claude MCP / FastMCP。</p>
+    <div class="badge-row">
+      <span class="badge red">Python</span>
+      <span class="badge blue">MCP Server</span>
+      <span class="badge dark">Claude MCP</span>
+    </div>
+    <div class="badge-row">
+      <span class="badge ink">97 工具</span>
+      <span class="badge ink">精简版 20</span>
+      <span class="badge ink">CDP</span>
+      <span class="badge ink">nodriver</span>
+    </div>
+    <div class="alert">
+      <strong>核心价值</strong>
+      <p>Cloudflare、Queue-It 等反爬系统难以检测；嫌多可砍到 20 个精简工具。</p>
+      <div class="mini-row">
+        <span class="mini-tag">★ 1,726</span>
+        <span class="mini-tag">Fork 251</span>
+        <span class="mini-tag">Issue 2</span>
+        <span class="mini-tag">Open Source</span>
+      </div>
+    </div>
+  </div>
+  <figure class="hero-visual">
+    <div class="panel-top">
+      <div class="eyebrow">核心能力</div>
+      <h3>真实 Chrome 内核 · 97 工具</h3>
+      <p>基础导航、CDP 命令、UI 克隆、网络拦截，从完整工具集精简到 20 个轻量工具。</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote"><b>一句话：</b>Stealth Browser MCP 是目前唯一能绕过反爬系统的浏览器自动化框架，专为 AI Agent 设计。</div>
+      <div class="flow">
+        <div class="flow-item blue"><div class="t">基础</div><div class="c">页面导航、点击、填表</div></div>
+        <div class="flow-item red"><div class="t">CDP</div><div class="c">执行 Chrome DevTools 命令</div></div>
+        <div class="flow-item dark"><div class="t">克隆</div><div class="c">像素级复制页面 UI</div></div>
+        <div class="flow-item blue"><div class="t">拦截</div><div class="c">捕获任意网络请求</div></div>
+      </div>
+    </div>
+  </figure>
+</header>
+
+<!-- OVERVIEW -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no k">01</div>
+    <div class="section-meta">
+      <div class="label k">OVERVIEW · 一句话概述</div>
+      <h2>Stealth Browser MCP 是什么</h2>
+    </div>
+  </div>
+  <div class="grid-2">
+    <article class="card">
+      <div class="tagrow"><span class="tag red">定位</span><span class="tag dark">浏览器自动化框架</span></div>
+      <h3>反爬克星 + AI Agent 专用</h3>
+      <p>基于 nodriver（无头 Chrome 驱动）+ 真实 Chrome 内核，在 AI Agent 场景中直接硬闯 Cloudflare 和 Queue-It 等反爬验证，而非依赖代理池或打码服务。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">核心差异</span><span class="tag red">真实浏览器</span></div>
+      <h3>不是 Selenium / Playwright</h3>
+      <p>不依赖 WebDriver，不注入 JS 特征；使用 nodriver 直接控制 Chrome，行为与真实用户浏览器一致，反爬系统难以识别为自动化。</p>
+    </article>
+  </div>
+  <!-- stats matrix -->
+  <div class="matrix" style="margin-top:14px">
+    <article class="mini">
+      <div class="lead">GitHub Stars</div>
+      <h4 style="font-size:22px">1,726</h4>
+      <p class="quote-line red">2026-08 实测</p>
+    </article>
+    <article class="mini">
+      <div class="lead blue">Forks</div>
+      <h4 style="font-size:22px">251</h4>
+      <p class="quote-line">社区活跃度指标</p>
+    </article>
+    <article class="mini">
+      <div class="lead">创建时间</div>
+      <h4 style="font-size:16px">2025-08-09</h4>
+      <p class="quote-line">一年有余</p>
+    </article>
+    <article class="mini">
+      <div class="lead red">工具总数</div>
+      <h4 style="font-size:22px">97 / 20</h4>
+      <p class="quote-line">完整 / 精简版</p>
+    </article>
+  </div>
+</div>
+
+<!-- CAPABILITIES -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no">02</div>
+    <div class="section-meta">
+      <div class="label">CAPABILITIES · 核心能力</div>
+      <h2>97 个工具，覆盖全自动化链路</h2>
+      <p>从基础页面操作到底层 CDP 命令，从 UI 克隆到网络拦截，可按需裁剪至 20 个精简工具集。</p>
+    </div>
+  </div>
+  <table class="style-table">
+    <thead>
+      <tr>
+        <th style="width:32%">能力分类</th>
+        <th style="width:22%">能力 ID</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>基础导航与交互</td>
+        <td><span class="style-id">basic-navigation</span></td>
+        <td><span class="feat-tag">navigate</span> <span class="feat-tag">click</span> <span class="feat-tag">type</span> <span class="feat-tag">scroll</span> <span class="feat-tag">screenshot</span></td>
+      </tr>
+      <tr>
+        <td>CDP 原生命令</td>
+        <td><span class="style-id">cdp-commands</span></td>
+        <td><span class="feat-tag">cdp_send_command</span> <span class="feat-tag">cdp_get_schema</span> 直接与 Chrome DevTools Protocol 交互</td>
+      </tr>
+      <tr>
+        <td>UI 克隆与元素操作</td>
+        <td><span class="style-id">ui-clone</span></td>
+        <td><span class="feat-tag">clone_element</span> <span class="feat-tag">clone_page</span> 像素级复制任意页面元素</td>
+      </tr>
+      <tr>
+        <td>网络请求拦截</td>
+        <td><span class="style-id">network-interception</span></td>
+        <td><span class="feat-tag">intercept_request</span> <span class="feat-tag">mock_response</span> 捕获、修改、Mock 任意网络请求</td>
+      </tr>
+      <tr>
+        <td>MCP 协议集成</td>
+        <td><span class="style-id">mcp-protocol</span></td>
+        <td><span class="feat-tag">Claude MCP</span> <span class="feat-tag">FastMCP</span> 标准 MCP 接口，AI Agent 即插即用</td>
+      </tr>
+      <tr>
+        <td>反爬绕过</td>
+        <td><span class="style-id">anti-bot-bypass</span></td>
+        <td><span class="feat-tag">Cloudflare</span> <span class="feat-tag">Queue-It</span> nodriver 底层控制，无 WebDriver 指纹</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="grid-2" style="margin-top:12px">
+    <article class="card">
+      <div class="tagrow"><span class="tag dark">精简版</span><span class="tag blue">工具数量</span></div>
+      <h3>可裁剪至 20 个工具</h3>
+      <p>完整 97 工具集适合复杂场景；按需裁剪到 20 个精简版，降低 AI Agent 上下文消耗，适合简单自动化任务。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag red">技术栈</span><span class="tag blue">nodriver</span></div>
+      <h3>nodriver 底层驱动</h3>
+      <p>nodriver 是无头 Chrome 的 Pythonic 封装，不依赖 Selenium/Playwright 的 WebDriver 协议，无自动化特征，是绕过反爬的关键。</p>
+    </article>
+  </div>
+</div>
+
+<!-- USE CASES -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no b">03</div>
+    <div class="section-meta">
+      <div class="label b">USE CASES · 适用场景</div>
+      <h2>谁在用 Stealth Browser MCP</h2>
+      <p>爬虫开发者、AI Agent 工程师、数据采集团队、自动化测试人员。</p>
+    </div>
+  </div>
+  <div class="grid-3">
+    <article class="card">
+      <div class="tagrow"><span class="tag red">爬虫</span><span class="tag dark">反爬克星</span></div>
+      <h3>绕过登录墙与 Cloudflare</h3>
+      <p>Cloudflare 验证、Queue-It 排队、Login Wall 等反爬机制，实测可绕过，但取决于站点、地区和版本。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">AI Agent</span><span class="tag dark">自动化</span></div>
+      <h3>Claude / AI Agent 自动化</h3>
+      <p>通过 MCP 接口接入 Claude，直接用自然语言控制真实浏览器，适合构建 AI 驱动的网页自动化 Agent。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag dark">数据采集</span><span class="tag red">网络拦截</span></div>
+      <h3>抓包与 API 分析</h3>
+      <p>拦截任意网络请求，捕获 JS 加密参数、GraphQL 查询或动态加载数据，无需逆向 JS 代码。</p>
+    </article>
+  </div>
+  <div class="quote-block" style="margin-top:14px">
+    <b>绕过能力边界说明：</b>Cloudflare 和 Queue-It 等绕过效果受站点配置、地理位置、浏览器版本等因素影响，不保证 100% 成功。初次使用建议在小号/测试环境验证。
+  </div>
+</div>
+
+<!-- INSTALLATION -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no">04</div>
+    <div class="section-meta">
+      <div class="label">INSTALL · 安装与使用</div>
+      <h2>安装方式</h2>
+      <p>开源项目，可直接 Clone 代码使用；MCP 集成需配合 Claude Desktop 或其他支持 MCP 的 Agent。</p>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="tagrow"><span class="tag dark">方式一</span><span class="tag red">GitHub Clone</span></div>
+      <h3>直接拉取源码</h3>
+<pre>git clone https://github.com/vibheksoni/stealth-browser-mcp
+cd stealth-browser-mcp
+pip install -e .  # 或 pip install nodriver 等依赖</pre>
+    </div>
+    <div class="card">
+      <div class="tagrow"><span class="tag blue">方式二</span><span class="tag dark">MCP 集成</span></div>
+      <h3>Claude Desktop 集成</h3>
+<pre>{
+  "mcpServers": {
+    "stealth-browser": {
+      "command": "npx",
+      "args": ["-y", "@vibheksoni/stealth-browser-mcp"]
+    }
+  }
+}</pre>
+    </div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="tagrow"><span class="tag dark">工具集配置</span><span class="tag red">可自定义</span></div>
+    <h3>精简工具集（20 个）</h3>
+    <p>如果完整 97 工具集对 Agent 上下文消耗过大，可在 MCP 配置中声明只启用部分工具：</p>
+<pre>{
+  "tools": ["navigate", "click", "type", "screenshot",
+            "cdp_send_command", "clone_element",
+            "intercept_request", "get_cookies"]
+}</pre>
+  </div>
+</div>
+
+<!-- CREDITS -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no b">05</div>
+    <div class="section-meta">
+      <div class="label b">CREDITS · 项目信息</div>
+      <h2>作者 &amp; 项目信息</h2>
+    </div>
+  </div>
+  <div class="grid-4">
+    <article class="mini">
+      <div class="lead">GitHub 仓库</div>
+      <h4>vibheksoni</h4>
+      <p>stealth-browser-mcp</p>
+      <p style="margin-top:6px;font-size:11.5px;color:var(--muted)">Python · 2025-08-09</p>
+    </article>
+    <article class="mini">
+      <div class="lead blue">Stars / Forks</div>
+      <h4>1,726 / 251</h4>
+      <p>2026-08 实测</p>
+    </article>
+    <article class="mini">
+      <div class="lead red">技术栈</div>
+      <h4>nodriver + CDP</h4>
+      <p>MCP / FastMCP 协议</p>
+    </article>
+    <article class="mini">
+      <div class="lead">Open Issues</div>
+      <h4>2</h4>
+      <p>活跃维护中</p>
+    </article>
+  </div>
+  <div class="footer-block" style="margin-top:14px">
+    <h3>数据来源与边界说明</h3>
+    <ul>
+      <li>Stars / Forks 数据来源：GitHub API 实时查询（2026-08-27）</li>
+      <li>Bypass 效果：nodriver + 真实 Chrome 内核可绕过 Cloudflare 等系统，但成功率受站点、地区、版本影响，不保证 100%</li>
+      <li>OKX 等外部推广内容未纳入本卡；工具使用请遵守目标站点的 robots.txt 与服务条款</li>
+    </ul>
+    <div class="meta">来源：X @NFTCPS · GitHub vibheksoni/stealth-browser-mcp · 2026-08-27 | Theme: hardblue</div>
+  </div>
+</div>
+
+<div class="rule"></div>
+<p class="source-note">Stealth Browser MCP · AI Agent 隐身浏览器 · vibheksoni/stealth-browser-mcp · Stars 1,726 · Fork 251 · 硬核蓝手册</p>
+</main>
+</body>
+</html>
