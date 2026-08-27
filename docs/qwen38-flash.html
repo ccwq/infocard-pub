@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="blue">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qwen3.8-Flash — 通义千问最新 MoE 模型</title>
+<style>
+:root{
+  --bg:#eef3fb;
+  --paper:#fffdf8;
+  --ink:#0a0a0a;
+  --red:#c8102e;
+  --blue:#0036a3;
+  --blue2:#1f63ff;
+  --green:#15803d;
+  --soft-blue:#eef5ff;
+  --soft-red:#fff5f6;
+  --line:#0a0a0a;
+  --muted:#5d5653;
+  --shadow:6px 6px 0 rgba(10,10,10,.10);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;min-height:100vh}
+.page{max-width:720px;margin:0 auto;padding:0 0 62px;background:var(--paper);box-shadow:var(--shadow)}
+
+/* ── HEADER ── */
+.hdr{background:linear-gradient(135deg,var(--red) 0%,var(--red) 40%,var(--blue) 40%,var(--blue2) 100%);color:#fff;padding:22px 22px 0;position:relative}
+.hdr-bar{height:5px;background:linear-gradient(90deg,var(--red),var(--blue2))}
+.hdr-body{padding:18px 0 0}
+.hdr-eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.85;margin-bottom:6px}
+.hdr-title{font-size:28px;font-weight:950;line-height:1.15;letter-spacing:-.02em;margin-bottom:8px}
+.hdr-title span{display:block;font-size:16px;font-weight:400;opacity:.85;margin-top:3px}
+.hdr-meta-row{display:flex;flex-wrap:wrap;gap:6px;padding:10px 0 14px}
+.hdr-badge{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:11px;font-weight:600;padding:3px 9px;border-radius:2px;letter-spacing:.04em}
+.hdr-footer{background:var(--ink);color:#fff;padding:10px 22px;font-size:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.hdr-footer strong{color:var(--blue2)}
+.hdr-footer a{color:var(--blue2);text-decoration:none}
+.hdr-footer a:hover{text-decoration:underline}
+
+/* ── SECTIONS ── */
+.section{border-bottom:2px solid var(--line);display:flex}
+.section:last-child{border-bottom:none}
+.section-num{width:52px;min-width:52px;background:var(--blue);color:#fff;font-size:18px;font-weight:950;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:.6rem .1rem;letter-spacing:.02em}
+.section-body{padding:14px 18px;flex:1;min-width:0}
+.section-title{font-size:13px;font-weight:800;color:var(--blue);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid var(--line)}
+
+/* ── KEY METRICS GRID ── */
+.metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.metric{background:var(--bg);border:2px solid var(--line);padding:9px 11px}
+.metric .val{font-size:19px;font-weight:950;color:var(--blue);line-height:1.1;font-family:var(--mono)}
+.metric .lbl{font-size:10.5px;color:var(--muted);margin-top:3px;font-weight:600}
+.metric .sub{font-size:10px;color:var(--muted);opacity:.75}
+
+/* ── ARCHITECTURE CALLOUTS ── */
+.arc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.arc-item{border:2px solid var(--line);padding:9px 11px;background:var(--bg)}
+.arc-item .tag{font-size:10px;font-weight:800;color:#fff;background:var(--blue);padding:2px 6px;display:inline-block;margin-bottom:5px;letter-spacing:.04em}
+.arc-item .name{font-size:13px;font-weight:800;color:var(--ink);margin-bottom:3px}
+.arc-item .desc{font-size:11.5px;color:var(--muted);line-height:1.45}
+
+/* ── TOOL LIST ── */
+.tool-list{display:flex;flex-direction:column;gap:7px}
+.tool-item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--bg);border:1.5px solid var(--line)}
+.tool-icon{width:30px;height:30px;background:var(--blue);color:#fff;font-size:13px;font-weight:950;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:2px;margin-top:1px}
+.tool-info{flex:1;min-width:0}
+.tool-name{font-size:13px;font-weight:800;color:var(--ink);font-family:var(--mono)}
+.tool-desc{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+/* ── PRICING TABLE ── */
+.price-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.price-table th{background:var(--ink);color:#fff;padding:7px 11px;text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.price-table td{padding:7px 11px;border-bottom:1px solid var(--line);vertical-align:middle}
+.price-table tr:nth-child(even) td{background:var(--bg)}
+.price-table .price{font-weight:900;color:var(--blue);font-family:var(--mono);font-size:13px}
+.price-table .note{font-size:10.5px;color:var(--muted)}
+
+/* ── CODE BOX ── */
+.code-box{background:var(--ink);border:2px solid var(--line);margin-top:10px}
+.code-box-hdr{background:#111;color:#5d8fff;padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;display:flex;justify-content:space-between}
+.code-box pre{color:#e8e8e8;font-family:var(--mono);font-size:12px;padding:10px 12px;overflow-x:auto;line-height:1.65}
+.code-box code{font-family:var(--mono)}
+.c-kw{color:#79b8ff}
+.c-str{color:#9ecbff}
+.c-cmt{color:#6a737d}
+.c-cmd{color:#86efac}
+.c-num{color:#f8c555}
+.c-fun{color:#c8e6ff}
+
+/* ── SCENE TAGS ── */
+.scene-tags{display:flex;flex-wrap:wrap;gap:6px}
+.scene-tag{background:var(--soft-blue);border:1.5px solid var(--blue);color:var(--blue);font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:2px}
+.scene-tag.alt{background:var(--soft-red);border-color:var(--red);color:var(--red)}
+
+/* ── WARN BOX ── */
+.warn{border-left:5px solid var(--red);padding:9px 12px;background:var(--soft-red);font-size:12px;margin-top:10px}
+.warn b{color:var(--red)}
+
+/* ── FOOTER ── */
+.footer{padding:14px 18px;background:var(--bg);border-top:2px solid var(--line);font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.footer a{color:var(--blue);text-decoration:none;font-weight:600}
+.footer a:hover{text-decoration:underline}
+
+/* ── CHECK/CROSS ── */
+.check{color:var(--green);font-weight:900}
+.cross{color:var(--red);font-weight:900}
+
+/* ── MOBILE ── */
+@media(max-width:720px){
+  body{font-size:13px}
+  .page{width:100%;max-width:100vw}
+  .metrics-grid{grid-template-columns:repeat(2,1fr)}
+  .arc-grid{grid-template-columns:1fr}
+  .section-num{width:2rem;min-width:2rem;font-size:.9rem;padding:.6rem .2rem}
+  .section-body{padding:.6rem .5rem}
+  .code-box pre{font-size:.68rem}
+  .hdr-title{font-size:22px}
+  .price-table{font-size:11px}
+  .price-table .price{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ═══ HEADER ═══ -->
+<div class="hdr">
+  <div class="hdr-bar"></div>
+  <div class="hdr-body">
+    <div class="hdr-eyebrow">通义千问 · MoE 多模态模型 · API 服务</div>
+    <div class="hdr-title">Qwen3.8-Flash<span>每 Token 仅激活 6B 参数，125B 总参的旗舰级推理效率</span></div>
+    <div class="hdr-meta-row">
+      <span class="hdr-badge">MoE 架构</span>
+      <span class="hdr-badge">多模态</span>
+      <span class="hdr-badge">1M Context</span>
+      <span class="hdr-badge">6 内置工具</span>
+      <span class="hdr-badge">开源权重</span>
+    </div>
+  </div>
+  <div class="hdr-footer">
+    <span>发布日期：<strong>2026-08-26</strong></span>
+    <span>开源协议：<strong>Apache 2.0</strong></span>
+    <span><a href="https://huggingface.co/Qwen/Qwen3.8-Flash-Next" target="_blank">Hugging Face ↓</a></span>
+  </div>
+</div>
+
+<!-- ═══ 01 MODEL SPECS ═══ -->
+<div class="section">
+  <div class="section-num">01</div>
+  <div class="section-body">
+    <div class="section-title">模型定位与核心指标</div>
+    <div class="metrics-grid">
+      <div class="metric">
+        <div class="val">125B</div>
+        <div class="lbl">总参数量</div>
+        <div class="sub">Qwen3.8-Flash 主模型</div>
+      </div>
+      <div class="metric">
+        <div class="val">6B</div>
+        <div class="lbl">每 Token 激活</div>
+        <div class="sub">MoE experts 稀疏激活</div>
+      </div>
+      <div class="metric">
+        <div class="val">MoE</div>
+        <div class="lbl">架构类型</div>
+        <div class="sub">Mixture of Experts</div>
+      </div>
+      <div class="metric">
+        <div class="val">262K</div>
+        <div class="lbl">原生上下文</div>
+        <div class="sub">YaRN 扩展至 1M（生产默认）</div>
+      </div>
+      <div class="metric">
+        <div class="val">≈Opus4.8</div>
+        <div class="lbl">综合性能</div>
+        <div class="sub">超越 Claude Opus4.6</div>
+      </div>
+      <div class="metric">
+        <div class="val">÷9</div>
+        <div class="lbl">训练成本</div>
+        <div class="sub">仅为 Qwen3.7-Plus 的 1/9</div>
+      </div>
+    </div>
+    <div class="warn">
+      <b>注：</b>benchmark 具体分数以官方发布为准；千问 AI 平台（qianwenai.com）已上线该模型，权重已开源至 Hugging Face 与 ModelScope。
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 02 PRICING ═══ -->
+<div class="section">
+  <div class="section-num">02</div>
+  <div class="section-body">
+    <div class="section-title">API 定价速查（¥/M tokens）</div>
+    <table class="price-table">
+      <thead>
+        <tr>
+          <th>类型</th>
+          <th>价格</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>输入（标准）</td>
+          <td class="price">¥0.80</td>
+          <td class="note">每百万 token</td>
+        </tr>
+        <tr>
+          <td>输出</td>
+          <td class="price">¥2.70</td>
+          <td class="note">每百万 token</td>
+        </tr>
+        <tr>
+          <td>缓存命中</td>
+          <td class="price">¥0.10</td>
+          <td class="note">重复上下文折扣约 87%</td>
+        </tr>
+        <tr>
+          <td>Batch API 输入</td>
+          <td class="price">¥0.40</td>
+          <td class="note">异步批处理场景</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:10px;font-size:12px;color:var(--muted);">
+      <b>速率限制：</b>TPM 5M · 最大输入 991K tokens · 最大输出 131K tokens
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 03 ARCHITECTURE ═══ -->
+<div class="section">
+  <div class="section-num">03</div>
+  <div class="section-body">
+    <div class="section-title">新架构亮点</div>
+    <div class="arc-grid">
+      <div class="arc-item">
+        <div class="tag">注意力</div>
+        <div class="name">GDN + QSA 混合注意力</div>
+        <div class="desc">Gated DeltaNet（门控 DeltaNet）结合 Qwen Sparse Attention，兼顾长程依赖与稀疏效率</div>
+      </div>
+      <div class="arc-item">
+        <div class="tag">残差</div>
+        <div class="name">Gated Residual</div>
+        <div class="desc">门控残差连接，缓解深层网络梯度消失，提升训练稳定性与收敛速度</div>
+      </div>
+      <div class="arc-item">
+        <div class="tag">嵌入</div>
+        <div class="name">N-gram Embedding</div>
+        <div class="desc">51B 参数的 N-gram 嵌入层，增强词法模式捕获，降低主模型对常见模式的重复学习开销</div>
+      </div>
+      <div class="arc-item">
+        <div class="tag">核心</div>
+        <div class="name">MoE Expert 路由</div>
+        <div class="desc">专家稀疏激活，每 Token 仅激活 6B 参数，125B 总参实现 20× 参数效率</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 04 TOOLS ═══ -->
+<div class="section">
+  <div class="section-num">04</div>
+  <div class="section-body">
+    <div class="section-title">内置工具清单（6 个）</div>
+    <div class="tool-list">
+      <div class="tool-item">
+        <div class="tool-icon">⬡</div>
+        <div class="tool-info">
+          <div class="tool-name">code_interpreter</div>
+          <div class="tool-desc">代码解释器 — 执行 Python/JS 代码并返回结构化结果，支持数据分析与算法验证</div>
+        </div>
+      </div>
+      <div class="tool-item">
+        <div class="tool-icon">🔍</div>
+        <div class="tool-info">
+          <div class="tool-name">i2i_search</div>
+          <div class="tool-desc">以图搜图 — 输入图片，检索相似图像或图片来源，适用于版权查询与图像溯源</div>
+        </div>
+      </div>
+      <div class="tool-item">
+        <div class="tool-icon">📝</div>
+        <div class="tool-info">
+          <div class="tool-name">t2i_search</div>
+          <div class="tool-desc">以文搜图 — 输入描述性文本，检索匹配的图片素材，适用于配图推荐</div>
+        </div>
+      </div>
+      <div class="tool-item">
+        <div class="tool-icon">🌐</div>
+        <div class="tool-info">
+          <div class="tool-name">web_extractor</div>
+          <div class="tool-desc">网页抓取 — 结构化提取任意公网页面的正文、标题、链接与元数据</div>
+        </div>
+      </div>
+      <div class="tool-item">
+        <div class="tool-icon">🔎</div>
+        <div class="tool-info">
+          <div class="tool-name">web_search</div>
+          <div class="tool-desc">联网搜索 — 实时检索互联网最新信息，支持新闻、百科与多语言搜索</div>
+        </div>
+      </div>
+      <div class="tool-item">
+        <div class="tool-icon">🧩</div>
+        <div class="tool-info">
+          <div class="tool-name">function_call</div>
+          <div class="tool-desc">函数调用 — 结构化 API 集成，支持自定义工具扩展与工作流自动化编排</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 05 API EXAMPLE ═══ -->
+<div class="section">
+  <div class="section-num">05</div>
+  <div class="section-body">
+    <div class="section-title">API 调用示例（Python + OpenAI 兼容）</div>
+    <div class="code-box">
+      <div class="code-box-hdr">
+        <span>Python · DashScope / OpenAI 兼容</span>
+        <span>qwen3.8-flash</span>
+      </div>
+<pre><code><span class="c-kw">from</span> openai <span class="c-kw">import</span> OpenAI
+
+client = OpenAI(
+    api_key=<span class="c-str">"YOUR_DASHSCOPE_KEY"</span>,
+    base_url=<span class="c-str">"https://dashscope.aliyuncs.com/compatible-mode/v1"</span>
+)
+
+response = client.chat.completions.create(
+    model=<span class="c-str">"qwen3.8-flash"</span>,
+    messages=[
+        {"role": "system", "content": <span class="c-str">"你是千问助手。"</span>},
+        {"role": "user",   "content": <span class="c-str">"用 Python 写一个快速排序"</span>}
+    ],
+    tools=[
+        {"type": "function", "function": {
+            "name": <span class="c-str">"code_interpreter"</span>,
+            "description": <span class="c-str">"执行 Python 代码并返回输出"</span>,
+            "parameters": {"type": "object", "properties": {}}
+        }}
+    ],
+    stream=<span class="c-kw">False</span>
+)
+<span class="c-kw">print</span>(response.choices[<span class="c-num">0</span>].message.content)</code></pre>
+    </div>
+    <div class="warn">
+      <b>注意：</b>工具调用需在千问 AI 平台开通对应能力；Batch API 通过 <code>batch</code> 端点提交，异步返回结果。
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 06 USE CASES ═══ -->
+<div class="section">
+  <div class="section-num">06</div>
+  <div class="section-body">
+    <div class="section-title">适用场景</div>
+    <div class="scene-tags">
+      <div class="scene-tag">🤖 AI 编程</div>
+      <div class="scene-tag alt">📊 长文档分析</div>
+      <div class="scene-tag">🖼️ 多模态智能体</div>
+      <div class="scene-tag alt">🏢 企业 API 集成</div>
+      <div class="scene-tag">📑 办公智能体（RAG）</div>
+      <div class="scene-tag alt">🔍 图像理解与搜索</div>
+      <div class="scene-tag">🌐 实时联网问答</div>
+      <div class="scene-tag alt">📦 异步批处理</div>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--muted);">
+      <span class="check">✓</span> 适合：需要长上下文、高并发 API 调用、多工具协同的企业级应用<br>
+      <span class="cross">✗</span> 不适合：纯本地部署硬件受限场景（建议 Qwen3.8-27B 量化版）
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<div class="footer">
+  <span>开源权重：<a href="https://huggingface.co/Qwen/Qwen3.8-Flash-Next" target="_blank">Hugging Face</a> · <a href="https://modelscope.cn/models/Qwen/Qwen3.8-Flash-Next" target="_blank">ModelScope</a></span>
+  <span>来源：qianwenai.com · IT之家 · AIHub · 雷峰网</span>
+</div>
+
+</div>
+</body>
+</html>
