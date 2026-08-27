@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perplexity Brain — Agent 记忆系统深度解析</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+      --green:#15803d;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(22px,3.6vw,38px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:var(--muted)}
+    .overview-body p{margin:0}
+
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(20px,3.4vw,34px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:16px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:13.5px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:13.5px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ CODE + DIR TREE ============ */
+    .code-box{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto}
+    .code-box code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre}
+    .code-box .c1{color:#79b8ff}
+    .code-box .c2{color:#86efac}
+    .code-box .c3{color:#f8c555}
+    .code-box .c4{color:#f0ebe0}
+    .code-box .c5{color:#d80018}
+    .code-box .c6{color:#1f63ff}
+    .code-box .c7{color:#e8c200}
+    .dir-tree{background:#fff;border:2px solid var(--line);padding:12px 14px;font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.9;color:#111}
+    .dir-tree .d{color:var(--blue);font-weight:900}
+    .dir-tree .f{color:var(--muted)}
+    .dir-tree .k{color:var(--red);font-weight:900}
+
+    /* ============ MATRIX ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:12px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+
+    /* ============ METRICS GRID ============ */
+    .metrics-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .metric-card{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:6px}
+    .metric-card .metric-label{font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+    .metric-card .metric-value{font-size:28px;font-weight:950;line-height:1;color:var(--ink);letter-spacing:-.04em}
+    .metric-card .metric-value.up{color:var(--red)}
+    .metric-card .metric-value.down{color:var(--blue)}
+    .metric-card .metric-note{font-size:12px;color:var(--muted);line-height:1.5}
+
+    /* ============ QUOTE BLOCK + RISK ============ */
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:15px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:13.5px;line-height:1.65;color:#222}
+
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid,.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid,.metrics-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+      .code-box code{font-size:.68rem}
+      .dir-tree{font-size:.68rem}
+    }
+
+    /* ====== check/cross ====== */
+    .check{color:var(--green);font-weight:900}
+    .cross{color:var(--red);font-weight:900}
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- HERO -->
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">Perplexity Brain · 深度解析</div>
+        <h1 class="demo-title">Brain：让 Computer Agent 拥有自我进化的记忆</h1>
+        <p class="subtitle">不是向量数据库，而是文件系统里的 Markdown Wiki——用 cat、grep、Git 就能翻。Dream 每晚自动整理，Memory Agent 按需加载，30 天生产验证：答案正确性 +9.3 pp，即时性 +8.0 pp，Token 消耗 -15%。</p>
+        <div class="badge-row">
+          <span class="badge red">记忆即 Wiki</span>
+          <span class="badge blue">Dream 夜整理</span>
+          <span class="badge dark">Memory Agent</span>
+          <span class="badge">[[wikilinks]]</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge red">Max $200/mo</span>
+          <span class="badge blue">Research Preview</span>
+        </div>
+        <div class="alert">
+          <strong>核心理念：Work Memory &gt; User Memory</strong>
+          <p>传统记忆系统存用户偏好；Brain 存"agent 做了什么"——work memory 比 user memory 更重要。</p>
+          <div class="mini-row">
+            <span class="mini-tag">不是向量库</span>
+            <span class="mini-tag">是文件系统</span>
+            <span class="mini-tag">cat/grep 可翻</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">WORKING MEMORY</div>
+          <h3>Brain = 自我进化的记忆层</h3>
+          <p>三层目录 × Wiki 链接 × Dream 夜整理 × Memory Agent 子 agent。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>一句话：</b>Brain 把 agent 的"经历"变成可追溯、可引用、可挖掘的 Wiki，而不是黑盒 embedding。</b></div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">三层目录结构</div></div>
+            <div class="flow-item red"><div class="t">Step 2</div><div class="c">Wiki 链接横纵上下文</div></div>
+            <div class="flow-item blue"><div class="t">Step 3</div><div class="c">Dream 每晚自动整理</div></div>
+            <div class="flow-item red"><div class="t">Step 4</div><div class="c">Memory Agent 按需加载</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <!-- OVERVIEW -->
+    <div class="overview">
+      <div class="overview-sentence">Brain 是 Perplexity Computer 的记忆核心——用文件系统 Markdown Wiki 替代向量数据库，让 agent 的工作记忆可追溯、可引用、可自我进化。</div>
+      <div class="overview-body">
+        <p>Brain 将 agent 的交互历史存储为标准 Markdown 文件（而非向量 embedding），通过三层目录结构（knowledge/notes/sessions）组织知识，支持 [[wikilinks]] 横向上下文链接和 [cite:N] 证据引用链。Dream 后台 agent 每晚自动 orient → summarize → attach → update 循环，用 Git commit 持久化。Memory Agent 子 agent 按需语义搜索并加载文件。30 天生产数据：答案正确性 +9.3pp（0.600→0.661），召回率 +8.9pp（0.573→0.625），Token -15%，成本 -10%，生成速度 +10%；最大增益出现在偏好问题（+10.2pp）、时间推理（+8.6pp）和活动细节提取（+6.9pp）。定位 Max（$200/月）和 Enterprise Max 订阅者，现为 Research Preview。</p>
+      </div>
+    </div>
+
+    <!-- SECTION 01: Core Architecture -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">CORE ARCHITECTURE</div>
+          <h2>不是向量库，是文件系统 Wiki</h2>
+          <p>Brain 的核心创新：把记忆存在标准 Markdown 文件里，用 Git 追踪历史，用 cat/grep 浏览——完全不需要向量数据库。</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="quote-block">
+          <b>为什么不用向量数据库？</b><br/>
+          embedding 是黑盒——你不知道记忆里有什么、怎么关联、结论从何而来。Brain 选择透明：记忆就是人类可读的文件，[[wikilinks]] 就是关联，[cite:N] 就是证据链。
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">向量数据库</span><span class="tag dark">Brain</span></div>
+          <h3>两种记忆范式对比</h3>
+          <ul>
+            <li><span class="cross">✗</span> embedding 黑盒，不可解释</li>
+            <li><span class="cross">✗</span> 相似性搜索，无法精确引用</li>
+            <li><span class="cross">✗</span> 需要单独向量索引服务</li>
+            <li><span class="check">✓</span> 标准 Markdown，人类可读</li>
+            <li><span class="check">✓</span> Git 版本控制，可追溯历史</li>
+            <li><span class="check">✓</span> cat/grep 即可浏览，无需专有工具</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Directory Tree -->
+      <div class="dir-tree">
+<span class="d">brain/</span>                        <span class="f">← Perplexity Computer 记忆根目录</span>
+  <span class="d">knowledge/</span>                   <span class="f">← Brain 本身：合成知识 Wiki，链接实体/概念/项目/历史</span>
+    entity_<span class="k">perplexity-computer</span>.md  <span class="f">← 链接项目、团队成员、历史</span>
+    concept_<span class="k">brain-architecture</span>.md
+    project_<span class="k">research-preview</span>.md
+    <span class="d">notes/</span>                     <span class="f">← 按主题组织的精炼片段</span>
+    <span class="d">sessions/</span>                   <span class="f">← 原始记录、摘要、完整转录</span>
+      session_<span class="k">2026-08-01</span>.md
+      session_<span class="k">2026-08-15</span>.md
+      summary_<span class="k">2026-08</span>.md
+      transcript_<span class="k">2026-08-20-long</span>.md
+      </div>
+    </section>
+
+    <!-- SECTION 02: Wiki Linking -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">WIKI LINKING</div>
+          <h2>[[wikilinks]] 横向上下文 + [cite:N] 证据链</h2>
+          <p>Brain 的两条核心链接语法：[[wikilinks]] 连接横向上下文（"还需要知道什么？"），[cite:N] 指向证据来源（"这个结论怎么来的？"）。</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">[[wikilinks]]</span><span class="tag dark">横向上下文</span></div>
+          <h3>回答"还需要知道什么？"</h3>
+          <p>在 Markdown 文件中用 <code>[[实体名]]</code> 或 <code>[[project/项目名]]</code> 链接相关实体、概念、项目：</p>
+          <div class="code-box">
+<code><span class="c5">## Brain 架构概述
+
+Brain 是 [[perplexity-computer]] 的记忆核心，
+基于 [[knowledge-base]] 而非向量数据库。
+参见 [[project/research-preview]] 了解最新进展。</code>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">链接目标可是 entity、concept、project、历史学习记录——形成横向上下文网络。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag red">[cite:N]</span><span class="tag dark">证据链</span></div>
+          <h3>回答"结论从何而来？"</h3>
+          <p>用 <code>[cite:N]</code> 指向原始 session 或 connector 来源，建立可验证的证据边：</p>
+          <div class="code-box">
+<code><span class="c5">## Brain 评估结论
+
+Brain 在 30 天生产中[cite:1]提升答案正确性
++9.3pp（0.600→0.661），Token 消耗 -15%[cite:2]。
+
+证据来源：
+[1] sessions/session_2026-08-01.md
+[2] sessions/session_2026-08-15.md</code>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">84% 的问题 agent 可验证地接触了绑定到黄金证据的来源。</p>
+        </div>
+      </div>
+
+      <!-- Two link types side by side -->
+      <div class="grid-3">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">链接类型</span></div>
+          <h3>[[wikilinks]]</h3>
+          <p>横向上下文边——连接相关实体、概念、项目。</p>
+          <ul>
+            <li>用途：扩展上下文</li>
+            <li>回答：还需要知道什么？</li>
+            <li>位置：knowledge/ 下各文件</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag red">链接类型</span></div>
+          <h3>[cite:N]</h3>
+          <p>证据边——向下连接到原始 session 或 connector 来源。</p>
+          <ul>
+            <li>用途：可验证的引用链</li>
+            <li>回答：结论怎么来的？</li>
+            <li>位置：结论性陈述后</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">探索方式</span></div>
+          <h3>cat / grep</h3>
+          <p>用标准 Unix 工具浏览 Brain，无需专有客户端：</p>
+          <div class="code-box">
+<code><span class="c4">$ grep -r "wikilink" brain/</span>
+<span class="c4">$ cat brain/knowledge/</span>
+<span class="c4">  entity_perplexity.md</span>
+<span class="c4">$ git log brain/</span>
+<span class="c4">  ← 查看历史版本</span></code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 03: Dream & Memory Agent -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">DREAM &amp; MEMORY AGENT</div>
+          <h2>Dream 每晚整理 + Memory Agent 按需加载</h2>
+          <p>Dream 是每晚运行的后台整理 agent，执行四阶段循环；Memory Agent 是按需触发的语义搜索子 agent，两者共同构成 Brain 的自动维护机制。</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">Dream</span><span class="tag dark">Nightly Agent</span></div>
+          <h3>Dream：每晚四阶段整理循环</h3>
+          <p>默认每晚自动执行（可配置间隔），完整四阶段：</p>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Phase 1</div><div class="c">Orient — 定位今日新增内容</div></div>
+            <div class="flow-item blue"><div class="t">Phase 2</div><div class="c">Summarize — 总结新 session</div></div>
+            <div class="flow-item red"><div class="t">Phase 3</div><div class="c">Attach — 附加重要观察</div></div>
+            <div class="flow-item dark"><div class="t">Phase 4</div><div class="c">Update — 更新 links & citations</div></div>
+          </div>
+          <p style="margin-top:10px;font-size:12.5px">通过确定性格式检查 + 语义证据验证后，用 <code>git commit</code> 提交更改。记忆进化由 Git 版本控制追踪。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Memory Agent</span><span class="tag dark">On-demand Subagent</span></div>
+          <h3>Memory Agent：按需语义搜索</h3>
+          <p>独立子 agent，在 agent 需要特定记忆时触发：</p>
+          <div class="code-box">
+<code><span class="c6">启动时</span>: <span class="c3">预加载初始 map</span>
+<span class="c6">运行中</span>: <span class="c3">Memory Agent 语义搜索</span>
+<span class="c6">加载时</span>: <span class="c3">按需补充文件</span>
+
+<span class="c4"># 混合物化策略</span>
+preload_map = <span class="c3">initial_context</span>
+memory_agent.search(<span class="c3">query</span>)
+memory_agent.load(<span class="c3">relevant_files</span>)</code>
+          </div>
+          <p style="margin-top:10px;font-size:12.5px">Memory Agent 不是每次都全量搜索，而是结合预加载 initial map + 按需语义补充的混合物化策略，平衡速度与精度。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 04: 30-Day Production Metrics -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="label b">30-DAY PRODUCTION DATA</div>
+          <h2>30 天生产验证：四项核心指标全面提升</h2>
+          <p>Perplexity 内部 30 天 A/B 测评（Baseline vs Brain），在真实生产流量下验证效果。</p>
+        </div>
+      </div>
+
+      <!-- Primary Metrics -->
+      <div class="metrics-grid" style="margin-bottom:14px">
+        <div class="metric-card">
+          <div class="metric-label">答案正确性</div>
+          <div class="metric-value up">+9.3pp</div>
+          <div class="metric-note">0.600 → 0.661</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">即时性（Currentness）</div>
+          <div class="metric-value up">+8.0pp</div>
+          <div class="metric-note">最新信息召回提升</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">召回率（Recall）</div>
+          <div class="metric-value up">+8.9pp</div>
+          <div class="metric-note">0.573 → 0.625</div>
+        </div>
+      </div>
+
+      <!-- Secondary Metrics -->
+      <div class="metrics-grid" style="margin-bottom:14px">
+        <div class="metric-card">
+          <div class="metric-label">Token 消耗</div>
+          <div class="metric-value down">-15%</div>
+          <div class="metric-note">生成等量答案更少 Token</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">成本</div>
+          <div class="metric-value down">-10%</div>
+          <div class="metric-note">综合成本下降</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">生成速度</div>
+          <div class="metric-value up">+10%</div>
+          <div class="metric-note">响应延迟改善</div>
+        </div>
+      </div>
+
+      <!-- Max Gain Areas -->
+      <div class="grid-3">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">最大增益</span></div>
+          <h3>偏好问题</h3>
+          <div class="metric-value up" style="font-size:32px">+10.2pp</div>
+          <p>用户偏好类问题提升最显著——Brain 记住用户习惯后，个性化回答质量明显提高。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">最大增益</span></div>
+          <h3>时间推理</h3>
+          <div class="metric-value up" style="font-size:32px">+8.6pp</div>
+          <p>时间相关问题（如"上周发生了什么"）大幅改善——sessions/ 目录保留了完整时间线。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">最大增益</span></div>
+          <h3>活动细节提取</h3>
+          <div class="metric-value up" style="font-size:32px">+6.9pp</div>
+          <p>具体活动描述和细节提取能力增强——[[wikilinks]] 建立了活动间的横向关联网络。</p>
+        </div>
+      </div>
+
+      <div class="quote-block" style="margin-top:14px">
+        <b>关键发现：</b>84% 的问题中，agent 可以验证地接触到绑定到黄金证据的来源（via [cite:N] 链接）。这意味着 Brain 不仅是"感觉更好"，而是可审计、可引用的记忆系统。
+      </div>
+    </section>
+
+    <!-- SECTION 05: Pricing & Access -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">PRICING &amp; ACCESS</div>
+          <h2>定位 Max（$200/月）和 Enterprise Max</h2>
+          <p>Brain 目前处于 Research Preview 阶段，主要面向 Max 订阅者（$200/月）和企业级用户。</p>
+        </div>
+      </div>
+
+      <div class="risk-grid">
+        <div class="risk" data-accent="red">
+          <div class="n">$</div>
+          <h4>Max 订阅</h4>
+          <p><strong style="color:var(--red)">$200/月</strong>，含 Brain 功能（Research Preview）。</p>
+          <p style="margin-top:6px">适合高强度 Perplexity Computer 用户，30 天验证效果已证明 ROI。</p>
+        </div>
+        <div class="risk" data-accent="blue">
+          <div class="n">E</div>
+          <h4>Enterprise Max</h4>
+          <p>企业级部署，支持团队共享 Brain 记忆，支持更多 connector 和数据源。</p>
+          <p style="margin-top:6px">适合企业知识管理、多人协作场景。</p>
+        </div>
+        <div class="risk" data-accent="dark">
+          <div class="n">RP</div>
+          <h4>Research Preview</h4>
+          <p>当前阶段，功能持续迭代中。部分用户可提前体验。</p>
+          <p style="margin-top:6px">未来随功能完善可能调整定价和定位。</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">适用</span></div>
+          <h3>Brain 最适合的场景</h3>
+          <ul>
+            <li><span class="check">✓</span> 多会话、长周期任务（需要跨时间上下文）</li>
+            <li><span class="check">✓</span> 需要可追溯证据链的专业查询</li>
+            <li><span class="check">✓</span> 偏好密集型任务（用户习惯影响答案质量）</li>
+            <li><span class="check">✓</span> 企业知识管理（团队共享 Brain）</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag red">不适合</span></div>
+          <h3>Brain 暂不适用的场景</h3>
+          <ul>
+            <li><span class="cross">✗</span> 一次性单次查询（启动成本不划算）</li>
+            <li><span class="cross">✗</span> 完全独立的短任务（无跨会话价值）</li>
+            <li><span class="cross">✗</span> 需要实时数据库的场景（Brain 是事后整理）</li>
+            <li><span class="cross">✗</span> Max 订阅以下用户（暂未开放）</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">Perplexity Brain · Agent 记忆即知识 Wiki · 核心数据来源：Perplexity AI 官方披露（2026-08 内部测评）</p>
+  </main>
+</body>
+</html>
