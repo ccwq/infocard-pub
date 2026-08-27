@@ -72,7 +72,13 @@ function validateThemeContract({ root, bundle, entries }) {
   if (!metaStyle) add('meta.style', `must equal "${style}"`);
   else if (metaStyle !== style) add('meta.style', `"${metaStyle}" !== bundle.style "${style}"`);
 
-  const literals = colorLiteralMatches(html);
+  // Theme palette declarations are allowed in :root; only component declarations
+  // must consume variables instead of hard-coding colors.
+  const componentCss = html
+    .replace(/:root\s*\{[^{}]*\}/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '');
+  const literals = colorLiteralMatches(componentCss);
   if (literals.length) add('html.colors', `hard-coded color literals are forbidden (${literals.slice(0, 8).join(', ')})`);
   if (!/var\(\s*--[a-z0-9-]+/i.test(html)) add('html.tokens', 'must consume theme CSS variables via var(--token)');
   return { valid: errors.length === 0, errors };
