@@ -1,7 +1,7 @@
 ---
 name: infocard-topic-selection
-description: Use when selecting or evaluating information-card topics from the user's profile or from explicitly supplied themes; rank single or multiple candidates without researching, authoring, or publishing cards.
-version: 1.0.0
+description: Use when selecting or evaluating information-card topics from the user's profile or explicitly supplied themes; judge value and visual expression potential without choosing a concrete infocard theme or publishing.
+version: 2.0.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -59,7 +59,7 @@ metadata:
 - 核心切入角度；
 - 目标读者；
 - 推荐信息卡结构；
-- 推荐视觉风格；
+- 视觉表达潜力（如时间线、流程图、对比表或架构图），不输出具体主题名；
 - 主要风险与缺口；
 - 是否建议进入调研阶段。
 
@@ -133,7 +133,7 @@ metadata:
 - 从“AI 很厉害”改为“它的架构、边界和真实使用条件是什么”；
 - 从“某观点很流行”改为“观点背后的机制、证据和适用范围是什么”。
 
-推荐输出 1—3 个标题草案，但不要写成最终发布文案。
+推荐输出 1—3 个标题草案，但不要写成最终发布文案。视觉潜力只描述信息组织形态；具体 `style`、候选池和主题选择统一交给 `infocard-theme-assignment`。
 
 ## Source and Platform Boundary
 
@@ -236,6 +236,10 @@ metadata:
 - 适合架构图、流程图、时间线、对比表或操作手册的主题。
 
 当用户指定主题或候选列表时，指定输入优先于画像默认值；画像只用于补充角度、目标读者和风格建议，不得擅自改题。
+
+## 与主题分配的边界
+
+本 skill 输出 `topic_value`、`content_shape_hint` 和 `visual_expression_potential` 即可，不输出 `theme_primary`、`theme_fallback`、具体 style 或主题权重。进入 authoring 前，由 `infocard-content-types` 确定内容结构，再由 `infocard-theme-assignment` 生成候选池并写入 `theme-decision.json`。选题判断不因主题偏好而替代内容价值判断。
 
 ## Operating Rules
 

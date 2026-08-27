@@ -1,7 +1,7 @@
 ---
 name: infocard-publish-sop
 description: Use when creating or publishing an infocard through the mandatory .docs-to-promotion workflow.
-version: 4.1.0
+version: 4.2.0
 ---
 
 # Infocard Publish SOP: `.docs` → Promotion → Main Checkout
@@ -50,7 +50,7 @@ Author writes only under `.docs/<run-id>/<slug>/`:
 card.html
 card.html.meta.yaml
 facts.json or research.md
-theme-decision.txt
+theme-decision.json
 promotion-manifest.json
 visual/
 assets/ (only declared assets)
@@ -80,7 +80,7 @@ slug, path, category, title, desc, date, updated, tags,
 author, source, source_url, style
 ```
 
-`path` must exactly equal the manifest HTML target. `date` and `updated` use quoted `YYYY-MM-DD HH:MM:SS`; Publisher sets final promotion time. Theme decision evidence must record content shape, primary/fallback theme, and rejection rationale before candidate HTML is written.
+`path` must exactly equal the manifest HTML target. `date` and `updated` use quoted `YYYY-MM-DD HH:MM:SS`; Publisher sets final promotion time. Theme evidence must be the validated `.docs/<run-id>/<slug>/theme-decision.json` produced by `infocard-theme-assignment` before candidate HTML is written. This SOP validates its selected theme against the sidecar, HTML, and visual evidence; it never generates candidates, ranks themes, or makes a second theme decision.
 
 ## Promotion
 

@@ -22,4 +22,4 @@ Session pattern distilled from `http-proxy-to-socks` graph-paper card.
 Graph/manual-style infocards are read like reference sheets. A parameter matrix that already fits within desktop width should read in one pass on desktop; independent horizontal scrolling is the fallback for phone width, not the desktop default.
 
 ## Pointer
-Use together with the `infocard-creation-preview-standards` desktop readability rule and the `infocard-mobile-rendering-verification` mobile overflow checks.
+Use together with the `infocard-creation-preview-standards` desktop readability rule and the `infocard-mobile-verifier` mobile overflow checks.

@@ -12,7 +12,7 @@ The user clarified two things about infocard standards:
 Store these as follows:
 
 - Put the canonical rule in `infocard-creation-preview-standards`.
-- Let `infocard-pub-publisher` and `infocard-mobile-rendering-verification` reference that umbrella skill rather than redefining the same rule in parallel.
+- Let `infocard-pub-publisher` and `infocard-mobile-verifier` reference that umbrella skill rather than redefining the same rule in parallel.
 
 ## Why this matters
 

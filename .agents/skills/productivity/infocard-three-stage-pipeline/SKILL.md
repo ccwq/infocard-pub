@@ -38,7 +38,8 @@ Publisher → 主 checkout manifest promotion → visual gate → build/verify �
 
 ### Author
 
-- 基于 `.docs` 研究 handoff 写 `.docs/<run-id>/<slug>/card.html`、`card.html.meta.yaml`、`theme-decision.txt`、`promotion-manifest.json` 和视觉证据；
+- 基于 `.docs` 研究 handoff 写 `.docs/<run-id>/<slug>/card.html`、`card.html.meta.yaml`、`theme-decision.json`、`promotion-manifest.json` 和视觉证据；
+- 主题由 `infocard-theme-assignment` 唯一决定；Author 只读取并校验该 JSON，不生成候选、排序或第二套主题规则。sidecar 的 `style` 使用同一 registered bare slug（必要时按 canonical normalization 校验）。
 - 存疑项保持明确标记，不擅自升级为确定事实；
 - 不调研、不 build、不 commit/push、不写正式 `docs/`/`assets/`，不写 Wiki。
 

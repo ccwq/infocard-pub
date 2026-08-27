@@ -66,16 +66,22 @@ claim | source | status(confirmed/claimed/unsupported) | final wording
 
 ### 2. 主题选择与 run evidence
 
-根据 `infocard-theme-assignment` 选择注册主题，并在 `.docs/<run-id>/<slug>/theme-decision.txt` 保留：
+调用 `infocard-theme-assignment` 生成并冻结 `.docs/<run-id>/<slug>/theme-decision.json`。该 JSON 是唯一主题决策源；本 skill 只消费并检查它，不重新选择主题：
 
-```text
-content_shape: ...
-theme_primary: ...
-theme_fallback: ...
-theme_reject: ...
+```json
+{
+  "content_type": "...",
+  "content_shape": "...",
+  "candidate_themes": ["..."],
+  "excluded_themes": [{ "theme": "...", "reason": "..." }],
+  "selection_weights": { "...": 1 },
+  "seed": "...",
+  "selected_theme": "...",
+  "user_override": { "requested": null, "accepted": false, "reason": null }
+}
 ```
 
-读取对应 `theme/<theme>.html` 和 style skill。HTML 必须使用注册 `data-theme`，sidecar 必须使用对应 canonical `style`，并满足 token + 结构签名门禁。
+读取对应 `theme/<selected_theme>.html` 和 style skill，使用主题分配模块解析/校验决策记录。HTML 必须使用与 `selected_theme` 一致的注册 `data-theme`，sidecar 必须使用同一 bare slug 的 canonical `style`，并满足 token + 结构签名门禁。缺失或冲突时返回 `THEME_BLOCKED`；不得生成旧式文本决策记录或旧四字段。
 
 ### 3. Authoring：只写 `.docs`
 

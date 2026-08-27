@@ -1,19 +1,22 @@
-# Authorized infocard run: resource recovery and visual evidence
+# Historical incident: authorized infocard run resource recovery
+
+> Historical case study only. Do not execute this document as a current recovery
+> SOP. Current authorization, staging, visual gates, and publication follow
+> `infocard-publish-sop` in the main checkout.
 
 ## Incident pattern
 
 A multi-card publish had explicit create-and-publish authorization. Intermediate screenshot automation failed, and the run was incorrectly paused for repeated user confirmation. The correct response is to preserve authorization and switch tools.
 
-## Reliable recovery ladder
+## Historical recovery observations
 
-1. Existing Chrome CDP 9222: inspect tabs, navigate a dedicated preview tab, read DOM dimensions.
-2. Local HTTP preview: verify each exact card URL returns 200.
-3. System Chrome headless: capture one card and one viewport per command with `--window-size=390,844` and `--window-size=1280,900`.
-4. For long pages, capture a bounded viewport or region; do not use an artificial height such as 5000px as proof of full-page layout.
-5. Read `document.documentElement.scrollHeight`, `document.body.scrollHeight`, `scrollWidth`, and `clientWidth` before interpreting visual output.
-6. Use `vision_analyze` serially or in small groups. A provider capacity error is an infrastructure result; do not turn it into a new user-confirmation gate.
-7. Run build → stage generated indexes → verify-index → stage declared cards → leak scan → commit → `git push origin HEAD:main`.
-8. Verify Pages workflow SHA, raw GitHub content, exact Pages URL, and release fingerprint separately.
+The incident exposed these observations, retained for diagnosis and review:
+
+- Inspect the existing browser session and DOM dimensions before interpreting screenshots.
+- A local HTTP 200 or a first-screen screenshot is not visual acceptance evidence by itself.
+- Long pages need bounded viewport or region captures; an artificial 5000px viewport is not proof of full-page layout.
+- Provider capacity errors are infrastructure results and should not silently become a new user-confirmation gate.
+- Build, staging, verification, commit, push, and public verification belong to the ordered `infocard-publish-sop` flow; this historical note does not prescribe those commands.
 
 ## Screenshot diagnosis
 

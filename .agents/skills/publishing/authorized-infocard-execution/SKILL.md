@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [infocard, publishing, execution, recovery]
-    related_skills: [infocard-publish-sop, infocard-mobile-rendering-verification, visual-verification-gate]
+    related_skills: [infocard-publish-sop, infocard-mobile-verifier, visual-verification-gate]
 ---
 
 # Authorized Infocard Execution

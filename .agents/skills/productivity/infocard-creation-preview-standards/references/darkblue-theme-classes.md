@@ -119,5 +119,5 @@ font-family: Inter, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", 
 ```
 
 ## 参考源文件
-- 完整 CSS 骨架：`/tmp/infocard-unlimited-ocr/theme/darkblue.html`
-- 实际信息卡示例：`/tmp/infocard-unlimited-ocr/docs/20260722-unlimited-ocr-rswa.html`
+- 完整 CSS 骨架：`theme/darkblue.html`
+- 实际信息卡示例：`docs/20260722-unlimited-ocr-rswa.html`

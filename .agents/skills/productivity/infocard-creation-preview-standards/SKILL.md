@@ -1,13 +1,13 @@
 ---
 name: infocard-creation-preview-standards
-description: Use when creating, previewing, or revising infocard HTML so PC/mobile preview entrypoints, responsive authoring constraints, and wide-table handling stay consistent across themes.
+description: Use when creating or revising infocard HTML so preview entrypoints and creation-time responsive constraints stay consistent across themes.
 version: 1.0.0
 author: Hermes Agent
 license: MIT
 metadata:
   hermes:
-    tags: [infocard, preview, responsive, mobile, publishing, live-server]
-    related_skills: [infocard-pub-publisher, infocard-mobile-rendering-verification, infocard-legibility-publishing]
+    tags: [infocard, preview, responsive, live-server]
+    related_skills: [infocard-mobile-verifier, infocard-publish-sop]
 ---
 
 # Infocard Creation & Preview Standards
@@ -67,23 +67,7 @@ Use this skill when:
 
 ### 0) Rule placement discipline
 
-Cross-theme preview and responsive rules belong in this umbrella skill first.
-
-Use this placement model:
-- **This skill** owns the canonical rule for preview entrypoints, PC/mobile preview parity, creation-time responsive constraints, and desktop-vs-mobile table readability.
-- **Publish / mobile / legibility skills** should reference this skill as the source of truth, then keep only their execution-specific layer.
-- Do not scatter the same preview rule independently across multiple infocard skills unless a local execution note is genuinely necessary.
-
-This prevents rule drift such as:
-- preview rules being treated as mobile-only
-- PC preview and mobile preview using different conventions
-- wide-table handling being remembered only as QA instead of as a creation constraint
-
-### 0.1) When a wide table rule belongs here
-
-If the user says a wide-table rule is **style-agnostic** or says it should apply during creation rather than only during verification, treat it as a base preview/authoring rule and store it here first.
-
-Only keep shorter execution references in downstream skills.
+本 skill 只负责创建阶段的通用预览面和响应式约束。真实移动端验收、截图、DOM 诊断与修复统一交给 `infocard-mobile-verifier`；发布级门禁由 `infocard-publish-sop` 和 `visual-verification-gate` 负责。不要在这里复制下游验收或发布 SOP。
 
 
 ### 1) Standard local preview surface
@@ -177,44 +161,12 @@ Avoid putting the primary parameter/options table inside a left-right split that
 
 Mobile may still use an independent horizontal-scroll container when needed, but desktop should first try to preserve one-screen legibility for the main manual table.
 
-## Standard Workflow
+## Creation-stage checklist
 
-1. Create or revise the card in `infocard-pub`.
-2. Start local preview with `live-server` on `10.6.8.14:5588`.
-3. Open the draft URL on the standard LAN preview surface.
-4. Review PC layout first on the same preview surface.
-5. Review mobile layout on the same preview surface.
-6. For any wide table, verify that the table region—not the whole page—owns the horizontal scroll behavior.
-7. Only after preview is structurally correct should publish verification continue.
-
-### Source-tree build and commit hygiene
-
-For a new card created in an isolated worktree from `origin/main`:
-
-1. Write the HTML, matching `.meta.yaml`, and the repository-conventional Markdown report before building.
-2. Run `npm run build`; treat `_index.yaml` and the root `index.html` as generated deliverables and inspect them for changes.
-3. Run `npm run verify`, `npm test`, and a file-scoped leak scan such as `node scripts/check-info-leak.js <html> <meta> <report>`.
-4. Run `git diff --check` and a direct forbidden-term scan over the three authored files when the brief imposes content exclusions.
-5. Build scripts may rewrite the new metadata timestamp. Preserve that generated timestamp rather than manually reverting it.
-6. Stage only the authored bundle and generated index outputs. Confirm `git status --short` before committing.
-7. Do not run broad `npm run fix-taxonomy` as a reflex on a fresh card: it can touch unrelated historical metadata and may fail on legacy shapes. If it has already modified unrelated files, restore only those unrelated changes, keep the target bundle, and continue with the targeted verification commands.
-8. A successful build may still print historical slug-mismatch warnings; distinguish those repository-baseline warnings from errors affecting the new bundle.
-
-### Reading `npm run build` output correctly
-
-`npm run build` is a pipeline of scripts run sequentially. Even if one script prints a `fatal:` line, the overall build may still complete successfully — check the **last script** in the output.
-
-Common patterns:
-- `fatal: path 'docs/...html.meta.yaml' exists on disk, but not in 'HEAD'` — this is **normal and expected** for brand-new files. Git is saying the file is untracked. The build pipeline continues after this. Look for the final script output (`[build-site] wrote _index.yaml`) to confirm success.
-- `[fix-meta-shape] ... errors=0` — clean.
-- `wrote _index.yaml and injected index.html (N cards)` — confirmed success, where N is the total card count.
-- Historical slug-mismatch warnings are **repository baseline issues**, not problems with the new card.
-
-**Verification sequence after build:**
-```bash
-node scripts/check-info-leak.js docs/<slug>.html  # 0 issues = pass
-git log --oneline -3                                # confirm HEAD stable
-```
+1. 在主 checkout 的 `.docs/<run-id>/<slug>/` 创建或修订候选稿。
+2. 使用统一的 `live-server` 预览面检查桌面布局。
+3. 对宽表、代码块、多列块、图片和固定控件预先设计窄屏处理，并在交给 `infocard-mobile-verifier` 前记录处理意图。
+4. 需要移动端证据时，转交 `infocard-mobile-verifier`；本 skill 不执行移动截图或发布门禁。
 
 ## Common Pitfalls
 
@@ -233,45 +185,17 @@ git log --oneline -3                                # confirm HEAD stable
 5. **Using a different local server ad hoc.**
    Wrong. Standard infocard preview should converge on `live-server` at `10.6.8.14:5588` unless an explicit exception is documented.
 
-## Mobile Screenshot: Use Local Chrome, Not CDP
-
-When verifying mobile layout, **do not use CDP `Page.captureScreenshot`** — it times out on headless CDP targets. Any local Chrome CLI invocation must follow `chrome-automation-safety`: unique temporary profile, owned cleanup only, and no default `--no-sandbox`.
-
-**Correct approach (2026-06-27 confirmed):**
-```bash
-PROFILE_DIR="$(mktemp -d /tmp/hermes-card-profile.XXXXXX)"
-google-chrome --headless=new --disable-gpu \
-  --user-data-dir="$PROFILE_DIR" \
-  --screenshot=/tmp/card-390.png \
-  --window-size=390,844 \
-  --force-device-scale-factor=2 \
-  http://127.0.0.1:4173/docs/<slug>.html
-rm -rf "$PROFILE_DIR"
-```
-
-This writes directly to file and returns a real PNG. The `window-size` controls viewport dimensions; `force-device-scale-factor=2` gives 2× retina quality.
-
-**Why not CDP screenshot:** CDP `Page.captureScreenshot` on headless targets times out (~30s) even for small pages. The Chrome CLI approach is reliable and instant.
-
-**Verification pipeline for each card:**
-1. `npm run preview` (background)
-2. `google-chrome --headless=new ... --window-size=390,844 ... URL`
-3. `vision_analyze` or `mcp_minimax_understand_image` on the PNG
-
-Do not attempt CDP screenshot unless a live interactive browser session is already attached.
-
 ## References
 
 - `references/manual-table-desktop-vs-mobile.md` — when a manual/parameter table should become full-width on desktop while preserving local horizontal scroll on mobile.
 - `references/rule-placement-and-table-scope-2026-06-18.md` — why cross-theme preview rules and style-agnostic wide-table constraints belong in this umbrella skill first.
 - `references/darkblue-theme-classes.md` — darkblue 主题 CSS class 速查（调色板、hero、card、pill、grid 布局、SVG 简图规范），含完整参考源文件路径。
 
-## Verification Checklist
+## Handoff checklist
 
 - [ ] Local preview uses `live-server`
 - [ ] Preview URL uses `http://10.6.8.14:5588/docs/<slug>.html`
-- [ ] PC preview and mobile preview use the same preview surface
+- [ ] 桌面预览已在统一 preview surface 完成
 - [ ] Responsive constraints were handled during creation, not deferred blindly to final QA
-- [ ] Wide tables use a dedicated horizontal scroll container when needed
-- [ ] Mobile can reach the rightmost table columns without shrinking the entire page
+- [ ] 宽表使用局部滚动容器或已设计移动 card/list 表达
 - [ ] Rule application is theme-agnostic
