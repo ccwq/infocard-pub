@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>x64dbg MCP Server：AI Agent 操控 Windows 调试器，下断点 / 读内存 / 逆向分析</title>
+<meta name="description" content="x64dbg MCP Server 将 Windows 经典调试器 x64dbg 接入 MCP 协议，Claude Code、Codex 等 AI Agent 可直接调用断点、内存读取、寄存器 Dump 等调试能力，用自然语言完成程序逆向分析。Zig 构建，零依赖单文件。">
+<style>
+:root{
+  --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+  --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+  --shadow:8px 8px 0 rgba(17,17,17,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  color:var(--ink);line-height:1.58;
+  background:
+    linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+    linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+    radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+    radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+    var(--bg);
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";color:var(--red);font-size:10.5px}
+.demo-title{margin:0;max-width:820px;font-size:clamp(20px,3.2vw,36px);line-height:.98;letter-spacing:-.05em}
+.subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+.badge-row{display:flex;flex-wrap:wrap;gap:6px}
+.badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+.badge.red{background:var(--red);color:#fff}
+.badge.blue{background:var(--blue);color:#fff}
+.badge.dark{background:#111;color:#fff}
+.badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+.alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+.alert strong{display:block;font-size:13.5px;line-height:1.35}
+.alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+.hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+.hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+.panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+.panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+.flow{display:grid;gap:8px}
+.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+.flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+.flow-item.red .c{color:var(--red)}
+.flow-item.blue .c{color:var(--blue)}
+.flow-item.dark .c{color:#111}
+
+.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+.section-no.b{background:var(--blue)}
+.section-no.k{background:#111}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+.section-meta .label.b{color:var(--blue)}
+.section-meta .label.k{color:#111}
+.section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+.section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+.grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+.card,.mini{padding:14px}
+.card{display:grid;gap:10px}
+.card h3,.mini h4{margin:0;letter-spacing:-.02em}
+.card h3{font-size:17px;line-height:1.16}
+.card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+.card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+.card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+.tag.red{background:var(--soft-red)}
+.tag.blue{background:var(--soft-blue)}
+.tag.dark{background:#111;color:#fff}
+
+.matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.matrix .mini{display:grid;gap:8px}
+.mini h4{font-size:15px;line-height:1.2}
+.mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.mini .red{color:var(--red)}
+.mini .blue{color:var(--blue)}
+.mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+.quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+.quote-block b{color:#111}
+pre{margin:0;background:#111;color:#e8e8e8;padding:14px;border:2px solid var(--line);overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.72}
+.rule{height:3px;background:#111;margin:8px 0 0}
+.source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+.footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+.footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+.footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+.footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+.footer-block .meta{font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px}
+
+.style-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:0}
+.style-table th{padding:8px 12px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;text-align:left}
+.style-table td{padding:8px 12px;border:2px solid var(--line);vertical-align:top}
+.style-table tr:nth-child(even) td{background:var(--soft-ink)}
+.style-table .style-id{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--blue);font-weight:700}
+.style-table .feat-tag{display:inline-flex;padding:2px 6px;background:var(--soft-red);border:1.5px solid var(--red);font-size:10.5px;font-weight:850;color:var(--red)}
+.style-table .feat-tag.blue{background:var(--soft-blue);border-color:var(--blue);color:var(--blue)}
+.style-table .feat-tag.dark{background:#111;color:#fff;border-color:#111}
+
+@media(max-width:1080px){
+  .hero{grid-template-columns:1fr}
+  .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+  .grid-4,.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+  .hero{display:flex;flex-direction:column}
+  .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+  .grid-4,.grid-3,.grid-2,.matrix{grid-template-columns:1fr}
+  .section-head{grid-template-columns:1fr;gap:10px}
+  .section-no{width:72px;height:72px;font-size:28px}
+  .style-table{font-size:11px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">REVERSE ENGINEERING · MCP · AI AGENT</div>
+    <h1 class="demo-title">x64dbg MCP Server</h1>
+    <p class="subtitle">将 Windows 经典调试器 x64dbg 接入 MCP 协议，Claude Code / Codex 等 AI Agent 可直接用自然语言下断点、读内存、做逆向分析。Zig 构建，零依赖单文件输出。</p>
+    <div class="badge-row">
+      <span class="badge red">Zig</span>
+      <span class="badge blue">MCP Server</span>
+      <span class="badge dark">x64dbg</span>
+    </div>
+    <div class="badge-row">
+      <span class="badge ink">零依赖</span>
+      <span class="badge ink">单文件</span>
+      <span class="badge ink">HTTP 接口</span>
+    </div>
+    <div class="alert">
+      <strong>核心价值</strong>
+      <p>以前盯着汇编一点点啃，现在 AI Agent 直接帮你下断点、读寄存器、做程序分析。</p>
+      <div class="mini-row">
+        <span class="mini-tag">★ 1,524</span>
+        <span class="mini-tag">Fork 151</span>
+        <span class="mini-tag">Issue 0</span>
+        <span class="mini-tag">Win x64</span>
+      </div>
+    </div>
+  </div>
+  <figure class="hero-visual">
+    <div class="panel-top">
+      <div class="eyebrow">操作方式</div>
+      <h3>MCP 协议 + HTTP 接口</h3>
+      <p>通过 HTTP 暴露 x64dbg 完整调试能力，任何 MCP 兼容 AI 助手均可接入操控。</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote"><b>一句话：</b>x64dbg MCP Server 让 AI Agent 直接控制调试器，用自然语言完成逆向分析——逆向工程正式进入 Agent 时代。</div>
+      <div class="flow">
+        <div class="flow-item blue"><div class="t">x64dbg</div><div class="c">Windows x64 调试器加载目标程序</div></div>
+        <div class="flow-item red"><div class="t">MCP Server</div><div class="c">HTTP 接口暴露完整调试 API</div></div>
+        <div class="flow-item dark"><div class="t">AI Agent</div><div class="c">Claude Code / Codex 自然语言操控</div></div>
+        <div class="flow-item blue"><div class="t">分析结果</div><div class="c">断点、内存、寄存器返回 AI</div></div>
+      </div>
+    </div>
+  </figure>
+</header>
+
+<!-- OVERVIEW -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no k">01</div>
+    <div class="section-meta">
+      <div class="label k">OVERVIEW · 一句话概述</div>
+      <h2>x64dbg MCP Server 是什么</h2>
+    </div>
+  </div>
+  <div class="grid-2">
+    <article class="card">
+      <div class="tagrow"><span class="tag red">定位</span><span class="tag dark">调试器 MCP 插件</span></div>
+      <h3>x64dbg 的 MCP 协议插件</h3>
+      <p>x64dbg 是 Windows 平台最流行的开源 x64/x32 调试器。本项目为其编写原生 MCP Server 插件，通过 HTTP 接口将调试器完整能力暴露给 AI Agent，让自然语言操控调试成为可能。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">技术栈</span><span class="tag red">Zig</span></div>
+      <h3>Zig 构建 · 零依赖 · 单文件</h3>
+      <p>使用 Zig 语言编写，编译产出单一可执行文件，无需运行时依赖。Windows x64 平台开箱即用。</p>
+    </article>
+  </div>
+  <div class="matrix" style="margin-top:14px">
+    <article class="mini">
+      <div class="lead">GitHub Stars</div>
+      <h4 style="font-size:22px">1,524</h4>
+      <p class="quote-line red">2026-08 实测（上线 5 天）</p>
+    </article>
+    <article class="mini">
+      <div class="lead blue">Forks</div>
+      <h4 style="font-size:22px">151</h4>
+      <p class="quote-line">社区热度极高</p>
+    </article>
+    <article class="mini">
+      <div class="lead">创建时间</div>
+      <h4 style="font-size:16px">2026-08-22</h4>
+      <p class="quote-line">仅 5 天前上线</p>
+    </article>
+    <article class="mini">
+      <div class="lead red">Issues</div>
+      <h4 style="font-size:22px">0</h4>
+      <p class="quote-line">暂无待处理问题</p>
+    </article>
+  </div>
+</div>
+
+<!-- CAPABILITIES -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no">02</div>
+    <div class="section-meta">
+      <div class="label">CAPABILITIES · 调试能力</div>
+      <h2>x64dbg 调试能力全开放</h2>
+      <p>MCP Server 暴露 x64dbg 调试器的完整功能集，AI Agent 可通过 MCP 协议调用。</p>
+    </div>
+  </div>
+  <table class="style-table">
+    <thead>
+      <tr>
+        <th style="width:30%">能力域</th>
+        <th style="width:20%">能力标签</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>断点控制</td>
+        <td><span class="style-id">breakpoint-control</span></td>
+        <td><span class="feat-tag">设置断点</span> <span class="feat-tag">条件断点</span> <span class="feat-tag">硬件断点</span> <span class="feat-tag">内存断点</span></td>
+      </tr>
+      <tr>
+        <td>执行控制</td>
+        <td><span class="style-id">execution-control</span></td>
+        <td><span class="feat-tag.blue">单步执行</span> <span class="feat-tag.blue">步进</span> <span class="feat-tag.blue">运行 / 暂停</span> <span class="feat-tag.blue">跳过函数</span></td>
+      </tr>
+      <tr>
+        <td>内存操作</td>
+        <td><span class="style-id">memory-operations</span></td>
+        <td><span class="feat-tag">读取内存</span> <span class="feat-tag">写入内存</span> <span class="feat-tag">Dump 内存区段</span> <span class="feat-tag">搜索内存</span></td>
+      </tr>
+      <tr>
+        <td>寄存器 &amp; 标志位</td>
+        <td><span class="style-id">registers-flags</span></td>
+        <td><span class="feat-tag.dark">Dump 寄存器</span> <span class="feat-tag.dark">读取标志位</span> 修改寄存器值</td>
+      </tr>
+      <tr>
+        <td>模块 &amp; 符号</td>
+        <td><span class="style-id">modules-symbols</span></td>
+        <td>列出模块、导入/导出表、符号解析、调用栈</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="quote-block" style="margin-top:14px">
+    <b>适用人群：</b>逆向工程师、恶意软件分析师、安全研究员、CTF 选手，以及希望用 AI 辅助理解程序行为的开发者。
+  </div>
+</div>
+
+<!-- USE CASES -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no b">03</div>
+    <div class="section-meta">
+      <div class="label b">USE CASES · 适用场景</div>
+      <h2>谁在用 x64dbg MCP Server</h2>
+      <p>安全研究员、逆向工程师、恶意软件分析者，以及 AI Agent 开发者。</p>
+    </div>
+  </div>
+  <div class="grid-3">
+    <article class="card">
+      <div class="tagrow"><span class="tag red">恶意软件分析</span><span class="tag dark">安全研究</span></div>
+      <h3>AI 辅助恶意软件动态分析</h3>
+      <p>"分析这个 EXE 的网络行为"——AI Agent 自动下断点监控 send/recv、注册表操作和文件写入，无需手动逐行追踪。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">逆向工程</span><span class="tag dark">CTF</span></div>
+      <h3>用自然语言逆向程序逻辑</h3>
+      <p>"找出这个函数在比较什么值"——AI Agent 在对应地址下断点，读取内存并分析，输出结论。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag dark">AI Agent 开发</span><span class="tag red">MCP</span></div>
+      <h3>构建 AI 驱动的调试工作流</h3>
+      <p>在 Claude Code、Codex 中接入 x64dbg MCP Server，构建自动化逆向分析 pipeline，批量处理程序行为验证。</p>
+    </article>
+  </div>
+</div>
+
+<!-- INSTALL -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no">04</div>
+    <div class="section-meta">
+      <div class="label">INSTALL · 安装与使用</div>
+      <h2>安装方式</h2>
+      <p>需要 x64dbg 调试器本体（单独下载）+ MCP Server 可执行文件。</p>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="tagrow"><span class="tag dark">前置</span><span class="tag red">x64dbg 调试器</span></div>
+      <h3>x64dbg 本体</h3>
+      <p>先安装 x64dbg 调试器（x64dbg.com）：</p>
+<pre>https://x64dbg.com</pre>
+      <p style="margin-top:8px">下载 x64dbg_snapshot*.zip，解压后备用。</p>
+    </div>
+    <div class="card">
+      <div class="tagrow"><span class="tag blue">方式一</span><span class="tag dark">GitHub 下载</span></div>
+      <h3>MCP Server 单文件</h3>
+<pre>git clone https://github.com/duty1g/x64dbg-mcp-server
+cd x64dbg-mcp-server
+# 下载或编译 release 版本
+./x64dbg-mcp-server.exe</pre>
+    </div>
+  </div>
+  <div class="grid-2" style="margin-top:12px">
+    <div class="card">
+      <div class="tagrow"><span class="tag red">MCP 集成</span><span class="tag dark">Claude Code</span></div>
+      <h3>Claude Desktop 配置</h3>
+<pre>{
+  "mcpServers": {
+    "x64dbg": {
+      "command": "/path/to/x64dbg-mcp-server.exe",
+      "args": ["--port", "8080"]
+    }
+  }
+}</pre>
+    </div>
+    <div class="card">
+      <div class="tagrow"><span class="tag dark">源码编译</span><span class="tag blue">Zig</span></div>
+      <h3>从源码构建</h3>
+<pre>zig build release
+# 或
+zig build -Drelease-safe</pre>
+    </div>
+  </div>
+</div>
+
+<!-- CREDITS -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no b">05</div>
+    <div class="section-meta">
+      <div class="label b">CREDITS · 项目信息</div>
+      <h2>作者 &amp; 项目信息</h2>
+    </div>
+  </div>
+  <div class="grid-4">
+    <article class="mini">
+      <div class="lead">GitHub 仓库</div>
+      <h4>duty1g</h4>
+      <p>x64dbg-mcp-server</p>
+      <p style="margin-top:6px;font-size:11.5px;color:var(--muted)">Zig · Windows x64</p>
+    </article>
+    <article class="mini">
+      <div class="lead blue">Stars / Forks</div>
+      <h4>1,524 / 151</h4>
+      <p>上线 5 天实测</p>
+    </article>
+    <article class="mini">
+      <div class="lead red">Issues</div>
+      <h4>0</h4>
+      <p>活跃维护</p>
+    </article>
+    <article class="mini">
+      <div class="lead">上线时间</div>
+      <h4 style="font-size:14px">2026-08-22</h4>
+      <p>极新鲜项目</p>
+    </article>
+  </div>
+  <div class="footer-block" style="margin-top:14px">
+    <h3>数据来源与边界说明</h3>
+    <ul>
+      <li>Stars / Forks 数据来源：GitHub API 实时查询（2026-08-28）；1,524 stars 仅上线 5 天，热度极高</li>
+      <li>x64dbg 调试器和 MCP Server 均仅支持 Windows x64 环境，不支持 macOS / Linux</li>
+      <li>恶意软件分析用途请遵守相关法律法规；逆向工程请用于授权的安全研究和学习目的</li>
+    </ul>
+    <div class="meta">来源：X @grgerwcwetwet · GitHub duty1g/x64dbg-mcp-server · 2026-08-28 | Theme: hardblue</div>
+  </div>
+</div>
+
+<div class="rule"></div>
+<p class="source-note">x64dbg MCP Server · AI Agent 操控调试器 · duty1g/x64dbg-mcp-server · Stars 1,524 · Fork 151 · 硬核蓝手册</p>
+</main>
+</body>
+</html>
