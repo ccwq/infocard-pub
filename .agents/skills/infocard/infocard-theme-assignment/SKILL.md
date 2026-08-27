@@ -1,136 +1,75 @@
 ---
 name: infocard-theme-assignment
-description: Use when choosing an infocard theme before .docs authoring.
-version: 2.0.0
+description: Use before infocard .docs authoring to select a registered theme from content-aware candidates. Owns the only content-to-theme association, capability filtering, bounded reproducible variation, and theme-decision.json.
+version: 3.0.0
 author: Hermes Agent
 license: MIT
 metadata:
   hermes:
-    tags: [infocard, theme, style, assignment, hardblue, darkblue, redswiss]
-    related_skills: [infocard-publish-sop, infocard-style-man-skill, infocard-authoring-workflow, any2card]
+    tags: [infocard, theme, assignment, capability, decision-record]
+    related_skills: [infocard-content-types, infocard-authoring-workflow, infocard-publish-sop]
 ---
 
 # 信息卡主题分配
 
-## 适用场景
+## 职责
 
-- 写卡前需要选 `style` / theme；
-- 用户询问主题分配标准、主题库存或批量主题塌缩；
-- 用户未指定主题，需要自动选型并保留依据；
-- 已有卡需要主题重建。
+本 skill 是唯一的内容—主题关联入口，负责：
 
-本 skill 只负责选择与验证主题契约；不替代具体 `infocard-*-style` 的 token/组件规范。选定后仍必须读取对应 style skill 与 `theme/<theme>.html`。
+- 接收已确定的 `content_type`、`content_shape` 和结构需求；
+- 从已注册主题生成候选池；
+- 按能力过滤主题并记录排除原因；
+- 处理用户指定主题；
+- 在合格候选中进行有界加权随机选择；
+- 在 `.docs/<run-id>/<slug>/theme-decision.json` 写入唯一决策记录。
 
-## Authoring 与发布边界
+内容类型只声明结构需求，选题只判断价值，authoring 只消费决策，publish 只验证决策。不要新增或调用第二个 content-theme router，也不要在这些模块复制具体主题映射。
 
-主题选择遵循信息卡唯一工作区模型：
+## 工作流
 
-```text
-.docs/<run-id>/<slug>/theme-decision.txt + candidate artifacts
-→ promotion manifest
-→ Publisher 在主 checkout 提升到 docs/assets、视觉门禁、build、commit、push
+1. 确认 `content_type`、`content_subtype`、`content_shape` 和 `required_modules` 已由内容模块确定。缺失时停止并回到内容分类，不猜主题。
+2. 从 `theme/*.html` 读取实际注册的 bare slug；不能虚构主题，也不能只依据 sidecar 的 `style` 判断主题存在。
+3. 根据内容形态生成候选池。候选是倾向和能力起点，不是固定 Primary/Fallback 绑定；同一内容形态允许多个合格主题。
+4. 对每个候选检查：长标题承载、信息密度、表格、代码、流程/关系模块、图片/风险面板和移动端结构。将不支持项写入 `excluded_themes`，不得静默丢弃。
+5. 若用户指定主题，先放入校验路径：主题已注册、能力满足、能通过视觉门禁则选择；不满足时记录原因并返回合格替代候选，不能无条件服从或静默改选。
+6. 无用户指定主题时，在过滤后的候选池执行 bounded weighted random。随机只用于小范围变化，不能选出池外主题；`seed` 必须保留，便于同一运行复现。
+7. 在写 HTML 前完成并冻结 `theme-decision.json`。authoring 不得覆盖已冻结的选择；任何 override 或主题切换都要生成新的记录并使旧视觉证据失效。
+
+## 能力与选择规则
+
+主题能力至少使用以下键表达，不能用主题名称推断能力：
+
+```json
+{
+  "long_title": true,
+  "dense_content": true,
+  "tables": false,
+  "code_blocks": true,
+  "process_blocks": true,
+  "imagery": false,
+  "risk_panels": true,
+  "mobile_layout": true
+}
 ```
 
-禁止 theme assignment 创建、复用、进入或清理 Git worktree；禁止 `/tmp/infocard*`、临时 clone、detached HEAD、发布分支和 force-push。主题选择不直接写 `docs/`、`assets/`、Git state 或生成索引。
+候选主题的权重应体现内容可读性和组件覆盖，不能把随机当作无约束抽签。最近重复主题、未注册主题和能力不足主题可排除，但每项都必须有稳定理由。若过滤后为空，返回 `THEME_BLOCKED`，不要降低能力门槛；用户可随后改变内容结构或明确授权主题重建。
 
-## Inventory baseline
+## 决策记录
 
-注册主题以 `_themes.yaml` 和 `theme/*.html` 实测为准。当前常用注册 family：
+决策记录的最小结构见 [`references/theme-decision-schema.md`](references/theme-decision-schema.md)。实现位于 [`scripts/theme-decision.js`](scripts/theme-decision.js)，供 authoring/publish 读取和校验。至少包含：
 
-```text
-q, green, black-head, main, blue-technical-manual, darkblue,
-hardblue, redswiss, color-material, wood, handline, darkgreen,
-bigwhite, white-purple, graph-paper, pixelstack, scrapbook,
-archive-green, sage-swiss, crayon
-```
+`content_type`、`content_shape`、`candidate_themes`、`excluded_themes`（含 reason）、`selection_weights`、`seed`、`selected_theme`、`user_override`。
 
-硬规则：
+`selected_theme` 必须是 `theme/*.html` 的 bare slug。sidecar 使用规范化后的 `style`（例如 `infocard-hardblue-style`），HTML 使用同一个 bare slug 的 `data-theme`；三者不一致即阻塞。用户指定主题时，`user_override` 记录请求值、是否接受和理由。
 
-1. `meta.yaml.style` 是声明，不是主题已生效的证据。
-2. 只能使用已注册主题；不得为单卡虚构视觉系统。
-3. 先分类内容形态，再选择 primary/fallback，再读 style skill 与 theme skeleton。
-4. 技术、开源、tool 字样不是 hardblue/redswiss 的自动映射。
-5. 用户禁止 `darkblue` 时，必须从其他注册主题中选，不得把 hardblue 与 darkblue 混同。
+## 批量与重建
 
-## 内容形态 → 主题矩阵
+- 普通单卡只执行候选能力校验和记录，不强制批量 diversity、重复审查或复杂 fallback 字段。
+- 批量复用或主题重建才增加重复主题检查；同主题例外需记录内容形态、读者场景和信息密度理由。
+- 视觉失败先修当前主题的 HTML、DOM、CSS、响应式或内容问题。只有确认是主题能力不适配且完成约定修复轮次后，才从合格池切换主题；切换后重新执行完整桌面与移动视觉门禁。
 
-| 内容形态 | Primary | Fallback | 不要默认成 |
-|---|---|---|---|
-| 单一技术工具 / CLI / 实施手册 / agent workflow | hardblue | redswiss | 标题含 tool 就选 redswiss |
-| 多工具目录 / CLI ecosystem / 对比图库 | redswiss | main | hardblue |
-| AI 架构 / agent 方法论 / paradigm / 系统设计 | darkblue | wood | 仅因技术就 hardblue |
-| UI component / React library，live demo 是核心 | darkblue | hardblue | 标题含 tool 就 redswiss |
-| X-origin agent framework / harness / control plane | darkblue | hardblue | 把架构叙事误降成普通工具手册 |
-| 代码架构 / dependency graph / knowledge network | graph-paper | darkblue | hardblue |
-| Security / hardening / monitoring / zero trust | darkgreen | hardblue | darkblue |
-| Investigation / conclusion-first deconstruction | black-head | hardblue | q / crayon |
-| Tutorial / note-style methodology | white-purple 或 blue-technical-manual | main | hardblue |
-| Reading / longform interpretation | paper-warm 或 bigwhite | wood | hardblue |
-| Hand-drawn process / parallel scheduling sketch | handline | crayon | hardblue |
-| Pixel / retro / game stacking | pixelstack | crayon | hardblue |
-| Light overview / sticker-like comparison | q / crayon / scrapbook | main | black-head |
-| Simon-Willison-like agentic engineering prose | wood | darkblue | redswiss |
-| Brand-green platform product | green | main | hardblue |
-| Unknown / mixed / low-confidence | main | hardblue | 未注册主题 |
+## 边界与验收
 
-## Pre-authoring gate
+本 skill 只选择和验证主题契约，不读取具体 style skill 以外的发布权限，也不直接写 `docs/`、`assets/`、Git state、生成索引或执行 build/commit/push。禁止 worktree、clone、detached HEAD 和 `/tmp/infocard*`。
 
-在写候选 HTML 前，把以下内容保存在 `.docs/<run-id>/<slug>/theme-decision.txt` 或 frozen bundle：
-
-```text
-content_shape: <matrix row>
-theme_primary: <registered theme>
-theme_fallback: <registered theme>
-theme_reject: <why nearby themes were rejected>
-```
-
-缺少任一行即 `THEME_BLOCKED`。作者不能静默覆盖研究/主题建议；任何 override 必须记录理由，并重新按选中主题 skeleton 检查。
-
-## Batch diversity gate
-
-批量 `>= 2` 张卡时：
-
-- 每张卡独立记录 `content_shape`、`theme_primary`、`theme_fallback`、`theme_reject`；
-- 同一主题复用默认阻塞；只有所有卡片确实具有相同内容形态、读者场景和信息密度，或用户明确授权单色批次时才可保留；
-- 同主题例外必须在 bundle 记录 `same_theme_exception` 三部分理由；
-- Publisher promotion/build/push 仍在一个主 checkout 串行进行，不能为每卡创建 worktree。
-
-## Mechanical theme implementation gate
-
-Publisher promotion 后、build 前，每张卡必须验证：
-
-1. sidecar `style` 规范化后对应已注册 bare theme；
-2. HTML 有匹配 `data-theme="<bare-slug>"`；
-3. 目标主题 CSS token signature 存在；
-4. 至少两个目标 structural signatures 存在。
-
-声明与实现不一致、主题未注册或批量复用未获批准时，停止为 `THEME_BLOCKED`。
-
-## Existing card theme rebuild
-
-主题重建不是 metadata 换色。正确流程：
-
-1. 只读已有 `docs/<slug>.html`、sidecar 与 target `theme/<theme>.html`；
-2. 将原内容和新主题 decision 写入 `.docs/<run-id>/<slug>/`；
-3. 从目标主题 skeleton 重建 `.docs` 中 candidate HTML，保留所有原始内容模块；
-4. 更新 `.docs` sidecar candidate 的 canonical `style`；
-5. 创建 promotion manifest，仅声明正式 HTML、sidecar 与必要 assets；
-6. Publisher 在主 checkout promotion 后执行新一轮桌面/移动视觉门禁、build、verify、commit、非强推 push 与公网复核。
-
-不得使用工作树、临时分支、force-push 或“只改 meta.style”的伪重建。任何 HTML/CSS/结构变更都会使先前视觉证据失效。
-
-## After selection
-
-1. 读取 `infocard-<theme>-style`（存在时）；
-2. 读取 `theme/<theme>.html`；
-3. 在 `.docs` 写候选 HTML；
-4. 写 formal sidecar candidate 与 promotion manifest；
-5. 由 Publisher 完成 mechanical gate 与正式发布。
-
-## Closeout must report
-
-- `content_shape`
-- `theme_primary` / `theme_fallback`
-- style skill loaded（或 theme-only）
-- token/signature verification result
-- `.docs` authoring path 与 manifest source-to-target mapping
+验收至少确认：决策记录完整且可解析；固定 seed 得到相同选择；不同获批 seed 只在过滤池内变化；用户主题优先但不绕过能力检查；authoring 和 publish 不包含第二套主题选择规则。

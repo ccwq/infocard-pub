@@ -1,4 +1,6 @@
-# Batch theme collapse — 2026-08-16
+# Batch theme collapse — 2026-08-16（历史参考）
+
+> 本文件仅保留历史背景，不是当前发布指令。新卡统一使用 `theme-decision.json`；不得按本文旧四行记录创建新卡。
 
 ## Incident
 
@@ -15,7 +17,7 @@ Theme selection was treated as a batch-level convenience instead of a per-card c
 
 ## Required prevention
 
-1. Record `content_shape`, `theme_primary`, `theme_fallback`, and `theme_reject` for every card before authoring.
+1. 历史记录曾使用 `content_shape`、`theme_primary`、`theme_fallback` 和 `theme_reject` 四行；当前流程改用 `theme-decision.json`。
 2. For batches of two or more, block same-theme reuse unless a `same_theme_exception` records identical shape, reader scenario, and information density, or the user explicitly authorizes a monochrome batch.
 3. Treat a research/author theme recommendation as an input that cannot be silently overridden.
 4. Verify implementation, not only metadata: `meta.style`, HTML `data-theme`, token signature, and at least two structural signatures must agree.

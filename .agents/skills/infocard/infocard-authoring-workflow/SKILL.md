@@ -119,22 +119,13 @@ This keeps project-specific workflows separate from the global skill library and
 4. Create `.docs/<run-id>/<slug>/promotion-manifest.json` mapping candidate sources to final `docs/<slug>.html`, matching sidecar, and declared `assets/` targets.
 5. Verify the candidate and manifest landed under `.docs`; do not create formal `docs/` files in the Author phase.
 
-### Theme selection (light-route lookup)
+### Theme decision input
 
-`infocard-publish-sop` is the single source of truth for theme assignment. Before writing HTML, classify the content form and apply its decision table.
+`infocard-theme-assignment` is the only owner of content-to-theme association. Before writing HTML, load `.docs/<run-id>/<slug>/theme-decision.json` and the assignment skill's schema. Authoring must not maintain a lookup table, recommend a concrete theme, or perform a second selection.
 
-**⚠️ Hard constraint: must use an actual theme from `theme/` — never fabricate custom CSS.** The theme decision is a structural requirement, not aesthetic preference. Custom CSS built from scratch will be rejected by the user (原话：「风格主题要靠近系统内置主题的其中一个，不是捏造」). If no built-in theme fits, default to `main`.
+The record must already contain `content_type`, `content_shape`, `candidate_themes`, `excluded_themes`, `selection_weights`, `seed`, `selected_theme`, and `user_override`. Confirm that the selected theme is registered, the record is internally consistent, and the HTML `data-theme` plus sidecar `style` normalize to that selected bare slug. If missing or inconsistent, stop with `THEME_BLOCKED` and return to theme assignment.
 
-Quick lookup:
-- single technical tool / CLI / executable implementation manual → `hardblue`
-- multi-tool comparison, catalog, CLI ecosystem → `redswiss`
-- AI architecture, Agent system, paradigm/methodology narrative → `darkblue`
-- code graph, dependency or knowledge network → `graph-paper`
-- tutorial / knowledge note → `blue-technical-manual` or `white-purple`
-- **UI component / React library with live demo as core value** → `darkblue` + **去 mockup 原则**（见下方）
-- unclear fit → `main` (not `hardblue` by default)
-
-**Available themes** (check `theme/` at runtime — this list may be stale): `archive-green`, `bigwhite`, `black`, `blue`, `codex-notebook`, `color-material`, `crayon`, `darkblue`, `darkgreen`, `graph-paper`, `green`, `handline`, `hardblue`, `main`, `pixelstack`, `q`, `redswiss`, `sage-swiss`, `scrapbook`, `white-purple`, `wood`.
+Use the selected registered theme's skill and `theme/<selected_theme>.html` as skeleton input. User-selected themes remain preferred only when the assignment record marks them accepted after capability filtering; authoring never bypasses that check.
 
 **Content depth guide ("内容不要吝啬")**: When user asks for practical-guide level:
 - Expand comparison tables with full detail rows
@@ -182,22 +173,7 @@ google-chrome --headless=new --disable-gpu \
   "http://127.0.0.1:PORT/docs/<slug>.html"
 ```
 
-Before HTML authoring, record `Content form`, `Primary theme`, `Alternative theme`, and `Rejection rationale`; then set HTML `data-theme` to the registered bare slug (for example `hardblue`), set canonical sidecar `style: infocard-hardblue-style`, and verify their normalized match, target tokens, and two structural signatures. This is a hard gate for new cards. For batches of three or more, an all-one-theme result needs the SOP's documented content-form/reader/evidence-density exemption.
-
-## Mandatory theme gate (light-route)
-
-在写任何 HTML 之前，你必须输出并保留这四行：
-
-```
-content_shape: <矩阵中的一行，如 single technical tool>
-theme_primary: <注册主题名，如 hardblue>
-theme_fallback: <备用主题>
-theme_reject: <为什么排除了流行主题>
-```
-
-缺少任一行 = THEME_BLOCKED，停止并加载 infocard-theme-assignment skill。
-
-然后在 meta.yaml 中记录 style 和 theme_reject 依据。
+The decision record replaces the former four-line `theme_primary/theme_fallback/theme_reject` note. Keep rejection reasons and weights in JSON; do not copy them into a competing authoring contract. Any HTML, structure, CSS, content, or theme change invalidates prior visual evidence.
 
 ### Step 2 · Write HTML directly (preferred)
 

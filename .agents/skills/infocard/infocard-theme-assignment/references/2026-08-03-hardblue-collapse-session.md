@@ -1,4 +1,6 @@
-# 2026-08-03 hardblue collapse session
+# 2026-08-03 hardblue collapse session（历史参考）
+
+> 本文件仅用于解释旧决策背景，不是当前发布指令。新卡必须使用候选池、能力过滤和 `theme-decision.json`。
 
 ## User question
 
@@ -39,7 +41,7 @@ But runtime practice reduced to:
 ## What to do next time
 
 1. Load `infocard-theme-assignment`
-2. Fill content_shape / theme_primary / theme_fallback / theme_reject
+2. 历史流程曾填写 content_shape / theme_primary / theme_fallback / theme_reject；当前流程改为填写 `theme-decision.json`。
 3. Load the chosen style skill + theme demo
 4. Apply batch diversity gate when >=3 cards
 

@@ -14,7 +14,9 @@ metadata:
 
 ## Trigger
 
-Use this skill **before any worktree creation, before any Research A subagent dispatch, before any `publish-bundle.json` write**, whenever the user provides a source URL that is NOT `https://x.com/i/status/...`.
+Use this skill **before any Research A subagent dispatch or `publish-bundle.json` write**, whenever the user provides a source URL that is NOT `https://x.com/i/status/...`.
+
+All infocard work stays in the current main checkout. This routing skill performs source classification only; it never creates, enters, removes, or recommends a Git worktree or clone. Authoring remains under `.docs/<run-id>/<slug>/`, and any promotion or publication is owned by `infocard-publish-sop` and its Publisher flow.
 
 The protocol's default entry path assumes an X post: status URL → author + timestamp + body extractable in one fetch. Non-X sources break that assumption in three places:
 
@@ -89,7 +91,7 @@ curl -sL "<caption-baseUrl>&fmt=srv3&lang=zh-Hans" -A "Mozilla/5.0"
 
 **Symptom**: User supplied `https://m.youtube.com/watch?v=8RedSkw1UjE&t=952s` (a 20-min Graph Engineering video by 大飞说科技 / 最佳拍档). I read the URL and associated the `t=952s` timestamp with an AutoResearch card from earlier in the session, dispatched Research A + worktree + bundle, and only discovered the actual title 「什么是图工程」several minutes into the run.
 
-**Hard rule**: Before any research delegation or worktree creation, fetch the source and report the title + description + topic in one line. If the title disagrees with the assumed topic, **stop and re-discuss with the user** — do not let momentum push you into an off-topic run.
+**Hard rule**: Before any research delegation, verify the current main checkout, then fetch the source and report the title + description + topic in one line. Worktrees and temporary clones are prohibited. If the title disagrees with the assumed topic, **stop and re-discuss with the user** — do not let momentum push you into an off-topic run.
 
 **Concrete check that fits in a single turn**:
 

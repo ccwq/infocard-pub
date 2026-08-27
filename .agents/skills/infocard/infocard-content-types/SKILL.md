@@ -1,7 +1,7 @@
 ---
 name: infocard-content-types
 description: 信息卡内容类型标准 — 写卡前必须先确定内容类型，再按对应模块结构填充。触发：写新卡、重建卡、修复"内容空洞"。
-version: 1.0.0
+version: 2.0.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -277,6 +277,6 @@ metadata:
 
 ## 与主题分配的关系
 
-`infocard-theme-assignment` 决定用哪个视觉风格，`infocard-content-types` 决定用哪个内容结构。两者并行执行，互不替代。
+本 skill 只产出内容契约：`content_type`、`content_subtype`、`content_shape`、`required_modules`、`required_capabilities`、`primary_source` 和 `evidence_gaps`。它可以声明主题所需的能力（例如 `tables`、`code_blocks`、`mobile_layout`），但不得写具体主题名、Primary/Fallback 映射、权重或随机规则。
 
-theme 解决"看起来怎么样"，content type 解决"里面有什么"。
+随后由 `infocard-theme-assignment` 读取这些能力，生成候选池并写入唯一的 `.docs/<run-id>/<slug>/theme-decision.json`。内容类型决定“需要什么结构”，主题分配决定“哪个已注册主题能承载它”；两者通过能力契约相连，不形成强绑定。
