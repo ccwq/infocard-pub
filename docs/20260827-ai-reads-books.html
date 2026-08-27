@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>AI-reads-books — 页级 PDF 知识提取与摘要流水线</title>
+<style>
+:root{
+  --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+  --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+  --shadow:8px 8px 0 rgba(17,17,17,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  color:var(--ink);line-height:1.58;
+  background:
+    linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+    linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+    radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+    radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+    var(--bg);
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 88px}
+
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-copy{padding:22px;border-right:3px solid var(--line);display:grid;gap:14px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:6px 10px;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";color:var(--red);font-size:11px}
+h1.demo-title{margin:0;max-width:820px;font-size:clamp(26px,3.8vw,44px);line-height:.98;letter-spacing:-.05em}
+.subtitle{color:var(--muted);font-size:14px;line-height:1.6}
+.badge-row{display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:inline-flex;align-items:center;min-height:33px;padding:6px 10px;border:2px solid var(--line);background:#fff;font-size:12.1px;font-weight:850}
+.badge.red{background:var(--red);color:#fff}
+.badge.blue{background:var(--blue);color:#fff}
+.badge.dark{background:#111;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+.stat .k{display:block;margin-bottom:6px;font-size:10.8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.stat .v{display:block;font-size:13.5px;line-height:1.34;font-weight:900}
+.alert{border:3px solid var(--line);background:#111;color:#fff;padding:15px;display:grid;gap:10px}
+.alert strong{display:block;font-size:15px;line-height:1.35}
+.alert p{margin:0;font-size:14px;line-height:1.68;color:#f0ebe0!important}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+.hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+.hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+.panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+.panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+.flow{display:grid;gap:8px}
+.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+.flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+.flow-item.red .c{color:var(--red)}
+.flow-item.blue .c{color:var(--blue)}
+.flow-item.dark .c{color:#111}
+
+.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+.section-no.b{background:var(--blue)}
+.section-no.k{background:#111}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+.section-meta .label.b{color:var(--blue)}
+.section-meta .label.k{color:#111}
+.section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+.section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+.grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card,.mini{border:2px solid var(--line);background:#fff;min-width:0;padding:14px}
+.card{display:grid;gap:10px}
+.card h3,.mini h4{margin:0;letter-spacing:-.02em}
+.card h3{font-size:17px;line-height:1.16}
+.card p,.mini p{margin:0;font-size:14px;color:var(--muted);line-height:1.66}
+.card li,.mini li{margin:4px 0;font-size:14px;color:var(--muted);line-height:1.66}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+.tag.red{background:var(--soft-red)}
+.tag.blue{background:var(--soft-blue)}
+.tag.dark{background:#111;color:#fff}
+.check{color:var(--blue);font-weight:900}
+.cross{color:var(--red);font-weight:900}
+
+.matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.matrix .mini{display:grid;gap:8px}
+.mini h4{font-size:15px;line-height:1.2}
+.mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.mini .red{color:var(--red)}
+.mini .blue{color:var(--blue)}
+.mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+.quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+.quote-block b{color:#111}
+.table-wrap{border:2px solid var(--line);background:#fff;overflow:hidden;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 10px;border:1.5px solid var(--line);vertical-align:top;text-align:left}
+th{background:#111;color:#fff;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+tr:nth-child(even) td{background:#faf8f4}
+.table-note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.62}
+.link-box{border:2px solid var(--line);background:#fff;padding:12px 14px;display:grid;gap:6px;min-width:0}
+.link-box .lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);font-weight:900}
+.link-box a{font-size:12.5px;word-break:break-all;line-height:1.58}
+.link-box p{font-size:12.5px;line-height:1.62;color:var(--muted);margin:0}
+.rule{height:3px;background:#111;margin:8px 0 0}
+.source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+.footer{margin-top:10px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+.save-btn{position:fixed;right:18px;bottom:18px;z-index:999;border:2px solid #111;border-radius:8px;padding:10px 14px;background:linear-gradient(135deg,var(--red) 0%,#a90f27 100%);color:#fff;font-weight:900;letter-spacing:.04em;box-shadow:6px 6px 0 rgba(0,0,0,.22);cursor:pointer}
+.save-btn:disabled{opacity:.75;cursor:progress}
+.code-box{border:2px solid var(--line);background:#111;color:#e8e3d8;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.62;overflow-x:auto;white-space:pre}
+.code-box .c0{color:#86efac}
+.code-box .c1{color:#f9e2af}
+.code-box .c2{color:#89b4fa}
+.code-box .c3{color:#f38ba8}
+.code-box .c4{color:#cba6f7}
+.code-box .c5{color:#94e2d5}
+.code-box .label{color:#f9e2af;font-weight:900}
+
+@media (max-width:1080px){
+  .hero{grid-template-columns:1fr}
+  .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+  .stats,.grid-4,.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 72px}
+  .hero{display:flex;flex-direction:column}
+  .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+  .stats,.grid-4,.grid-3,.grid-2,.matrix{grid-template-columns:1fr}
+  .section-head{grid-template-columns:1fr;gap:10px}
+  .section-no{width:72px;height:72px;font-size:28px}
+  .card,.mini,.alert,.quote-block{padding-left:12px;padding-right:12px}
+  .save-btn{right:12px;bottom:12px}
+  .code-box{font-size:11px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+<article>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">GitHub 开源 · PDF 知识提取 · ~2K ⭐</div>
+    <h1 class="demo-title">AI-reads-books：页级 PDF 知识提取与连续摘要流水线</h1>
+    <p class="subtitle">解决"AI 总结长 PDF 虎头蛇尾"——逐页读取、逐页积累、间隔摘要、全局综合，让 AI 记住整本书的每一个细节。</p>
+    <div class="badge-row">
+      <span class="badge red">逐页提取</span>
+      <span class="badge blue">JSON 知识库</span>
+      <span class="badge dark">断点续读</span>
+      <span class="badge">间隔摘要</span>
+    </div>
+    <div class="stats" aria-label="style summary">
+      <div class="stat"><span class="k">仓库</span><span class="v">echohive42/AI-reads-books</span></div>
+      <div class="stat"><span class="k">Star</span><span class="v">~2,000 ⭐</span></div>
+      <div class="stat"><span class="k">协议</span><span class="v">MIT</span></div>
+      <div class="stat"><span class="k">语言</span><span class="v">Python</span></div>
+    </div>
+    <div class="alert">
+      <strong>核心问题：AI 总结长 PDF 虎头蛇尾——前几十页准确，越往后越含糊，结尾靠编。</strong>
+      <p>解决方案：逐页读取 PDF，每页提取知识点存入本地 JSON 知识库；每隔 N 页产出阶段性摘要；全书读完后做全局综合——前后文连续积累，不是各管一段。</p>
+      <div class="mini-row">
+        <span class="mini-tag">page-by-page</span>
+        <span class="mini-tag">knowledge-base</span>
+        <span class="mini-tag">interval-summary</span>
+        <span class="mini-tag">resume-capable</span>
+      </div>
+    </div>
+  </div>
+  <figure class="hero-visual">
+    <div class="panel-top">
+      <div class="eyebrow">WORKFLOW</div>
+      <h3>PDF → 逐页解析 → 知识积累 → 全局综合</h3>
+      <p>核心逻辑：不是"一次读完全书再总结"，而是"读一页、存一页、积累一页"。</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote"><b>核心洞察：</b>间隔摘要让 AI 在每个 checkpoint 都"重置记忆"，避免前文遗忘导致的幻觉。</div>
+      <div class="flow">
+        <div class="flow-item red"><div class="t">Step 1</div><div class="c">逐页读取 PDF，自动跳过目录/索引/空白页</div></div>
+        <div class="flow-item blue"><div class="t">Step 2</div><div class="c">每页提取关键知识点，写入 JSON 知识库文件</div></div>
+        <div class="flow-item dark"><div class="t">Step 3</div><div class="c">每隔 N 页产出间隔摘要（interval summary）</div></div>
+        <div class="flow-item blue"><div class="t">Step 4</div><div class="c">全书读完后，全局综合摘要（前后文连续）</div></div>
+        <div class="flow-item red"><div class="t">Step 5</div><div class="c">支持断点续读：中断后可从知识库恢复</div></div>
+      </div>
+    </div>
+  </figure>
+</header>
+
+<!-- SECTION 01: PROBLEM -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">01</div>
+    <div class="section-meta">
+      <div class="label">核心问题</div>
+      <h2>长 PDF 总结：AI 为何虎头蛇尾？</h2>
+      <p>大语言模型有上下文窗口限制，一次性灌输整本书的内容会导致前文被遗忘、后续内容与前文脱节，最终总结变成"靠编"。</p>
+    </div>
+  </div>
+  <div class="grid-3">
+    <article class="card">
+      <div class="tagrow"><span class="tag red">上下文遗忘</span><span class="tag blue">幻觉来源</span></div>
+      <h3>上下文窗口耗尽</h3>
+      <p>超过模型的上下文限制后，前面的关键信息被挤出窗口，AI 只能基于最近的内容"推测"总结，越往后越偏离原意。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag red">信息衰减</span><span class="tag blue"> TOC 干扰</span></div>
+      <h3>目录与索引噪音</h3>
+      <p>大部头 PDF 通常包含超长目录、索引页，直接灌入会导致大量 token 被无用内容消耗，有效信息密度极低。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag dark">无积累</span><span class="tag blue">无状态</span></div>
+      <h3>逐次调用无记忆</h3>
+      <p>用 API 逐段调用时，每段都是独立请求，AI 无法建立跨章节的知识关联，只能给出"碎化摘要"。</p>
+    </article>
+  </div>
+</section>
+
+<!-- SECTION 02: SOLUTION -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no b">02</div>
+    <div class="section-meta">
+      <div class="label b">解决方案</div>
+      <h2>逐页积累 × 间隔摘要 × 断点续读</h2>
+      <p>AI-reads-books 的核心设计原则：不要一次读完，要边读边积累；不要一次总结，要分阶段产出；不要从头再来，要随时可恢复。</p>
+    </div>
+  </div>
+  <div class="grid-2">
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">JSON 知识库</span></div>
+      <h3>每页提取 → 本地 JSON</h3>
+      <p>每读一页，提取该页的关键知识点（实体、概念、关系、引用），以结构化 JSON 写入本地知识库文件。全书读完后，知识库即成为可查询的完整知识图谱。</p>
+      <div class="code-box">knowledge_bases/
+  └── &lt;book_name&gt;_kb.json
+{
+  "pages": [
+    {
+      "page": 1,
+      "chunk": "...",
+      "entities": ["概念A", "人物B"],
+      "key_points": ["..."],
+      "summary": "..."
+    },
+    ...
+  ]
+}</div>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">间隔摘要</span></div>
+      <h3>每隔 N 页 → 阶段性摘要</h3>
+      <p>通过 <code>ANALYSIS_INTERVAL</code> 配置间隔（默认每 10 页），在每个 checkpoint 产出该段落摘要。重置注意力基准线，保证每个阶段的核心信息不丢失。</p>
+      <div class="code-box"><span class="label"># 配置示例</span>
+PDF_NAME = "my_book.pdf"
+ANALYSIS_INTERVAL = 10  <span class="c3"># 每10页做一次间隔摘要</span>
+MODEL = <span class="c0">"gpt-4o-mini"</span>
+TEST_PAGES = 5         <span class="c3"># 仅测试前5页</span></div>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag red">断点续读</span></div>
+      <h3>load existing knowledge</h3>
+      <p>处理中断后，可从已有知识库文件加载历史进度，新页继续追加到同一 JSON，无需从头扫描全书。适合超长文档或网络不稳定场景。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag dark">智能跳过</span></div>
+      <h3>目录 / 索引 / 空白页自动跳过</h3>
+      <p>内置智能过滤器，自动识别并跳过目录页（TOC）、索引页（index keywords）、空白页，避免无效 token 消耗，提高知识库有效密度。</p>
+    </article>
+  </div>
+</section>
+
+<!-- SECTION 03: OUTPUT STRUCTURE -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no k">03</div>
+    <div class="section-meta">
+      <div class="label k">输出结构</div>
+      <h2>book_analysis/ 目录：知识库 + 摘要双轨并行</h2>
+      <p>所有输出按功能分目录存储，知识库与摘要分离，互不干扰又可交叉引用。</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>目录</th><th>内容</th><th>格式</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>book_analysis/knowledge_bases/</code></td>
+          <td>每页提取的结构化知识点</td>
+          <td>JSON</td>
+          <td>可查询知识图谱、断点续读基础</td>
+        </tr>
+        <tr>
+          <td><code>book_analysis/summaries/</code></td>
+          <td>间隔摘要 + 全局综合摘要</td>
+          <td>Markdown</td>
+          <td>快速浏览、笔记整理、内容复用</td>
+        </tr>
+        <tr>
+          <td><code>book_analysis/raw_pages/</code></td>
+          <td>原始分页文本（可选）</td>
+          <td>Text</td>
+          <td>调试、审计、回溯</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-note">知识库 JSON 支持增量写入，全局摘要由间隔摘要拼接模型重新综合，前后文连续不割裂。</div>
+</section>
+
+<!-- SECTION 04: CONFIGURATION -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">04</div>
+    <div class="section-meta">
+      <div class="label">核心配置</div>
+      <h2>主要参数一览</h2>
+      <p>开箱即用，支持 PDF / EPUB / TXT / 直接 URL 输入；分析模型可独立选择。</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>参数</th><th>默认值</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>PDF_NAME</code></td>
+          <td>必填</td>
+          <td>目标文件路径，支持 PDF / EPUB / TXT / URL</td>
+        </tr>
+        <tr>
+          <td><code>ANALYSIS_INTERVAL</code></td>
+          <td>10</td>
+          <td>每隔多少页产出一次间隔摘要（interval summary）</td>
+        </tr>
+        <tr>
+          <td><code>MODEL</code></td>
+          <td>gpt-4o-mini</td>
+          <td>用于摘要和分析的 LLM 模型，可替换为其他兼容模型</td>
+        </tr>
+        <tr>
+          <td><code>TEST_PAGES</code></td>
+          <td>0（关闭）</td>
+          <td>设为正整数时仅处理前 N 页，用于快速验证流程</td>
+        </tr>
+        <tr>
+          <td><code>CHAPTER_PATTERN</code></td>
+          <td>正则自动检测</td>
+          <td>自定义章节检测正则，匹配时自动产出章节级摘要</td>
+        </tr>
+        <tr>
+          <td><code>SKIP_TOC</code></td>
+          <td>true</td>
+          <td>自动跳过目录、索引、空白页</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION 05: SCENE -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no b">05</div>
+    <div class="section-meta">
+      <div class="label b">适用场景</div>
+      <h2>适合谁 / 不适合谁</h2>
+      <p>不是通用 PDF 工具，是面向深度阅读、知识管理、长文档分析的专用流水线。</p>
+    </div>
+  </div>
+  <div class="grid-2">
+    <article class="card">
+      <div class="tagrow"><span class="tag blue">✓ 适合</span></div>
+      <h3>适合的场景</h3>
+      <ul>
+        <li>学术论文、专著、教科书（200 页+）的深度知识提取</li>
+        <li>需要完整知识图谱而非简单摘要的研究人员</li>
+        <li>超长技术文档（如 RFC、规范）结构化处理</li>
+        <li>多本书同一主题的横向知识整合</li>
+        <li>PDF 版调查报告、白皮书、政策文件的快速梳理</li>
+      </ul>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag red">✗ 不适合</span></div>
+      <h3>不适合的场景</h3>
+      <ul>
+        <li>短文稿（10 页以内）——用普通摘要 API 更快</li>
+        <li>扫描版 PDF（无文字层）——需要先 OCR</li>
+        <li>纯图片 PDF（漫画、图表集）——无法提取文字</li>
+        <li>实时对话式文档交互——这是批处理流水线，不是实时聊天</li>
+        <li>非结构化网页抓取——不是爬虫工具</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- SECTION 06: USAGE -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no k">06</div>
+    <div class="section-meta">
+      <div class="label k">快速上手</div>
+      <h2>安装与基本用法</h2>
+    </div>
+  </div>
+  <div class="code-box">git clone https://github.com/echohive42/AI-reads-books-page-by-page.git
+cd AI-reads-books-page-by-page
+pip install -r requirements.txt
+
+<span class="c3"># 设置 API Key</span>
+<span class="c5">export</span> OPENAI_API_KEY=<span class="c0">"sk-..."</span>
+
+<span class="c3"># 基本运行</span>
+python read_books.py</div>
+  <div class="table-note" style="margin-top:10px">依赖：Python 3.x + OpenAI API Key（或其他兼容模型的 API Key）。模型可配置，推荐 gpt-4o-mini 平衡速度与质量。</div>
+</section>
+
+<!-- SECTION 07: LINK -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-no">07</div>
+    <div class="section-meta">
+      <div class="label">相关信息</div>
+      <h2>仓库与社区</h2>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="link-box">
+      <div class="lab">GitHub 仓库</div>
+      <a href="https://github.com/echohive42/AI-reads-books-page-by-page">github.com/echohive42/AI-reads-books-page-by-page</a>
+      <p>MIT 协议 · Python · ~2K Stars</p>
+    </div>
+    <div class="link-box">
+      <div class="lab">X 推荐</div>
+      <a href="https://x.com/GitHub_Daily/status/2092552649744994611">@GitHub_Daily 推荐推文</a>
+      <p>Posted by GitHubDaily · 2026-08-27</p>
+    </div>
+  </div>
+  <div class="quote-block" style="margin-top:12px">
+    <b>X 推荐原文：</b>"AI-reads-books — page-by-page PDF knowledge extractor and summarizer. Solves the problem of AI summarizing long PDFs badly by the end. It extracts knowledge page-by-page to a JSON knowledge base with interval summaries and full final synthesis. ~2K stars ⭐"
+  </div>
+</section>
+
+<div class="rule"></div>
+<div class="source-note">来源：GitHub · X(@GitHub_Daily) · README 调研 &nbsp;|&nbsp; 主题：hardblue &nbsp;|&nbsp; 创作日期：2026-08-27</div>
+
+</article>
+</main>
+</body>
+</html>
