@@ -73,3 +73,11 @@ metadata:
 本 skill 只选择和验证主题契约，不读取具体 style skill 以外的发布权限，也不直接写 `docs/`、`assets/`、Git state、生成索引或执行 build/commit/push。禁止 worktree、clone、detached HEAD 和 `/tmp/infocard*`。
 
 验收至少确认：决策记录完整且可解析；固定 seed 得到相同选择；不同获批 seed 只在过滤池内变化；用户主题优先但不绕过能力检查；authoring 和 publish 不包含第二套主题选择规则。
+
+## 编排硬门禁（2026-08-27）
+
+- 委派 Author 前必须已经生成并冻结 `.docs/<run-id>/<slug>/theme-decision.json`；缺失时返回 `THEME_BLOCKED`，不得让 Author 自行选择主题或回退到 `hardblue`。
+- 委派 prompt/context 不得包含 `Theme: <具体主题>`、`Create a <具体主题> card` 或任何等价的预选指令。只能要求 Author 消费 `theme-decision.json.selected_theme`。
+- `selected_theme` 必须来自 `theme/*.html`，并与 HTML `data-theme`、sidecar `style` 三方一致。
+- 批量任务必须额外记录近期主题分布和多样性检查结果；重复主题可以被能力门禁保留，但必须有显式 `diversity_exception` 与审查理由。
+- 可执行门禁：`npm run verify:theme-delegation -- --context <prompt.txt> --decision <theme-decision.json>`；失败码非 0 时不得启动 Author。批量可用 `npm run verify:theme-diversity -- --themes <theme-sequence.json>`。

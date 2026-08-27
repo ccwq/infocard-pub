@@ -11,6 +11,8 @@ const {
   readThemeDecision,
   selectTheme,
   validateThemeDecision,
+  evaluateBatchDiversity,
+  validateAuthorDelegationContext,
 } = require('../../.agents/skills/infocard/infocard-theme-assignment/scripts/theme-decision');
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -246,4 +248,26 @@ test('selection weights reject unregistered and excluded themes', () => {
     () => selectTheme({ ...base, selectionWeights: { blue: 1 } }),
     /selection weight for blue must target a final candidate theme/,
   );
+});
+
+test('batch diversity gate flags concentration and consecutive reuse', () => {
+  const result = evaluateBatchDiversity(['blue', 'hardblue', 'hardblue', 'hardblue', 'hardblue', 'redswiss']);
+  assert.equal(result.dominant_theme, 'hardblue');
+  assert.equal(result.dominant_count, 4);
+  assert.equal(result.review_required, true);
+  assert.equal(result.thresholds.recent_limit, 6);
+});
+
+test('author delegation rejects hard-coded themes and requires frozen decision consumer', () => {
+  const valid = validateAuthorDelegationContext(
+    'Read .docs/run/card/theme-decision.json and consume selected_theme exactly.',
+    '.docs/run/card/theme-decision.json',
+  );
+  assert.equal(valid.valid, true);
+  const invalid = validateAuthorDelegationContext(
+    'Theme: hardblue. Create a hardblue information card.',
+    null,
+  );
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.some((item) => item.includes('hard-codes')));
 });

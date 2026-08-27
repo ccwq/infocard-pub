@@ -14,7 +14,13 @@
   "selection_weights": { "hardblue": 0.5, "redswiss": 0.3, "blue": 0.2 },
   "seed": "run-20260827-01",
   "selected_theme": "hardblue",
-  "user_override": { "requested": null, "accepted": false, "reason": null }
+  "user_override": { "requested": null, "accepted": false, "reason": null },
+  "batch_context": {
+    "recent_themes": [],
+    "diversity_review_required": false,
+    "diversity_exception": false,
+    "diversity_exception_reason": null
+  }
 }
 ```
 

@@ -66,7 +66,15 @@ claim | source | status(confirmed/claimed/unsupported) | final wording
 
 ### 2. 主题选择与 run evidence
 
-调用 `infocard-theme-assignment` 生成并冻结 `.docs/<run-id>/<slug>/theme-decision.json`。该 JSON 是唯一主题决策源；本 skill 只消费并检查它，不重新选择主题：
+调用 `infocard-theme-assignment` 生成并冻结 `.docs/<run-id>/<slug>/theme-decision.json`。该 JSON 是唯一主题决策源；本 skill 只消费并检查它，不重新选择主题。**委派 Author 前必须确认该文件已存在且有效；委派上下文禁止写入或暗示任何具体主题（包括 `Theme: hardblue`），只能要求消费 `selected_theme`。** P0 主题决策门禁如下：
+
+```text
+主题决策存在且有效 → 才能 author
+主题决策缺失/无效 → THEME_BLOCKED
+委派上下文预选具体主题 → DELEGATION_THEME_BLOCKED
+```
+
+主题决策记录格式：
 
 ```json
 {

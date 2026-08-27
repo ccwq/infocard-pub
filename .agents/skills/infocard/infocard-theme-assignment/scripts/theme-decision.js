@@ -256,6 +256,51 @@ function readThemeDecision(filePath, options = {}) {
   }
 }
 
+function evaluateBatchDiversity(themes, {
+  recentLimit = 6,
+  consecutiveLimit = 3,
+  concentrationLimit = 0.5,
+} = {}) {
+  const sequence = Array.isArray(themes) ? themes.filter(Boolean).map(String) : [];
+  const recent = sequence.slice(-recentLimit);
+  const counts = Object.fromEntries([...new Set(recent)].map((theme) => [theme, 0]));
+  for (const theme of recent) counts[theme] += 1;
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || [null, 0];
+  let consecutive = 0;
+  for (let i = sequence.length - 1; i >= 0 && sequence[i] === top[0]; i -= 1) consecutive += 1;
+  return {
+    recent_themes: recent,
+    counts,
+    dominant_theme: top[0],
+    dominant_count: top[1],
+    dominant_ratio: recent.length ? top[1] / recent.length : 0,
+    consecutive_count: consecutive,
+    review_required: consecutive >= consecutiveLimit || (recent.length > 0 && top[1] / recent.length >= concentrationLimit),
+    thresholds: { recent_limit: recentLimit, consecutive_limit: consecutiveLimit, concentration_limit: concentrationLimit },
+  };
+}
+
+function validateAuthorDelegationContext(context, decisionPath) {
+  const text = String(context || '');
+  const forbidden = [
+    /(?:^|\n)\s*Theme\s*:\s*[`']?[a-z0-9][a-z0-9-]*[`']?/i,
+    /Create\s+(?:a|an)\s+[a-z0-9][a-z0-9-]*\s+(?:information\s+)?card/i,
+    /(?:use|使用|采用)\s+(?:the\s+)?[a-z0-9][a-z0-9-]*\s+theme/i,
+  ];
+  const violations = forbidden.filter((pattern) => pattern.test(text)).map((pattern) => pattern.toString());
+  const hasConsumerInstruction = /theme-decision\.json[\s\S]{0,240}(?:selected_theme|消费|读取|consume|read)/i.test(text);
+  return {
+    valid: violations.length === 0 && Boolean(decisionPath) && hasConsumerInstruction,
+    decision_path: decisionPath || null,
+    violations,
+    errors: [
+      ...(decisionPath ? [] : ['missing frozen theme-decision.json']),
+      ...(hasConsumerInstruction ? [] : ['delegation must consume theme-decision.json.selected_theme']),
+      ...(violations.length ? ['delegation context hard-codes a concrete theme'] : []),
+    ],
+  };
+}
+
 module.exports = {
   registeredThemes,
   normalizeThemeSlug,
@@ -264,4 +309,6 @@ module.exports = {
   validateThemeDecision,
   parseThemeDecision,
   readThemeDecision,
+  evaluateBatchDiversity,
+  validateAuthorDelegationContext,
 };

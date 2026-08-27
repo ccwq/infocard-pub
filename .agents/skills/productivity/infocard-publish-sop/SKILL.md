@@ -80,7 +80,7 @@ slug, path, category, title, desc, date, updated, tags,
 author, source, source_url, style
 ```
 
-`path` must exactly equal the manifest HTML target. `date` and `updated` use quoted `YYYY-MM-DD HH:MM:SS`; Publisher sets final promotion time. Theme evidence must be the validated `.docs/<run-id>/<slug>/theme-decision.json` produced by `infocard-theme-assignment` before candidate HTML is written. This SOP validates its selected theme against the sidecar, HTML, and visual evidence; it never generates candidates, ranks themes, or makes a second theme decision.
+`path` must exactly equal the manifest HTML target. `date` and `updated` use quoted `YYYY-MM-DD HH:MM:SS`; Publisher sets final promotion time. Theme evidence must be the validated `.docs/<run-id>/<slug>/theme-decision.json` produced by `infocard-theme-assignment` before candidate HTML is written. This SOP validates its selected theme against the sidecar, HTML, and visual evidence; it never generates candidates, ranks themes, or makes a second theme decision. Author delegation is blocked unless that decision exists; delegation context must not hard-code or preselect a concrete theme.
 
 ## Promotion
 

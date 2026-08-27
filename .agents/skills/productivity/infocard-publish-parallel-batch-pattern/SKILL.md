@@ -55,9 +55,9 @@ git fetch origin main
 
 Each `delegate_task` call:
 
-- goal: produce a complete HTML file for ONE card, theme X, content Y
-- context: theme file path, canonical URL, source content
-- explicit output rule: "write the HTML to `docs/<slug>.html` in the primary repository. Commit and push after all cards are written."
+- goal: produce a complete candidate for ONE card, content Y; do not include a preselected visual theme
+- context: canonical URL, source content, and the frozen `.docs/<run-id>/<slug>/theme-decision.json` path
+- explicit output rule: "read and consume theme-decision.json.selected_theme exactly; if it is missing or invalid, return THEME_BLOCKED. Write only under `.docs/<run-id>/<slug>/`; do not write docs/, assets/, indexes, Git state, commit, or push."
 
 Each subagent must end by reporting:
 - slug
