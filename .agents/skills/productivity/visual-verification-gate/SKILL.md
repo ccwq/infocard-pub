@@ -149,3 +149,68 @@ A tool timeout is infrastructure evidence, not a visual pass and not a visual fa
 - Don't substitute the 5-attempt timeout fallback (`PUBLISHED_PENDING_VISUAL`) for skipping review on a happy-path release.
 - Don't commit + push a follow-up patch without re-running the gate. The first pass covered the first version; the patch invalidates that pass.
 - Don't claim "small change, no need to re-screenshot" — the user has corrected this exact anti-pattern (visual review must precede every commit, including follow-up enrichment patches).
+
+## Visual failure exception policy (VISUAL_EXCEPTION_AFTER_MAX_REPAIRS)
+
+The visual gate may be passed by explicit exception after **at least 3 recorded visual failure attempts**; 4 or more attempts also qualify. Attempts include real visual defects and screenshot/capture/visual-review infrastructure failures. Infrastructure failures count as attempts, but are not completed repair rounds and must record an explicit evidence gap without fabricated screenshots or review dispositions.
+
+**Counting rule:** A completed repair round counts only when:
+1. A real HTML/CSS/content/structure change was made (`change_made: true`), **AND**
+2. Fresh desktop AND mobile screenshot evidence was captured afterward, **AND**
+3. A fresh review disposition was recorded.
+
+Every failure attempt must have deterministic `name`, `type` (`visual_defect` or `infrastructure_failure`), and `outcome`. The manifest must record `visual_failure_attempts` and valid completed `repair_rounds`; fewer than three attempts, missing/malformed/unrecorded attempts, stale evidence, or `VISUAL_PENDING` remain blocked.
+
+**Exception manifest contract:**
+
+Add a top-level `visual_failure_attempts` array. Each entry is `{ "name": "...", "type": "visual_defect" | "infrastructure_failure", "outcome": "..." }`; infrastructure entries also require `evidence_gap: true` and `error_category`, and must omit screenshots/review dispositions.
+
+```json
+{
+  "target": "docs/<slug>.html",
+  "html_sha256": "<current-sha256>",
+  "review_status": "VISUAL_EXCEPTION_AFTER_MAX_REPAIRS",
+  "theme_match": true,
+  "repair_rounds": [
+    {
+      "attempt": 1,
+      "repair_completed": true,
+      "html_sha256": "<same-sha256>",
+      "desktop": { "critical": 1, "major": 1, "minor": 0, "screenshot_path": "/path/to/desktop-1.png" },
+      "mobile":   { "critical": 1, "major": 1, "minor": 0, "screenshot_path": "/path/to/mobile-1.png" }
+    },
+    {
+      "attempt": 2,
+      "repair_completed": true,
+      "html_sha256": "<same-sha256>",
+      "desktop": { "critical": 0, "major": 1, "minor": 2, "screenshot_path": "/path/to/desktop-2.png" },
+      "mobile":   { "critical": 0, "major": 0, "minor": 0, "screenshot_path": "/path/to/mobile-2.png" }
+    },
+    {
+      "attempt": 3,
+      "repair_completed": true,
+      "html_sha256": "<same-sha256>",
+      "desktop": { "critical": 0, "major": 0, "minor": 2, "screenshot_path": "/path/to/desktop-3.png" },
+      "mobile":   { "critical": 0, "major": 0, "minor": 1, "screenshot_path": "/path/to/mobile-3.png" }
+    }
+  ]
+}
+```
+
+- `repair_rounds` must contain completed repair records; its length is not the failure-attempt count and is not required to be exactly 3.
+- Each record must set `repair_completed: true`, `change_made: true`, and use sequential `attempt` values; these fields make repair evidence deterministic rather than dependent on prose.
+- `visual_failure_attempts` must contain at least 3 valid records for the exception, and may contain 4 or more.
+- Every round's `html_sha256` must match the manifest root `html_sha256` (evidence binding to the reviewed HTML).
+- Every round must have both `desktop` and `mobile` objects with `critical`, `major`, `minor` numbers and a `screenshot_path` string.
+- `review_status` must be the exact string `"VISUAL_EXCEPTION_AFTER_MAX_REPAIRS"`.
+- Fewer than 3 recorded failure attempts, missing evidence, stale hash, malformed records, or `VISUAL_PENDING` **fail the gate** — no automatic upgrade. The exception report must disclose the evidence gap and must not claim visual PASS.
+
+**No automatic retry loop:** The mechanical validator (`scripts/verify-visual-gate.js`) does not edit HTML, recapture, or re-review. The publisher/agent owns each repair action; the validator only checks the declared evidence and final disposition.
+
+**Non-visual gates are unaffected:** `theme_match=false`, hash mismatches, build failures, leak checks, taxonomy failures, and Git policy violations all remain blocking regardless of visual exception status.
+
+**Final report wording** (use verbatim after an exception release):
+
+> 视觉门禁：三轮修复后例外放行。已完成 3 次"修复 → 重新截图 → 重新审查"；最终仍遗留 critical=N、major=N、minor=N。该放行仅适用于视觉门禁，非视觉门禁均已独立通过。
+
+A clean visual pass (zero critical/major on initial review) must **not** be reported as an exception.
