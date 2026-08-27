@@ -21,14 +21,11 @@
 
 ## 实际修复案例
 
-贾浅浅舆情信息卡最初在 390px CDP 检查中发现 12 个 `.source` 证据标签为 11px。通过独立 worktree 做最小 CSS 修改，在 `@media(max-width:720px)` 中增加 `.source{font-size:11.5px}`，然后执行：
+贾浅浅舆情信息卡最初在 390px CDP 检查中发现 12 个 `.source` 证据标签为 11px。历史上曾通过隔离副本做最小 CSS 修改；当前流程只保留这个诊断案例，不复制其隔离、发布或推送方式。修复应回到主 checkout 的 `.docs/<run-id>/<slug>/`，在 `@media(max-width:720px)` 中增加 `.source{font-size:11.5px}`，然后交给发布 SOP：
 
-- `npm run build`
-- `npm run verify`
-- `npm run check-leak -- --file docs/<slug>.html`
-- rebase 到最新 `origin/main` 后 push
-- 公网 `curl` HTTP 200 与源码规则核验
-- reload 公网页面，再次读取 computed style
+- 由 Publisher 按 `infocard-publish-sop` 统一执行发布级 build、verify、leak 和公网复核；
+- `infocard-mobile-verifier` 只提供 390px 结构/可读性证据，不执行 build、commit 或 push；
+- 发布后的移动复核由 Publisher 提供目标公网 URL 后，再次读取 computed style。
 
 最终结果：390px 下 `scrollWidth=375`、`clientWidth=375`，12 个证据标签均为 11.5px，低于 11.2px 的可见文字为 0。
 
@@ -36,5 +33,5 @@
 
 - 不要把截图超时写成页面失败；应报告为“结构性门禁可验证，真实视觉证据缺失”。
 - 不要把 DOM 门禁写成“视觉通过”。
-- 修改后必须验证公网部署版本，而不是只看本地 worktree。
-- Pages/CDN 可能缓存旧 HTML；先用 `curl` 看远端源码，再 reload 浏览器 tab。
+- 修改后必须由 Publisher 验证公网部署版本；本 skill 不管理部署状态。
+- Pages/CDN 可能缓存旧 HTML；由发布 SOP 处理远端源码与缓存复核，本 skill 只记录移动诊断结论。

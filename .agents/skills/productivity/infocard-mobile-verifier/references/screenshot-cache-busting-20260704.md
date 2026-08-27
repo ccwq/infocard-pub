@@ -21,13 +21,14 @@ playwright screenshot --viewport-size="390,844" --full-page \
   /tmp/SLUG-390.png
 ```
 
-## Verification Sequence
+## Mobile evidence recipe
 
-1. Push CSS fix → `git push origin main`
-2. Wait for Pages deployment (poll HTTP 200)
-3. **Screenshot with `?cb=$(date +%s)`** ← mandatory for post-fix verification
-4. vision_analyze the fresh screenshot
-5. Only then report to user
+This is a cache-diagnosis recipe only. It does not grant release authority and does not define a publish sequence.
+
+1. Ask the Publisher for the exact deployed URL after the publish SOP completes.
+2. **Screenshot with `?cb=$(date +%s)`** to avoid stale browser state.
+3. Inspect the fresh screenshot and report mobile findings to the Publisher.
+4. Keep the result as `VISUAL_PASSED` or `VISUAL_PENDING`; do not infer release success from this recipe.
 
 ## Anti-Pattern
 
@@ -39,4 +40,4 @@ playwright screenshot --viewport-size="390,844" --full-page \
 
 ## User Signal
 
-When user sends screenshot and says "截图像我证明你解决了" → always respond with `MEDIA:/tmp/filename.png` so user can verify the screenshot is from live URL.
+When a user supplies a screenshot, record its URL/viewport provenance before treating it as evidence; do not turn the screenshot recipe into a separate publishing workflow.

@@ -1,6 +1,6 @@
-# Public Pages 390px Verification Playbook
+# Public Pages 390px Diagnostic Recipe
 
-This note captures the mobile verification pattern that repeatedly proved useful for infocard public releases.
+This note captures a mobile verification pattern that is useful after the Publisher has supplied a public URL. It is a diagnostic recipe, not an independent publishing SOP.
 
 ## Checklist
 1. Always verify on the **public GitHub Pages URL**, not just the local file.
@@ -23,9 +23,9 @@ This note captures the mobile verification pattern that repeatedly proved useful
 - If the page uses a fixed bottom-right save button, keep the button fixed and add bottom safe-area padding to the content shell rather than changing the button to static.
 - For cards with a first-fold stats strip, collapse 4-up grids to 2-up on mobile before shrinking text further.
 
-## Reusable verification sequence
-1. Load the public URL.
+## Mobile evidence sequence
+1. Load the public URL supplied by the Publisher.
 2. Set mobile metrics to 390×844.
 3. Read `scrollWidth`, `innerWidth`, and `overflowX`.
 4. Capture screenshot.
-5. If needed, inspect the screenshot visually and only then patch CSS.
+5. If needed, report the screenshot finding to the Author/Publisher; do not publish or push from this skill.
