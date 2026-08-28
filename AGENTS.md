@@ -64,5 +64,4 @@
 修改卡片或元数据后，按 manifest allowlist 在主 checkout 依次运行 `npm run build`、`npm run verify`、`npm run verify-taxonomy` 与 `npm run check-leak`。修改脚本行为时，在 `scripts/test/` 补充或更新聚焦的 `*.test.js`。提交 PR 前确认本地卡片路径可访问、首页可见。
 
 ## 提交与 Pull Request
-
-采用历史中的 Conventional Commit 风格，例如 `feat: publish <title>`、`docs(package): add script descriptions`。保持提交范围单一。PR 应说明影响的卡片或脚本、列出已运行的校验命令、关联 issue；涉及首页或卡片视觉变化时附截图。生成产物必须和源文件一并提交。
+使用git-up -pcP 执行提交

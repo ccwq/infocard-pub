@@ -12,8 +12,8 @@ Status: project tree verified locally; global migration and Hermes discovery rem
 ## Deterministic inventory summary
 
 - Enumerated canonical global candidates: 52 unique names across 54 source directories.
-- Existing project-local skills retained: 11.
-- Final project-local skills: 63 unique canonical names (11 retained + 52 migrated names; no canonical-name overlap remains in the project tree).
+- Existing project-local skills retained: 9.
+- Final project-local skills: 57 unique canonical names (9 retained + 48 migration records; no canonical-name overlap remains in the project tree).
 - Duplicate canonical sources merged: `infocard-metadata-provenance`, `infocard-q-style`.
 - Global-source removal: unverified here; the specified `/home/ccwq/hehome/hermes-data/skills` root is not available from this environment.
 - Remaining global infocard canonical skills: unverified here; verify from the qbox/Hermes environment before treating `infocard-router` as the only remaining canonical skill.
@@ -25,7 +25,6 @@ Status: project tree verified locally; global migration and Hermes discovery rem
 | `any2card` | `/home/ccwq/hehome/hermes-data/skills/any2card` | `.agents/skills/infocard/any2card` | `move` | 123 retained | unverified | create support | local PASS; global unverified |
 | `authorized-infocard-execution` | `/home/ccwq/hehome/hermes-data/skills/publishing/authorized-infocard-execution` | `.agents/skills/publishing/authorized-infocard-execution` | `move` | 1 retained | unverified | composed project support | local PASS; global unverified |
 | `delegated-infocard-publishing` | `/home/ccwq/hehome/hermes-data/skills/productivity/delegated-infocard-publishing` | `.agents/skills/productivity/delegated-infocard-publishing` | `move` | 1 retained | unverified | composed project support | local PASS; global unverified |
-| `infocard-archival-theme-refinement` | `/home/ccwq/hehome/hermes-data/skills/design/infocard-archival-theme-refinement` | `.agents/skills/design/infocard-archival-theme-refinement` | `move` | 3 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-bigwhite-style` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-bigwhite-style` | `.agents/skills/infocard-styles/infocard-bigwhite-style` | `move` | 2 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-black-head-style` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-black-head-style` | `.agents/skills/infocard-styles/infocard-black-head-style` | `move` | 2 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-blue-technical-manual-style` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-blue-technical-manual-style` | `.agents/skills/infocard-styles/infocard-blue-technical-manual-style` | `move` | 6 retained | unverified | composed project support | local PASS; global unverified |
@@ -44,7 +43,6 @@ Status: project tree verified locally; global migration and Hermes discovery rem
 | `infocard-legibility-publishing` | `/home/ccwq/hehome/hermes-data/skills/productivity/infocard-legibility-publishing` | `.agents/skills/productivity/infocard-legibility-publishing` | `move` | 14 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-main-style` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-main-style` | `.agents/skills/infocard-styles/infocard-main-style` | `move` | 4 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-metadata-provenance` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-metadata-provenance`<br>`/home/ccwq/hehome/hermes-data/skills/productivity/infocard-metadata-provenance` | `.agents/skills/content/infocard-metadata-provenance` | `merge` | 7 retained | unverified | direct project target | local PASS; global unverified |
-| `infocard-mobile-rendering-verification` | `/home/ccwq/hehome/hermes-data/skills/productivity/infocard-mobile-rendering-verification` | `.agents/skills/productivity/infocard-mobile-rendering-verification` | `move` | 8 retained | unverified | direct project target | local PASS; global unverified |
 | `infocard-paper-warm-style` | `/home/ccwq/hehome/hermes-data/skills/infocard-paper-warm-style` | `.agents/skills/infocard-styles/infocard-paper-warm-style` | `move` | 0 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-pixelstack-style` | `/home/ccwq/hehome/hermes-data/skills/infocard-styles/infocard-pixelstack-style` | `.agents/skills/infocard-styles/infocard-pixelstack-style` | `move` | 5 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-preview-delivery` | `/home/ccwq/hehome/hermes-data/skills/productivity/infocard-preview-delivery` | `.agents/skills/productivity/infocard-preview-delivery` | `move` | 0 retained | unverified | composed project support | local PASS; global unverified |
@@ -55,11 +53,9 @@ Status: project tree verified locally; global migration and Hermes discovery rem
 | `infocard-q-style` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-q-style`<br>`/home/ccwq/hehome/hermes-data/skills/infocard-q-style` | `.agents/skills/infocard-styles/infocard-q-style` | `merge` | 7 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-rebuild-template-grill` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-rebuild-template-grill` | `.agents/skills/content/infocard-rebuild-template-grill` | `move` | 20 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-redswiss-style` | `/home/ccwq/hehome/hermes-data/skills/infocard-styles/infocard-redswiss-style` | `.agents/skills/infocard-styles/infocard-redswiss-style` | `move` | 4 retained | unverified | composed project support | local PASS; global unverified |
-| `infocard-responsive-layout` | `/home/ccwq/hehome/hermes-data/skills/productivity/infocard-responsive-layout` | `.agents/skills/productivity/infocard-responsive-layout` | `move` | 1 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-scrapbook-style` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-scrapbook-style` | `.agents/skills/infocard-styles/infocard-scrapbook-style` | `move` | 0 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-source-routing-decision-tree` | `/home/ccwq/hehome/hermes-data/skills/infocard-source-routing-decision-tree` | `.agents/skills/infocard/infocard-source-routing-decision-tree` | `move` | 1 retained | unverified | composed project support | local PASS; global unverified |
-| `infocard-style-man-skill` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-style-man-skill` | `.agents/skills/content/infocard-style-man-skill` | `move` | 21 retained | unverified | direct project target | local PASS; global unverified |
-| `infocard-theme-redesign` | `/home/ccwq/hehome/hermes-data/skills/design/infocard-theme-redesign` | `.agents/skills/design/infocard-theme-redesign` | `move` | 2 retained | unverified | direct project target | local PASS; global unverified |
+| `infocard-style-man-skill` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-style-man-skill` + design lifecycle references | `.agents/skills/infocard-styles/infocard-style-man-skill` | `merge` | 26 retained | unverified | direct project target | local PASS; global unverified |
 | `infocard-theme-validation` | `/home/ccwq/hehome/hermes-data/skills/productivity/infocard-theme-validation` | `.agents/skills/productivity/infocard-theme-validation` | `move` | 1 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-three-stage-pipeline` | `/home/ccwq/hehome/hermes-data/skills/productivity/infocard-three-stage-pipeline` | `.agents/skills/productivity/infocard-three-stage-pipeline` | `move` | 3 retained | unverified | composed project support | local PASS; global unverified |
 | `infocard-tool-cli-pattern` | `/home/ccwq/hehome/hermes-data/skills/content/infocard-tool-cli-pattern` | `.agents/skills/content/infocard-tool-cli-pattern` | `move` | 1 retained | unverified | composed project support | local PASS; global unverified |
@@ -77,19 +73,17 @@ Status: project tree verified locally; global migration and Hermes discovery rem
 
 ## Existing project-local skills retained
 
-These 11 directories were already project-local and were not overwritten by a global source migration:
+These 9 directories were already project-local and were not overwritten by a global source migration:
 
 - `any2card-github-hardblue-workflow` — `.agents/skills/infocard/any2card/any2card-github-hardblue-workflow/SKILL.md`
 - `cdp-visual-evidence-verification` — `.agents/skills/infocard/cdp-visual-evidence-verification/SKILL.md`
 - `infocard-authoring-workflow` — `.agents/skills/infocard/infocard-authoring-workflow/SKILL.md`
 - `infocard-build-and-deploy` — `.agents/skills/infocard/infocard-build-and-deploy/SKILL.md`
-- `infocard-css-recovery` — `.agents/skills/infocard/infocard-css-recovery/SKILL.md`
-- `infocard-grid-stripe-collapse` — `.agents/skills/infocard/infocard-grid-stripe-collapse/SKILL.md`
-- `infocard-html-structure-debug` — `.agents/skills/infocard/infocard-html-structure-debug/SKILL.md`
-- `infocard-poster-shell-rebuild` — `.agents/skills/infocard/infocard-poster-shell-rebuild/SKILL.md`
-- `infocard-theme-assignment` — `.agents/skills/infocard/infocard-theme-assignment/SKILL.md`
-- `infocard-mobile-verifier` — `.agents/skills/productivity/infocard-mobile-verifier/SKILL.md`
+- `infocard-content-types` — `.agents/skills/infocard/infocard-content-types/SKILL.md`
+- `infocard-mobile-verifier` — `.agents/skills/productivity/infocard-mobile-verifier/SKILL.md`（唯一移动端入口）
 - `infocard-pub-publisher` — `.agents/skills/productivity/infocard-pub-publisher/SKILL.md`
+- `infocard-theme-assignment` — `.agents/skills/infocard/infocard-theme-assignment/SKILL.md`
+- `web-capture` — `.agents/skills/productivity/web-capture/SKILL.md`
 
 ## Merge details
 
@@ -98,16 +92,16 @@ These 11 directories were already project-local and were not overwritten by a gl
 
 ## Shared support retained globally
 
-Generic cross-project browser automation, GitHub, research, image-generation, document, and general visual-review mechanisms were not included in the explicit candidate allowlist and were not deleted. This migration removed only the spec-required canonical `infocard-*` family plus the six named project-owned companions.
+Generic cross-project browser automation, GitHub, research, image-generation, document, and general visual-review mechanisms were not included in the explicit candidate allowlist and were not deleted. This migration removed only the spec-required canonical `infocard-*` family plus the five named project-owned mobile companions listed below.
 
 ## Router routes
 
 - create/write → `infocard-publish-sop`, `infocard-authoring-workflow`, `any2card`
 - query/audit/topic → `infocard-topic-selection`, canonical `infocard-metadata-provenance`
 - theme query/assignment → `infocard-theme-assignment` + selected `infocard-*-style`
-- theme create/revise/govern → `infocard-style-man-skill`, `infocard-theme-redesign`, optional archival refinement
+- theme create/revise/govern → `infocard-style-man-skill`
 - update vs new → `infocard-update-vs-new-pattern` + publish SOP
-- preview/mobile/visual → preview standards, mobile verifier/rendering verification, visual gate
+- preview/mobile/visual → preview standards, mobile verifier, visual gate
 - build/publish → publisher/build-and-deploy/closeout
 - metadata/index/Wiki → canonical metadata provenance + Wiki coverage
 
@@ -115,14 +109,22 @@ Generic cross-project browser automation, GitHub, research, image-generation, do
 
 - Deleted: no global source directory was deleted in this Windows environment. Each table row requires qbox/Hermes-side verification before its global deletion state can be changed from `unverified`.
 - Blocked: the explicit 52-canonical candidate inventory cannot be enumerated from the specified global root in this environment.
-- Retired without replacement: none. Duplicate definitions were merged rather than discarded.
+- Retired without replacement: five project-local mobile skill directories were deleted after their useful recipes were consolidated into `infocard-mobile-verifier`.
+
+Deleted project-local mobile directories:
+
+- `.agents/skills/productivity/infocard-mobile-rendering-verification`
+- `.agents/skills/productivity/infocard-responsive-layout`
+- `.agents/skills/infocard/infocard-css-recovery`
+- `.agents/skills/infocard/infocard-html-structure-debug`
+- `.agents/skills/infocard/infocard-grid-stripe-collapse`
 
 ## Verification evidence
 
 Local deterministic validator output:
 
 ```json
-{"project_skill_count":63,"unique_name_count":63,"migration_records":52,"errors":[]}
+{"project_skill_count":59,"unique_name_count":59,"migration_records":50,"errors":[]}
 ```
 
 Checks performed:
