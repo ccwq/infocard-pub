@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>zoetrope：Claude Code 的实时流图可视化，subagent 执行过程一览无遗</title>
+<meta name="description" content="zoetrope：开源的 Claude Code 会话可视化工具，终端/浏览器实时追踪 subagent 调用、工具、耗时、token，macOS/Linux 一键安装 brew install furkankly/tap/zoetrope，Rust 编写，MIT 协议。">
+<style>
+:root{
+  --bg:#060c14;--paper:#0c1420;--ink:#c8d8f0;--muted:#6b82a8;--line:#1c3058;
+  --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;--red:#ff6b6b;
+  --shadow:6px 6px 0 rgba(88,195,255,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  color:var(--ink);line-height:1.6;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(74,120,255,.12) 0 40%, transparent 41%),
+    radial-gradient(circle at 80% 20%, rgba(88,195,255,.10) 0 35%, transparent 36%),
+    radial-gradient(circle at 60% 80%, rgba(133,89,255,.07) 0 30%, transparent 31%),
+    linear-gradient(rgba(28,48,88,.3) 1px, transparent 1px) 0 0/100% 40px,
+    linear-gradient(90deg, rgba(28,48,88,.25) 1px, transparent 1px) 0 0/40px 100%,
+    var(--bg);
+  font-family:ui-monospace,"SF Mono","Fira Code","Fira Mono",Menlo,Consolas,"PingFang SC","Microsoft YaHei",monospace;
+}
+img{display:block;max-width:100%}
+a{color:var(--cyan);text-decoration:none}
+code,pre{font-family:inherit}
+.page{width:min(1040px,calc(100%-20px));margin:0 auto;padding:18px 0 80px}
+
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:2px solid var(--line);background:var(--paper);overflow:hidden}
+.hero-bar{grid-column:1/-1;height:10px;background:var(--blue);border-bottom:2px solid var(--line)}
+.hero-copy{padding:16px;border-right:2px solid var(--line);display:grid;gap:10px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:6px;width:fit-content;border:1.5px solid var(--cyan);background:rgba(88,195,255,.08);padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan)}
+.kicker::before{content:"◆";font-size:9px}
+.demo-title{margin:0;font-size:clamp(18px,3vw,34px);line-height:1.05;letter-spacing:-.04em;color:#e8f4ff}
+.subtitle{color:var(--muted);font-size:12.5px;line-height:1.55}
+.badge-row{display:flex;flex-wrap:wrap;gap:5px}
+.badge{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border:1.5px solid var(--line);background:rgba(255,255,255,.04);font-size:11.5px;font-weight:700;color:var(--ink)}
+.badge.cyan{background:rgba(88,195,255,.12);border-color:var(--cyan);color:var(--cyan)}
+.badge.green{background:rgba(45,179,106,.12);border-color:var(--green);color:var(--green)}
+.badge.purple{background:rgba(133,89,255,.12);border-color:var(--purple);color:var(--purple)}
+.badge.yellow{background:rgba(244,200,76,.10);border-color:var(--yellow);color:var(--yellow)}
+.badge.red{background:rgba(255,107,107,.10);border-color:var(--red);color:var(--red)}
+.alert{border:1.5px solid var(--line);background:rgba(74,120,255,.08);padding:10px 12px;display:grid;gap:8px}
+.alert strong{display:block;font-size:13px;line-height:1.35;color:#e8f4ff}
+.alert p{margin:0;font-size:12px;line-height:1.65;color:var(--muted)}
+.mini-row{display:flex;flex-wrap:wrap;gap:5px}
+.mini-tag{display:inline-flex;align-items:center;border:1px solid var(--line);padding:3px 7px;font-size:11px;font-weight:700;line-height:1;background:rgba(255,255,255,.04);color:var(--muted)}
+.hero-visual{background:rgba(0,0,0,.3);display:grid;grid-template-rows:auto 1fr}
+.hero-visual .panel-top{padding:12px;border-bottom:2px solid var(--line);background:linear-gradient(135deg,rgba(74,120,255,.25) 0%,rgba(88,195,255,.15) 100%);color:#e8f4ff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.3);padding:2px 7px;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+.panel-top h3{margin:8px 0 5px;font-size:18px;line-height:1.1;letter-spacing:-.03em}
+.panel-top p{margin:0;color:rgba(200,216,240,.8);font-size:12.5px;line-height:1.62}
+.panel-body{padding:12px;display:grid;gap:8px;background:rgba(0,0,0,.15)}
+.quote{border-left:3px solid var(--cyan);padding:8px 11px;background:rgba(88,195,255,.07);font-weight:600;line-height:1.6;font-size:13px}
+.quote b{color:var(--cyan)}
+.flow{display:grid;gap:6px}
+.flow-item{border:1.5px solid var(--line);background:rgba(255,255,255,.03);padding:8px 11px;display:grid;gap:2px;position:relative}
+.flow-item::after{content:"→";position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--cyan);font-size:16px;font-weight:700}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.flow-item .c{font-size:13px;line-height:1.55;font-weight:700;color:#e8f4ff}
+.flow-item.cyan .c{color:var(--cyan)}
+.flow-item.green .c{color:var(--green)}
+.flow-item.red .c{color:var(--red)}
+
+.section{margin-top:28px;border-top:2px solid var(--line);padding-top:12px}
+.section-head{display:grid;grid-template-columns:88px 1fr;gap:12px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:88px;height:88px;border:2px solid var(--cyan);background:rgba(88,195,255,.1);color:var(--cyan);font-size:30px;font-weight:900;line-height:1}
+.section-no.b{border-color:var(--blue);background:rgba(74,120,255,.1);color:var(--blue)}
+.section-no.k{border-color:var(--yellow);background:rgba(244,200,76,.08);color:var(--yellow)}
+.section-no.r{border-color:var(--red);background:rgba(255,107,107,.08);color:var(--red)}
+.section-meta{display:grid;gap:6px;padding-top:4px}
+.section-meta .label{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan);font-weight:700}
+.section-meta .label.k{color:var(--yellow)}
+.section-meta .label.b{color:var(--blue)}
+.section-meta h2{margin:0;font-size:clamp(20px,3.5vw,36px);line-height:1.05;letter-spacing:-.04em;color:#e8f4ff}
+.section-meta p{margin:0;color:var(--muted);font-size:13px;line-height:1.62;max-width:960px}
+
+.grid-2,.grid-3,.grid-4{display:grid;gap:10px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card,.mini{border:1.5px solid var(--line);background:rgba(255,255,255,.03);min-width:0}
+.card,.mini{padding:12px}
+.card{display:grid;gap:9px}
+.card h3,.mini h4{margin:0;letter-spacing:-.02em;color:#e8f4ff}
+.card h3{font-size:16px;line-height:1.18}
+.card p,.mini p{margin:0;font-size:13px;color:var(--muted);line-height:1.65}
+.card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+.card li,.mini li{margin:3px 0;font-size:13px;color:var(--muted);line-height:1.65}
+.tagrow{display:flex;flex-wrap:wrap;gap:5px}
+.tag{display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--line);padding:3px 8px;background:rgba(255,255,255,.04);font-size:11.5px;font-weight:700;color:var(--ink)}
+.tag.cyan{background:rgba(88,195,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.tag.green{background:rgba(45,179,106,.1);border-color:var(--green);color:var(--green)}
+.tag.purple{background:rgba(133,89,255,.1);border-color:var(--purple);color:var(--purple)}
+.tag.yellow{background:rgba(244,200,76,.08);border-color:var(--yellow);color:var(--yellow)}
+.tag.red{background:rgba(255,107,107,.08);border-color:var(--red);color:var(--red)}
+
+.matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.matrix .mini{display:grid;gap:7px}
+.mini h4{font-size:14px;line-height:1.22}
+.mini .lead{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.mini .quote-line{border-left:3px solid var(--cyan);padding-left:9px;font-weight:600;line-height:1.55;font-size:13px;color:#e8f4ff}
+.quote-block{border-left:3px solid var(--cyan);padding:10px 13px;background:rgba(88,195,255,.07);font-size:13px;line-height:1.7}
+.quote-block b{color:var(--cyan)}
+pre{margin:0;background:rgba(0,0,0,.4);color:#a8c8e8;padding:13px;border:1.5px solid var(--line);overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.7}
+
+.style-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:0;color:var(--ink)}
+.style-table th{padding:7px 11px;border:1.5px solid var(--line);background:rgba(74,120,255,.15);color:var(--cyan);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;text-align:left}
+.style-table td{padding:7px 11px;border:1.5px solid var(--line);vertical-align:top}
+.style-table tr:nth-child(even) td{background:rgba(0,0,0,.2)}
+.style-table .feat-tag{display:inline-flex;padding:2px 6px;background:rgba(88,195,255,.1);border:1px solid var(--cyan);font-size:10px;font-weight:700;color:var(--cyan)}
+.style-table .feat-tag.green{background:rgba(45,179,106,.1);border-color:var(--green);color:var(--green)}
+.style-table .feat-tag.red{background:rgba(255,107,107,.08);border-color:var(--red);color:var(--red)}
+.style-table .feat-tag.purple{background:rgba(133,89,255,.1);border-color:var(--purple);color:var(--purple)}
+
+.rule{height:2px;background:var(--line);margin:6px 0 0}
+.source-note{margin-top:16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
+.footer-block{border:2px solid var(--line);background:rgba(255,255,255,.03);padding:14px;display:grid;gap:9px}
+.footer-block h3{font-size:16px;line-height:1.2;margin:0;letter-spacing:-.02em;color:#e8f4ff}
+.footer-block p{font-size:13px;color:var(--muted);line-height:1.65;margin:0}
+.footer-block ul{margin:0;padding-left:14px;font-size:13px;color:var(--muted);line-height:1.72}
+.footer-block .meta{font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding-top:7px;margin-top:3px;opacity:.7}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border:1.5px solid var(--cyan);background:rgba(88,195,255,.1);color:var(--cyan);font-size:12.5px;font-weight:700;text-decoration:none}
+
+@media(max-width:1080px){
+  .hero{grid-template-columns:1fr}
+  .hero-copy{border-right:0;border-bottom:2px solid var(--line)}
+  .grid-4,.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .page{width:min(100%-16px,1040px);padding:10px 0 60px}
+  .hero{display:flex;flex-direction:column}
+  .hero-copy{padding:14px;border-right:0;border-top:2px solid var(--line)}
+  .grid-4,.grid-3,.grid-2,.matrix{grid-template-columns:1fr}
+  .section-head{grid-template-columns:1fr;gap:9px}
+  .section-no{width:68px;height:68px;font-size:26px}
+  .style-table{font-size:11px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-bar"></div>
+  <div class="hero-copy">
+    <div class="kicker">Claude Code · Agent 可观测性 · Rust</div>
+    <h1 class="demo-title">zoetrope</h1>
+    <p class="subtitle">Claude Code subagent 执行过程的实时流图可视化工具，终端/浏览器双端运行，会话回放+时间轴倒退，只读设计依赖树无 HTTP client。</p>
+    <div class="badge-row">
+      <span class="badge cyan">Rust</span>
+      <span class="badge green">MIT</span>
+      <span class="badge">brew 安装</span>
+    </div>
+    <div class="badge-row">
+      <span class="badge">只读设计</span>
+      <span class="badge">JSONL 会话</span>
+      <span class="badge">终端+浏览器</span>
+    </div>
+    <div class="alert">
+      <strong>一句话定位</strong>
+      <p>Claude Code 多 subagent 并行执行时，执行过程如同黑盒。zoetrope 把本地 JSONL 会话记录变成实时流图——谁创建谁、每个 Agent 调用了什么工具、用了多久，一眼看清。</p>
+      <div class="mini-row">
+        <span class="mini-tag">终端实时跟踪</span>
+        <span class="mini-tag">会话回放</span>
+        <span class="mini-tag">时间轴倒退</span>
+        <span class="mini-tag">无 HTTP 依赖</span>
+      </div>
+    </div>
+  </div>
+  <figure class="hero-visual">
+    <div class="panel-top">
+      <div class="eyebrow">工作流</div>
+      <h3>Claude Code → JSONL → 流图</h3>
+      <p>zoetrope 读取 Claude Code 未公开的内部 JSONL 格式，在终端或浏览器实时渲染 Agent 调用图谱。</p>
+    </div>
+    <div class="panel-body">
+      <div class="quote"><b>一句话：</b>zoetrope = Claude Code 的「可视化行车记录仪」。多 Agent 并行时不再盲跑，终端实时看到每个 Agent 在干什么。</div>
+      <div class="flow">
+        <div class="flow-item cyan"><div class="t">Claude Code</div><div class="c">运行 subagent，产生 JSONL 记录</div></div>
+        <div class="flow-item"><div class="t">zoetrope</div><div class="c">实时解析 JSONL，渲染流图</div></div>
+        <div class="flow-item green"><div class="t">终端 / 浏览器</div><div class="c">可视化 Agent 调用链</div></div>
+        <div class="flow-item"><div class="t">回放 / 倒退</div><div class="c">时间轴精确定位卡点</div></div>
+      </div>
+    </div>
+  </figure>
+</header>
+
+<!-- OVERVIEW -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no b">01</div>
+    <div class="section-meta">
+      <div class="label b">OVERVIEW · 一句话概述</div>
+      <h2>zoetrope 是什么</h2>
+    </div>
+  </div>
+  <div class="grid-2">
+    <article class="card">
+      <div class="tagrow"><span class="tag cyan">Agent 可观测性</span><span class="tag purple">Claude Code</span></div>
+      <h3>多 Agent 并行执行可视化</h3>
+      <p>Claude Code 的 subagent 机制强大，但执行过程不透明。zoetrope 读取 Claude Code 本地 JSONL 会话记录，将每个 Agent 的创建关系、工具调用、耗时、token 消耗实时渲染为流图。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag green">MIT · Rust</span><span class="tag yellow">只读设计</span></div>
+      <h3>无 HTTP client · 隐私优先</h3>
+      <p>zoetrope 只读取本地 JSONL 文件，依赖树中没有 HTTP client，不会向外发送任何数据。README 明确标注"只读设计"——适合关注数据隐私的开发者。</p>
+    </article>
+  </div>
+  <div class="matrix" style="margin-top:12px">
+    <article class="mini">
+      <div class="lead">GitHub Stars</div>
+      <h4 style="font-size:22px;color:var(--cyan)">629</h4>
+      <p class="quote-line">上线 10 天热度极高</p>
+    </article>
+    <article class="mini">
+      <div class="lead">语言</div>
+      <h4 style="font-size:18px">Rust</h4>
+      <p class="quote-line">高性能 + 跨平台</p>
+    </article>
+    <article class="mini">
+      <div class="lead">License</div>
+      <h4 style="font-size:18px;color:var(--green)">MIT</h4>
+      <p class="quote-line">可自由商用</p>
+    </article>
+    <article class="mini">
+      <div class="lead">平台</div>
+      <h4 style="font-size:18px">macOS / Linux</h4>
+      <p class="quote-line">brew 一键安装</p>
+    </article>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no">02</div>
+    <div class="section-meta">
+      <div class="label">KEY FEATURES · 核心功能</div>
+      <h2>Agent 执行过程全透明</h2>
+      <p>从实时追踪到历史回放，zoetrope 提供完整的 Agent 可观测性视图。</p>
+    </div>
+  </div>
+  <table class="style-table">
+    <thead>
+      <tr>
+        <th style="width:30%">功能</th>
+        <th style="width:14%">标签</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>终端实时跟踪</td>
+        <td><span class="feat-tag">实时</span></td>
+        <td>终端窗口直接渲染正在运行的 Claude Code Session，实时显示 Agent 节点、调用关系和状态变化</td>
+      </tr>
+      <tr>
+        <td>会话回放</td>
+        <td><span class="feat-tag green">Replay</span></td>
+        <td>已完成的任务可随时回放，支持沿时间轴前进/倒退，精确定位每个决策点的输入输出</td>
+      </tr>
+      <tr>
+        <td>Agent 详情查看</td>
+        <td><span class="feat-tag purple">Detail</span></td>
+        <td>点开任意 Agent 节点，查看完整 prompt、所选 model、工具调用链与每步耗时</td>
+      </tr>
+      <tr>
+        <td>浏览器运行模式</td>
+        <td><span class="feat-tag green">Browser</span></td>
+        <td>同一套引擎可在浏览器运行，会话文件保留在本地，无需上传到任何服务器</td>
+      </tr>
+      <tr>
+        <td>只读设计</td>
+        <td><span class="feat-tag green">Privacy</span></td>
+        <td>依赖树中无 HTTP client，不发送任何数据，JSONL 文件完全本地读取，隐私优先</td>
+      </tr>
+      <tr>
+        <td>JSONL 格式解析</td>
+        <td><span class="feat-tag">Core</span></td>
+        <td>读取 Claude Code 内部 JSONL 会话记录（未公开格式），展示 agent 创建关系和工具调用</td>
+      </tr>
+      <tr>
+        <td>token / 耗时统计</td>
+        <td><span class="feat-tag purple">Metrics</span></td>
+        <td>每个 Agent 的输出 token 数量、总耗时、工具调用次数均可见，方便性能分析</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- INSTALLATION -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no k">03</div>
+    <div class="section-meta">
+      <div class="label k">INSTALL · 安装方式</div>
+      <h2>Homebrew 一键安装</h2>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="tagrow"><span class="tag cyan">Homebrew</span><span class="tag green">推荐</span></div>
+      <h3>macOS / Linux</h3>
+<pre style="margin-top:8px">brew install furkankly/tap/zoetrope
+zoe</pre>
+      <p style="margin-top:8px;font-size:12px;color:var(--muted)">运行命令为 <code>zoe</code>，启动后自动检测本地 Claude Code JSONL 文件。</p>
+    </div>
+    <div class="card">
+      <div class="tagrow"><span class="tag purple">GitHub</span><span class="tag">源码</span></div>
+      <h3>手动构建（Rust 环境）</h3>
+<pre style="margin-top:8px">git clone https://github.com/furkankly/zoetrope
+cd zoetrope
+cargo build --release
+./target/release/zoetrope</pre>
+    </div>
+  </div>
+  <div class="quote-block" style="margin-top:12px">
+    <b>⚠ 兼容性限制：</b>zoetrope 读取 Claude Code 未公开的内部 JSONL 格式，后续 Claude Code 版本变化可能导致解析异常。项目会跳过未知记录而非报错，不保证与未来版本永久兼容。建议用于日常调试，遇到版本问题时关注 GitHub issues 更新。
+  </div>
+</div>
+
+<!-- USE CASES -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-no r">04</div>
+    <div class="section-meta">
+      <div class="label">USE CASES · 适用场景</div>
+      <h2>什么情况下值得用</h2>
+    </div>
+  </div>
+  <div class="grid-3">
+    <article class="card">
+      <div class="tagrow"><span class="tag red">调试长任务</span></div>
+      <h3>定位 subagent 卡点</h3>
+      <p>多 Agent 并行跑代码重构、批量文件处理等长任务时，某个 subagent 卡住不知道原因。用 zoetrope 一眼看到哪个 Agent 在等待、哪个已超时。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag yellow">复盘执行</span></div>
+      <h3>Agent 执行过程复盘</h3>
+      <p>任务完成后回放全流程，对比不同 prompt、不同 model 下的 Agent 行为差异，找到最优的 agentic 工作流配置。</p>
+    </article>
+    <article class="card">
+      <div class="tagrow"><span class="tag green">成本分析</span></div>
+      <h3>token 消耗可视化</h3>
+      <p>每个 Agent 的输出 token 和耗时清晰可见，方便分析 Claude Code 使用成本，识别消耗异常高的 subagent。</p>
+    </article>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="section">
+  <div class="footer-block">
+    <h3>数据来源与边界说明</h3>
+    <ul>
+      <li>功能数据来源：GitHub furkankly/zoetrope README（629 stars，2026-08-18 上线，MIT 协议）+ X @AISuperDomain 推文（2026-08-28 02:22 UTC）</li>
+      <li>JSONL 兼容性：Claude Code 未公开内部 JSONL 格式，后续版本可能变化；项目会跳过未知记录，建议关注 GitHub issues 了解兼容性状态</li>
+      <li>zoetrope 为只读工具，不修改 Claude Code 行为，不上传任何数据；隐私敏感场景请以官方 README 最新说明为准</li>
+    </ul>
+    <div class="meta">来源：X @AISuperDomain · GitHub furkankly/zoetrope · 2026-08-28 | Theme: hardblue</div>
+  </div>
+</div>
+
+<div class="rule"></div>
+<p class="source-note">zoetrope · Claude Code 可观测性工具 · Agent 流图可视化 · Rust 629★ · MIT · 蓝色工具手册</p>
+</main>
+</body>
+</html>
