@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="redswiss">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SpiderFoot：输入一个域名，自动摸清公网暴露资产</title>
+  <meta name="description" content="开源 OSINT 自动化框架，200+ 模块串成一条流水线，21k Stars，MIT 协议。" />
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* topbar: diagonal red→black hero + right meta pills */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    .topbar-meta{
+      padding:14px;border-left:3px solid var(--line);
+      display:grid;grid-template-rows:auto auto;gap:0;align-content:start;background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;grid-template-columns:1.4fr 1fr;gap:5px;
+      padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;grid-template-columns:1.2fr 1fr 0.8fr;gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);padding:7px 9px 5px;background:#fff;
+      font-weight:900;font-size:14px;line-height:1.1;
+    }
+    .meta-pill-lg .sub{
+      display:block;font-size:9px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.06em;color:#888;margin-top:2px;
+    }
+    .meta-pill-md{
+      border:2px solid var(--line);border-left:4px solid var(--red);
+      padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25;
+    }
+    .meta-pill-md .sub{
+      display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.06em;color:#888;margin-top:1px;
+    }
+    .meta-pill-sm{
+      border:2px solid var(--line);border-left:4px solid #666;
+      padding:3px 7px 3px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3;
+    }
+    .meta-pill-sm .sub{
+      display:block;font-size:8px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.06em;color:#aaa;margin-top:1px;
+    }
+    .kicker{
+      display:inline-block;border:2px solid #fff;padding:4px 8px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;
+    }
+    h1.demo-title{
+      margin:10px 0 6px;
+      font-size:clamp(20px,3.2vw,38px);font-weight:800;
+      letter-spacing:-.03em;line-height:1.05;
+    }
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{
+      display:inline-block;padding:3px 8px;border:2px solid #fff;
+      background:var(--red);color:#fff;font-size:10.5px;font-weight:800;
+      text-transform:uppercase;letter-spacing:.08em;margin-top:8px;
+    }
+
+    /* overview */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{
+      font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;
+      line-height:1.35;letter-spacing:-.01em;
+    }
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* stats */
+    .stats{
+      display:flex;flex-wrap:wrap;border:2px solid var(--line);
+      margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow);
+    }
+    .stat{
+      flex:1;min-width:60px;padding:10px 12px 8px;
+      border-right:2px solid var(--line);text-align:center;background:#fff;
+    }
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* pills */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* section */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{
+      background:var(--ink);color:#fff;padding:7px 12px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:10px 12px}
+    h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+    p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+
+    /* tags */
+    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
+
+    /* grid */
+    .grid-2,.grid-3{display:grid;gap:10px;margin-bottom:10px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr));display:grid;gap:10px;margin-bottom:10px}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+    .card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+
+    /* table */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+    th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    tr:nth-child(even) td{background:#faf8f4}
+    .check{color:var(--red);font-weight:900;font-size:13px}
+    .cross{color:var(--ink);font-weight:900;font-size:13px}
+
+    /* flow */
+    .flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow);overflow-x:auto}
+    .flow-item{flex:0 0 auto;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff;min-width:60px}
+    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+
+    /* btn */
+    .btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+    .btn.red{background:var(--red);border-color:var(--red)}
+    .btn.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* alert */
+    .alert{border:2px solid var(--red);background:var(--soft-red);padding:12px 14px;margin-bottom:10px}
+    .alert strong{font-size:13px;color:var(--red);display:block;margin-bottom:4px}
+    .alert p{font-size:12px;color:#5a1010;margin:0;line-height:1.65}
+
+    /* code */
+    pre{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:12px 14px;overflow-x:auto;font-size:12px;line-height:1.72;margin-bottom:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    /* rule / source */
+    .rule{height:3px;background:var(--ink);margin:10px 0}
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+
+    /* responsive */
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .grid-3,.grid-2,.grid-4{grid-template-columns:1fr 1fr}
+      .stats{flex-direction:column}
+      .stat{border-right:0;border-bottom:2px solid var(--line)}
+      .stat:last-child{border-bottom:0}
+      .card{padding-left:12px;padding-right:12px}
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:0;border-top:3px solid var(--line)}
+      h1.demo-title{font-size:clamp(18px,6vw,28px)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .flow{overflow-x:scroll}
+    }
+    @media (max-width:480px){
+      .grid-3,.grid-2,.grid-4{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- TOPBAR: diagonal hero + meta pills -->
+    <header class="topbar">
+      <div class="topbar-hero">
+        <div class="kicker">OSINT · 自动化框架</div>
+        <h1 class="demo-title">SpiderFoot</h1>
+        <p class="sub-line">公网资产自动梳理流水线 · 200+ 模块 · 发布订阅引擎</p>
+        <div class="tagline">MIT · 开源</div>
+      </div>
+      <div class="topbar-meta">
+        <div class="meta-row-high">
+          <div class="meta-pill-lg">21k<span class="sub">Stars</span></div>
+          <div class="meta-pill-lg">MIT<span class="sub">协议</span></div>
+        </div>
+        <div class="meta-row-low">
+          <div class="meta-pill-md">200+<span class="sub">模块</span></div>
+          <div class="meta-pill-md">活跃<span class="sub">维护</span></div>
+          <div class="meta-pill-sm">Python<span class="sub">实现</span></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- OVERVIEW -->
+    <div class="overview">
+      <div class="overview-sentence">输入一个域名，SpiderFoot 自动摸清这家公司暴露在公网上的全部资产。</div>
+      <div class="overview-body">
+        <p>SpiderFoot 把子域名枚举、DNS 查询、端口扫描、banner 抓取串成一条自动化流水线——模块之间用发布订阅方式互相喂数据，一个模块挖到的域名自动变成下一个模块的输入，跑完直接导出 CSV 或 JSON。它自带 YAML 关联规则引擎，能把散落的线索自动串成同一条结论，Nmap、WhatWeb、CMSeeK 等外部工具也能挂进来一起跑。工具本身中立，是否授权扫描是使用者自己的事。</p>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats" aria-label="关键指标">
+      <div class="stat"><strong>21k</strong><span>GitHub Stars</span></div>
+      <div class="stat"><strong>MIT</strong><span>开源协议</span></div>
+      <div class="stat"><strong>200+</strong><span>集成模块</span></div>
+      <div class="stat"><strong>活跃</strong><span>持续维护</span></div>
+    </div>
+
+    <!-- PILLS -->
+    <div class="pills">
+      <span class="pill red">OSINT</span>
+      <span class="pill dark">自动化</span>
+      <span class="pill">开源</span>
+      <span class="pill">安全工具</span>
+      <span class="pill soft">资产梳理</span>
+    </div>
+
+    <!-- SECTION 01: 核心能力 -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">01</span>
+        <span class="label">核心能力</span>
+      </div>
+      <div class="sec-body">
+        <div class="grid-4">
+          <article class="card">
+            <div class="lead">STEP 01</div>
+            <h4>子域名枚举</h4>
+            <p>被动/主动发现目标关联的所有子域名，为后续流水线提供入口数据。</p>
+          </article>
+          <article class="card">
+            <div class="lead">STEP 02</div>
+            <h4>DNS 查询</h4>
+            <p>自动解析 IP、MX、TXT、NS 记录，构建域名→IP 映射表。</p>
+          </article>
+          <article class="card">
+            <div class="lead">STEP 03</div>
+            <h4>端口扫描</h4>
+            <p>对每个 IP 执行端口枚举，识别暴露服务和潜在攻击面。</p>
+          </article>
+          <article class="card">
+            <div class="lead">STEP 04</div>
+            <h4>Banner 抓取</h4>
+            <p>获取服务指纹（Web 服务器、数据库、中间件版本），辅助漏洞研判。</p>
+          </article>
+        </div>
+        <p style="margin-top:8px;font-size:12px;color:#555">所有步骤由发布订阅引擎自动串联，一个模块的输出自动流向下一个模块。</p>
+      </div>
+    </div>
+
+    <!-- SECTION 02: 流水线架构 -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">02</span>
+        <span class="label">流水线架构</span>
+      </div>
+      <div class="sec-body">
+        <h3>发布订阅模块流水线</h3>
+        <p>SpiderFoot 内置 200+ 模块，模块之间通过事件总线互连，形成数据驱动的流水线。</p>
+        <div class="flow">
+          <div class="flow-item red">域名输入</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">子域名枚举</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">DNS 解析</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">端口扫描</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">Banner 抓取</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item red">CSV / JSON</div>
+        </div>
+        <div class="grid-2">
+          <article class="card">
+            <div class="lead">发布订阅</div>
+            <h4>事件总线驱动</h4>
+            <p>模块既是数据消费者也是生产者，事件总线负责分发，任一模块的发现自动触发下游。</p>
+          </article>
+          <article class="card">
+            <div class="lead">数据导出</div>
+            <h4>CSV / JSON / 图表</h4>
+            <p>支持结构化导出，便于后续分析、整合到 SIEM 或生成可视化报告。</p>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 03: 关联规则引擎 -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">03</span>
+        <span class="label">关联规则引擎</span>
+      </div>
+      <div class="sec-body">
+        <h3>YAML 关联规则 · 自动化结论生成</h3>
+        <p>SpiderFoot 内置 YAML 规则引擎，可将零散线索自动串联成有意义的结论，例如将某 IP 的开放端口 + 检测到的 SSL 证书 + 历史 DNS 记录关联为"存在风险的外网服务"。</p>
+        <div class="grid-3">
+          <article class="card">
+            <div class="lead">YAML 规则</div>
+            <h4>声明式关联</h4>
+            <p>用 YAML 描述"如果 X 和 Y 同时出现，则推断 Z"的逻辑，无需写代码。</p>
+          </article>
+          <article class="card">
+            <div class="lead">外部集成</div>
+            <h4>Nmap · WhatWeb · CMSeeK</h4>
+            <p>主流安全工具可作为外部模块接入，扩展 SpiderFoot 的数据采集能力。</p>
+          </article>
+          <article class="card">
+            <div class="lead">可视化</div>
+            <h4>内置 Web UI</h4>
+            <p>提供 Web 界面实时查看扫描进度和结果图表，无需命令行操作。</p>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 04: 快速上手 -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">04</span>
+        <span class="label">快速上手</span>
+      </div>
+      <div class="sec-body">
+        <h3>pip 安装 · Web UI 运行</h3>
+<pre>pip install spiderfoot
+sf.py -l 127.0.0.1:5001
+# 浏览器打开 http://127.0.0.1:5001
+# 输入目标域名，选择模块，点击「Start Scan」</pre>
+        <div class="grid-2">
+          <article class="card">
+            <div class="lead">GUI 模式</div>
+            <h4>Web UI（推荐）</h4>
+            <p>本地启动 Web 服务，浏览器操作，无需记忆命令参数。</p>
+          </article>
+          <article class="card">
+            <div class="lead">CLI 模式</div>
+            <h4>sf.py 命令行</h4>
+            <p><code>sf.py -s example.com -m sfp_...</code> 无界面，适合脚本化和 CI 集成。</p>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 05: 适用边界 -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="num">05</span>
+        <span class="label">适用边界</span>
+      </div>
+      <div class="sec-body">
+        <div class="alert">
+          <strong>⚠ 工具中立 · 使用者自担授权责任</strong>
+          <p>SpiderFoot 是中立的自动化工具，可用于授权的安全测试、资产自查、红蓝对抗训练。扫描谁、是否在授权范围内进行，是使用者自己的责任。建议在获得明确书面授权后对目标执行扫描。</p>
+        </div>
+        <div class="grid-2">
+          <article class="card">
+            <div class="lead">✓ 适用场景</div>
+            <h4>授权安全测试</h4>
+            <p>对自有资产做安全自查、渗透测试前的信息收集、应急响应中的暴露面梳理。</p>
+          </article>
+          <article class="card">
+            <div class="lead">✗ 风险场景</div>
+            <h4>未授权扫描</h4>
+            <p>对未获授权的目标执行端口扫描或主动探测可能违反当地法律法规。</p>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAGS -->
+    <div class="tags">
+      <span class="tag">OSINT</span>
+      <span class="tag">自动化</span>
+      <span class="tag">开源</span>
+      <span class="tag">安全工具</span>
+      <span class="tag">资产梳理</span>
+      <span class="tag">发布订阅</span>
+      <span class="tag">YAML 规则引擎</span>
+    </div>
+
+    <!-- LINKS -->
+    <div class="grid-2">
+      <a class="btn red" href="https://github.com/smicallef/spiderfoot" target="_blank" rel="noopener">GitHub 仓库</a>
+      <a class="btn" href="https://www.spiderfoot.net/" target="_blank" rel="noopener">官方文档</a>
+    </div>
+
+    <div class="rule"></div>
+    <p class="source-note">来源：X @Ryrenz · 2026-08-30</p>
+  </main>
+</body>
+</html>
