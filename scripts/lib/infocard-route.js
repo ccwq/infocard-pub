@@ -43,6 +43,7 @@ function classifyRoute(input = {}, options = {}) {
   if (input.sourceConflict === true || input.requiresReconciliation === true) reasons.push('需要多源冲突 reconciliation');
   if (input.sourceCodeAudit === true || input.requiresSourceAudit === true) reasons.push('需要源码级审计');
   if (input.complexVisual === true || input.requiresComplexVisual === true) reasons.push('需要复杂视觉创作');
+  if (input.highDensity === true || Number(input.categoryCount || 0) > 12 || Number(input.itemCount || 0) > 60) reasons.push('高密度目录内容不属于 light route');
   if (risk || sensitivePatterns.some((pattern) => pattern.test(text))) reasons.push('命中敏感或高风险声明');
 
   return {

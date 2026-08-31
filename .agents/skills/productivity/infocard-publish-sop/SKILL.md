@@ -42,6 +42,12 @@ Creation-and-publication authorization authorizes this whole release chain unles
 
 Light route 的 static gates 必须绑定当前卡片：`node scripts/verify-taxonomy.js docs/<slug>.html.meta.yaml`、`node scripts/check-info-leak.js docs/<slug>.html` 和 `npm run verify:visual-gate -- docs/<slug>.html`。不要在普通单卡路径中调用 `--all`、全量 `fix-taxonomy` 或全仓历史 leak 阻断扫描。
 
+### Full-route 30-minute hard-stop
+
+下列任一情况必须进入 full route：多源核验、敏感声明、复杂视觉、或高密度目录（显式 `highDensity=true`、超过 12 个分类、或超过 60 个条目）。full route 仍然有边界：墙钟硬上限 **30 分钟**，预算为研究 4 分钟、主题 1 分钟、authoring 6 分钟、Publisher 审计 3 分钟、promotion/static 4 分钟、build/verify 5 分钟、release/public 4 分钟，并保留 3 分钟缓冲。
+
+超过研究预算立即停止继续搜索并 author；超过 authoring 预算立即停止子智能体并由 Publisher 做最小缺口接管；超过 30 分钟只能报告明确的 `BLOCKED_AT_*` 终态或执行已有产物的最小恢复，不得重新研究、重复派发同一 slug 或无限修复。
+
 `.stop.jsonl` 诊断记录使用 schema v2：`run_start` 不计阶段时间；research、promotion、visual_capture、visual_review、deployment_wait 和 repair 分开记录；SLA 以 wall clock 为准。
 
 实际 light-route 编排入口为 `npm run run:light-route -- --config <run.json>`。配置必须声明 `runId`、`request`、`preflight.authoringDir`、正式 `htmlPath`，以及需要外部工具完成的 `stageCommands`；截图阶段会收到 `INFOCARD_CAPTURE_PLAN_PATH/JSON`。仅在诊断需要时设置 `diagnosticsPath`，否则不得每次创建 `.stop.jsonl`。编排器使用单调时钟执行阶段预算、定向 static gates 和 20 分钟 hard-stop，并写入四种允许终态之一。
@@ -67,6 +73,12 @@ assets/ (only declared assets)
 ```
 
 The Author must not directly write formal `docs/` or `assets/`, generated indexes, Git state, or `/tmp` files. It does not build, commit, push, or start Wiki sync.
+
+### Bounded Author delegation
+
+同一 bare slug 同时只能有一个 Author 任务锁；第二个任务不得重派完整 authoring，而应读取已有目录并只恢复缺失阶段。协调器已经提供完整来源事实、主题、条目清单、路径和结构时，Author 只允许读取 `theme-decision.json`，然后立即写入五个声明文件；不得重复加载大 Skill、历史模板、历史 manifest 或再次搜索。60 秒没有任何声明文件写入时，协调器必须停止该子任务并直接接管。
+
+子智能体模型必须在派发前通过运行时 provider 配置解析；provider/model 不可用属于立即失败，不得等待模型 400 后再重派。
 
 ### Publisher
 
@@ -102,6 +114,16 @@ author, source, source_url, style
 
 For a batch, validate all manifests first, promote all declared artifacts, then build once in the same primary checkout.
 
+### Timestamp and hash order
+
+`npm run build` normalizes a new sidecar's `date` and `updated`, so Publisher must not treat pre-build sidecar hashes as final. Required sequence:
+
+```text
+promotion → build timestamp normalization → copy final formal sidecar back to candidate → recompute manifest hashes → verify → narrow commit/push
+```
+
+This is one bounded synchronization step. A hash mismatch after it is `BLOCKED_AT_LOCAL_GATE`, not a reason to rerun authoring or repeat build indefinitely.
+
 ## Required visual gate before build / commit / push
 
 After promotion, before build:
@@ -117,6 +139,10 @@ After promotion, before build:
 6. block commit/push on any critical or major defect.
 
 Infrastructure-only capture or visual-review failure must be recorded according to `visual-verification-gate`, with an explicit `evidence_gap`, error category, and outcome. It is never visual pass, and must not fabricate screenshots or dispositions.
+
+### Batch visual preflight
+
+批量开始时先探测一次 CDP / `web-capture`。若不可用，写入批次级 `VISUAL_PENDING` 与错误类别；后续单卡仅引用该状态，不重复调用已确认不可用的 capture backend。基础设施恢复后，必须对仍待发布卡重新采集当前 HTML hash 绑定的桌面和 390px 移动证据。
 
 ### Visual exceptions
 

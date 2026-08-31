@@ -64,21 +64,28 @@ function isQuoted(value) {
   return /^".*"$/.test(value) || /^'.*'$/.test(value);
 }
 
-function isTaxonomyOnlyChange(rel, raw) {
+function comparableMeta(content) {
+  const data = yaml.load(content, { schema: yaml.FAILSAFE_SCHEMA });
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const result = { ...data };
+  delete result.taxonomy;
+  delete result.updated;
+  return JSON.stringify(result);
+}
+
+function classifyMetadataAtHead(rel, raw, readHead = (file) => execFileSync("git", ["show", `HEAD:${file}`], { cwd: ROOT_DIR, encoding: "utf8" })) {
   try {
-    const headRaw = execFileSync("git", ["show", `HEAD:${rel}`], { cwd: ROOT_DIR, encoding: "utf8" });
-    const comparable = (content) => {
-      const data = yaml.load(content, { schema: yaml.FAILSAFE_SCHEMA });
-      if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-      const result = { ...data };
-      delete result.taxonomy;
-      delete result.updated;
-      return JSON.stringify(result);
-    };
-    return comparable(headRaw) === comparable(raw);
+    const headRaw = readHead(rel);
+    return { state: 'tracked', taxonomyOnly: comparableMeta(headRaw) === comparableMeta(raw) };
   } catch {
-    return false;
+    // A new sidecar has no HEAD object. Treat it explicitly as new instead of
+    // leaking a fatal `git show HEAD:<path>` message into release verification.
+    return { state: 'new', taxonomyOnly: false };
   }
+}
+
+function isTaxonomyOnlyChange(rel, raw) {
+  return classifyMetadataAtHead(rel, raw).taxonomyOnly;
 }
 
 function main() {
@@ -124,4 +131,6 @@ function main() {
   console.log(`[verify-meta-timestamps] OK: ${files.length} changed meta sidecar(s), ${taxonomyOnly} taxonomy-only skipped`);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { classifyMetadataAtHead, collectChangedMetaFiles, isTaxonomyOnlyChange, main };

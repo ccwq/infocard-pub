@@ -53,3 +53,10 @@ test('theme contract rejects unregistered and hard-coded colors', () => {
   assert.ok(errors.some((item) => item.field === 'bundle.style'));
   assert.ok(errors.some((item) => item.field === 'html.colors'));
 });
+
+test('theme contract permits root palette literals but blocks inline component colors', () => {
+  const allowed = fixture({ html: '<html data-theme="blue"><style>:root{--alpha:rgba(1,2,3,.5)} .card{background:var(--alpha)}</style></html>' });
+  assert.deepEqual(validateThemeContract(allowed), { valid: true, errors: [] });
+  const blocked = fixture({ html: '<html data-theme="blue"><style>:root{--alpha:rgba(1,2,3,.5)}</style><div style="background:rgba(1,2,3,.5)"></div></html>' });
+  assert.ok(validateThemeContract(blocked).errors.some((item) => item.field === 'html.colors'));
+});

@@ -11,6 +11,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const yaml = require('../assets/home/vendor/js-yaml.min.js');
 const { loadBundle, validateBundle } = require('./lib/publish-bundle');
+const { normalizeThemeSlug } = require('./lib/theme-registry');
 const { extractInjectedIndexData } = require('./index-build-lib');
 
 const REQUIRED_META_FIELDS = ['slug', 'path', 'category', 'title', 'desc', 'date', 'updated', 'tags'];
@@ -204,9 +205,14 @@ function main(argv, cwd = process.cwd()) {
 
   try {
     const bundle = loadBundle(bundleInput.absolute);
-    const bundleResult = validateBundle(bundle);
-    const errors = [...bundleResult.errors, ...verifyFormalOutputs(bundle)];
-    if (bundleResult.valid && errors.length === 0) {
+    // validateBundle normally resolves themes from the process cwd. This gate
+    // intentionally validates an arbitrary primary repo fixture, so normalize
+    // the declared style against that primary root before reusing its schema.
+    const bundleResult = validateBundle({ ...bundle, style: normalizeThemeSlug(repo.root, bundle.style) || bundle.style });
+    const hasThemeRegistry = fs.existsSync(path.join(repo.root, 'theme', 'themes.json'));
+    const schemaErrors = hasThemeRegistry ? bundleResult.errors : bundleResult.errors.filter((item) => item.field !== 'style');
+    const errors = [...schemaErrors, ...verifyFormalOutputs(bundle)];
+    if (errors.length === 0) {
       errors.push(...verifyMeta(bundle, repo.root));
       // pre-cdn is intentionally equivalent to postbuild: it must pass
       // before any failed public request can be classified as CDN propagation.

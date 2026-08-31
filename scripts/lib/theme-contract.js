@@ -25,6 +25,8 @@ function htmlTheme(text) {
 
 function colorLiteralMatches(text) {
   const matches = [];
+  // Inline attributes are part of component styling too; token definitions are
+  // stripped by validateThemeContract before this scanner runs.
   const css = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/gi, '');
   const patterns = [
     /#[0-9a-f]{3,8}\b/gi,
