@@ -6,7 +6,7 @@ const path = require('node:path');
 const { loadBundle, validateBundle } = require('./lib/publish-bundle');
 const ROOT = path.resolve(__dirname, '..');
 const WIDTH = 390, HEIGHT = 844;
-const DEFAULT_CDP = process.env.MOBILE_CDP_URL || 'http://127.0.0.1:9222';
+const MOBILE_CDP_URL = process.env.MOBILE_CDP_URL;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function stripComments(text) { return text.replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//g, ''); }
@@ -27,8 +27,8 @@ function staticCheck(html) {
   return { ok: !errors.length, errors };
 }
 function parseArgs(argv) {
-  const result = { bundlePaths: [], bundleGlobs: [], baseUrl: 'http://127.0.0.1:4173', root: ROOT, cdpUrl: DEFAULT_CDP };
-  const flags = new Set(['--bundle', '--bundles', '--base-url', '--root', '--artifacts-dir', '--cdp-url']);
+  const result = { bundlePaths: [], bundleGlobs: [], baseUrl: 'http://127.0.0.1:4173', root: ROOT, cdpUrl: MOBILE_CDP_URL };
+  const flags = new Set(['--bundle', '--bundles', '--base-url', '--root', '--artifacts-dir']);
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     if (!flags.has(flag)) throw new Error(`unknown argument: ${flag}`);
@@ -44,7 +44,6 @@ function parseArgs(argv) {
     if (flag === '--bundle') result.bundlePaths.push(value);
     else if (flag === '--base-url') result.baseUrl = value;
     else if (flag === '--root') result.root = path.resolve(value);
-    else if (flag === '--cdp-url') result.cdpUrl = value;
     else result.artifactsDir = path.resolve(value);
   }
   return result;
@@ -70,8 +69,8 @@ function cdpSocket(wsUrl, timeoutMs = 15000, WebSocketFactory = (url) => new Web
   function close() { if (state === 'closed') return; fail(new Error('CDP closed')); state = 'closed'; try { ws.close(); } catch {} }
   return { send, close };
 }
-async function probeBrowser(cdpUrl = DEFAULT_CDP, fetcher = fetchJson) { try { const version = await fetcher(`${cdpUrl.replace(/\/$/, '')}/json/version`); if (!version.webSocketDebuggerUrl) throw new Error('browser websocket unavailable'); return version; } catch (error) { error.code = 'BROWSER_UNAVAILABLE'; throw error; } }
-async function defaultBrowserRunner({ url, width, height, screenshotPath, cdpUrl = DEFAULT_CDP, fetcher = fetchJson, clientFactory = cdpSocket, readinessTimeoutMs = 10000 }) {
+async function probeBrowser(cdpUrl, fetcher = fetchJson) { if (!cdpUrl) throw Object.assign(new Error('MOBILE_CDP_URL is required'), { code: 'BROWSER_UNAVAILABLE' }); try { const version = await fetcher(`${cdpUrl.replace(/\/$/, '')}/json/version`); if (!version.webSocketDebuggerUrl) throw new Error('browser websocket unavailable'); return version; } catch (error) { error.code = 'BROWSER_UNAVAILABLE'; throw error; } }
+async function defaultBrowserRunner({ url, width, height, screenshotPath, cdpUrl, fetcher = fetchJson, clientFactory = cdpSocket, readinessTimeoutMs = 10000 }) {
   let cdp, contextId, targetId, sessionId;
   try { const version = await probeBrowser(cdpUrl, fetcher); cdp = clientFactory(version.webSocketDebuggerUrl); try { ({ browserContextId: contextId } = await cdp.send('Target.createBrowserContext')); } catch { contextId = undefined; } const created = await cdp.send('Target.createTarget', { url: 'about:blank', ...(contextId ? { browserContextId: contextId } : {}) }); targetId = created.targetId; if (!targetId) throw new Error('CDP did not create target'); ({ sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true })); if (!sessionId) throw new Error('CDP did not attach target');
     await cdp.send('Page.enable', {}, sessionId); await cdp.send('Runtime.enable', {}, sessionId); await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true }, sessionId); const nav = await cdp.send('Page.navigate', { url }, sessionId); if (nav.errorText) throw new Error(`Page.navigate failed: ${nav.errorText}`);
@@ -87,9 +86,10 @@ function pngDimensions(file) { const b = fs.readFileSync(file); if (b.length < 2
 function validateEvidence(e, screenshotPath, root, slug) { const errors = [], expected = path.relative(root, screenshotPath).replaceAll(path.sep, '/'); if (!e || !Number.isFinite(e.scrollWidth) || !Number.isFinite(e.clientWidth)) errors.push('scroll/client widths must be finite'); else { e.horizontalOverflow = e.scrollWidth > e.clientWidth + 1; if (e.clientWidth !== WIDTH) errors.push(`clientWidth must equal ${WIDTH}`); if (e.horizontalOverflow) errors.push('horizontal overflow'); } if (!Array.isArray(e?.brokenImages) || e.brokenImages.length) errors.push('broken images detected or evidence malformed'); if (e?.screenshot !== expected || expected !== `artifacts/mobile/${slug}.png`) errors.push('unexpected screenshot path'); try { const stat = fs.statSync(screenshotPath), d = pngDimensions(screenshotPath); if (!stat.isFile() || !stat.size) throw new Error(); if (d.width !== WIDTH || d.height < 1) errors.push(`PNG dimensions must be ${WIDTH}px wide and nonzero`); } catch { errors.push('screenshot must be a nonempty valid PNG'); } return errors; }
 async function runBatch(options = {}) {
   const root = path.resolve(options.root || ROOT), runner = options.runner || defaultBrowserRunner, bundlePaths = resolveBundlePaths(options.bundlePaths || [], options.bundleGlobs || []); if (!bundlePaths.length) return { status:'SKIPPED', reason:'no bundles supplied', exitCode:2, cards:[] };
-  const probe = options.probe || ((cdpUrl) => probeBrowser(cdpUrl)); try { await probe(options.cdpUrl || DEFAULT_CDP); } catch (error) { if (error.code === 'BROWSER_UNAVAILABLE') return { status:'SKIPPED', reason:error.message, browserUnavailable:error.message, exitCode:2, cards:[] }; throw error; }
+  const cdpUrl = options.cdpUrl || MOBILE_CDP_URL;
+  const probe = options.probe || ((endpoint) => probeBrowser(endpoint)); try { await probe(cdpUrl); } catch (error) { if (error.code === 'BROWSER_UNAVAILABLE') return { status:'SKIPPED', reason:error.message, browserUnavailable:error.message, exitCode:2, cards:[] }; throw error; }
   const cards = []; let browserUnavailable;
-  for (const bundlePath of bundlePaths) { const card = { bundlePath }; cards.push(card); let bundle; try { bundle = loadBundle(bundlePath); const checked = validateBundle(bundle); if (!checked.valid) throw new Error(checked.errors.map((e) => `${e.field}: ${e.message}`).join('; ')); card.slug=bundle.slug; card.htmlPath=bundle.html_path; card.static=staticCheck(fs.readFileSync(safeExistingFile(root,bundle.html_path),'utf8')); if (!card.static.ok) { card.errors=card.static.errors.map((e)=>e.message); continue; } const screenshotPath=expectedScreenshot(root,bundle.slug,options.artifactsDir); fs.rmSync(screenshotPath,{force:true}); card.browser=await runner({url:cardUrl(options.baseUrl||'http://127.0.0.1:4173',bundle.html_path),width:WIDTH,height:HEIGHT,screenshotPath,cdpUrl:options.cdpUrl||DEFAULT_CDP}); card.errors=validateEvidence(card.browser,screenshotPath,root,bundle.slug); } catch(error) { if(error.code==='BROWSER_UNAVAILABLE'){browserUnavailable=error.message; card.errors=[error.message]; break;} card.errors=[error.message]; } }
+  for (const bundlePath of bundlePaths) { const card = { bundlePath }; cards.push(card); let bundle; try { bundle = loadBundle(bundlePath); const checked = validateBundle(bundle); if (!checked.valid) throw new Error(checked.errors.map((e) => `${e.field}: ${e.message}`).join('; ')); card.slug=bundle.slug; card.htmlPath=bundle.html_path; card.static=staticCheck(fs.readFileSync(safeExistingFile(root,bundle.html_path),'utf8')); if (!card.static.ok) { card.errors=card.static.errors.map((e)=>e.message); continue; } const screenshotPath=expectedScreenshot(root,bundle.slug,options.artifactsDir); fs.rmSync(screenshotPath,{force:true}); card.browser=await runner({url:cardUrl(options.baseUrl||'http://127.0.0.1:4173',bundle.html_path),width:WIDTH,height:HEIGHT,screenshotPath,cdpUrl}); card.errors=validateEvidence(card.browser,screenshotPath,root,bundle.slug); } catch(error) { if(error.code==='BROWSER_UNAVAILABLE'){browserUnavailable=error.message; card.errors=[error.message]; break;} card.errors=[error.message]; } }
   const failed=cards.some((c)=>c.errors?.length); if(browserUnavailable && !cards.slice(0,-1).some((c)=>c.errors?.length)) return {status:'SKIPPED',reason:browserUnavailable,browserUnavailable,exitCode:2,cards}; return {status:failed?'FAIL':'PASS',exitCode:failed?1:0,width:WIDTH,cards,...(browserUnavailable?{browserUnavailable}:{})};
 }
 async function main(argv) { try { const result=await runBatch(parseArgs(argv)); process.stdout.write(`${JSON.stringify(result,null,2)}\n`); return result.exitCode; } catch(error) { process.stdout.write(`${JSON.stringify({status:'SKIPPED',reason:error.message,exitCode:2,cards:[]},null,2)}\n`); return 2; } }

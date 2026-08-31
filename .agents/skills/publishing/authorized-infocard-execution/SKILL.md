@@ -48,7 +48,7 @@ Authors do not write formal `docs/`/`assets/`, generated indexes, or Git state. 
 
 When one automation path fails, use the next available path without a new user decision:
 
-1. Existing Chrome CDP 9222 and browser-native evaluation.
+1. Existing Chrome CDP endpoint supplied by the runtime and browser-native evaluation.
 2. Existing local HTTP preview server and browser navigation.
 3. System Chrome headless screenshot using a unique non-repository temporary profile.
 4. Direct terminal checks: HTTP status, DOM dimensions, raw GitHub content, workflow status, and Git state.

@@ -64,3 +64,7 @@ description: 在 any2card 已完成发布前视觉门禁并自动发布后，审
 ## 4. Final report
 
 报告至少包含：仓库与分支、commit SHA、线上 URL 及核验结果、门禁轮次、桌面/移动分数、遗留 minor、是否第 4 轮低分放行，以及任何未完成项。
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-card-authoring` + `infocard-publish-pipeline`。调用时必须遵循 `legacy-adapter@1`，不得扩大原授权；新任务不得默认选择本入口。

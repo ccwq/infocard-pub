@@ -7,11 +7,11 @@
 ## 陷阱 1：agent-browser screenshot 截错 tab
 
 **现象**：
-- `agent-browser --cdp 9222 --json screenshot /tmp/qm-desktop.png` 返回 success，但内容是被误判为卡片的 **ChatGPT 404 登录页**（后续 vision 分析发现"Your session has expired"弹窗 + 404）
+- `agent-browser --json screenshot /tmp/qm-desktop.png` 返回 success，但内容是被误判为卡片的 **ChatGPT 404 登录页**（后续 vision 分析发现"Your session has expired"弹窗 + 404）
 - 第二次截图截到了 **Trigger.dev Chat Agent 预览页**（`http://127.0.0.1:8891/docs/20260812-trigger-chat-agent.html`）
 - 关键迷惑点：错误页截图与正确卡片截图**字节数完全相同（281167 bytes）**——之前同一 session 截的 qm-mobile.png 也是 104794 bytes 与 qm-mobile-pin.png 相同
 
-**根因**：共享 CDP 9222 上多个 tab 并存，`screenshot` 命令没有绑定到 `open` 返回的 targetId；agent-browser 会话指向了其他 tab（用户浏览器里正好开着 ChatGPT 登录页、本地 8891 预览服务）。
+**根因**：共享 CDP endpoint 上多个 tab 并存，`screenshot` 命令没有绑定到 `open` 返回的 targetId；agent-browser 会话指向了其他 tab（用户浏览器里正好开着 ChatGPT 登录页、本地 8891 预览服务）。
 
 **修复**：
 1. 用 `--pin-tab` 从第一个命令开始绑定 session

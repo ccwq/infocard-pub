@@ -7,6 +7,8 @@ tags: [infocard, hardblue, red, blue, Swiss, high-density, manual]
 
 # infocard-hardblue-style · 硬核蓝手册
 
+> Runtime boundary：新流程只消费 `infocard-theme-contract/adapters/index.json` 中的本主题适配器与本文件的视觉令牌/组件说明。下方任何 authoring、worktree、浏览器验收、构建或发布步骤均为 legacy archive，不可从主题层执行。
+
 ## 定位
 
 用于重型多章节技术手册、调查、观点拆解、工具图鉴类内容。比 `infocard-redswiss-style` 多了蓝/红/黑三色 hero-bar + 网格底纹 + 96px 大编号块。
@@ -311,3 +313,7 @@ updated: "2026-06-07T15:18:25+08:00"
 | "A" / "B" / 选数字 | 明确选项 | 执行对应方案 |
 | "继续" / "继续吧" / "OK" | 接受默认方案 | 执行默认，轮次不+1 |
 | "不是这个，另外的" | 拒绝当前轮 | 继续下一轮追问 |
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1`; only its visual language is current. Earlier authoring, worktree, browser and publishing procedures are archived/deprecated compatibility guidance and must not be executed from this package. `infocard-card-authoring`, `infocard-quality-gate` and `infocard-publish-pipeline` own those responsibilities.

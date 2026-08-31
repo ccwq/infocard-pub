@@ -93,3 +93,7 @@ git show HEAD:index.html | grep -c 'home-index-data'
 curl -s https://ccwq.github.io/infocard-pub/docs/<slug>.html | grep -c 'href='
 # 预期：从 1 增长到预期数量
 ```
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-publish-pipeline#build`。没有有效质量通过结果和发布授权时不得执行构建或部署副作用。

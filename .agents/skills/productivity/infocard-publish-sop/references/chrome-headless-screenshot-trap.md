@@ -7,7 +7,7 @@
 - `google-chrome --headless=new --screenshot=...` 进程长时间零 stdout/stderr，超过 50 秒仍未生成 PNG。
 - `node scripts/verify-mobile-card.js --browser` 提前打印 `PASS viewport meta` / `PASS mobile media query` 后整段挂住，最后被超时杀掉。
 - 不同 `--user-data-dir` 临时目录被前一个任务残留占用，导致后续 `google-chrome` 在 user-data-dir 锁上等待。
-- 系统中已有用户的桌面 Chrome 进程（`/usr/bin/google-chrome` 或 `/opt/google/chrome/chrome`）通过 `remote-debugging-port` 占用端口 9222，headless 再启经常冲突。
+- 系统中已有用户的桌面 Chrome 进程（`/usr/bin/google-chrome` 或 `/opt/google/chrome/chrome`）通过 `remote-debugging-port` 与其他浏览器进程冲突，headless 再启经常冲突。
 
 ## 根因
 

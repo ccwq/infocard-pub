@@ -130,7 +130,7 @@ bundle 明确列出 HTML、meta、Markdown、assets/manifest。完成后主线�
 
 ### P2-6 视觉验收复用专用 CDP tab
 
-所有 `agent-browser`调用显式使用 `--cdp 9222`。新建专用预览 tab；关闭前核对身份；身份不确定时保留并报告，禁止误关用户已有 tab。
+所有 `agent-browser` 调用使用运行环境提供的 endpoint。新建专用预览 tab；关闭前核对身份；身份不确定时保留并报告，禁止误关用户已有 tab。
 
 ### P2-7 push 后先确认 CDN 新内容，再截图
 

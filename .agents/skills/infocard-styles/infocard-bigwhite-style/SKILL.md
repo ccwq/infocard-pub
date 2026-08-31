@@ -12,6 +12,8 @@ metadata:
 
 # infocard-bigwhite-style · 大白商务风信息卡主题
 
+> Runtime boundary：新流程只消费 `infocard-theme-contract/adapters/index.json` 中的本主题适配器与本文件的视觉令牌/组件说明。下方任何 authoring、浏览器验收、构建或发布步骤均为 legacy archive，不可从主题层执行。
+
 ## Overview
 
 `infocard-bigwhite-style` 是一种通用大白商务风信息卡主题：纯白背景、大面积留白、深蓝单强调、黑色标题、细灰分割线、大数字英雄化，以及统一页脚元信息。它适合把技术报告、产品发布、数据简报、商业分析、项目复盘做成克制、干净、可信的报告型页面。
@@ -461,3 +463,7 @@ disallowed = ['class=', 'id=', '<div', '<main', '<h1', '<h2', '<p>', '<b>', '<co
 - Theme slug：`bigwhite-style`
 - CSS class：`bigwhite`
 - Theme file：`theme/bigwhite.html`
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1`; its active responsibility is visual identity only. The adapter registry declares suitability, tokens, typography, colors, borders, shadows, background, components, mobile exceptions, template and assets. Any earlier generic authoring, browser validation or publishing procedure is deprecated compatibility guidance; `infocard-card-authoring`, `infocard-quality-gate` and `infocard-publish-pipeline` own those decisions.

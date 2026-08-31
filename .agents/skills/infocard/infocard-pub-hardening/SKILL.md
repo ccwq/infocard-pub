@@ -127,5 +127,5 @@ vision_analyze({
 ## 关联 skill
 
 - `infocard-authoring-workflow` — 完整发布流程（worktree / meta.yaml / build / commit）
-- `browser-cdp-only-operations` — 9222 CDP 强制规则
+- `browser-cdp-only-operations` — browser/CDP 操作边界
 - `infocard-visual-pass-loop` — 视觉验收循环

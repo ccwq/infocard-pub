@@ -12,6 +12,8 @@ metadata:
 
 # infocard-handline-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 `infocard-handline-style` 是一套“手绘草图 / 白板便签 / 纸上讲解”风格的信息卡主题。
@@ -600,3 +602,7 @@ grep -rn "d0c8be\|c0b8a8\|c9c0b3" docs/YYYYMMDD-*.html  # 空 → PASS
 这套主题强调“像人在纸上边画边讲”，不是“像软件产品页面”。
 
 如果页面看起来过于精致、过于几何、过于理工 UI 化，说明已经偏离 handline 风格。
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

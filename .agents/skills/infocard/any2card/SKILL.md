@@ -58,7 +58,7 @@ When the primary source is an X (Twitter) status URL, the full extraction pipeli
    ```bash
    AB=/home/ccwq/.npm/_npx/6de2aa2fded2970c/node_modules/.bin/agent-browser
    NS=x-extract-$(date +%s)
-   "$AB" --namespace "$NS" --session "x-extract" --cdp 9222 \
+   "$AB" --namespace "$NS" --session "x-extract" \
      --json open "https://x.com/i/status/<STATUS_ID>"
    ```
    Then `Runtime.evaluate` to read article text, author, datetime, engagement stats.
@@ -122,9 +122,9 @@ Completion criterion: the bundle contains current evidence for both viewports, a
 
 ## CDP session reuse for visual evidence
 
-Before launching an `agent-browser` session for a local infocard preview, probe the workstation Chrome DevTools endpoint on port `9222`. When it is available, attach with `--cdp 9222` (or the repository `ab` alias) rather than creating a separate browser session. Preserve unrelated user tabs; create and later close only the preview tab. This is especially important when browser navigation wrappers reject private preview URLs but the attached Chrome can reach them.
+Before launching an `agent-browser` session for a local infocard preview, use the workstation Chrome DevTools endpoint supplied by the runtime rather than creating a separate browser session. Preserve unrelated user tabs; create and later close only the preview tab. This is especially important when browser navigation wrappers reject private preview URLs but the attached Chrome can reach them.
 
-**Reliability checks:** a successful `/json/version` response does not prove WebSocket usability. If `agent-browser` reports a `Page.enable` timeout, use a fresh namespace/session instead of the stale default daemon. If the WebSocket handshake returns HTTP 403 mentioning `remote-allow-origins`, restart the dedicated automation Chrome with an explicit local-client allowlist such as `http://127.0.0.1:9222,http://localhost:9222`, then re-probe. Do not claim visual evidence until `tab list`, local-preview `open`, and `get url` all succeed. See `references/agent-browser-cdp-9222-visual-evidence.md`.
+**Reliability checks:** a successful `/json/version` response does not prove WebSocket usability. If `agent-browser` reports a `Page.enable` timeout, use a fresh namespace/session instead of the stale default daemon. If the WebSocket handshake returns HTTP 403 mentioning `remote-allow-origins`, repair the runtime browser Origin configuration, then re-probe. Do not claim visual evidence until `tab list`, local-preview `open`, and `get url` all succeed. See `references/agent-browser-runtime-visual-evidence.md`.
 
 **X-source identity gate:** when a supplied X status URL redirects to a canonical profile/status URL or exposes only a shell, preserve the original status ID but do not infer the author from the redirect, profile URL, page title, or search snippets alone. Confirm display name and handle from a rendered post/API payload and record source/confidence in the bundle. If the body is unavailable, mark content pending/blocked and do not author a detailed card from the URL alone. See `infocard-publish-sop/references/x-tweet-content-extraction.md`.
 

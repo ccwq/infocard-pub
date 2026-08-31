@@ -107,7 +107,7 @@ For a batch, validate all manifests first, promote all declared artifacts, then 
 After promotion, before build:
 
 1. render exact formal `docs/<slug>.html` locally;
-2. capture desktop and 390px mobile evidence by delegating to `web-capture` (which uses the repository-required `agent-browser --cdp 9696`), including all relevant hero/body/table/code/risk/footer regions;
+2. capture desktop and 390px mobile evidence by delegating to `web-capture` (which uses the runtime-provided `agent-browser` endpoint), including all relevant hero/body/table/code/risk/footer regions;
    - Call `web-capture` with the target tab / URL and the `pc` or `mobile` preset
    - `web-capture` returns screenshot paths and geometry checks
    - **Do NOT embed `browser_exec` built-in `cdp()` screenshot logic here** — route all web screenshots through `web-capture`
@@ -175,7 +175,7 @@ Do not start Wiki automatically. Do not list, prune, remove, or otherwise operat
 - [ ] Author wrote only `.docs/<run-id>/<slug>/`
 - [ ] Manifest validates source-to-target allowlist
 - [ ] Promotion diff contains only declared formal artifacts
-- [ ] Desktop/mobile visual evidence captured with `agent-browser --cdp 9696` and has 0 critical / 0 major
+- [ ] Desktop/mobile visual evidence captured with `runtime-configured agent-browser` and has 0 critical / 0 major
 - [ ] Build, verify, taxonomy, and leak gates pass
 - [ ] Staged diff excludes ambient state
 - [ ] Public detail/index/home fingerprint and fresh visual evidence pass

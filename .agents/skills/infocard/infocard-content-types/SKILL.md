@@ -280,3 +280,7 @@ metadata:
 本 skill 只产出内容契约：`content_type`、`content_subtype`、`content_shape`、`required_modules`、`required_capabilities`、`primary_source` 和 `evidence_gaps`。它可以声明主题所需的能力（例如 `tables`、`code_blocks`、`mobile_layout`），但不得写具体主题名、Primary/Fallback 映射、权重或随机规则。
 
 随后由 `infocard-theme-assignment` 读取这些能力，生成候选池并写入唯一的 `.docs/<run-id>/<slug>/theme-decision.json`。内容类型决定“需要什么结构”，主题分配决定“哪个已注册主题能承载它”；两者通过能力契约相连，不形成强绑定。
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-source-and-content`。旧的内容类型输出必须转换为统一 content pack，不得直接决定具体主题或发布动作。

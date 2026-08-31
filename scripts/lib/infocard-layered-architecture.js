@@ -5,21 +5,8 @@ const path = require('node:path');
 
 const TASK_MODES = new Set(['create', 'update', 'rebuild', 'repair', 'publish']);
 const DELIVERY_MODES = new Set(['preview', 'direct', 'delegated']);
-const QUALITY_LEVELS = new Set(['Blocker', 'Major', 'Advisory']);
-const REPAIRERS = {
-  'layout-overlap': 'infocard-layout-debugging',
-  'mobile-overflow': 'infocard-mobile-verifier',
-  'theme-guard': 'infocard-crayon-r5-guard',
-  'evidence-mismatch': 'infocard-visual-evidence-grounding',
-  'source-gap': 'infocard-source-and-content',
-};
-const BASE_STAGES = [
-  'infocard-source-and-content',
-  'infocard-card-authoring',
-  'infocard-theme-contract',
-  'infocard-quality-gate',
-  'infocard-publish-pipeline',
-];
+const QUALITY_LEVELS = new Set(['Critical', 'Major', 'Minor']);
+const BASE_STAGES = ['infocard-router', 'infocard-author', 'infocard-publish'];
 
 function loadArchitecture(root) {
   const file = path.join(root, '.agents', 'skills-cop', 'infocard', 'infocard-core-contract', 'contracts', 'architecture.json');
@@ -45,33 +32,35 @@ function skillName(file) {
 
 function validateArchitecture(root, architecture) {
   const errors = [];
-  if (architecture.contract_version !== '1.0.0') errors.push('unsupported contract_version');
+  if (architecture.contract_version !== '2.0.0') errors.push('unsupported contract_version');
   const skillFiles = walkSkillFiles(path.join(root, '.agents', 'skills-cop'));
   const namedFiles = new Map(skillFiles.map((file) => [skillName(file), file]).filter(([name]) => Boolean(name)));
   const names = [...namedFiles.keys()];
   const records = architecture.skills || [];
   const recordNames = records.map((item) => item.name);
   const compatibilityNames = new Set((architecture.compatibility || []).map((item) => item.legacy));
+  const executableNames = new Set(recordNames);
   for (const name of names) if (!recordNames.includes(name) && !compatibilityNames.has(name)) errors.push(`unregistered skill: ${name}`);
   for (const name of recordNames) if (!names.includes(name)) errors.push(`missing registered skill: ${name}`);
   for (const name of recordNames.filter((name, index) => recordNames.indexOf(name) !== index)) errors.push(`duplicate contract record: ${name}`);
+  if (records.map((item) => item.name).join(',') !== 'infocard-router,infocard-author,infocard-publish') errors.push('architecture must expose only Router, Author and Publish');
   for (const item of records) {
     if (!item.layer || !item.trigger || !item.inputs || !item.outputs || !item.success || !item.next) errors.push(`incomplete contract: ${item.name}`);
     if (item.status === 'deprecated' && !item.replacement) errors.push(`deprecated skill lacks replacement: ${item.name}`);
   }
   const compatContract = architecture.compatibility_contract;
   if (!compatContract || !compatContract.trigger || !compatContract.non_trigger || !compatContract.required_inputs || !compatContract.structured_output || !compatContract.pre || !compatContract.post || !compatContract.success || !compatContract.recoverable_errors || !compatContract.blocking_errors || !compatContract.allowed_references) errors.push('incomplete compatibility contract');
+  for (const pre of compatContract?.pre || []) if (!executableNames.has(pre)) errors.push(`compatibility precondition missing: ${pre}`);
   for (const item of architecture.compatibility || []) {
     if (!item.legacy || !item.replacement || !item.status) errors.push(`incomplete compatibility mapping: ${item.legacy || 'unknown'}`);
     for (const target of String(item.replacement || '').split(' + ')) {
       const targetName = target.split('#')[0];
-      if (targetName && !names.includes(targetName)) errors.push(`compatibility target missing: ${item.legacy}->${targetName}`);
+      if (targetName && !executableNames.has(targetName)) errors.push(`compatibility target missing: ${item.legacy}->${targetName}`);
     }
     if (item.status === 'deprecated') {
       const file = namedFiles.get(item.legacy);
       const source = file ? fs.readFileSync(file, 'utf8') : '';
-      const targets = String(item.replacement || '').split(' + ').map((target) => target.split('#')[0]);
-      if (!source.includes('Deprecated compatibility entry') || targets.some((target) => !source.includes(target))) errors.push(`deprecated skill lacks local migration declaration: ${item.legacy}`);
+      if (!source.includes('Deprecated compatibility entry')) errors.push(`deprecated skill lacks local migration declaration: ${item.legacy}`);
     }
   }
   const themeRecords = [
@@ -122,51 +111,37 @@ function buildRunPlan(input = {}) {
   const qualityIssues = quality.issues || [];
   const requestedMode = input.deliveryMode || (input.publishAuthorized ? 'direct' : 'preview');
   if (!DELIVERY_MODES.has(requestedMode)) throw new Error(`unsupported delivery mode: ${requestedMode}`);
-  if (mode === 'publish' && quality.status !== 'passed') throw new Error('publish requires an accepted quality result');
-  const hasBlocker = qualityIssues.some((issue) => issue.level === 'Blocker');
-  const hasMajor = qualityIssues.some((issue) => issue.level === 'Major');
-  const majorPreviewAllowed = hasMajor && requestedMode === 'preview' && Boolean(input.previewWarningAuthorized);
-  if (hasBlocker || (hasMajor && !majorPreviewAllowed)) {
-    return {
-      task: { mode, audience: input.audience || 'unspecified', output: 'preview' },
-      stages: stagesForMode(mode, input),
-      source: sourcePlan(input),
-      theme: { id: input.theme || 'recommended', contract_version: '1.0.0' },
-      quality: { status: quality.status, issues: qualityIssues },
-      delivery: {
-        mode: requestedMode,
-        status: 'blocked',
-        publishes: false,
-        actions: [],
-        reason: hasBlocker ? 'quality blocker requires repair' : 'major issue requires explicit preview warning for preview mode only',
-      },
-    };
-  }
-  if (requestedMode === 'direct' && !input.publishAuthorized) return { task: { mode, audience: input.audience || 'unspecified', output: 'preview' }, stages: ['infocard-quality-gate', 'infocard-publish-pipeline'], quality: { status: quality.status }, delivery: { mode: 'direct', status: 'blocked', publishes: false, actions: [], reason: 'publication authorization required' } };
+  const hasCritical = qualityIssues.some((issue) => issue.level === 'Critical');
+  const review = evaluateQuality({ issues: qualityIssues, repairRound: input.repairRound || 0 });
+  const declaredQualityAccepted = quality.status === review.status && (review.status === 'passed' || review.status === 'accepted_with_human_review');
+  if (mode === 'publish' && !declaredQualityAccepted) return { task: { mode, audience: input.audience || 'unspecified', output: 'preview' }, stages: stagesForMode(mode), source: sourcePlan(input), quality: { ...review, declared_status: quality.status }, delivery: { mode: requestedMode, status: 'blocked', publishes: false, actions: [], reason: 'publish requires a current accepted quality report' } };
+  if (hasCritical) return { task: { mode, audience: input.audience || 'unspecified', output: 'preview' }, stages: stagesForMode(mode), source: sourcePlan(input), quality: review, delivery: { mode: requestedMode, status: 'blocked', publishes: false, actions: [], reason: 'critical visual defect requires repair' } };
+  if (review.status === 'blocked') return { task: { mode, audience: input.audience || 'unspecified', output: 'preview' }, stages: stagesForMode(mode), source: sourcePlan(input), quality: review, delivery: { mode: requestedMode, status: 'blocked', publishes: false, actions: [], reason: 'visual review requires its second and final attempt' } };
+  if (requestedMode === 'direct' && !input.publishAuthorized) return { task: { mode, audience: input.audience || 'unspecified', output: 'preview' }, stages: ['infocard-publish'], quality: review, delivery: { mode: 'direct', status: 'blocked', publishes: false, actions: [], reason: 'publication authorization required' } };
   const delivery = { mode: requestedMode, publishes: requestedMode === 'direct' && Boolean(input.publishAuthorized) };
   if (requestedMode === 'preview') {
     delivery.actions = ['preview-artifact'];
-    delivery.status = hasMajor ? 'warning' : 'ready';
-    if (hasMajor) delivery.warnings = qualityIssues.filter((issue) => issue.level === 'Major');
+    delivery.status = review.needs_human_review ? 'needs_human_review' : 'ready';
   }
   if (requestedMode === 'direct') delivery.actions = ['build', 'index', 'resource-smoke', 'public-url-smoke'];
   if (requestedMode === 'delegated') {
     delivery.actions = ['handoff-package'];
     delivery.publishes = false;
   }
+  if (review.needs_human_review) delivery.result_protocol_header = '需要人工审核';
   return {
     task: { mode, audience: input.audience || 'unspecified', output: delivery.mode === 'preview' || requestedMode === 'delegated' ? 'preview' : 'published' },
-    stages: stagesForMode(mode, input),
+    stages: stagesForMode(mode),
     source: sourcePlan(input),
-    theme: { id: input.theme || 'recommended', contract_version: '1.0.0' },
-    quality: { status: quality.status, repair_round: input.repairRound || 0 },
+    theme: { id: input.theme || 'recommended' },
+    quality: review,
     delivery,
   };
 }
 
-function stagesForMode(mode, input = {}) {
-  if (mode === 'publish') return ['infocard-quality-gate', 'infocard-publish-pipeline'];
-  if (mode === 'repair' && !input.repairNeedsSource) return BASE_STAGES.slice(1);
+function stagesForMode(mode) {
+  if (mode === 'publish') return ['infocard-publish'];
+  if (mode === 'repair') return ['infocard-router', 'infocard-author', 'infocard-publish'];
   return BASE_STAGES;
 }
 
@@ -185,28 +160,28 @@ function resolveLegacyRoute(architecture, name) {
   return { ...route, contract: architecture.compatibility_contract?.id || 'legacy-adapter@1' };
 }
 
-function evaluateQuality({ issues = [], repairRound = 0, repairRounds = {} } = {}) {
+function evaluateQuality({ issues = [], repairRound = 0 } = {}) {
   const required = ['level', 'check', 'category', 'evidence', 'impact', 'repairer', 'recheck'];
   for (const issue of issues) {
     if (!QUALITY_LEVELS.has(issue.level)) throw new Error(`unsupported quality level: ${issue.level}`);
     for (const field of required) if (!issue[field]) throw new Error(`quality issue missing ${field}`);
   }
-  const blocking = issues.find((issue) => issue.level === 'Blocker');
+  const critical = issues.find((issue) => issue.level === 'Critical');
   const major = issues.find((issue) => issue.level === 'Major');
-  if (!blocking && !major) return { status: 'passed', blockers: [], advisories: issues.filter((issue) => issue.level === 'Advisory'), next: 'infocard-publish-pipeline', repairRounds };
-  const selected = blocking || major;
-  const category = selected.category;
-  const count = repairRounds[category] ?? repairRound;
-  if (count >= 2) return { status: 'blocked', blockers: issues.filter((issue) => issue.level !== 'Advisory'), advisories: [], next: 'human-review', recheck: null, repairRounds };
-  const nextRounds = { ...repairRounds, [category]: count + 1 };
+  const minor = issues.find((issue) => issue.level === 'Minor');
+  if (!critical && !major && !minor) return { status: 'passed', critical: [], majors: [], minors: [], needs_human_review: false, next: 'infocard-publish', review_attempt: repairRound };
+  const selected = critical || major || minor;
+  if (repairRound >= 2) return critical
+    ? { status: 'blocked', critical: issues.filter((issue) => issue.level === 'Critical'), majors: issues.filter((issue) => issue.level === 'Major'), minors: issues.filter((issue) => issue.level === 'Minor'), next: 'human-review', recheck: null, needs_human_review: false, review_attempt: 2 }
+    : { status: 'accepted_with_human_review', critical: [], majors: issues.filter((issue) => issue.level === 'Major'), minors: issues.filter((issue) => issue.level === 'Minor'), next: 'infocard-publish', recheck: null, needs_human_review: true, review_attempt: 2 };
   return {
     status: 'blocked',
-    blockers: issues.filter((issue) => issue.level !== 'Advisory'),
-    advisories: issues.filter((issue) => issue.level === 'Advisory'),
-    next: selected.repairer || REPAIRERS[category] || 'human-review',
-    recheck: 'infocard-quality-gate',
-    repairRound: repairRound + 1,
-    repairRounds: nextRounds,
+    critical: issues.filter((issue) => issue.level === 'Critical'),
+    majors: issues.filter((issue) => issue.level === 'Major'),
+    minors: issues.filter((issue) => issue.level === 'Minor'),
+    next: selected.repairer || 'infocard-author',
+    recheck: 'infocard-publish',
+    review_attempt: repairRound + 1,
   };
 }
 
@@ -222,9 +197,22 @@ function walkFiles(root) {
 
 function runStages(input = {}, handlers = {}) {
   const plan = buildRunPlan(input);
-  const state = { task: plan.task, theme: plan.theme, quality: plan.quality, delivery: plan.delivery, artifacts: {}, stages: [] };
+  const state = { task: plan.task, theme: plan.theme, quality: plan.quality, delivery: plan.delivery, artifacts: { ...(input.artifacts || {}) }, stages: [] };
   for (const stage of plan.stages) {
+    if (stage === 'infocard-publish') {
+      const accepted = input.quality?.status === state.quality?.status && (state.quality?.status === 'passed' || state.quality?.status === 'accepted_with_human_review');
+      if (!accepted || !state.artifacts.acceptedArtifact || input.visualReviewCompleted !== true) {
+        return { ...state, status: 'blocked', stopped_at: stage, error: 'publish requires accepted quality, acceptedArtifact and completed visual review' };
+      }
+    }
     const result = typeof handlers[stage] === 'function' ? handlers[stage](state) : { status: 'blocked', summary: `${stage} handler unavailable`, artifacts: {}, issues: [{ code: 'STAGE_HANDLER_UNAVAILABLE', stage }], next: null };
+    const required = ['status', 'summary', 'artifacts', 'issues', 'next'];
+    if (!result || typeof result !== 'object') {
+      return { ...state, status: 'blocked', stopped_at: stage, error: `${stage} returned invalid result` };
+    }
+    if (result.status === 'completed' && required.some((field) => !Object.hasOwn(result, field))) {
+      return { ...state, status: 'blocked', stopped_at: stage, error: `${stage} returned malformed completed result` };
+    }
     state.stages.push({ stage, ...result });
     if (result.status !== 'completed') return { ...state, status: result.status, stopped_at: stage };
     Object.assign(state.artifacts, result.artifacts || {});

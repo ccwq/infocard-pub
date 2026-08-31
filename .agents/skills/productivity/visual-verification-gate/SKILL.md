@@ -60,7 +60,7 @@ Any HTML/CSS/structure/content change invalidates all prior visual evidence. Re-
    Desktop capture via `web-capture` preset `pc` or `desktop`.
    Mobile capture via `web-capture` preset `mobile`.
    Tablet capture via `web-capture` preset `tablet` when needed.
-   `web-capture` owns the repository-required `agent-browser --cdp 9696` tab selection, viewport switch, geometry checks, and PNG output path.
+   `web-capture` owns the runtime-configured `agent-browser` endpoint tab selection, viewport switch, geometry checks, and PNG output path.
 
 4. Run `vision_analyze` on each screenshot. Demand an explicit `critical / major / minor` defect list. Screenshot delivery to the user is evidence-sharing or requested human review; it never substitutes for the Agent's disposition.
 
@@ -113,13 +113,13 @@ After build, verify `dist/docs/<slug>.html` contains a newly introduced, release
 
 ### Verification checklist — screenshot capture (2026-08-26)
 
-All screenshots use **`agent-browser --cdp 9696`**:
+All screenshots use **`agent-browser` with the runtime-provided endpoint**:
 
 ```bash
 # Desktop 1280×900
-agent-browser --cdp 9696 tab <id> && set viewport 1280 900 && screenshot <path>/desktop.png
+agent-browser tab <id> && set viewport 1280 900 && screenshot <path>/desktop.png
 # Mobile 390×844
-agent-browser --cdp 9696 tab <id> && set viewport 390 844 && screenshot <path>/mobile.png
+agent-browser tab <id> && set viewport 390 844 && screenshot <path>/mobile.png
 ```
 
 - [ ] desktop 1280px screenshot: no critical/major
@@ -216,3 +216,7 @@ Add a top-level `visual_failure_attempts` array. Each entry is `{ "name": "...",
 > 视觉门禁：三轮修复后例外放行。已完成 3 次"修复 → 重新截图 → 重新审查"；最终仍遗留 critical=N、major=N、minor=N。该放行仅适用于视觉门禁，非视觉门禁均已独立通过。
 
 A clean visual pass (zero critical/major on initial review) must **not** be reported as an exception.
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-quality-gate`。质量结论只有统一门禁可以给出；本入口不得并行产生第二份最终结论。

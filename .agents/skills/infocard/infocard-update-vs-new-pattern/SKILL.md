@@ -61,3 +61,7 @@ version: 2.0.0
 - [ ] manifest target 唯一、位于 docs/ 或 assets/
 - [ ] Publisher 在主 checkout 完成 visual/build/static/public gates
 - [ ] 未创建、进入、复用或清理 worktree
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-orchestrator#task-mode`。旧判定结果必须映射为 create、update、rebuild、repair 或 publish 之一。

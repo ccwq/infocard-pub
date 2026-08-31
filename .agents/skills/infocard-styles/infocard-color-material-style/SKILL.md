@@ -7,6 +7,8 @@ description: |
 
 # infocard-color-material-style · Color Material 风
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## 主题定位
 
 这是一套面向 **高密度技术产品、调查复盘、能力地图与架构说明** 的信息卡主题。
@@ -222,3 +224,7 @@ description: |
 - 结构必须像“材料面板式架构海报”，不是普通模块列表。
 - 如果来源内容有图，必须把图作为首屏视觉锚点之一。
 - landscape 优先；内容密度高时允许做成 2+1+sidebar 结构。
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

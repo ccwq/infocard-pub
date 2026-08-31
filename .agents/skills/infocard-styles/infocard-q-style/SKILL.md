@@ -17,6 +17,8 @@ metadata:
 
 # infocard-q-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 Q 版主题是 infocard 体系中的纸感 / 手作感 / 彩色卡片风主题。
@@ -207,3 +209,7 @@ print(list(d['query']['pages'].values())[0]['imageinfo'][0]['url'])
 ```
 
 格式：`▲ 英文名 / 中文名 说明文字（来源: 文件名）`
+
+## Active theme adapter contract
+
+Implements `infocard-theme-contract@1` as a visual-only adapter. Generic authoring, browser verification and publishing guidance is deprecated compatibility text.

@@ -215,3 +215,7 @@ Also check: `getComputedStyle(element).backgroundColor` returns `rgba(0,0,0,0)` 
 - Image-heavy source integration pattern: `references/image-heavy-technical-share-cards.md`
 - Theme structural update: always update theme HTML + demo page together — see `references/theme-structural-update-two-files.md`
 - Redswiss diagonal hero absorption: `references/redswiss-header-absorption.md`
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-quality-gate`。可读性检查只产生结构化 issue，不得自行发布。

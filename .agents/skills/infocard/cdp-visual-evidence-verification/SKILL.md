@@ -15,15 +15,15 @@ Screenshots and vision-model findings are **evidence only after verification**. 
 
 Both failures, if uncaught, either block a valid publish or pass an invalid one. This skill is the cross-check protocol.
 
-## 1. Screenshot identity verification (shared CDP 9222)
+## 1. Screenshot identity verification (shared runtime-configured CDP endpoint)
 
-On a shared `--cdp 9222` Chrome, `agent-browser screenshot` can capture a DIFFERENT tab than the one `open` returned. Observed wrong captures: a ChatGPT 404 login page and a Trigger.dev preview page, both while the target card was open in another tab.
+On a shared runtime-provided CDP endpoint Chrome, `agent-browser screenshot` can capture a DIFFERENT tab than the one `open` returned. Observed wrong captures: a ChatGPT 404 login page and a Trigger.dev preview page, both while the target card was open in another tab.
 
 **Byte-size is NOT identity.** A wrong-page capture and the correct card measured identical 281167 bytes in the same session. Never infer page identity from file size, dimensions, or a successful exit code.
 
 ### Mandatory protocol before trusting any screenshot
 
-1. Bind the session with `--pin-tab` from the FIRST command; keep the same `--session` + `--cdp 9222` + `--pin-tab` flags on `open`, `set viewport`, and `screenshot`.
+1. Bind the session with `--pin-tab` from the FIRST command; keep the same `--session` + runtime-provided CDP endpoint + `--pin-tab` flags on `open`, `set viewport`, and `screenshot`.
 2. `Runtime.evaluate` on the pinned `targetId` (via CDP or `--json eval`):
    - `location.href` must match the target URL
    - `document.title` must match the target title

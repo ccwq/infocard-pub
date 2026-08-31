@@ -78,3 +78,7 @@ A preview URL and a final published URL are different evidence classes. When pro
 
 - `infocard-creation-preview-standards` — local preview surface (`live-server` + port 5588)
 - `webpage-vision-inspect-skill` — structured multi-shot visual inspection after URL delivery
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-publish-pipeline#preview`。preview 不得产生公开发布副作用，并必须保留质量警告。

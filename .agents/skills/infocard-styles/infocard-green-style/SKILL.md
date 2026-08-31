@@ -8,6 +8,8 @@ tags: [infocard, style, green, teal, emerald, swiss, editorial, ui, theming]
 
 # infocard-green-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## 触发条件
 当用户明确表达以下意图时启用本技能：
 - "绿色信息卡片"
@@ -151,3 +153,7 @@ tags: [infocard, style, green, teal, emerald, swiss, editorial, ui, theming]
 - 内容技能负责写内容与结构
 - `infocard-green-style` 负责切换配色与 UI 元素
 - 若用户没有特别说明，不要自动把所有卡片都改成绿色
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

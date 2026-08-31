@@ -173,3 +173,7 @@ For arXiv papers: prefer `https://arxiv.org/abs/<id>` (HTML, easier to parse) ov
 ## References
 
 - `references/non-x-source-extraction-recipes.md` — concrete curl + python snippets for YouTube, arXiv, podcast transcripts, and paywall-aware news sites
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-source-and-content`。来源分类结果必须写入统一 source pack，不得自行分发 Author 或发布。

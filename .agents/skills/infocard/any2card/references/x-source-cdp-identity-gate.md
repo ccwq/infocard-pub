@@ -13,10 +13,10 @@
 ## agent-browser + CDP
 
 ```bash
-agent-browser --namespace <unique-run> --session <unique-session> --cdp 9222 --json tab list
-agent-browser --namespace <unique-run> --session <unique-session> --cdp 9222 --json open http://127.0.0.1:<port>/
-agent-browser --namespace <unique-run> --session <unique-session> --cdp 9222 --json get url
-agent-browser --namespace <unique-run> --session <unique-session> --cdp 9222 --json close
+agent-browser --namespace <unique-run> --session <unique-session> --json tab list
+agent-browser --namespace <unique-run> --session <unique-session> --json open http://<preview-host>:<port>/
+agent-browser --namespace <unique-run> --session <unique-session> --json get url
+agent-browser --namespace <unique-run> --session <unique-session> --json close
 ```
 
 `/json/version` 只证明 HTTP 调试端点可达，不证明 WebSocket 可用。`Page.enable` 超时通常应先换全新的 namespace/session，避免复用陈旧 daemon。若 WebSocket 握手返回 403 并提示 `remote-allow-origins`，在专用 Chrome 启动脚本中加入明确的本地 Origin allowlist，重启 Chrome 后再验收。只有 `tab list`、本地预览 `open`、`get url` 都成功，才可将 CDP 视觉链路视为可用。

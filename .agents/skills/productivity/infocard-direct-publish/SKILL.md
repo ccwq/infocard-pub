@@ -55,3 +55,7 @@ next: 交给 infocard-publish-sop 的下一阶段
 ```
 
 若 X 帖只是项目发现入口，使用 `infocard-x-content-tracing` 追踪 GitHub 上游，并将 X 内容标记为 discovery source；不要把 X 帖当作项目事实源。
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-publish-pipeline#direct`。必须消费 `quality.status=passed` 且取得明确发布授权，否则返回 blocked。

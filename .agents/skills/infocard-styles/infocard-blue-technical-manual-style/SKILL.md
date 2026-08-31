@@ -12,6 +12,8 @@ metadata:
 
 # infocard-blue-technical-manual-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 这是技术手册蓝主题，适合 Claude Code / Skill / Agent / workflow 的分层案例与实施手册卡。
@@ -407,3 +409,7 @@ browser_cdp(method='Emulation.setDeviceMetricsOverride',
 ## Naming
 中文名：**蓝色技术手册主题**
 别名：蓝技手册风、红蓝技术手册风
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

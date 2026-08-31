@@ -12,6 +12,8 @@ metadata:
 
 # infocard-darkblue-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 `infocard-darkblue-style` 是一种面向 **Agent-first IDE / 桌面工作台 / 开发者产品** 的深蓝渐变风格。
@@ -249,3 +251,7 @@ metadata:
 ## Notes
 
 这个风格最适合表达“Agent-first IDE / 类 Nezha 的桌面工作台产品”。如果内容变成纯文档、纯调查或纯知识卡，应改用更合适的主题。
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

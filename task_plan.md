@@ -1,30 +1,25 @@
-# 三张信息卡重建计划
+# X 帖子信息卡发布与流程耗时诊断
 
 ## 目标
-重建并验证：
-- docs/20260827-ai-reads-books.html
-- docs/20260827-openwiki.html
-- docs/20260828-stitch-google.html
+- 从 https://x.com/Xudong07452910/status/2094218611112263944?s=20 提取可核验事实与来源边界。
+- 在主 checkout 完成一张信息卡的 `.docs` authoring、manifest promotion、视觉门禁、构建校验、提交推送和公网复核。
+- 以发布过程实测与仓库流程静态分析为依据，识别过渡/冗余设计，尤其是时间消耗，并保存诊断证据。
 
 ## 阶段状态
-- [x] 读取现状与环境，记录 ambient dirty state。
-- [x] 三个子智能体并行产出各自 .docs 候选稿、sidecar、主题决策与 manifest。
-- [x] Publisher 按声明的 HTML/sidecar 目标提升到正式 docs 路径；未提升 process 文件、索引或 assets。
-- [ ] 经 web-capture 完成桌面/390px 移动截图与视觉审查。
-- [ ] 运行 npm run verify:visual-gate、build、verify、taxonomy、leak 检查。
-
-## 已完成输出
-- .docs/rebuild-20260828-ai-reads-books/
-- .docs/rebuild-20260828-openwiki/
-- .docs/rebuild-20260828-stitch-google/
-- docs/20260827-ai-reads-books.html 与 sidecar
-- docs/20260827-openwiki.html 与 sidecar
-- docs/20260828-stitch-google.html 与 sidecar
+- [ ] 读取项目记忆、记录 ambient dirty state 与运行环境。
+- [ ] 浏览 X 帖子并形成 facts/research 证据。
+- [ ] 选择主题并由 Author 生成 `.docs/<run-id>/<slug>/` 候选与 manifest。
+- [ ] Publisher 精确 promotion 到 docs/，保留 diff/hash 证据。
+- [ ] 通过 web-capture 完成桌面与 390px 移动截图、DOM grounding 和视觉审查。
+- [ ] 运行 visual-gate、build、verify、taxonomy、leak 检查。
+- [ ] 使用 git-up -pcP 提交推送并进行公网缓存破坏复核。
+- [ ] 输出 skill-doctor 风格冲突/冗余与时间成本诊断。
 
 ## 硬约束
-- 未使用 worktree、clone、detached HEAD、force push。
-- Author 只写 .docs；正式 docs 由本轮 Publisher 提升。
-- 视觉证据必须来自 web-capture / agent-browser --cdp 9222；HTML/CSS/content 改动后需重捕获。
+- 仅使用当前主 checkout，不创建/使用/清理 worktree 或 clone。
+- Author 只能写 `.docs/<run-id>/<slug>/`；Publisher 才能 promotion/build/commit/push。
+- 视觉证据必须经 web-capture / agent-browser（endpoint 由环境变量提供）；HTML 改动后必须重捕获。
+- 不把 HTTP 200、build、DOM 或单端截图当成视觉通过。
 
-## 阻塞
-- DSH 的 pwsh 执行器连续返回 node.exe ENOENT，因此无法执行 npm、promote-infocard.js、agent-browser/web-capture 或 git-up；不能伪造视觉/构建通过状态。
+## 错误日志
+- 暂无。

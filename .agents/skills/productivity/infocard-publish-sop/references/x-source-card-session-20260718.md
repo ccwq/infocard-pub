@@ -6,7 +6,7 @@
 
 ## 稳定流程
 
-1. 先用现有 Chrome/CDP 或 `agent-browser --cdp 9222 --session <run-id>` 读取原帖；不要把稀疏壳页面、搜索摘要或跳转 URL 当成完整正文。
+1. 先用现有 Chrome/CDP 或 `agent-browser --session <run-id>` 读取原帖；不要把稀疏壳页面、搜索摘要或跳转 URL 当成完整正文。
 2. 优先保存结构化事实包：状态 ID、作者 display name、`@handle`、认证状态、发布时间、正文、是否回复/引用/转推、媒体、互动快照、所有展开链接。
 3. 用 `api.fxtwitter.com/status/<id>` 与 X DOM 交叉核验；两个来源冲突时保留冲突，不猜测。
 4. 将原帖事实与外部来源事实分层：`X 帖子称`、`官方文档确认`、`外部来源未确认`、`路线图/规划`。版本号、发布日期、能力上线状态不得跨层升级。

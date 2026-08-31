@@ -49,13 +49,13 @@ git checkout -b publish/xxx-20260723    # now succeeds
 
 ```bash
 # Start Chrome with networking logging
-google-chrome --remote-debugging-port=9222 \
+google-chrome \
   --save-page-as-completed \
   --no-sandbox
 
 # After page load, use CDP to capture Network.dataReceived
 # Or: intercept XHR/fetch requests containing "xhscdn"
-npx --yes agent-browser --cdp "$CDP" eval '
+npx --yes agent-browser eval '
 JSON.stringify(performance.getEntriesByType("resource")
   .filter(r => r.name.includes("xhscdn") && !r.name.includes("avatar"))
   .map(r => r.name))

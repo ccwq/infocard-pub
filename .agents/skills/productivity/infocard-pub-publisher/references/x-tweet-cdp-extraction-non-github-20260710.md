@@ -72,7 +72,7 @@ curl -sI "https://t.co/xxx" -L --max-redirs 5 2>/dev/null | grep -i "^location:"
 
 - `browser_cdp`（Hermes 原生 CDP 工具）
 - `curl` + Python3（备用 HTML 提取）
-- Chrome 调试端口：`http://localhost:9222`（已配置）
+- Chrome 调试 endpoint 由运行环境提供
 
 ## 关键教训
 
