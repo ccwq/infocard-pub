@@ -12,6 +12,8 @@ metadata:
 
 # infocard-main-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 这是从 `duix-avatar` 与 `claude-subagents` 抽象出的主要主题。
@@ -315,3 +317,7 @@ For GitHub repo cards with UI screenshots, use the `showcase-grid` pattern docum
 中文名：**主要主题**
 副标识：**小字**
 别名：主主题、默认主骨架
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

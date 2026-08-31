@@ -11,6 +11,8 @@ metadata:
 
 # infocard-white-purple-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 `infocard-white-purple-style` 是一套面向 **AI 驱动开发 / 方法论拆解 / 流程工作台** 的白紫主题信息卡风格。
@@ -245,3 +247,7 @@ When this theme carries many stacked cards or repo facts, pure `calc(100vw / 72)
 - 重点控制：白底、紫色少量强调、结构优先
 
 如果后续要落地为可发布主题，应同步补充 theme 文件、预览注册和发布验证流程；这些不属于本 skill 的主职责。
+
+## Active theme adapter contract
+
+Implements `infocard-theme-contract@1` as a visual-only adapter. Generic authoring, verification and publishing guidance is deprecated compatibility text.

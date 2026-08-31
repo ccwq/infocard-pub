@@ -12,6 +12,8 @@ metadata:
 
 # infocard-darkgreen-style · 深绿色监控工作台风格
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 `infocard-darkgreen-style` 是面向**终端状态总览、监控面板、运行健康度、轻量工具发布**的深绿色信息卡风格。
@@ -191,3 +193,7 @@ page
 - 该风格优先适配“终端状态总览、监控工具、运行面板、只读安全、本地运行”类主题。
 - 如果内容更偏白板、教程、说明书、评论卡，不应使用该风格。
 - 创建卡片时，优先让“状态、数值、面板、终端提示”成为第一视觉层。
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

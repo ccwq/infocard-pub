@@ -216,3 +216,7 @@ Add a top-level `visual_failure_attempts` array. Each entry is `{ "name": "...",
 > 视觉门禁：三轮修复后例外放行。已完成 3 次"修复 → 重新截图 → 重新审查"；最终仍遗留 critical=N、major=N、minor=N。该放行仅适用于视觉门禁，非视觉门禁均已独立通过。
 
 A clean visual pass (zero critical/major on initial review) must **not** be reported as an exception.
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-quality-gate`。质量结论只有统一门禁可以给出；本入口不得并行产生第二份最终结论。

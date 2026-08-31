@@ -12,6 +12,8 @@ metadata:
 
 # infocard-wood-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 `infocard-wood-style` 是一套偏“暖木质感 / 编辑页 / 说明书海报”的信息卡主题，灵感来自 Simon Willison 的 *Agentic Engineering Patterns* 视觉语言：
@@ -234,3 +236,7 @@ metadata:
 - 触发词：Simon Willison、Agentic Engineering、木感、暖纸、编辑型知识卡
 - 主题 slug：`wood`
 - 预览页：`theme/wood.html`
+
+## Active theme adapter contract
+
+Implements `infocard-theme-contract@1` as a visual-only adapter. Generic authoring, verification and publishing guidance is deprecated compatibility text.

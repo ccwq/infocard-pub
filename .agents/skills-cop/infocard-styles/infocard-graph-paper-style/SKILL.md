@@ -11,6 +11,8 @@ metadata:
 
 # infocard-graph-paper-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 `infocard-graph-paper-style` 是面向“代码图谱 / 知识网络 / 结构关系”的纸感研究手册风主题。
@@ -259,3 +261,7 @@ metadata:
 - `references/codebase-to-course-graph-paper-pattern.md`：记录“代码知识重表达 / 课程化 / 审计化”类仓库做成 graph-paper 卡时，如何把主叙事从 feature list 拉回 conversion pipeline（输入 → 中间翻译层 → 输出）的做法。
 - 网站型 graph-paper 卡若没有公开 repo，不要强行按仓库结构写；优先把主视觉落在“可见导航 / 控件 / 路由树 / 状态机”上，把页面当作知识画布或交互运行时来解释。
 - Session review note: `references/codegraph-graph-paper-style-note.md`
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

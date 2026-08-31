@@ -7,6 +7,8 @@ tags: [infocard, redswiss, red, black, Swiss, tool, CLI, high-density]
 
 # infocard-redswiss-style · 红黑瑞士风
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## 定位
 
 用于开源工具图鉴、CLI 生态集合、AI 工具对比等重型多项目内容。视觉锚点：红色斜切 hero + 纯红黑无蓝 + category-dot 色点。
@@ -435,3 +437,7 @@ updated: "2026-06-07 15:18:25"  # 必须加，防止 CI verify 失败
 ### ⚠️ Git Add 顺序陷阱（Wiki Sync 坑 · 2026-07-07）
 
 Wiki 新文件必须先 `git add` 再 `git commit`，否则 commit 不包含新文件。验证：`git status` 必须干净。详见 `references/redswiss-github-research-wiki-sync.md`。
+
+## Active theme adapter contract
+
+Implements `infocard-theme-contract@1` as a visual-only adapter. The Git/Wiki/publishing instructions above are deprecated compatibility guidance; use `infocard-publish-pipeline` for delivery.

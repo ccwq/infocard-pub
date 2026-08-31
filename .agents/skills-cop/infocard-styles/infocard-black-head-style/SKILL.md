@@ -12,6 +12,8 @@ metadata:
 
 # infocard-black-head-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 这是从 `claude-dynamic-workflows` 与 `voxcpm-investigation` 抽象出的黑头主题。
@@ -103,3 +105,7 @@ metadata:
 ## Naming
 中文名：**黑头主题**
 别名：黑头调查风、黑头拆解风
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance; the core authoring, quality and delivery stages own them.

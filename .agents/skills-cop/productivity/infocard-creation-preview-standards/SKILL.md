@@ -199,3 +199,7 @@ Mobile may still use an independent horizontal-scroll container when needed, but
 - [ ] Responsive constraints were handled during creation, not deferred blindly to final QA
 - [ ] 宽表使用局部滚动容器或已设计移动 card/list 表达
 - [ ] Rule application is theme-agnostic
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-quality-gate`。它不得再独立宣布视觉通过或重复启动完整浏览器验收。

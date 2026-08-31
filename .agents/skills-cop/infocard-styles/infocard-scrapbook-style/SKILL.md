@@ -15,6 +15,8 @@ metadata:
 
 # infocard-scrapbook-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 `infocard-scrapbook-style` 是一套面向资料封面、教程手册和课程介绍的“手账拼贴风 / 数字笔记本风”信息卡主题。
@@ -282,3 +284,7 @@ footer CTA
 - [x] 有 mobile rules
 - [x] 有 anti-patterns
 - [x] 有命名和触发词
+
+## Active theme adapter contract
+
+Implements `infocard-theme-contract@1` as a visual-only adapter. Generic authoring, verification and publishing guidance is deprecated compatibility text.

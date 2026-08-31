@@ -77,3 +77,7 @@ When using `live-server`, its configured port may already be occupied and the se
 
 - `references/pitfalls-20260728-visual-gate.md` — full incident transcript of the 2026-07-28 case.
 - `infocard-pub-hardening` — additional screenshot and preview hardening notes (currently user-owned; adopt before autonomous edits).
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-quality-gate#repair-loop`。同一失败类别最多自动修复两轮，每轮后必须回到统一质量门禁。

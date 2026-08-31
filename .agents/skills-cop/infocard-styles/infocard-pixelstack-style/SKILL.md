@@ -12,6 +12,8 @@ metadata:
 
 # infocard-pixelstack-style
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## Overview
 
 `infocard-pixelstack-style` 是一套**像素插画通用风**信息卡主题：复古手作气质 + 现代中文排版。
@@ -287,3 +289,7 @@ metadata:
 - 主模板：`theme/pixelstack.html`（相对于当前 active repository root）
 - 注册位置：`_themes.yaml` slug=`pixelstack-style` position=`15`
 - themes.html 已注册：通过 `python3 scripts/rebuild_themes.py` 重建
+
+## Active theme adapter contract
+
+Implements `infocard-theme-contract@1` as a visual-only adapter. Generic authoring, verification and publishing guidance is deprecated compatibility text.

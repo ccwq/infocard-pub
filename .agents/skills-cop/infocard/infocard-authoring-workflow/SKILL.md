@@ -658,3 +658,7 @@ for c in checks:
 **Mobile screenshot height**: Use `--window-size=390,2200` (not 1500) for full-length infocards. 2200 captures the complete card without cutting off the bottom.
 
 <!-- MODIFIED 2026-08-19: 添加 light-route 强制主题门禁 -->
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-card-authoring`。调用时必须保留既有 authoring 语义与 `.docs` 边界；新任务不得默认选择本入口。

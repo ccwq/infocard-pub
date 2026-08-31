@@ -83,3 +83,7 @@ metadata:
 - `selected_theme` 必须来自 `theme/*.html`，并与 HTML `data-theme`、sidecar `style` 三方一致。
 - 批量任务必须额外记录近期主题分布和多样性检查结果；重复主题可以被能力门禁保留，但必须有显式 `diversity_exception` 与审查理由。
 - 可执行门禁：`npm run verify:theme-delegation -- --context <prompt.txt> --decision <theme-decision.json>`；失败码非 0 时不得启动 Author。批量可用 `npm run verify:theme-diversity -- --themes <theme-sequence.json>`。
+
+## Deprecated compatibility entry
+
+此旧入口仅作兼容转发，替代入口为 `infocard-orchestrator#theme-route`。显式主题必须保持身份；本入口不得形成第二套主题最终判断。

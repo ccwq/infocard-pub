@@ -5,6 +5,8 @@ description: 为知识卡片提供暖纸感、手帐感的视觉设计规范与�
 
 # Paper Warm 信息卡风格
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 适用于知识卡片、学习笔记、生活方式内容与轻量信息图。核心气质：暖纸张、低饱和色、轻微手作感、清晰阅读层级。
 
 ## 1. 视觉语言
@@ -100,3 +102,7 @@ Rules:
 本主题 Skill 只负责视觉语言、tokens、排版、组件和响应式规则。
 
 不得在本主题 Skill 中加入：启动 preview、固定端口、健康检查、进程管理、截图、视觉评分、`npm run preview`、`npm run publish`、发布或部署流程。以上运行时工作由 `any2card` 调用 `web-visual-acceptance` 完成。
+
+## Active theme adapter contract
+
+Implements `infocard-theme-contract@1` for visual identity only. Generic authoring, browser verification and publishing text above is deprecated compatibility guidance; core stages own those decisions.

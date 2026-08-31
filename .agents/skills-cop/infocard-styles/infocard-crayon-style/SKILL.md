@@ -12,6 +12,8 @@ metadata:
 
 # infocard-crayon-style · 蜡笔彩绘信息卡主题
 
+> Runtime boundary：本 Skill 仅提供视觉差异；通用来源、创作、浏览器验收、构建与发布文字均视为 legacy archive，由核心阶段接管。
+
 ## 两种模式
 
 本主题支持两种视觉模式，切换方式为：**在 HTML 中给 `.page` 外层增加 `.poster-shell` div**。
@@ -255,3 +257,7 @@ metadata:
 
 主题骨架：`theme/crayon.html`  
 演示页面：`https://ccwq.github.io/infocard-pub/theme/crayon.html`
+
+## Active theme adapter contract
+
+This package implements `infocard-theme-contract@1` as a visual-only adapter. Its theme-specific guard remains available only when routed by the quality gate. Earlier generic authoring, browser verification and publishing instructions are deprecated compatibility guidance.
