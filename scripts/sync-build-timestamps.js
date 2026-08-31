@@ -29,11 +29,27 @@ function git(args) {
   }).trim();
 }
 
-function changedMetaFiles() {
+function changedDocFiles() {
   const files = new Set();
   for (const file of git(['diff', '--name-only', 'HEAD']).split(/\r?\n/).filter(Boolean)) files.add(file.replace(/\\/g, '/'));
   for (const file of git(['ls-files', '--others', '--exclude-standard', '--', 'docs']).split(/\r?\n/).filter(Boolean)) files.add(file.replace(/\\/g, '/'));
-  return [...files].filter(file => file.startsWith('docs/') && file.endsWith('.meta.yaml')).sort();
+  return [...files].filter(file => file.startsWith('docs/')).sort();
+}
+
+function sidecarsForChangedDocs(files, exists = (rel) => fs.existsSync(path.join(ROOT_DIR, rel))) {
+  const sidecars = new Set();
+  for (const file of files) {
+    if (file.endsWith('.meta.yaml')) sidecars.add(file);
+    if (file.endsWith('.html')) {
+      const sidecar = `${file}.meta.yaml`;
+      if (exists(sidecar)) sidecars.add(sidecar);
+    }
+  }
+  return [...sidecars].sort();
+}
+
+function changedMetaFiles() {
+  return sidecarsForChangedDocs(changedDocFiles());
 }
 
 function trackedAtHead(file) {
@@ -119,6 +135,6 @@ function main() {
   console.log(`[sync-build-timestamps] build_ts=${timestamp} new=${summary.newCards} existing=${summary.updatedCards} repaired_date=${summary.repairedDate}`);
 }
 
-main();
+module.exports = { TS_RE, changedDocFiles, sidecarsForChangedDocs };
 
-module.exports = { TS_RE };
+if (require.main === module) main();

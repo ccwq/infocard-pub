@@ -190,45 +190,64 @@ function resolveBusinessSortTsNs(item, metaPath, cardPath) {
   return latestSourceMtimeNs(metaPath, cardPath);
 }
 
-function buildIndexData() {
+function processMeta(metaPath) {
+  const requiredFields = ["slug", "path", "category", "title", "date", "tags", "desc"];
+  const data = loadMetaYaml(metaPath);
+  const missing = requiredFields.filter((key) => !(key in data));
+  if (missing.length) throw new Error(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: missing fields ${missing.join(", ")}`);
+  const cardPath = path.join(ROOT_DIR, String(data.path));
+  if (!fs.existsSync(cardPath)) throw new Error(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: target path missing -> ${data.path}`);
+  const item = { ...data };
+  if (item.description != null && item.desc == null) { item.desc = item.description; delete item.description; }
+  if (typeof item.desc !== "string" || !item.desc.trim()) throw new Error(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: desc is empty — a meaningful description is required`);
+  item.date = normalizeDateValue(item.date);
+  if (Object.prototype.hasOwnProperty.call(item, "updated")) item.updated = normalizeDateValue(item.updated);
+  const sortTs = resolveBusinessSortTsNs(item, metaPath, cardPath);
+  item._sort_ts = sortTs; item._modified_date = formatSortDate(sortTs);
+  return item;
+}
+
+function sortCards(cards) {
+  return cards.sort((a, b) => {
+    const sortDiff = Number(b._sort_ts || 0) - Number(a._sort_ts || 0);
+    if (sortDiff !== 0) return sortDiff;
+    const titleDiff = String(a.title || "").localeCompare(String(b.title || ""), "zh-Hans-CN");
+    return titleDiff || String(a.slug || "").localeCompare(String(b.slug || ""), "zh-Hans-CN");
+  });
+}
+
+function mergeIndexSnapshot(baseCards, changedItems, removedPaths = []) {
+  const changed = new Map(changedItems.map((item) => [String(item.path), item]));
+  const removed = new Set(removedPaths);
+  const cards = baseCards.filter((card) => !removed.has(String(card.path)) && !changed.has(String(card.path)));
+  cards.push(...changed.values());
+  return sortCards(cards);
+}
+
+function buildIndexData(options = {}) {
+  const selected = options.metaPaths;
+  if (Array.isArray(selected)) {
+    let base;
+    try {
+      const raw = fs.existsSync(SOURCE_INDEX_YAML_PATH) ? readText(SOURCE_INDEX_YAML_PATH) : readText(INDEX_PATH);
+      base = yaml.load(raw, { schema: yaml.FAILSAFE_SCHEMA });
+      if (!base || !Array.isArray(base.cards)) throw new Error("invalid index snapshot");
+    } catch (error) { throw new Error(`Incremental index requires valid snapshot: ${error.message}`); }
+    const changed = [];
+    for (const metaPath of selected) {
+      if (!fs.existsSync(metaPath)) continue;
+      changed.push(processMeta(metaPath));
+    }
+    const cards = mergeIndexSnapshot(base.cards, changed, options.removedPaths);
+    return { _count: cards.length, cards: sortCards(cards) };
+  }
   const entries = [];
   const errors = [];
   const requiredFields = ["slug", "path", "category", "title", "date", "tags", "desc"];
 
   for (const metaPath of listMetaFiles(DOCS_DIR)) {
     try {
-      const data = loadMetaYaml(metaPath);
-      const missing = requiredFields.filter((key) => !(key in data));
-      if (missing.length) {
-        errors.push(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: missing fields ${missing.join(", ")}`);
-        continue;
-      }
-      const cardPath = path.join(ROOT_DIR, String(data.path));
-      if (!fs.existsSync(cardPath)) {
-        errors.push(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: target path missing -> ${data.path}`);
-        continue;
-      }
-      const item = { ...data };
-      // Normalize description → desc (fix legacy cards using wrong field name)
-      if (item.description != null && item.desc == null) {
-        item.desc = item.description;
-        delete item.description;
-      }
-      // desc must be non-empty (not just present but actually filled)
-      const descValue = typeof item.desc === "string" ? item.desc.trim() : "";
-      if (!descValue) {
-        errors.push(`${normalizeSlashes(path.relative(ROOT_DIR, metaPath))}: desc is empty — a meaningful description is required`);
-        continue;
-      }
-      item.date = normalizeDateValue(item.date);
-      if (Object.prototype.hasOwnProperty.call(item, "updated")) {
-        item.updated = normalizeDateValue(item.updated);
-      }
-
-      const sortTs = resolveBusinessSortTsNs(item, metaPath, cardPath);
-      item._sort_ts = sortTs;
-      item._modified_date = formatSortDate(sortTs);
-      entries.push(item);
+      entries.push(processMeta(metaPath));
     } catch (error) {
       errors.push(error.message);
     }
@@ -239,13 +258,7 @@ function buildIndexData() {
     throw new Error(message);
   }
 
-  const cards = entries.sort((a, b) => {
-    const sortDiff = Number(b._sort_ts || 0) - Number(a._sort_ts || 0);
-    if (sortDiff !== 0) return sortDiff;
-    const titleDiff = String(a.title || "").localeCompare(String(b.title || ""), "zh-Hans-CN");
-    if (titleDiff !== 0) return titleDiff;
-    return String(a.slug || "").localeCompare(String(b.slug || ""), "zh-Hans-CN");
-  });
+  const cards = sortCards(entries);
 
   return {
     _count: cards.length,
@@ -502,6 +515,44 @@ function writeGeneratedArtifacts(indexData) {
   writeText(INDEX_PATH, serializeIndexYaml(indexData));
 }
 
+function sameFile(left, right) {
+  return fs.existsSync(left) && fs.existsSync(right) && fs.readFileSync(left).equals(fs.readFileSync(right));
+}
+
+function copyFileIfChanged(source, target) {
+  if (!fs.existsSync(source)) { fs.rmSync(target, { force: true }); return; }
+  if (!fs.statSync(source).isFile() || sameFile(source, target)) return;
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(source, target);
+}
+
+function syncChangedFilesToDist(files) {
+  for (const rel of files) {
+    const normalized = normalizeSlashes(rel);
+    if (normalized.startsWith(".docs/")) continue;
+    const source = path.join(ROOT_DIR, normalized);
+    const target = path.join(DIST_DIR, normalized);
+    copyFileIfChanged(source, target);
+  }
+}
+
+function writeIncrementalArtifacts(indexData, changedFiles, options = {}) {
+  if (options.indexChanged) {
+    const indexYaml = serializeIndexYaml(indexData);
+    if (!fs.existsSync(SOURCE_INDEX_YAML_PATH) || readText(SOURCE_INDEX_YAML_PATH) !== indexYaml) writeText(SOURCE_INDEX_YAML_PATH, indexYaml);
+    const sourceHtml = readText(SOURCE_INDEX_HTML_PATH);
+    const nextHtml = injectIndexDataIntoHtml(sourceHtml, indexData);
+    if (nextHtml !== sourceHtml) writeText(SOURCE_INDEX_HTML_PATH, nextHtml);
+  }
+  syncChangedFilesToDist(changedFiles);
+  if (options.indexChanged) {
+    const indexYaml = serializeIndexYaml(indexData);
+    if (!fs.existsSync(INDEX_PATH) || readText(INDEX_PATH) !== indexYaml) writeText(INDEX_PATH, indexYaml);
+    const sourceHtml = readText(SOURCE_INDEX_HTML_PATH);
+    if (!sameFile(SOURCE_INDEX_HTML_PATH, INDEX_HTML_PATH)) writeText(INDEX_HTML_PATH, sourceHtml);
+  }
+}
+
 module.exports = {
   DIST_DIR,
   INDEX_HTML_PATH,
@@ -509,11 +560,15 @@ module.exports = {
   SOURCE_INDEX_YAML_PATH,
   ROOT_DIR,
   buildIndexData,
+  copyFileIfChanged,
   collectIndexReconciliationData,
   extractInjectedIndexData,
   formatIndexReconciliationData,
   readText,
+  mergeIndexSnapshot,
   runFixMetaDate,
   serializeIndexYaml,
+  syncChangedFilesToDist,
+  writeIncrementalArtifacts,
   writeGeneratedArtifacts,
 };
