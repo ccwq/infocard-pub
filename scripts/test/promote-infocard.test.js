@@ -93,6 +93,34 @@ test('promotes only exact manifest files and verifies destination hashes', () =>
   assert.equal(fs.existsSync(path.join(f.root, 'docs/undeclared.html')), false);
 });
 
+test('supports manifest-relative sources inside a nested run directory on Windows', () => {
+  /**
+   * Given：promotion manifest 位于 .docs/<run-id>/<card>/，source 使用相对 manifest 的路径。
+   * When：在 Windows 路径分隔符环境中执行 promotion。
+   * Then：source root 正确解析到嵌套 authoring 目录，并只复制声明文件。
+   * 防回归：避免 path.relative 的反斜杠被 path.posix.dirname 解析成仓库根目录。
+   */
+  const f = fixture();
+  const nestedRoot = path.join(f.root, '.docs', 'run-20260831', f.card);
+  fs.mkdirSync(path.dirname(nestedRoot), { recursive: true });
+  fs.renameSync(path.join(f.root, '.docs', f.card), nestedRoot);
+  f.manifest.files = f.manifest.files.map((entry) => ({
+    ...entry,
+    source: path.posix.relative('.docs/' + f.card, entry.source),
+  }));
+  const manifestPath = path.join(nestedRoot, 'promotion-manifest.json');
+  fs.writeFileSync(manifestPath, JSON.stringify(f.manifest, null, 2));
+
+  const result = promoteInfocard({ root: f.root, manifestPath });
+
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.copied.map((item) => item.destination).sort(), [
+    f.bundle.html_path,
+    f.bundle.manifest_path,
+    f.bundle.meta_path,
+  ].sort());
+});
+
 test('refuses hash mismatches before copying any later files', () => {
   /**
    * Given：manifest 中每个文件都有独立来源 hash。

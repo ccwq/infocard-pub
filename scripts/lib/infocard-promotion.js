@@ -58,9 +58,10 @@ function validatePromotionManifest(manifest, root, manifestPath = '') {
   // Sources are scoped to the directory containing the manifest. This supports
   // run-scoped authoring paths such as .docs/<run-id>/<slug>/ while keeping
   // promotion bounded to the declared candidate directory.
-  const manifestRelative = path.relative(root, path.resolve(root, manifestPath));
+  const manifestAbsolute = path.resolve(root, manifestPath);
+  const manifestRelative = path.relative(root, manifestAbsolute).split(path.sep).join('/');
   const decisionPath = manifestRelative && !manifestRelative.startsWith('..')
-    ? path.join(root, path.dirname(manifestRelative), 'theme-decision.json')
+    ? path.join(path.dirname(manifestAbsolute), 'theme-decision.json')
     : null;
   if (!decisionPath || !fs.existsSync(decisionPath)) {
     errors.push(error('theme.decision', 'theme-decision.json is required beside promotion-manifest.json'));

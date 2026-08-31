@@ -91,8 +91,16 @@ function scanFile(filePath) {
     while ((match = pattern.regex.exec(content)) !== null) {
       const value = match[0];
       if (pattern.exclude && pattern.exclude.test(value)) continue;
-      // Exclude matches inside URL path segments (e.g. /status/2078318406424793326)
-      if (pattern.urlContextExclude && pattern.urlContextExclude.test(value)) continue;
+      // Exclude matches inside URL path segments (e.g. /status/2078318406424793326).
+      // Check the surrounding source context: `value` is only the 11-digit
+      // substring matched by the phone regex and cannot contain `status/`.
+      if (pattern.urlContextExclude) {
+        const context = content.slice(
+          Math.max(0, match.index - 120),
+          Math.min(content.length, match.index + value.length + 120)
+        );
+        if (pattern.urlContextExclude.test(context)) continue;
+      }
       // Deduplicate
       if (issues.some(i => i.value === value)) continue;
       issues.push({
@@ -192,4 +200,6 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { scanFile };
