@@ -28,7 +28,7 @@ It does **not** perform visual judgment. Callers still run `vision_analyze` and 
 
 ## Non-negotiable policy
 
-- **Preferred capture engine:** `agent-browser --cdp 9222`
+- **Preferred capture engine:** repository-required `agent-browser --cdp 9696`
 - **Do not use** `browser_exec` screenshot helpers for web capture when this skill is available
 - **Do not use** `browser_exec` `Page.captureScreenshot` / Python WebSocket CDP as the primary path
 - If `agent-browser` cannot capture, report the blocker; do not silently downgrade the evidence path
@@ -48,12 +48,12 @@ These are viewport presets, not full UA impersonation profiles.
 
 ## Standard capture flow
 
-1. `agent-browser --cdp 9222 tab list` to find the stable tab id.
-2. `agent-browser --cdp 9222 tab <id>` to focus the target page.
-3. `agent-browser --cdp 9222 get url` and `get title` to confirm identity.
-4. `agent-browser --cdp 9222 set viewport <w> <h>` using a preset or caller-supplied size.
-5. `agent-browser --cdp 9222 eval` to read geometry when responsive correctness matters.
-6. `agent-browser --cdp 9222 screenshot <path>` to write the PNG.
+1. `agent-browser --cdp 9696 tab list` to find the stable tab id.
+2. `agent-browser --cdp 9696 tab <id>` to focus the target page.
+3. `agent-browser --cdp 9696 get url` and `get title` to confirm identity.
+4. `agent-browser --cdp 9696 set viewport <w> <h>` using a preset or caller-supplied size.
+5. `agent-browser --cdp 9696 eval` to read geometry when responsive correctness matters.
+6. `agent-browser --cdp 9696 screenshot <path>` to write the PNG.
 7. Hand the PNG path to the caller for `vision_analyze` or further checks.
 
 ## Required geometry checks
@@ -96,14 +96,14 @@ Higher-level infocard and web visual skills must route screenshot work through t
 ## Examples
 
 ```bash
-agent-browser --cdp 9222 tab list
-agent-browser --cdp 9222 tab t3
-agent-browser --cdp 9222 set viewport 1280 900
-agent-browser --cdp 9222 screenshot /tmp/visual/desktop.png
+agent-browser --cdp 9696 tab list
+agent-browser --cdp 9696 tab t3
+agent-browser --cdp 9696 set viewport 1280 900
+agent-browser --cdp 9696 screenshot /tmp/visual/desktop.png
 
-agent-browser --cdp 9222 set viewport 390 844
-agent-browser --cdp 9222 eval 'JSON.stringify({innerWidth:innerWidth,scrollWidth:document.documentElement.scrollWidth,clientWidth:document.documentElement.clientWidth})'
-agent-browser --cdp 9222 screenshot /tmp/visual/mobile.png
+agent-browser --cdp 9696 set viewport 390 844
+agent-browser --cdp 9696 eval 'JSON.stringify({innerWidth:innerWidth,scrollWidth:document.documentElement.scrollWidth,clientWidth:document.documentElement.clientWidth})'
+agent-browser --cdp 9696 screenshot /tmp/visual/mobile.png
 ```
 
 ## Failure handling

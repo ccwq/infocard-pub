@@ -47,7 +47,7 @@ A `1440×900` or `390×844` viewport screenshot is a crop. Do not call a long pa
 
 **Use `web-capture` — not `browser_exec` cdp() or Python WebSocket CDP (confirmed timeout-prone 2026-08-26).**
 
-`web-capture` is the only approved screenshot gate. It wraps `agent-browser --cdp 9222`, handles tab selection, viewport switching, geometry checks, and PNG output.
+`web-capture` is the only approved screenshot gate. It wraps the repository-required `agent-browser --cdp 9696`, handles tab selection, viewport switching, geometry checks, and PNG output.
 
 Desktop / mobile / tablet capture are selected by the `web-capture` preset.
 

@@ -58,7 +58,7 @@ Any HTML/CSS/structure/content change invalidates all prior visual evidence. Re-
    Desktop capture via `web-capture` preset `pc` or `desktop`.
    Mobile capture via `web-capture` preset `mobile`.
    Tablet capture via `web-capture` preset `tablet` when needed.
-   `web-capture` owns the `agent-browser --cdp 9222` tab selection, viewport switch, geometry checks, and PNG output path.
+   `web-capture` owns the repository-required `agent-browser --cdp 9696` tab selection, viewport switch, geometry checks, and PNG output path.
 
 4. Run `vision_analyze` on each screenshot. Demand an explicit `critical / major / minor` defect list. Screenshot delivery to the user is evidence-sharing or requested human review; it never substitutes for the Agent's disposition.
 
@@ -111,13 +111,13 @@ After build, verify `dist/docs/<slug>.html` contains a newly introduced, release
 
 ### Verification checklist — screenshot capture (2026-08-26)
 
-All screenshots use **`agent-browser --cdp 9222`**:
+All screenshots use **`agent-browser --cdp 9696`**:
 
 ```bash
 # Desktop 1280×900
-agent-browser --cdp 9222 tab <id> && set viewport 1280 900 && screenshot <path>/desktop.png
+agent-browser --cdp 9696 tab <id> && set viewport 1280 900 && screenshot <path>/desktop.png
 # Mobile 390×844
-agent-browser --cdp 9222 tab <id> && set viewport 390 844 && screenshot <path>/mobile.png
+agent-browser --cdp 9696 tab <id> && set viewport 390 844 && screenshot <path>/mobile.png
 ```
 
 - [ ] desktop 1280px screenshot: no critical/major
