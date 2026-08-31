@@ -28,7 +28,7 @@ metadata:
 ## 工作流
 
 1. 确认 `content_type`、`content_subtype`、`content_shape` 和 `required_modules` 已由内容模块确定。缺失时停止并回到内容分类，不猜主题。
-2. 从 `theme/*.html` 读取实际注册的 bare slug；不能虚构主题，也不能只依据 sidecar 的 `style` 判断主题存在。
+2. 从 `theme/themes.json` 读取主题注册表和实际模板；注册表是主题元数据唯一机器来源，不能虚构主题，也不能只依据 sidecar 的 `style` 判断主题存在。
 3. 根据内容形态生成候选池。候选是倾向和能力起点，不是固定 Primary/Fallback 绑定；同一内容形态允许多个合格主题。
 4. 对每个候选检查：长标题承载、信息密度、表格、代码、流程/关系模块、图片/风险面板和移动端结构。将不支持项写入 `excluded_themes`，不得静默丢弃。
 5. 若用户指定主题，先放入校验路径：主题已注册、能力满足、能通过视觉门禁则选择；不满足时记录原因并返回合格替代候选，不能无条件服从或静默改选。
@@ -60,7 +60,7 @@ metadata:
 
 `content_type`、`content_shape`、`candidate_themes`、`excluded_themes`（含 reason）、`selection_weights`、`seed`、`selected_theme`、`user_override`。
 
-`selected_theme` 必须是 `theme/*.html` 的 bare slug。sidecar 使用规范化后的 `style`（例如 `infocard-hardblue-style`），HTML 使用同一个 bare slug 的 `data-theme`；三者不一致即阻塞。用户指定主题时，`user_override` 记录请求值、是否接受和理由。
+`selected_theme` 必须是 `theme/themes.json` 中声明且对应 `theme/*.html` 的 bare slug。sidecar、bundle 和 HTML 均使用同一个 bare slug；HTML 使用 `data-theme`，三者不一致即阻塞。用户指定主题时，`user_override` 记录请求值、是否接受和理由。
 
 ## 批量与重建
 
@@ -70,7 +70,7 @@ metadata:
 
 ## 边界与验收
 
-本 skill 只选择和验证主题契约，不读取具体 style skill 以外的发布权限，也不直接写 `docs/`、`assets/`、Git state、生成索引或执行 build/commit/push。禁止 worktree、clone、detached HEAD 和 `/tmp/infocard*`。
+本 skill 只选择和验证主题契约，不读取具体 style skill 以外的发布权限，也不直接写 `docs/`、`assets/`、Git state、生成索引或执行 build/commit/push。禁止 worktree、clone、detached HEAD 和 `/tmp/infocard*`。不得维护第二套主题注册表、主题别名表或默认主题。
 
 验收至少确认：决策记录完整且可解析；固定 seed 得到相同选择；不同获批 seed 只在过滤池内变化；用户主题优先但不绕过能力检查；authoring 和 publish 不包含第二套主题选择规则。
 

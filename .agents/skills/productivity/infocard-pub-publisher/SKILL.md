@@ -8,16 +8,16 @@ version: 3.2.0
 
 ## Purpose
 
-The leading word is **promotion**. This skill turns a frozen Protocol v3 bundle and its .docs/<card>/promotion-manifest.json into a formal release. It does not research, author card content, select themes, or manage subagents.
+The leading word is **promotion**. This skill turns a frozen Protocol v3 bundle and its `.docs/<card>/promotion-manifest.json` into a formal release. It does not research, author card content, select themes, or manage subagents. Detailed workspace, theme, visual-exception, and Git safety rules are owned by `AGENTS.md`, `infocard-publish-sop`, `infocard-theme-assignment`, and `visual-verification-gate`; this skill only defines Publisher inputs, actions, and outputs.
 
 **No worktree is used for publishing.** All operations run directly in the primary repository checkout.
 
-Load infocard-publish-sop/references/infocard-publish-protocol-v3.md before any promotion, Git write, or public verification.
+Load `infocard-publish-sop/references/publish-protocol-v3.md` before any promotion, Git write, or public verification.
 
 ## 1. Validate the authoring directory and manifest
 
-1. Locate the declared .docs/<card>/ directory from the bundle. Confirm it is inside the authorized repository, ignored by the repository convention, and owned by the current run.
-2. Validate publish-bundle.json and promotion-manifest.json as single JSON documents.
+1. Locate the declared `.docs/<card>/` directory from the promotion manifest. Confirm it is inside the authorized repository, ignored by the repository convention, and owned by the current run.
+2. Validate `promotion-manifest.json` as the required promotion authority. Validate `publish-bundle.json` only when present and required by a concrete audit/integration command; it is process evidence, not a second authority.
 3. Resolve every manifest source relative to `.docs/<run-id>/<slug>/` and every target relative to the primary repository root. Reject absolute paths, `..`, duplicate targets, missing sources, undeclared assets, bundle/evidence files, generated indexes, any `/tmp/infocard*` or clone/worktree path, and targets outside `docs/` or `assets/`. Confirm the current checkout is the primary repository checkout, not a worktree or detached HEAD.
 4. Validate each sidecar before promotion. It must be one YAML mapping with slug, path, category, title, desc, date, updated, and tags; path must equal the manifest target.
 5. Confirm the authoring directory contains no process artifact, secret, screenshot, or generated index intended for publication.

@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { registeredThemes: registeredThemesFromRegistry } = require('../../../../../scripts/lib/theme-registry');
 
 const CAPABILITIES = [
   'long_title',
@@ -34,11 +35,7 @@ const STYLE_ALIASES = Object.freeze({
 });
 
 function registeredThemes(projectRoot) {
-  const themeDir = path.join(projectRoot, 'theme');
-  if (!fs.existsSync(themeDir)) return new Set();
-  return new Set(fs.readdirSync(themeDir)
-    .filter((name) => name.endsWith('.html'))
-    .map((name) => name.slice(0, -5)));
+  return registeredThemesFromRegistry(projectRoot);
 }
 
 function normalizeThemeSlug(value, projectRoot) {

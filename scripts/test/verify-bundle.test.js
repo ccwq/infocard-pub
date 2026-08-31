@@ -67,9 +67,9 @@ test('validateBundle reports every invalid contract field', () => {
 test('all required repository style names are accepted', () => {
   const { validateBundle } = require(MODULE_PATH);
   const styles = [
-    'darkblue', 'redswiss', 'hardblue', 'main-style', 'darkgreen',
-    'graph-paper', 'handline', 'wood', 'black-head', 'pixelstack',
-    'q-style', 'paper-warm', 'white-purple', 'color-material',
+    'darkblue', 'redswiss', 'hardblue', 'main', 'darkgreen',
+    'graph-paper', 'handline', 'wood', 'black', 'pixelstack',
+    'q', 'white-purple', 'color-material',
   ];
 
   for (const style of styles) {

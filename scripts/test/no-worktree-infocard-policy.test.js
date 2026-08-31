@@ -77,3 +77,17 @@ test('infocard policy: publisher keeps manifest sources and formal targets separ
   assert.match(publisher, /targets? .*`?docs\/`? or `?assets\//i);
   assert.match(publisher, /not a worktree or detached HEAD/i);
 });
+
+test('infocard policy: no legacy direct-copy publisher bypass remains', () => {
+  /**
+   * Given：`.docs → manifest promotion` is the only permitted publishing path.
+   * When：checking the script surface.
+   * Then：the legacy script that copied arbitrary HTML into docs/ is absent.
+   * 防回归：主题决策、promotion 与 visual gate must never be bypassed.
+   */
+  assert.equal(
+    fs.existsSync(path.join(ROOT, 'scripts', 'publish-card.js')),
+    false,
+    'remove scripts/publish-card.js; use scripts/promote-infocard.js through the manifest workflow',
+  );
+});

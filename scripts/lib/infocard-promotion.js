@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { validateBundle, bundleAllowlist } = require('./publish-bundle');
 const { validateThemeContract } = require('./theme-contract');
+const { readThemeDecision } = require('../../.agents/skills/infocard/infocard-theme-assignment/scripts/theme-decision');
 
 function error(field, message) { return { field, message }; }
 
@@ -58,6 +59,12 @@ function validatePromotionManifest(manifest, root, manifestPath = '') {
   // run-scoped authoring paths such as .docs/<run-id>/<slug>/ while keeping
   // promotion bounded to the declared candidate directory.
   const manifestRelative = path.relative(root, path.resolve(root, manifestPath));
+  const decisionPath = manifestRelative && !manifestRelative.startsWith('..')
+    ? path.join(root, path.dirname(manifestRelative), 'theme-decision.json')
+    : null;
+  if (!decisionPath || !fs.existsSync(decisionPath)) {
+    errors.push(error('theme.decision', 'theme-decision.json is required beside promotion-manifest.json'));
+  }
   const sourceRoot = manifestRelative && !manifestRelative.startsWith('..')
     ? path.posix.dirname(manifestRelative)
     : (typeof manifest.card === 'string' ? '.docs/' + manifest.card : '');
@@ -126,6 +133,13 @@ function validatePromotionManifest(manifest, root, manifestPath = '') {
   }
   const themeResult = validateThemeContract({ root, bundle: manifest.bundle, entries });
   errors.push(...themeResult.errors.map((item) => error('theme.' + item.field, item.message)));
+  if (decisionPath && fs.existsSync(decisionPath)) {
+    const decision = readThemeDecision(decisionPath, { projectRoot: root });
+    if (!decision.valid) errors.push(...decision.errors.map((item) => error('theme.decision.' + item.field, item.message)));
+    else if (decision.decision.selected_theme !== manifest.bundle.style) {
+      errors.push(error('theme.decision.selected_theme', 'must equal bundle.style'));
+    }
+  }
   return { valid: errors.length === 0, errors, entries: errors.length ? [] : entries };
 }
 

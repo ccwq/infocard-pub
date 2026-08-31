@@ -27,6 +27,9 @@ function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'promote-infocard-'));
   fs.mkdirSync(path.join(root, 'theme'), { recursive: true });
   fs.writeFileSync(path.join(root, 'theme', 'darkblue.html'), '<html></html>');
+  fs.writeFileSync(path.join(root, 'theme', 'themes.json'), JSON.stringify({ themes: {
+    darkblue: { template: 'theme/darkblue.html', capabilities: {}, structural_signature: [] },
+  }}));
   const card = 'copy-card';
   const bundle = {
     slug: card,
@@ -52,6 +55,12 @@ function fixture() {
   })) };
   const manifestPath = path.join(root, '.docs/' + card + '/promotion-manifest.json');
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  fs.writeFileSync(path.join(root, '.docs/' + card + '/theme-decision.json'), JSON.stringify({
+    version: 1, content_type: 'test', content_shape: 'test', required_capabilities: [],
+    candidate_themes: ['darkblue'], excluded_themes: [], selection_weights: { darkblue: 1 },
+    seed: 'test', selected_theme: 'darkblue',
+    user_override: { requested: null, accepted: false, reason: null },
+  }));
   return { root, card, bundle, manifest, manifestPath };
 }
 
