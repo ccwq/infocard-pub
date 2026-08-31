@@ -12,6 +12,9 @@ function fixture(overrides = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'theme-contract-'));
   fs.mkdirSync(path.join(root, 'theme'), { recursive: true });
   fs.writeFileSync(path.join(root, 'theme', 'blue.html'), '<html></html>');
+  fs.writeFileSync(path.join(root, 'theme', 'themes.json'), JSON.stringify({ themes: {
+    blue: { template: 'theme/blue.html', capabilities: {}, structural_signature: [] },
+  }}));
   const html = overrides.html || '<html data-theme="blue"><style>:root{--bg:white}body{background:var(--bg)}</style></html>';
   const meta = overrides.meta || 'style: blue\n';
   const htmlPath = path.join(root, '.docs/card/card.html');

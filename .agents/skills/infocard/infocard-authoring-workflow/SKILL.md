@@ -210,7 +210,7 @@ Python script approach remains as a fallback for very large content.
 - Keep the content in a single write, then validate with the repo build.
 
 **Template source priority**:
-1. Check `theme/<style>.html` for the base template; copy to `docs/<slug>.html`
+1. Read `theme/themes.json`, then use `theme/<selected_theme>.html` as the complete template skeleton; never use a default theme or copy a theme HTML into a stylesheet link
 2. No worktree template lookup needed
 
 **Python script fallback** (only needed for ~15KB+ content where direct write_file is risky):

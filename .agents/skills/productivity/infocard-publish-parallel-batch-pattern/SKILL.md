@@ -1,93 +1,143 @@
 ---
 name: infocard-publish-parallel-batch-pattern
-description: "Light-batch publish 2–3 cards in parallel without worktree."
-version: 2.0.0
+description: "Use for coordinating 2–3 independent infocard Authors in parallel through the canonical .docs promotion workflow."
+version: 3.0.0
 author: Hermes Agent
 license: MIT
 metadata:
   hermes:
-    tags: [infocard, publish, batch, parallel, light-route]
-    related_skills: [infocard-publish-sop]
+    tags: [infocard, publish, batch, parallel, authoring]
+    related_skills: [infocard-publish-sop, infocard-theme-assignment, visual-verification-gate]
 ---
 
-# Parallel Light-Batch Infocard Publishing
+# Parallel Infocard Authoring and Release
+
+## Purpose
+
+This skill coordinates a small batch of independent cards. It does not define a second publishing route. Workspace boundaries, theme assignment, visual evidence, promotion, static gates, and Git safety are owned by the canonical project rules:
+
+- `AGENTS.md` — primary checkout and `.docs` boundary
+- `infocard-theme-assignment` — one content-to-theme decision owner
+- `visual-verification-gate` — screenshot and visual disposition contract
+- `infocard-publish-sop` — release lifecycle and closeout
+
+This skill adds only batch cardinality, parallel Author coordination, and one shared Publisher release.
 
 ## When to use
 
-- 2 or 3 self-contained cards, each with a different theme (e.g. hardblue + pixelstack)
-- Each card has its own fixed facts (no shared research handoff)
-- Total API budget fits in one round (`max_concurrent_children=3`)
-- All cards belong to one user-facing batch release
+Use when all conditions hold:
 
-**No worktree is used.** All cards written directly to primary repository `docs/`.
+- 2–3 independent cards;
+- each card has a complete source brief or facts handoff;
+- each card gets its own frozen `theme-decision.json` before Author starts;
+- all cards belong to one user-facing release.
 
-## Anti-pattern
+Use the full three-stage pipeline for shared/heavy research, complex fact reconciliation, or more than three cards. Do not create a parallel publishing route for convenience.
 
-Do NOT use this when:
+## Batch invariants
 
-- Cards share heavy research (use the full `infocard-publish-sop` batch with `content.json` + main renderer)
-- Each card needs deep cross-source verification (use the full SOP)
-- Batch size is ≥4 (split into rounds of ≤3, wait between rounds)
-
-## Batch cardinality and artifact ownership
-
-The user's requested number of independent cards is a release invariant. If the user says "发布 7 张卡", author and verify exactly 7 card identities; never collapse them into one collection card. A later "go/继续" means execute without another confirmation.
-
-All author outputs must land in `docs/` before build. The orchestrator writes each HTML directly into the primary repository. A subagent claiming "created" is not evidence until the orchestrator verifies the exact HTML and meta paths, byte sizes, and matching slug/path pair.
-
-Before build, run a cardinality preflight:
-
-1. Expected slugs = actual HTML files = actual sidecars = index candidates.
-2. Every sidecar `slug` and `path` must match the dated HTML filename exactly when the repository convention requires date-prefixed identities.
-3. Do not trust an HTTP 200 alone. Parse the public `_index.yaml` and assert every expected slug is present, with the expected `date`, `updated`, `path`, and title.
-4. If one card is missing or indexed under a different slug, stop the closeout, normalize the sidecar, rebuild `_index.yaml` and `index.html`, then push and re-run the full per-card public check.
+- Expected card count is a release invariant: requested cards = Author candidates = promoted HTML/sidecar pairs = public index entries.
+- Author outputs live only under `.docs/<run-id>/<slug>/`.
+- Publisher promotes only manifest-declared files into `docs/` and `assets/`.
+- Never write formal outputs directly from an Author or orchestrator into `docs/`.
+- A subagent summary is not evidence; verify files, bytes, hashes, manifest, and final index entries on disk.
 
 ## Workflow
 
-### Step 1 — Fetch and confirm
+### 1. Preflight
 
-```bash
-cd ~/qbox/opendir/project/infocard-pub
-git fetch origin main
+1. Record `git status --short` in the primary checkout.
+2. For every card, determine `content_type`, `content_shape`, required modules/capabilities, source URL, and evidence boundary.
+3. Run `infocard-theme-assignment` once per card and freeze:
+
+```text
+.docs/<run-id>/<slug>/theme-decision.json
 ```
 
-### Step 2 — Dispatch parallel Author subagents
+4. Review recent theme distribution for the batch. If diversity review is required, record the explicit exception and reason in the decision evidence; do not silently force a theme.
 
-Each `delegate_task` call:
+### 2. Parallel Author dispatch
 
-- goal: produce a complete candidate for ONE card, content Y; do not include a preselected visual theme
-- context: canonical URL, source content, and the frozen `.docs/<run-id>/<slug>/theme-decision.json` path
-- explicit output rule: "read and consume theme-decision.json.selected_theme exactly; if it is missing or invalid, return THEME_BLOCKED. Write only under `.docs/<run-id>/<slug>/`; do not write docs/, assets/, indexes, Git state, commit, or push."
+Each Author receives only its card's source/facts and frozen decision path. The context must say:
 
-Each subagent must end by reporting:
-- slug
-- byte size
-- completion status (COMPLETE / PARTIAL)
+```text
+Read and consume theme-decision.json.selected_theme exactly.
+If missing or invalid, return THEME_BLOCKED.
+Write only under .docs/<run-id>/<slug>/.
+Create card.html, sidecar, promotion-manifest.json, and required facts/evidence.
+Do not write docs/, assets/, indexes, or Git state.
+Do not select, override, or invent a theme.
+```
 
-### Step 3 — One build, one verify, one commit, one push
+The delegation context must not contain `Theme: <specific-theme>`, `Create a <specific-theme> card`, or equivalent preselection.
+
+Each Author must report:
+
+- authoring directory;
+- candidate files and byte sizes;
+- selected theme read from the decision file;
+- manifest validation result;
+- status `COMPLETE` or `PARTIAL`.
+
+### 3. Publisher release
+
+After every Author candidate is independently re-read and validated:
 
 ```bash
+node scripts/promote-infocard.js --manifest .docs/<run-id>/<slug>/promotion-manifest.json
+npm run verify:visual-gate -- docs/<slug>.html
 npm run build
-git add docs/<slug1>.html docs/<slug1>.html.meta.yaml \
-        docs/<slug2>.html docs/<slug2>.html.meta.yaml \
-        _index.yaml index.html
-git commit -m "feat: publish <batch-title>"
-git push origin main
+npm run verify
+npm run fix-taxonomy
+npm run verify-taxonomy
+npm run check-leak
 ```
 
-### Step 4 — Public verification (all cards)
+For a batch, validate all manifests before promotion, promote all declared artifacts, then build once. Capture fresh desktop/mobile evidence for every card. Stage only promoted artifacts, declared assets, current visual evidence, and generated indexes. Never use `git add -A`.
 
-```bash
-sleep 60
-curl -sI https://ccwq.github.io/infocard-pub/docs/<slug1>.html | head -1
-curl -sI https://ccwq.github.io/infocard-pub/docs/<slug2>.html | head -1
-```
+### 4. Cardinality and public verification
 
-Both must return `HTTP/2 200`.
+Before closeout, verify:
+
+1. expected slugs = actual `.docs` candidates = promoted HTML/sidecar pairs;
+2. each sidecar `path` equals its manifest HTML target;
+3. generated `_index.yaml` and `index.html` contain every expected card;
+4. public detail pages, public indexes, titles, themes, and release fingerprints match the batch;
+5. each public card has fresh desktop/mobile visual evidence.
+
+Use cache-busting and retry Pages propagation at 10s, 30s, and 60s. HTTP 200 alone is not release proof.
+
+## Failure handling
+
+- Author timeout: inspect that Author's `.docs` directory and retain valid artifacts; do not search for or create a worktree.
+- Missing/invalid theme decision: `THEME_BLOCKED`; stop that card before authoring.
+- Manifest or theme-contract failure: repair the candidate, regenerate hashes, and rerun promotion validation.
+- Visual failure: follow `visual-verification-gate`; any critical/major defect blocks release.
+- Build/index failure: inspect generated artifacts and ambient changes, then rerun the affected gate; do not stage unrelated metadata churn.
+- Non-fast-forward: reconcile once in the primary checkout, regenerate affected indexes/evidence, and rerun required gates. Never force-push.
 
 ## Pitfalls
 
-- **meta.yaml trailing `---`**: `write_file` overwrites the whole file. If the existing file ends with `---` and your new snippet starts with `---`, the on-disk YAML becomes two documents. Re-read first; write without trailing `---`. Detection: `grep -c "^---$" docs/*.meta.yaml` returns 0.
-- **Section padding-left on mobile**: every theme's `section-head` needs `@media (max-width:720px) { padding-left: 14px; }`. Otherwise the number block touches the left edge.
-- **Table → case-card-list**: 5+ column tables need mobile collapse to `.case-card-list`.
-- **`Overview` block mandatory for hardblue**: between topbar and stats row, must include `.overview-sentence` (red, ≤50 chars) + `.overview-body` (100–400 chars).
+- Do not confuse a different accent color with a different theme.
+- Do not treat `theme/<slug>.html` as a stylesheet; consume it as a template skeleton and emit self-contained card HTML.
+- Do not append a second YAML document to a sidecar.
+- Do not trust a child-agent summary, build output, or HTTP status without on-disk identity and hash checks.
+- Any HTML/CSS/content change invalidates prior visual evidence.
+
+## Verification checklist
+
+- [ ] Every card has a frozen, valid `theme-decision.json` before Author dispatch.
+- [ ] Every Author wrote only inside its `.docs/<run-id>/<slug>/` directory.
+- [ ] Every manifest validates source/target containment and hashes.
+- [ ] Promotion happened before formal build/release.
+- [ ] Every card has fresh desktop/mobile visual dispositions with 0 critical/major.
+- [ ] Build, verify, taxonomy, and leak gates passed.
+- [ ] Staged diff contains only the batch release scope and generated indexes.
+- [ ] Public detail/index/home fingerprints and visual evidence passed.
+- [ ] No worktree, clone, detached HEAD, force-push, cleanup, or automatic Wiki sync occurred.
+
+## Ownership rule
+
+If a rule here conflicts with `AGENTS.md`, `infocard-publish-sop`, `infocard-theme-assignment`, or `visual-verification-gate`, those canonical sources win. This file remains a batch coordination recipe, not a duplicate SOP. The former direct-`docs/` authoring path was invalid and has been removed.
+
+---

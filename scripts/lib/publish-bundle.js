@@ -2,13 +2,11 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { registeredThemes, normalizeThemeSlug } = require('./theme-registry');
 
-const ALLOWED_STYLES = new Set([
-  'darkblue', 'redswiss', 'hardblue', 'main-style', 'darkgreen',
-  'graph-paper', 'handline', 'wood', 'black-head', 'pixelstack',
-  'q-style', 'paper-warm', 'white-purple', 'color-material',
-  'green', 'blue', 'sage-swiss',
-]);
+const ALLOWED_STYLES = {
+  has(style) { return Boolean(normalizeThemeSlug(process.cwd(), style)); },
+};
 
 function loadBundle(bundlePath) {
   return JSON.parse(fs.readFileSync(bundlePath, 'utf8'));
@@ -77,7 +75,9 @@ function validateBundle(bundle) {
     add('source_url', 'must be a valid http(s) URL');
   }
 
-  if (!ALLOWED_STYLES.has(bundle.style)) add('style', 'must be an allowed repository style');
+  if (!normalizeThemeSlug(process.cwd(), bundle.style)) {
+    add('style', 'must be a registered repository theme');
+  }
   if (typeof bundle.category !== 'string' || bundle.category.trim() === '') add('category', 'must be non-empty');
   if (!Array.isArray(bundle.keywords) || bundle.keywords.length === 0
       || bundle.keywords.some((value) => typeof value !== 'string' || value.trim() === '')) {

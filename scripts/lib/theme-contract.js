@@ -1,18 +1,10 @@
 'use strict';
 
 const fs = require('node:fs');
-const path = require('node:path');
+const { registeredThemes, normalizeThemeSlug } = require('./theme-registry');
 
 function error(field, message) {
   return { field, message };
-}
-
-function registeredThemes(root) {
-  const dir = path.join(root, 'theme');
-  if (!fs.existsSync(dir)) return new Set();
-  return new Set(fs.readdirSync(dir)
-    .filter((name) => name.endsWith('.html'))
-    .map((name) => name.slice(0, -'.html'.length)));
 }
 
 function canonicalStyle(value) {
@@ -40,7 +32,13 @@ function colorLiteralMatches(text) {
   ];
   for (const pattern of patterns) {
     let match;
-    while ((match = pattern.exec(css))) matches.push(match[0]);
+    while ((match = pattern.exec(css))) {
+      const lineStart = css.lastIndexOf('\n', match.index) + 1;
+      const lineEnd = css.indexOf('\n', match.index) === -1 ? css.length : css.indexOf('\n', match.index);
+      const line = css.slice(lineStart, lineEnd);
+      if (/shadow\s*:/i.test(line) || (/background(?:-image)?\s*:/i.test(line) && /gradient/i.test(line))) continue;
+      matches.push(match[0]);
+    }
   }
   return matches;
 }
@@ -66,11 +64,15 @@ function validateThemeContract({ root, bundle, entries }) {
   const meta = fs.readFileSync(metaEntry.sourceAbsolute, 'utf8');
   const dataTheme = htmlTheme(html);
   const metaStyle = topLevelYamlValue(meta, 'style');
+  const normalizedMetaStyle = normalizeThemeSlug(root, metaStyle);
 
   if (!dataTheme) add('html.data-theme', `must equal "${style}"`);
   else if (dataTheme !== style) add('html.data-theme', `"${dataTheme}" !== bundle.style "${style}"`);
   if (!metaStyle) add('meta.style', `must equal "${style}"`);
-  else if (metaStyle !== style) add('meta.style', `"${metaStyle}" !== bundle.style "${style}"`);
+  else if (normalizedMetaStyle !== style) add('meta.style', `"${metaStyle}" !== bundle.style "${style}"`);
+  if (/<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["'][^"']*theme\/[^"']+\.html["']/i.test(html)) {
+    add('html.theme_link', 'theme/*.html templates must not be used as stylesheets');
+  }
 
   // Theme palette declarations are allowed in :root; only component declarations
   // must consume variables instead of hard-coding colors.

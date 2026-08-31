@@ -64,7 +64,7 @@ Publisher owns manifest validation, exact promotion, visual gate, build, static 
 
 ## Bundle, sidecar, and manifest
 
-Before authoring, create `.docs/<run-id>/<slug>/publish-bundle.json` and `promotion-manifest.json`.
+Before authoring, create `.docs/<run-id>/<slug>/promotion-manifest.json`. A `publish-bundle.json` is optional process evidence unless a concrete Publisher/audit command requires it; it is not a second promotion authority.
 
 Manifest requirements:
 
@@ -80,7 +80,7 @@ slug, path, category, title, desc, date, updated, tags,
 author, source, source_url, style
 ```
 
-`path` must exactly equal the manifest HTML target. `date` and `updated` use quoted `YYYY-MM-DD HH:MM:SS`; Publisher sets final promotion time. Theme evidence must be the validated `.docs/<run-id>/<slug>/theme-decision.json` produced by `infocard-theme-assignment` before candidate HTML is written. This SOP validates its selected theme against the sidecar, HTML, and visual evidence; it never generates candidates, ranks themes, or makes a second theme decision. Author delegation is blocked unless that decision exists; delegation context must not hard-code or preselect a concrete theme.
+`path` must exactly equal the manifest HTML target. `date` and `updated` use quoted `YYYY-MM-DD HH:MM:SS`; Publisher sets final promotion time. Theme evidence must be the validated `.docs/<run-id>/<slug>/theme-decision.json` produced by `infocard-theme-assignment` before candidate HTML is written. The selected theme is a complete template from `theme/themes.json`; `theme/*.html` must not be referenced as a stylesheet. Theme selection and visual-evidence details are owned by `infocard-theme-assignment` and `visual-verification-gate`; this SOP only composes those gates. This SOP never generates candidates, ranks themes, or makes a second theme decision. Author delegation is blocked unless that decision exists; delegation context must not hard-code or preselect a concrete theme.
 
 ## Promotion
 
@@ -106,27 +106,15 @@ After promotion, before build:
 5. repair and recapture after every HTML/CSS/content/structure change;
 6. block commit/push on any critical or major defect.
 
-Infrastructure-only capture or visual-review failure must be recorded as a visual failure attempt with an explicit `evidence_gap`, error category, and outcome. It is never visual pass, and must not fabricate screenshots or dispositions.
+Infrastructure-only capture or visual-review failure must be recorded according to `visual-verification-gate`, with an explicit `evidence_gap`, error category, and outcome. It is never visual pass, and must not fabricate screenshots or dispositions.
 
-### Visual exception policy (`VISUAL_EXCEPTION_AFTER_MAX_REPAIRS`)
+### Visual exceptions
 
-The exception is eligible after **at least 3 recorded visual failure attempts**; 4 or more remain eligible. Attempts include real visual defects and screenshot/capture/visual-review infrastructure failures. This is not an automatic retry loop.
-
-Each completed repair round still requires all of: `change_made: true`, fresh desktop and mobile screenshot evidence, and a fresh review disposition. Infrastructure failures are attempts, but are not completed repair rounds and may have no screenshot/review evidence. Every attempt must have a deterministic `name`, `type` (`visual_defect` or `infrastructure_failure`), and `outcome`.
-
-The manifest must declare `review_status: "VISUAL_EXCEPTION_AFTER_MAX_REPAIRS"`, `visual_failure_attempts` with at least three valid records, and valid completed `repair_rounds` records. Fewer than three attempts, missing/malformed/unrecorded attempts, stale evidence, or `VISUAL_PENDING` fail the gate. Do not infer the exception from prose or missing records.
-
-The exception may pass only the visual gate and must disclose the attempt count, defect/infrastructure classification, unresolved findings, and evidence gap. Non-visual gates (theme, manifest/hash, build, verify, taxonomy, leak, Git, and public verification) remain blocking.
-
-**Final report wording:**
-
-> 视觉门禁：视觉失败尝试达到 N 次后例外放行（含基础设施失败 M 次）。仍遗留 critical=N、major=N、minor=N；基础设施证据缺口：……。该放行仅适用于视觉门禁，非视觉门禁均已独立通过。
-
-A clean `VISUAL_PASSED` must not be reported as an exception.
+All `VISUAL_EXCEPTION_AFTER_MAX_REPAIRS` rules, attempt counting, repair-round schema, and final wording are owned by `visual-verification-gate`. This SOP only requires that the Publisher consume its result; do not duplicate or reinterpret that schema here.
 
 ## Main-checkout gates and release
 
-**Terminal output truncation workaround**: each command's stdout is truncated to ~1 line. Use OUT-OF-BAND verification after each step — do NOT rely on the command's own output as the exit condition.
+**Execution evidence**: use exit codes plus independent file/index/hash checks; do not treat truncated stdout, a child-agent summary, or a single status code as the release result.
 
 Run, in the primary checkout:
 
@@ -183,6 +171,10 @@ Do not start Wiki automatically. Do not list, prune, remove, or otherwise operat
 - [ ] Public detail/index/home fingerprint and fresh visual evidence pass
 - [ ] `.docs` evidence retained; no cleanup side effect occurred
 
-## Historical references
+## Canonical references
+
+- `references/publish-protocol-v3.md` — detailed release fields, states, and ownership.
+- `../visual-verification-gate/SKILL.md` — screenshot, visual disposition, retry, and exception rules.
+- `../infocard/infocard-theme-assignment/SKILL.md` — theme selection and decision-record rules.
 
 Historical worktree incident notes may be retained only for a separately authorized migration/cleanup investigation. They are not active publication instructions and must never be loaded to create, recover, publish, or clean a new information card.

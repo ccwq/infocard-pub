@@ -16,7 +16,7 @@ version: 2.0.0
 
 ## 唯一工作区模型
 
-此模式不是直接写 `docs/` 的旁路，也不允许 worktree：
+本 skill 只定义单卡 light-route 的选择；工作区、主题、视觉与发布细节分别遵循 `AGENTS.md`、`infocard-theme-assignment`、`visual-verification-gate` 和 `infocard-publish-sop`。此模式不是直接写 `docs/` 的旁路，也不允许 worktree：
 
 ```text
 主线程调研与断言审计
