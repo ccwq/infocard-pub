@@ -1,7 +1,7 @@
 ---
 name: infocard-publish-closeout
 description: Use when finishing an infocard publish to verify public delivery, retain the .docs authoring record, and report cleanup candidates without deleting them.
-version: 3.0.0
+version: 3.1.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -19,6 +19,8 @@ This skill closes the Protocol v3 business lifecycle after promotion, build, pub
 **No worktree is used.** All operations run directly in the primary repository checkout.
 
 Use this after an infocard has been built, verified, pushed, and checked on Pages. The Publisher handles promotion, build, push, and public verification; this skill handles evidence, retained authoring material, and the final report.
+
+For a light-route run, closeout records exactly one terminal state: `PUBLISHED_VERIFIED`, `PAGES_PENDING`, `PUSH_FAILED`, or `BLOCKED_AT_LOCAL_GATE`. GitHub Pages propagation time is recorded as `work_type: deployment_wait`; it is not merged into authoring, visual review, or repair time. `.stop.jsonl` remains diagnostic-only and is created only when diagnostics are enabled for the run.
 
 It is intentionally narrower than the main publishing skill:
 - `infocard-pub-publisher` handles build / push / verify.

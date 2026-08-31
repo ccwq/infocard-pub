@@ -119,3 +119,24 @@ test('stale HTML binding remains blocking', () => {
   fs.writeFileSync(f.manifestPath, JSON.stringify(manifest));
   assert.equal(main([f.htmlRel], f.root).code, 1);
 });
+
+test('light route requires capture plan and desktop/mobile geometry', () => {
+  /**
+   * Given：VISUAL_PASSED manifest 声明为 light route。
+   * When：缺失 capture plan/geometry，或 geometry 显示横向溢出。
+   * Then：视觉机械门禁拒绝；补齐双视口计划与无溢出 geometry 后通过。
+   * 防回归：light route 的提速不能删除 desktop/mobile geometry 证据。
+   */
+  const f = makeFixture();
+  const manifest = JSON.parse(fs.readFileSync(f.manifestPath));
+  manifest.route = 'light';
+  fs.writeFileSync(f.manifestPath, JSON.stringify(manifest));
+  assert.equal(main([f.htmlRel], f.root).code, 1);
+  manifest.capture_plan = { desktop: ['hero', 'body', 'footer'], mobile: ['hero', 'body', 'footer'], geometry: true };
+  manifest.geometry = { desktop: { scrollWidth: 1280, clientWidth: 1280 }, mobile: { scrollWidth: 391, clientWidth: 390 } };
+  fs.writeFileSync(f.manifestPath, JSON.stringify(manifest));
+  assert.equal(main([f.htmlRel], f.root).code, 1);
+  manifest.geometry.mobile.scrollWidth = 390;
+  fs.writeFileSync(f.manifestPath, JSON.stringify(manifest));
+  assert.equal(main([f.htmlRel], f.root).code, 0);
+});

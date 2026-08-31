@@ -40,8 +40,8 @@ const HIGH_RISK_PATTERNS = [
     name: "手机号（中国大陆）",
     regex: /(\+?86)?[1][3-9]\d{9}/g,
     exclude: /(\+?86)?[1][3-9]\d{4}xxxx\d{4}|13800000000|13900000000/,
-    // Exclude numbers inside URL query params or path segments (e.g. X post IDs like 2078318406424793326)
-    urlContextExclude: /[?&][^=]*=|status\/\d{16,}|id\/\d{16,}/,
+    // Long numeric IDs inside public URLs are not phone numbers.
+    urlNumericIdExclude: true,
     severity: "HIGH",
   },
   {
@@ -94,13 +94,7 @@ function scanFile(filePath) {
       // Exclude matches inside URL path segments (e.g. /status/2078318406424793326).
       // Check the surrounding source context: `value` is only the 11-digit
       // substring matched by the phone regex and cannot contain `status/`.
-      if (pattern.urlContextExclude) {
-        const context = content.slice(
-          Math.max(0, match.index - 120),
-          Math.min(content.length, match.index + value.length + 120)
-        );
-        if (pattern.urlContextExclude.test(context)) continue;
-      }
+      if (pattern.urlNumericIdExclude && isInsideLongNumericUrl(content, match.index, value.length)) continue;
       // Deduplicate
       if (issues.some(i => i.value === value)) continue;
       issues.push({
@@ -113,6 +107,22 @@ function scanFile(filePath) {
   }
 
   return issues;
+}
+
+function isInsideLongNumericUrl(content, matchIndex, matchLength) {
+  const before = content.slice(0, matchIndex);
+  const start = Math.max(before.lastIndexOf('https://'), before.lastIndexOf('http://'));
+  if (start < 0) return false;
+  const whitespace = content.slice(start).search(/[\s"'<>]/);
+  const end = whitespace < 0 ? content.length : start + whitespace;
+  if (matchIndex + matchLength > end) return false;
+  const rawUrl = content.slice(start, end);
+  let parsed;
+  try { parsed = new URL(rawUrl); } catch (_) { return false; }
+  if (!/^(?:www\.)?(?:x\.com|github\.com)$/i.test(parsed.hostname)) return false;
+  // Only known public resource-ID paths are exempt. A random numeric URL must
+  // remain reviewable as possible contact data.
+  return /\/(?:status|runs|issues|pull|discussions)\/\d{12,}(?:\b|[/?#])/i.test(parsed.pathname);
 }
 
 function maskValue(value) {
@@ -202,4 +212,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { scanFile };
+module.exports = { scanFile, isInsideLongNumericUrl };

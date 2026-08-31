@@ -1,7 +1,7 @@
 ---
 name: visual-verification-gate
 description: "Use before publishing any card or cheatsheet."
-version: 1.1.0
+version: 1.2.0
 date: "2026-08-26"
 ---
 
@@ -12,6 +12,8 @@ date: "2026-08-26"
 `HTTP 200` + `npm run build` success are **NEVER** sufficient evidence of a finished card. This skill owns the verification loop and the recurring CSS defects that break shipped themes on long-Chinese titles and narrow viewports.
 
 It complements `infocard-publish-sop` (which defines the gate) by capturing the **defect recipes** the gate catches.
+
+This gate consumes the current revision's screenshots, DOM/geometry and theme evidence, then returns `VISUAL_PASSED`, `VISUAL_BLOCKED`, or `VISUAL_PENDING`. It does not own promotion, preview-server troubleshooting, research, or CSS design time; those remain separately timed stages.
 
 ## When to load
 

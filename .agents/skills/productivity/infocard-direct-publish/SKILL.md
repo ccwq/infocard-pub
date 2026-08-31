@@ -1,7 +1,7 @@
 ---
 name: infocard-direct-publish
 description: Use when one URL or a complete user brief should become one published infocard through the .docs promotion workflow.
-version: 2.1.0
+version: 2.2.0
 ---
 
 # Infocard 直连发布（单对象路线选择）
@@ -21,6 +21,8 @@ version: 2.1.0
 单一来源与低风险 → light route
 其他情况 → full route（bounded research）
 ```
+
+普通 light route 使用 `scripts/lib/infocard-route.js` 判定，并以 20 分钟为墙钟硬上限；路线选择阶段不执行研究、写卡或发布副作用。
 
 研究、主题选择、authoring、promotion、视觉门禁、build、verify、taxonomy、leak、commit、push、公网复核和 closeout，统一遵循：
 

@@ -1,7 +1,7 @@
 ---
 name: infocard-theme-assignment
 description: Use before infocard .docs authoring to select a registered theme from content-aware candidates. Owns the only content-to-theme association, capability filtering, bounded reproducible variation, and theme-decision.json.
-version: 3.0.0
+version: 3.1.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -24,6 +24,8 @@ metadata:
 - 在 `.docs/<run-id>/<slug>/theme-decision.json` 写入唯一决策记录。
 
 内容类型只声明结构需求，选题只判断价值，authoring 只消费决策，publish 只验证决策。不要新增或调用第二个 content-theme router，也不要在这些模块复制具体主题映射。
+
+普通 `project-brief` 单卡只做一次主题决策：在 authoring 前从已验证、满足 `mobile_layout` 与当前内容能力的候选池中冻结选择；authoring 后不重新排名。若视觉证明确认不适配，最多切换一次，生成新 decision 并使旧截图和 visual manifest 全部失效。
 
 ## 工作流
 

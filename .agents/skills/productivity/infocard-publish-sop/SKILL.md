@@ -1,7 +1,7 @@
 ---
 name: infocard-publish-sop
 description: Use when creating or publishing an infocard through the mandatory .docs-to-promotion workflow.
-version: 4.2.0
+version: 4.3.0
 ---
 
 # Infocard Publish SOP: `.docs` → Promotion → Main Checkout
@@ -35,6 +35,16 @@ Existing worktrees and `/tmp` artifacts are a separate inventory/cleanup concern
 Use the light route only when there is one card, one complete primary source/user brief, no sensitive claim/risk trigger, no multi-source reconciliation requirement, and no shared batch. Otherwise use the full route with bounded Research A and, only when needed, Research B.
 
 Creation-and-publication authorization authorizes this whole release chain unless the user explicitly requests draft-only or preview-only work. It does not authorize installing or configuring the subject tool.
+
+### Light-route 20-minute SLA
+
+普通单来源、低风险、单卡整理使用 `scripts/lib/infocard-route.js` 判定。其目标为 15–18 分钟，墙钟硬上限为 20 分钟；预算与 hard-stop 由 `scripts/lib/infocard-light-route.js` 固定。超过范围必须升级 full route，不得通过跳过视觉、manifest、build/verify 或公网复核来满足 SLA。
+
+Light route 的 static gates 必须绑定当前卡片：`node scripts/verify-taxonomy.js docs/<slug>.html.meta.yaml`、`node scripts/check-info-leak.js docs/<slug>.html` 和 `npm run verify:visual-gate -- docs/<slug>.html`。不要在普通单卡路径中调用 `--all`、全量 `fix-taxonomy` 或全仓历史 leak 阻断扫描。
+
+`.stop.jsonl` 诊断记录使用 schema v2：`run_start` 不计阶段时间；research、promotion、visual_capture、visual_review、deployment_wait 和 repair 分开记录；SLA 以 wall clock 为准。
+
+实际 light-route 编排入口为 `npm run run:light-route -- --config <run.json>`。配置必须声明 `runId`、`request`、`preflight.authoringDir`、正式 `htmlPath`，以及需要外部工具完成的 `stageCommands`；截图阶段会收到 `INFOCARD_CAPTURE_PLAN_PATH/JSON`。仅在诊断需要时设置 `diagnosticsPath`，否则不得每次创建 `.stop.jsonl`。编排器使用单调时钟执行阶段预算、定向 static gates 和 20 分钟 hard-stop，并写入四种允许终态之一。
 
 ## Roles
 

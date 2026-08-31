@@ -7,6 +7,18 @@ tags: [infocard, authoring, light-route, python, template-clone]
 
 # infocard-authoring-workflow · Light-Route Direct Authoring
 
+## Light-route contract
+
+普通单来源卡在 HTML 创作前必须准备以下文件，并运行 `node scripts/verify-infocard-preflight.js --authoring-dir .docs/<run-id>/<slug>`：
+
+- `.docs/<run-id>/<slug>/project-brief.json`
+- `facts.json`
+- `theme-decision.json`
+- `card.html.meta.yaml`
+- `promotion-manifest.json`
+
+`project-brief.json` 固定使用 `hero`、`summary`、`core_capabilities`、`tech_stack`、`usage`、`use_cases`、`risk_boundary`、`sources` 槽位。契约失败时停止 authoring，不在 promotion 阶段补 schema。
+
 ## When to use this skill
 
 Trigger: publishing a single infocard where you have full content and no multi-source cross-validation is needed. Specifically:

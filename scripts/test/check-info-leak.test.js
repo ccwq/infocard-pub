@@ -48,3 +48,31 @@ test("phone number in ordinary text remains blocking", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("GitHub long numeric ID is not misclassified as a phone number", () => {
+  /**
+   * Given：HTML 包含 GitHub actions 或 discussions 的长数字公开 ID。
+   * When：运行信息泄漏扫描器。
+   * Then：不产生手机号告警。
+   * 防回归：定向 leak gate 不应阻断公开平台资源 ID。
+   */
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "check-info-leak-"));
+  const file = path.join(tempDir, "card.html");
+  fs.writeFileSync(file, '<a href="https://github.com/org/repo/actions/runs/2094218611112263944">run</a>\n', "utf8");
+  try { assert.deepEqual(scanFile(file), []); }
+  finally { fs.rmSync(tempDir, { recursive: true, force: true }); }
+});
+
+test("numeric contact URL is not broadly exempted", () => {
+  /**
+   * Given：普通 HTTP URL 的数字路径并非已知公开平台资源 ID。
+   * When：运行信息泄漏扫描器。
+   * Then：仍报告手机号风险。
+   * 防回归：公开 ID 例外不能演变为任意 URL 数字白名单。
+   */
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "check-info-leak-"));
+  const file = path.join(tempDir, "card.html");
+  fs.writeFileSync(file, '<a href="https://example.com/contact/18612345678">contact</a>\n', "utf8");
+  try { assert.equal(scanFile(file)[0].severity, "HIGH"); }
+  finally { fs.rmSync(tempDir, { recursive: true, force: true }); }
+});

@@ -227,6 +227,22 @@ function checkManifest(manifestPath, htmlRelative, htmlHash, htmlTextHash) {
 
   const status = manifest.review_status || manifest.status || manifest.visual_status;
 
+  if (manifest.route === 'light') {
+    const plan = manifest.capture_plan;
+    const expected = ['hero', 'body', 'footer'];
+    if (!plan || JSON.stringify(plan.desktop) !== JSON.stringify(expected) || JSON.stringify(plan.mobile) !== JSON.stringify(expected) || plan.geometry !== true) {
+      errors.push(error('manifest.capture_plan', 'light route requires desktop/mobile hero/body/footer and geometry=true'));
+    }
+    for (const viewport of ['desktop', 'mobile']) {
+      const geometry = manifest.geometry && manifest.geometry[viewport];
+      if (!geometry || numberField(geometry.scrollWidth) === null || numberField(geometry.clientWidth) === null) {
+        errors.push(error(`manifest.geometry.${viewport}`, 'scrollWidth and clientWidth are required for light route'));
+      } else if (numberField(geometry.scrollWidth) > numberField(geometry.clientWidth)) {
+        errors.push(error(`manifest.geometry.${viewport}`, 'page-level horizontal overflow is not allowed'));
+      }
+    }
+  }
+
   if (status === 'VISUAL_EXCEPTION_AFTER_MAX_REPAIRS') {
     // Exception path: require exactly 3 completed repair rounds with fresh evidence
     errors.push(...checkVisualException(manifest, htmlHash, htmlTextHash));

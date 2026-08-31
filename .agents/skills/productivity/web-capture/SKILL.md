@@ -26,6 +26,10 @@ This skill is responsible for:
 
 It does **not** perform visual judgment. Callers still run `vision_analyze` and apply their own critical / major / minor rules.
 
+## Light-route capture plan
+
+普通单卡默认消费 `scripts/lib/capture-plan.js` 生成的风险驱动计划：desktop/mobile 各捕获 `hero`、`body`、`footer`，并执行 geometry 检查。只有存在表格、代码块、sticky 元素或首轮疑似裁切时，才通过 `triggers` 增加定向区域；不默认扩展 tablet 或全页截图。
+
 ## Non-negotiable policy
 
 - **Preferred capture engine:** repository-required `agent-browser --cdp 9696`
