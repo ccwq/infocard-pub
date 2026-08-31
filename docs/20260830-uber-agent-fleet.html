@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="color-material">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uber 怎么把 AI 成本砍掉 52%：托管 Agent 舰队实战报告</title>
+  <meta name="description" content="Uber 全公司 70% 代码 PR 由 AI Agent 接管，用量半年涨 10 倍但账单不涨，5 大降本策略拆解。">
+  <style>
+    :root{
+      --canvas:#f7f2e8;--paper:#fffdf8;--ink:#0c1220;--line:#111111;
+      --purple:#6e3fd6;--green:#2e9b4b;--blue:#2e6be6;--orange:#f59e0b;
+      --yellow:#f5d46b;--red:#e53e3e;
+      --soft-purple:#f2ecff;--soft-green:#eefbf1;--soft-blue:#eef4ff;--soft-orange:#fff4e6;--soft-red:#fff0f0;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:var(--canvas);color:var(--ink);font-size:12.5px;line-height:1.65
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(960px,calc(100% - 16px));margin:0 auto;padding:16px 0 80px}
+
+    /* hero */
+    .hero{margin-bottom:16px}
+    .hero-bar{height:8px;background:linear-gradient(90deg,var(--purple),var(--green),var(--blue));margin-bottom:0}
+    .hero-copy{
+      background:var(--paper);border:2px solid var(--line);border-top:none;
+      padding:16px 18px 14px;box-shadow:var(--shadow)
+    }
+    .kicker{
+      font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;
+      color:var(--purple);margin-bottom:8px
+    }
+    h1.demo-title{
+      font-size:clamp(18px,3.5vw,30px);font-weight:900;line-height:1.15;
+      letter-spacing:-.02em;margin-bottom:10px;color:var(--ink)
+    }
+    .subtitle{font-size:12.5px;line-height:1.65;color:#444;margin:0}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+    .badge{
+      padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:800;
+      border:2px solid
+    }
+    .badge.purple{background:var(--soft-purple);color:var(--purple);border-color:var(--purple)}
+    .badge.green{background:var(--soft-green);color:var(--green);border-color:var(--green)}
+    .badge.blue{background:var(--soft-blue);color:var(--blue);border-color:var(--blue)}
+    .badge.orange{background:var(--soft-orange);color:var(--orange);border-color:var(--orange)}
+
+    /* mini stats bar */
+    .mini-row{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+      margin-bottom:14px
+    }
+    .mini{
+      background:var(--paper);border:2px solid var(--line);
+      padding:10px 12px;box-shadow:var(--shadow);text-align:center
+    }
+    .mini strong{display:block;font-size:20px;font-weight:900;color:var(--ink)}
+    .mini span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666}
+
+    /* section */
+    .section{margin-bottom:12px}
+    .section-head{
+      display:flex;align-items:center;gap:10px;
+      background:var(--ink);color:#fff;padding:7px 12px
+    }
+    .section-no{
+      background:var(--purple);color:#fff;font-size:11px;font-weight:900;
+      padding:2px 7px;border-radius:3px;flex-shrink:0
+    }
+    .section-meta{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .panel-top{
+      background:var(--paper);border:2px solid var(--line);border-top:none;
+      padding:12px 14px;box-shadow:var(--shadow)
+    }
+    .panel-body{
+      background:var(--paper);border:2px solid var(--line);border-top:none;
+      padding:12px 14px;box-shadow:4px 4px 0 rgba(17,17,17,.08)
+    }
+    h3{font-size:14px;font-weight:800;margin:0 0 8px;letter-spacing:-.01em}
+    p{font-size:12.5px;line-height:1.7;color:#333;margin:0 0 10px}
+    .lead{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--purple);margin-bottom:6px}
+
+    /* grid */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:10px;margin-bottom:12px}
+    .grid-2{grid-template-columns:repeat(2,1fr)}
+    .grid-3{grid-template-columns:repeat(3,1fr)}
+    .grid-4{grid-template-columns:repeat(4,1fr)}
+    .card{
+      background:var(--paper);border:2px solid var(--line);
+      padding:12px;box-shadow:var(--shadow)
+    }
+    .card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+    .card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+    .card .lead{font-size:10px}
+
+    /* flow */
+    .flow{display:flex;align-items:center;gap:4px;margin-bottom:12px;overflow-x:auto}
+    .flow-item{
+      flex:0 0 auto;background:var(--paper);border:2px solid var(--line);
+      padding:8px 12px;font-size:11.5px;font-weight:700;text-align:center;
+      box-shadow:3px 3px 0 rgba(17,17,17,.08)
+    }
+    .flow-item.purple{background:var(--purple);color:#fff;border-color:var(--purple)}
+    .flow-item.green{background:var(--green);color:#fff;border-color:var(--green)}
+    .flow-arrow{color:var(--purple);font-weight:900;font-size:15px;flex-shrink:0}
+
+    /* table */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+    th{
+      background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;
+      text-transform:uppercase;letter-spacing:.06em
+    }
+    tr:nth-child(even) td{background:#faf8f2}
+    .check{color:var(--green);font-weight:900}
+    .cross{color:var(--red);font-weight:900}
+
+    /* alert */
+    .alert{border-radius:4px;padding:10px 14px;font-size:12px;margin-bottom:10px;border-left:4px solid}
+    .alert.purple{background:var(--soft-purple);border-color:var(--purple);color:var(--purple)}
+    .alert.green{background:var(--soft-green);border-color:var(--green);color:var(--green)}
+    .alert.orange{background:var(--soft-orange);border-color:var(--orange);color:#7a5000}
+    .alert.blue{background:var(--soft-blue);border-color:var(--blue);color:var(--blue)}
+
+    /* tag row */
+    .tagrow{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .tag{
+      padding:3px 8px;border:1.5px solid var(--line);
+      background:var(--paper);font-size:10.5px;font-weight:700
+    }
+
+    /* quote */
+    .quote-block{
+      border-left:4px solid var(--purple);padding:10px 14px;
+      background:var(--soft-purple);margin-bottom:12px
+    }
+    .quote-line{font-size:13px;font-weight:700;color:var(--ink);line-height:1.55;font-style:italic}
+
+    /* rule / source */
+    .rule{height:3px;background:var(--line);margin:14px 0}
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px}
+
+    /* risk */
+    .risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+    .risk{
+      border:2px solid var(--line);background:var(--paper);
+      padding:12px;box-shadow:var(--shadow)
+    }
+    .risk h4{font-size:12.5px;font-weight:800;margin:0 0 5px}
+    .risk p{font-size:11.5px;color:#444;margin:0;line-height:1.6}
+
+    /* btn */
+    .btn{
+      display:inline-block;padding:7px 16px;border:2px solid var(--line);
+      background:var(--paper);font-size:12px;font-weight:800;text-decoration:none;
+      box-shadow:3px 3px 0 rgba(17,17,17,.1)
+    }
+    .btn.purple{background:var(--purple);color:#fff;border-color:var(--purple)}
+
+    /* mobile */
+    @media(max-width:720px){
+      .page{padding:10px 0 60px}
+      .mini-row{grid-template-columns:repeat(2,1fr)}
+      .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+      .risk-grid{grid-template-columns:1fr}
+      .flow{overflow-x:scroll}
+      h1.demo-title{font-size:clamp(16px,5vw,24px)}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- HERO -->
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">Enterprise AI · Cost Optimization · Agent Fleet</div>
+        <h1 class="demo-title">Uber 怎么把 AI 成本砍掉 52%：托管 Agent 舰队实战报告</h1>
+        <p class="subtitle">全公司 70% 代码 PR 由 AI Agent 接管，用量半年涨 10 倍但账单不涨，单次会话成本硬生生砍掉 52%。他们把软件工程做成了一座全自动工厂。</p>
+        <div class="badge-row">
+          <span class="badge purple">案例分析</span>
+          <span class="badge green">降本 52%</span>
+          <span class="badge blue">Agent 舰队</span>
+          <span class="badge orange">5 大策略</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- MINI STATS -->
+    <div class="mini-row">
+      <div class="mini"><strong>70%</strong><span>PR 由 Agent 接管</span></div>
+      <div class="mini"><strong>×10</strong><span>半年调用量增长</span></div>
+      <div class="mini"><strong>52%</strong><span>单次成本下降</span></div>
+      <div class="mini"><strong>3万+</strong><span>每日流水线任务</span></div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-no">★</span>
+        <span class="section-meta">核心结论</span>
+      </div>
+      <div class="panel-top">
+        <p style="font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:10px">用量涨不可怕，浪费涨才可怕。</p>
+        <p>Uber 的核心洞察不是"少用 AI"，而是"消灭 AI 浪费"：把零价值的废 Token 物理抹杀，用量可以疯涨，但账单死死按在原地。解决方案是从"人打开聊天框求 AI 帮一把"转变为"托管 Agent 舰队自动上班"，人变成抽查质检的厂长。</p>
+      </div>
+    </div>
+
+    <!-- THE 5 STRATEGIES -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-no">01</span>
+        <span class="section-meta">策略一：规划用大脑，干活全用便宜子 Agent</span>
+      </div>
+      <div class="panel-body">
+        <p>任务拆解交给顶级大模型（Claude/GPT-4o），具体执行全部默认切给轻量模型（GPT-4o-mini/Claude-haiku）。这一招是全厂杠杆最高的开关：顶级模型只做高判断价值的规划，重复执行交给廉价模型。</p>
+        <div class="grid-2">
+          <div class="card">
+            <div class="lead">规划层</div>
+            <h4>顶级大模型</h4>
+            <p>任务理解、拆解、路由判断、架构设计——需要强推理能力的环节。</p>
+          </div>
+          <div class="card">
+            <div class="lead">执行层</div>
+            <h4>轻量子 Agent</h4>
+            <p>代码补全、测试生成、CI 修复、文档更新——大量重复执行任务。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <span class="section-no">02</span>
+        <span class="section-meta">策略二：5 分钟缓存 → 1 小时，原价 1 折续上</span>
+      </div>
+      <div class="panel-body">
+        <p>工程师去倒杯水或开个会回来，上下文缓存依然有效。更狠的是强制写摘要压缩（40 万 token 强制压缩），历史对话不会无限复印。</p>
+        <div class="flow">
+          <div class="flow-item purple">对话开始</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item">上下文缓存</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item">会议/休息回来</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item green">缓存续用（1折）</div>
+        </div>
+        <div class="alert blue">
+          <strong>40 万 token 强制摘要压缩</strong>：防止历史无限复制，把上下文总成本控制在可预测范围内。
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <span class="section-no">03</span>
+        <span class="section-meta">策略三：1000+ MCP 工具按需挂载，不开局灌 7 万 token</span>
+      </div>
+      <div class="panel-body">
+        <p>Uber 有 1000+ 内部 MCP 工具，如果开局就把所有工具定义灌给模型，光工具描述就要消耗 7 万 token。改为：模型先搜索工具库，按需挂载，只加载本次任务相关的工具。</p>
+        <div class="grid-2">
+          <div class="card">
+            <div class="lead">旧方案（已废弃）</div>
+            <h4>开局全量灌入</h4>
+            <p>启动时把所有工具定义一股脑塞给模型，token 消耗高且干扰上下文。</p>
+          </div>
+          <div class="card">
+            <div class="lead">新方案</div>
+            <h4>搜索 + 按需挂载</h4>
+            <p>模型需要时搜索工具库，按需挂载，开局零工具 token 开销。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <span class="section-no">04</span>
+        <span class="section-meta">策略四：Code-mode 砍掉话痨轮询，单项 token 省 90%</span>
+      </div>
+      <div class="panel-body">
+        <p>跑 SQL 查询和批处理时，模型自己写脚本去执行，只交回最终结果。避免一问一答的无效 ping-pong 轮询。</p>
+        <div class="flow">
+          <div class="flow-item purple">问：执行这个 SQL</div>
+          <span class="flow-arrow">✗</span>
+          <div class="flow-item">Ping-pong 轮询（浪费）</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item green">Code-mode 直接执行</div>
+        </div>
+        <div class="alert green">
+          <strong>单项 token 节省 90%</strong>：模型自主写脚本执行，只返回最终结果，不陷入问答循环。
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <span class="section-no">05</span>
+        <span class="section-meta">策略五：2400 万节点知识图谱导航，20 分钟→ 38 秒</span>
+      </div>
+      <div class="panel-body">
+        <p>给 Agent 发一张包含全公司服务和事故的活地图（2400 万节点知识图谱）。以前翻代码盲搜 20 分钟还报错，现在 38 秒精准定位。</p>
+        <div class="grid-4">
+          <div class="card"><div class="lead">图谱节点</div><h4>2400 万</h4><p>服务 · 依赖 · 事故关系</p></div>
+          <div class="card"><div class="lead">定位速度</div><h4>38 秒</h4><p>精准定位服务关系</p></div>
+          <div class="card"><div class="lead">旧方案</div><h4>20 分钟</h4><p>盲搜代码还报错</p></div>
+          <div class="card"><div class="lead">效率提升</div><h4>×30</h4><p>问题定位速度</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LESSONS TABLE -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-no">◆</span>
+        <span class="section-meta">5 大策略总结</span>
+      </div>
+      <div class="panel-body">
+        <table>
+          <tr><th>策略</th><th>核心动作</th><th>降本效果</th></tr>
+          <tr><td>大小模型分层</td><td>规划用大模型，执行用轻量模型</td><td class="check">★ 主要杠杆</td></tr>
+          <tr><td>长缓存 + 摘要压缩</td><td>5min → 1h 缓存，40 万 token 强制压缩</td><td class="check">★ 高 ROI</td></tr>
+          <tr><td>MCP 工具按需挂载</td><td>搜索 + 按需加载，零开局开销</td><td class="check">★ 显著</td></tr>
+          <tr><td>Code-mode 免轮询</td><td>脚本直接执行，单项省 90% token</td><td class="check">★ 显著</td></tr>
+          <tr><td>知识图谱导航</td><td>2400 万节点精准定位，效率 ×30</td><td class="check">间接降本</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- RISK NOTE -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-no">!</span>
+        <span class="section-meta">适用边界</span>
+      </div>
+      <div class="panel-body">
+        <div class="risk-grid">
+          <div class="risk">
+            <h4>✓ 适合的场景</h4>
+            <p>代码 PR 审查、CI 修复、报警分诊、重复性任务执行、有明确输出标准的搬砖任务。</p>
+          </div>
+          <div class="risk">
+            <h4>✗ 需要谨慎的场景</h4>
+            <p>需要强上下文理解的设计决策、安全敏感的权限变更、对外发布的文案生成。</p>
+          </div>
+        </div>
+        <div class="alert orange">
+          <strong>核心原则</strong>：AI 托管舰队适合有明确质量标准、可验证输出的任务；人的角色从执行者转为质检员和异常处理者。
+        </div>
+      </div>
+    </div>
+
+    <!-- KEY QUOTE -->
+    <div class="quote-block">
+      <p class="quote-line">"用量涨不可怕，浪费涨才可怕。从人机对话迈向托管工厂舰队，大厂把 AI 真正落地的账本，算是彻底算明白了。"</p>
+    </div>
+
+    <!-- TAGS -->
+    <div class="tagrow">
+      <span class="tag">Uber</span>
+      <span class="tag">AI 降本</span>
+      <span class="tag">Agent 舰队</span>
+      <span class="tag">MCP</span>
+      <span class="tag">知识图谱</span>
+      <span class="tag">成本优化</span>
+      <span class="tag">Code-mode</span>
+    </div>
+
+    <div class="rule"></div>
+    <p class="source-note">来源：X @AYi_AInotes · 2026-08-30</p>
+
+  </main>
+</body>
+</html>

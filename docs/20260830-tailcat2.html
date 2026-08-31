@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="green">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tailcat：没有 Tailscale 的 Tailscale，Go 用户态 WireGuard 直连隧道</title>
+  <meta name="description" content="Tailscale 官方出品，不用账号、不开端口、不改路由，Go 用户态 WireGuard 隧道，token 直连端到端加密。">
+  <style>
+    :root{
+      --bg:#f0fdf4;--paper:#ffffff;--ink:#111111;--line:#15803d;
+      --green:#15803d;--soft:#dcfce7;--soft2:#bbf7d0;
+      --orange:#d97706;--orange-soft:#fef3c7;
+      --red:#dc2626;--red-soft:#fee2e2;
+      --shadow:0 4px 0 rgba(21,128,61,.15);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.65
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:100%;max-width:720px;margin:0 auto;padding:16px 14px 80px}
+
+    /* hero */
+    .hero{
+      background:var(--paper);border:2px solid var(--line);border-radius:8px;
+      padding:16px 18px 14px;margin-bottom:14px;box-shadow:var(--shadow)
+    }
+    .kicker{
+      border-left:4px solid var(--green);padding-left:10px;
+      font-size:10.5px;font-weight:800;text-transform:uppercase;
+      letter-spacing:.08em;color:var(--green);margin-bottom:10px
+    }
+    h1.demo-title{
+      font-size:clamp(17px,3.5vw,26px);font-weight:900;line-height:1.2;
+      letter-spacing:-.02em;margin-bottom:10px;color:var(--ink)
+    }
+    .subtitle{font-size:12.5px;line-height:1.65;color:#374151;margin:0}
+
+    /* stats row */
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+    .cell{
+      border:1.5px solid var(--line);border-radius:6px;
+      background:var(--soft);padding:10px 10px 8px;text-align:center
+    }
+    .cell strong{display:block;font-size:20px;font-weight:800;color:#14532d}
+    .cell span{font-size:10px;color:#14532d;font-weight:700;text-transform:uppercase}
+
+    /* pills */
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+    .chip{padding:3px 9px;border:1.5px solid var(--green);border-radius:20px;font-size:11px;font-weight:700;color:var(--green)}
+    .chip.fill{background:var(--green);color:#fff}
+    .chip.orange{border-color:var(--orange);color:var(--orange);background:var(--orange-soft)}
+
+    /* section */
+    .section{margin-bottom:12px}
+    .sec-head{
+      background:var(--green);color:#fff;
+      padding:7px 14px;border-radius:6px 6px 0 0;
+      display:flex;align-items:center;gap:10px
+    }
+    .sec-num{background:#fff;color:var(--green);font-size:10px;font-weight:900;padding:2px 6px;border-radius:3px}
+    .sec-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{
+      background:var(--paper);border:2px solid var(--line);
+      border-top:none;border-radius:0 0 6px 6px;
+      padding:12px 14px;box-shadow:0 4px 0 rgba(21,128,61,.1)
+    }
+    h3{font-size:14px;font-weight:800;margin:0 0 8px;letter-spacing:-.01em}
+    p{font-size:12.5px;line-height:1.7;color:#374151;margin:0 0 10px}
+    .lead{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--green);margin-bottom:6px}
+
+    /* rows */
+    .rows{border:1.5px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:12px}
+    .row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--soft2);font-size:12px}
+    .row:last-child{border-bottom:none}
+    .row .label{font-weight:700;color:var(--green)}
+    .row .val{color:var(--ink);font-weight:600}
+    .row.highlight{background:var(--soft)}
+
+    /* flow */
+    .flow{display:flex;align-items:center;gap:4px;margin-bottom:12px;overflow-x:auto}
+    .flow-item{
+      flex:0 0 auto;background:var(--paper);border:2px solid var(--line);
+      border-radius:6px;padding:7px 10px;font-size:11.5px;font-weight:700;
+      text-align:center;white-space:nowrap
+    }
+    .flow-item.green{background:var(--green);color:#fff}
+    .flow-arrow{color:var(--green);font-weight:900;font-size:15px;flex-shrink:0}
+
+    /* feature grid */
+    .feat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+    .feat{
+      border:1.5px solid var(--line);border-radius:6px;
+      background:var(--paper);padding:10px 12px
+    }
+    .feat h4{font-size:12.5px;font-weight:800;margin:0 0 4px;color:var(--ink)}
+    .feat p{font-size:11.5px;margin:0;color:#555;line-height:1.55}
+
+    /* code block */
+    pre{
+      background:#14532d;color:#dcfce7;border:2px solid var(--green);
+      border-radius:6px;padding:10px 14px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:12px;line-height:1.9;margin-bottom:12px
+    }
+    pre .c{color:#6ee7b7}
+    pre .v{color:#fde68a}
+    pre .prompt{color:#86efac}
+
+    /* alert */
+    .alert{
+      border-radius:6px;padding:10px 14px;font-size:12px;
+      margin-bottom:10px;border-left:4px solid
+    }
+    .alert.green{background:var(--soft);border-color:var(--green);color:#14532d}
+    .alert.orange{background:var(--orange-soft);border-color:var(--orange);color:var(--orange)}
+    .alert.red{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+    .alert strong{display:block;font-weight:800;margin-bottom:3px}
+
+    /* note */
+    .note{
+      border-left:4px solid var(--green);padding:10px 14px;
+      background:var(--soft);border-radius:0 6px 6px 0;
+      font-size:12px;line-height:1.65;color:#14532d
+    }
+
+    /* table */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+    th,td{padding:7px 10px;border:1.5px solid var(--soft2);text-align:left}
+    th{background:var(--green);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    tr:nth-child(even) td{background:var(--soft)}
+    .check{color:var(--green);font-weight:800}
+    .cross{color:var(--red);font-weight:800}
+
+    /* btn */
+    .btn{
+      display:inline-block;padding:7px 16px;border:2px solid var(--green);
+      border-radius:6px;background:var(--green);color:#fff;
+      font-size:12px;font-weight:800;text-decoration:none
+    }
+    .btn.outline{background:var(--paper);color:var(--green)}
+
+    /* rule */
+    .rule{height:2px;background:var(--soft2);margin:14px 0}
+    .source-note{margin-top:14px;text-align:center;color:#888;font-size:11.5px}
+
+    /* mobile */
+    @media(max-width:720px){
+      .page{padding:10px 8px 60px}
+      .grid{grid-template-columns:repeat(3,1fr)}
+      .feat-grid{grid-template-columns:1fr}
+      .flow{overflow-x:scroll}
+      h1.demo-title{font-size:clamp(16px,5vw,22px)}
+    }
+    @media(max-width:400px){
+      .grid{grid-template-columns:repeat(2,1fr)}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="kicker">Networking · WireGuard · Userspace</div>
+      <h1 class="demo-title">Tailcat：没有 Tailscale 的 Tailscale</h1>
+      <p class="subtitle">Tailscale 官方出品，不用注册账号、不用装 VPN、不开端口、不改路由，两台机器发个短 token 过去，直接就连上了。WireGuard 端到端加密，像 netcat 但走 Tailscale 数据面。</p>
+    </div>
+
+    <!-- STATS -->
+    <div class="grid">
+      <div class="cell"><strong>官方</strong><span>Tailscale</span></div>
+      <div class="cell"><strong>Go</strong><span>用户态实现</span></div>
+      <div class="cell"><strong>MIT</strong><span>开源协议</span></div>
+    </div>
+
+    <!-- CHIPS -->
+    <div class="chips">
+      <span class="chip fill">WireGuard</span>
+      <span class="chip">用户态隧道</span>
+      <span class="chip fill">端到端加密</span>
+      <span class="chip orange">零配置</span>
+      <span class="chip">SOCKS5 代理</span>
+      <span class="chip">SSH 直连</span>
+    </div>
+
+    <!-- SECURITY PROPS -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">!</span>
+        <span class="sec-label">安全特性（什么不改）</span>
+      </div>
+      <div class="sec-body">
+        <div class="rows">
+          <div class="row highlight"><span class="label">无需账号</span><span class="val">发 token 直接连</span></div>
+          <div class="row"><span class="label">无需 VPN</span><span class="val">不走传统 VPN 隧道</span></div>
+          <div class="row"><span class="label">无需端口开放</span><span class="val">NAT 穿透直连</span></div>
+          <div class="row"><span class="label">无需 root</span><span class="val">用户态执行</span></div>
+          <div class="row"><span class="label">不改路由</span><span class="val">不接管系统网络</span></div>
+          <div class="row"><span class="label">不改 DNS</span><span class="val">系统 DNS 保持不变</span></div>
+        </div>
+        <div class="alert green">
+          <strong>WireGuard 端到端加密</strong>：直连走 WireGuard 隧道，打不通自动走 DERP 中继，全程加密不过明文。
+        </div>
+      </div>
+    </div>
+
+    <!-- CONNECT FLOW -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">→</span>
+        <span class="sec-label">连接流程</span>
+      </div>
+      <div class="sec-body">
+        <div class="flow">
+          <div class="flow-item green">机器 A 生成 token</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item">发 token 给机器 B</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item">机器 B 接受连接</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item green">WireGuard 隧道建立</div>
+        </div>
+        <div class="alert orange">
+          <strong>DERP 中继兜底</strong>：两端都在严格 NAT 后面打不通直连时，自动走 Tailscale DERP 中继节点，不影响连接成功。
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPABILITIES -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">★</span>
+        <span class="sec-label">连上之后能做什么</span>
+      </div>
+      <div class="sec-body">
+        <div class="feat-grid">
+          <div class="feat">
+            <h4>1. 文件互传</h4>
+            <p>两台电脑之间直接传文件，不需要中间服务器，不走云存储。</p>
+          </div>
+          <div class="feat">
+            <h4>2. 端口甩出去</h4>
+            <p>把本地端口暴露给对端，直接访问本地服务。</p>
+          </div>
+          <div class="feat">
+            <h4>3. SSH 直连</h4>
+            <p>不需要公网 IP 或跳板机，token 验证后直接 SSH 进入对端机器。</p>
+          </div>
+          <div class="feat">
+            <h4>4. SOCKS5 代理</h4>
+            <p>对端机器作为 SOCKS5 出口，流量经 WireGuard 隧道加密转发。</p>
+          </div>
+          <div class="feat">
+            <h4>5. 出口节点</h4>
+            <p>流量从对端机器出口，实现 IP 伪装和跨境访问。</p>
+          </div>
+          <div class="feat">
+            <h4>6. 浏览器传文件</h4>
+            <p>浏览器内置文件传输能力，不用额外工具。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USE CASES -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">◆</span>
+        <span class="sec-label">适用场景</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr><th>场景</th><th>说明</th><th>适用</th></tr>
+          <tr><td>远程 SSH 接入</td><td>无公网 IP 的家庭机器 / 内网机器</td><td class="check">✓</td></tr>
+          <tr><td>异地文件传输</td><td>两台机器之间直接互传大文件</td><td class="check">✓</td></tr>
+          <tr><td>临时安全代理</td><td>通过 WireGuard 加密隧道出口</td><td class="check">✓</td></tr>
+          <tr><td>开发环境访问</td><td>暴露本地端口给协作者测试</td><td class="check">✓</td></tr>
+          <tr><td>常驻 VPN 替代</td><td>长期接入家庭网络 / 办公网</td><td class="cross">→ 用 Tailscale</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- QUICKSTART -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">$</span>
+        <span class="sec-label">快速上手</span>
+      </div>
+      <div class="sec-body">
+        <pre><span class="c"># 安装（macOS）</span>
+<span class="prompt">$ </span><span class="v">brew install tailcat</span>
+
+<span class="c"># 机器 A：生成 token</span>
+<span class="prompt">$ </span><span class="v">tailcat serve</span>
+<span class="c"># 输出一段短 token，复制发给机器 B</span>
+
+<span class="c"># 机器 B：连接</span>
+<span class="prompt">$ </span><span class="v">tailcat connect &lt;TOKEN&gt;</span>
+<span class="c"># 连接建立后即可互传文件 / SSH / 代理</span></pre>
+        <div class="alert orange">
+          <strong>DERP 兜底</strong>：直连失败时自动切换到 DERP 中继，不需要手动配置。
+        </div>
+      </div>
+    </div>
+
+    <!-- RISK NOTE -->
+    <div class="alert red">
+      <strong>注意事项</strong>：Tailcat 使用 Tailscale 的 DERP 中继服务器（第三方托管）。如果对中继节点完全零信任，可考虑完全自托管 Tailscale 控制平面，或使用纯点对点直连模式。工具本身是官方出品，开源透明。
+    </div>
+
+    <!-- NOTE -->
+    <div class="note">
+      <strong style="font-weight:800">一句话定位</strong>：像 netcat，但走 WireGuard 加密隧道；像 Tailscale，但不是 Tailscale。
+    </div>
+
+    <div class="rule"></div>
+    <p class="source-note">来源：X @NFTCPS · 2026-08-30</p>
+
+    <!-- LINKS -->
+    <div style="margin-top:14px">
+      <a class="btn" href="https://tailscale.github.io/tailcat/" target="_blank" rel="noopener">官方文档</a>
+      <a class="btn outline" href="https://github.com/tailscale/tailcat" target="_blank" rel="noopener">GitHub</a>
+    </div>
+
+  </div>
+</body>
+</html>
