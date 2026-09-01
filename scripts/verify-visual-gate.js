@@ -175,8 +175,8 @@ function checkVisualException(manifest, htmlHash, htmlTextHash) {
     return errors;
   }
 
-  if (manifest.visual_failure_attempts.length < 3) {
-    errors.push(error('manifest.visual_failure_attempts', 'must contain at least 3 recorded visual failure attempts'));
+  if (manifest.visual_failure_attempts.length !== 2) {
+    errors.push(error('manifest.visual_failure_attempts', 'must contain exactly 2 recorded visual failure attempts'));
   }
 
   for (let i = 0; i < manifest.visual_failure_attempts.length; i++) {
@@ -244,7 +244,7 @@ function checkManifest(manifestPath, htmlRelative, htmlHash, htmlTextHash) {
   }
 
   if (status === 'VISUAL_EXCEPTION_AFTER_MAX_REPAIRS') {
-    // Exception path: require exactly 3 completed repair rounds with fresh evidence
+    // Exception path: require completed repair rounds with fresh evidence
     errors.push(...checkVisualException(manifest, htmlHash, htmlTextHash));
   } else if (status) {
     // Existing path: strict 0 critical / 0 major
