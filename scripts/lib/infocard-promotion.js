@@ -132,7 +132,17 @@ function validatePromotionManifest(manifest, root, manifestPath = '') {
       errors.push(error('files[' + entry.index + '].sha256', 'source hash mismatch'));
     }
   }
-  const themeResult = validateThemeContract({ root, bundle: manifest.bundle, entries });
+  let decisionForTheme = null;
+  if (decisionPath && fs.existsSync(decisionPath)) {
+    const parsedDecision = readThemeDecision(decisionPath, { projectRoot: root });
+    if (parsedDecision.valid) decisionForTheme = parsedDecision.decision;
+  }
+  const themeResult = validateThemeContract({
+    root,
+    bundle: manifest.bundle,
+    entries,
+    enforceImplementation: Boolean(decisionForTheme && decisionForTheme.version >= 2),
+  });
   errors.push(...themeResult.errors.map((item) => error('theme.' + item.field, item.message)));
   if (decisionPath && fs.existsSync(decisionPath)) {
     const decision = readThemeDecision(decisionPath, { projectRoot: root });

@@ -13,6 +13,8 @@ const {
   validateThemeDecision,
   evaluateBatchDiversity,
   validateAuthorDelegationContext,
+  styleSkillName,
+  styleSkillPath,
 } = require('../../.agents/skills/infocard/infocard-theme-assignment/scripts/theme-decision');
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -73,6 +75,21 @@ test('theme-decision.json contract exposes reproducibility and bounded variation
   assert.match(schema, /selected_theme.*candidate_themes/);
   assert.match(schema, /请求主题注册且能力校验通过/);
   assert.match(schema, /HTML.*data-theme.*sidecar/);
+  assert.match(schema, /"style_skill"[\s\S]*"name"/);
+});
+
+test('selected theme binds to its concrete style skill', () => {
+  const decision = selectTheme({
+    projectRoot: ROOT,
+    contentType: 'tool',
+    contentShape: 'tool',
+    candidateThemes: ['blue'],
+    seed: 'style-skill-binding',
+  });
+  assert.equal(decision.style_skill.name, 'infocard-blue-technical-manual-style');
+  assert.equal(decision.style_skill.path, styleSkillPath('blue'));
+  assert.equal(styleSkillName('wood'), 'infocard-wood-style');
+  assert.equal(validateThemeDecision({ ...decision, style_skill: undefined }, { projectRoot: ROOT }).valid, false);
 });
 
 test('ordinary single-card route does not inherit batch diversity requirements', () => {
@@ -103,11 +120,13 @@ test('theme decision module parses and validates a real decision record', () => 
     selection_weights: { hardblue: 2, blue: 1 },
     seed: 'fixed-seed',
     selected_theme: 'hardblue',
+    style_skill: { name: 'infocard-hardblue-style', path: 'infocard-styles/infocard-hardblue-style/SKILL.md' },
     user_override: { requested: null, accepted: false, reason: null },
   };
   const parsed = parseThemeDecision(JSON.stringify(record), { projectRoot: ROOT });
   assert.equal(parsed.valid, true);
   assert.equal(parsed.decision.selected_theme, 'hardblue');
+  assert.equal(parsed.decision.style_skill.name, 'infocard-hardblue-style');
   const file = path.join(os.tmpdir(), `theme-decision-${process.pid}.json`);
   fs.writeFileSync(file, JSON.stringify(record));
   assert.equal(readThemeDecision(file, { projectRoot: ROOT }).valid, true);

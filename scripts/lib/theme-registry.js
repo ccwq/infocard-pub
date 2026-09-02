@@ -48,6 +48,11 @@ function themeDefinition(projectRoot, slug) {
   return { slug, ...definition };
 }
 
+function themeImplementation(projectRoot, slug) {
+  const definition = themeDefinition(projectRoot, slug);
+  return definition && definition.implementation ? definition.implementation : null;
+}
+
 function validateThemeRegistry(projectRoot) {
   const registry = loadThemeRegistry(projectRoot);
   if (!registry) return { valid: false, errors: ['theme/themes.json is missing'], themes: [] };
@@ -69,4 +74,4 @@ function validateThemeRegistry(projectRoot) {
   return { valid: errors.length === 0, errors, themes: [...declared].sort() };
 }
 
-module.exports = { REGISTRY_PATH, loadThemeRegistry, registeredThemes, normalizeThemeSlug, themeDefinition, validateThemeRegistry };
+module.exports = { REGISTRY_PATH, loadThemeRegistry, registeredThemes, normalizeThemeSlug, themeDefinition, themeImplementation, validateThemeRegistry };

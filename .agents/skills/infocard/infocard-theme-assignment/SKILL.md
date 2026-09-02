@@ -62,7 +62,7 @@ metadata:
 
 `content_type`、`content_shape`、`candidate_themes`、`excluded_themes`（含 reason）、`selection_weights`、`seed`、`selected_theme`、`user_override`。
 
-`selected_theme` 必须是 `theme/themes.json` 中声明且对应 `theme/*.html` 的 bare slug。sidecar、bundle 和 HTML 均使用同一个 bare slug；HTML 使用 `data-theme`，三者不一致即阻塞。用户指定主题时，`user_override` 记录请求值、是否接受和理由。
+`selected_theme` 必须是 `theme/themes.json` 中声明且对应 `theme/*.html` 的 bare slug。sidecar、bundle 和 HTML 均使用同一个 bare slug；HTML 使用 `data-theme`，三者不一致即阻塞。决策记录还必须绑定对应的 `style_skill`（例如 `wood` → `infocard-wood-style`），供 Authoring 和 Publisher 校验；不能只写主题名而不执行对应 Style Skill。用户指定主题时，`user_override` 记录请求值、是否接受和理由。
 
 ## 批量与重建
 

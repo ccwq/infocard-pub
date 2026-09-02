@@ -15,6 +15,23 @@ const CAPABILITIES = [
   'mobile_layout',
 ];
 
+const STYLE_SKILL_ALIASES = Object.freeze({
+  blue: 'blue-technical-manual',
+  black: 'black-head',
+  main: 'main',
+  'paper-warm': 'paper-warm',
+});
+
+function styleSkillName(theme) {
+  const slug = STYLE_SKILL_ALIASES[theme] || theme;
+  return `infocard-${slug}-style`;
+}
+
+function styleSkillPath(theme) {
+  const slug = STYLE_SKILL_ALIASES[theme] || theme;
+  return `infocard-styles/${styleSkillName(theme)}/SKILL.md`;
+}
+
 // These defaults are intentionally conservative only where a theme family is
 // known to be illustration-first. Callers can provide a project-specific
 // capability map when a theme has been visually verified for more modules.
@@ -159,7 +176,7 @@ function selectTheme({
   }
 
   return {
-    version: 1,
+    version: 2,
     content_type: contentType,
     content_subtype: contentSubtype,
     content_shape: contentShape,
@@ -169,6 +186,10 @@ function selectTheme({
     selection_weights: weights,
     seed: String(seed || ''),
     selected_theme: selected,
+    style_skill: selected ? {
+      name: styleSkillName(selected),
+      path: styleSkillPath(selected),
+    } : null,
     user_override: {
       requested,
       accepted: overrideAccepted,
@@ -202,6 +223,24 @@ function validateThemeDecision(decision, {
   if (typeof decision.seed !== 'string' || !decision.seed.trim()) add('seed', 'must be a non-empty string');
   if (!candidates || typeof decision.selected_theme !== 'string' || !candidates.includes(decision.selected_theme)) {
     add('selected_theme', 'must be a candidate theme');
+  }
+  if (decision.version >= 2) {
+    const styleSkill = decision.style_skill;
+    const declaredStyleSkillName = typeof styleSkill?.name === 'string' ? styleSkill.name : null;
+    const expectedSkillName = typeof decision.selected_theme === 'string'
+      ? styleSkillName(decision.selected_theme)
+      : null;
+    if (!styleSkill || typeof styleSkill !== 'object' || Array.isArray(styleSkill)) {
+      add('style_skill', 'must bind the selected theme to a concrete style skill');
+    } else {
+      if (declaredStyleSkillName !== expectedSkillName) add('style_skill.name', `must equal ${expectedSkillName}`);
+      if (typeof styleSkill.path !== 'string' || styleSkill.path !== styleSkillPath(decision.selected_theme)) {
+        add('style_skill.path', 'must point to the selected theme style skill');
+      }
+      if (projectRoot && styleSkill.path && !fs.existsSync(path.resolve(projectRoot, '.agents/skills', styleSkill.path))) {
+        add('style_skill.path', 'style skill file does not exist');
+      }
+    }
   }
   const excluded = Array.isArray(decision.excluded_themes) ? decision.excluded_themes : [];
   for (const item of excluded) {
@@ -308,4 +347,6 @@ module.exports = {
   readThemeDecision,
   evaluateBatchDiversity,
   validateAuthorDelegationContext,
+  styleSkillName,
+  styleSkillPath,
 };

@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('node:fs');
-const { registeredThemes, normalizeThemeSlug } = require('./theme-registry');
+const { registeredThemes, normalizeThemeSlug, themeImplementation } = require('./theme-registry');
 
 function error(field, message) {
   return { field, message };
@@ -45,7 +45,16 @@ function colorLiteralMatches(text) {
   return matches;
 }
 
-function validateThemeContract({ root, bundle, entries }) {
+function validateThemeImplementation({ root, style, html, enforce = false }) {
+  if (!enforce) return [];
+  const implementation = themeImplementation(root, style);
+  if (!implementation || !Array.isArray(implementation.required_selectors)) return [];
+  return implementation.required_selectors
+    .filter((selector) => typeof selector === 'string' && selector.trim() && !html.includes(selector.replace(/^\./, 'class="')))
+    .map((selector) => `missing required selector ${selector}`);
+}
+
+function validateThemeContract({ root, bundle, entries, enforceImplementation = false }) {
   const errors = [];
   const add = (field, message) => errors.push(error(field, message));
   const themes = registeredThemes(root);
@@ -85,6 +94,7 @@ function validateThemeContract({ root, bundle, entries }) {
   const literals = colorLiteralMatches(componentCss);
   if (literals.length) add('html.colors', `hard-coded color literals are forbidden (${literals.slice(0, 8).join(', ')})`);
   if (!/var\(\s*--[a-z0-9-]+/i.test(html)) add('html.tokens', 'must consume theme CSS variables via var(--token)');
+  for (const message of validateThemeImplementation({ root, style, html, enforce: enforceImplementation })) add('html.implementation', message);
   return { valid: errors.length === 0, errors };
 }
 
@@ -94,5 +104,6 @@ module.exports = {
   topLevelYamlValue,
   htmlTheme,
   colorLiteralMatches,
+  validateThemeImplementation,
   validateThemeContract,
 };

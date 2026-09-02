@@ -4,7 +4,7 @@
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "content_type": "tool",
   "content_subtype": "cli",
   "content_shape": "single technical tool",
@@ -14,6 +14,10 @@
   "selection_weights": { "hardblue": 0.5, "redswiss": 0.3, "blue": 0.2 },
   "seed": "run-20260827-01",
   "selected_theme": "hardblue",
+  "style_skill": {
+    "name": "infocard-hardblue-style",
+    "path": "infocard-styles/infocard-hardblue-style/SKILL.md"
+  },
   "user_override": { "requested": null, "accepted": false, "reason": null },
   "batch_context": {
     "recent_themes": [],
