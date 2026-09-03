@@ -129,11 +129,11 @@ This is one bounded synchronization step. A hash mismatch after it is `BLOCKED_A
 After promotion, before build:
 
 1. render exact formal `docs/<slug>.html` locally;
-2. capture desktop and 390px mobile evidence by delegating to `web-capture` (which uses the runtime-provided `agent-browser` endpoint), including all relevant hero/body/table/code/risk/footer regions;
+2. generate the canonical risk-driven capture plan, then capture exactly the desktop/mobile `hero` and selected `complex` regions by delegating to `web-capture` (which uses the runtime-provided `agent-browser` endpoint); package each viewport's two raw images as one labeled contact sheet;
    - Call `web-capture` with the target tab / URL and the `pc` or `mobile` preset
    - `web-capture` returns screenshot paths and geometry checks
    - **Do NOT embed `browser_exec` built-in `cdp()` screenshot logic here** — route all web screenshots through `web-capture`
-3. record explicit `critical / major / minor` findings and bind screenshot manifest to current HTML SHA-256;
+3. record explicit per-panel `critical / major / minor` findings and bind the four raw images plus two contact sheets to current HTML SHA-256;
 4. run `npm run verify:visual-gate -- docs/<slug>.html`;
 5. repair and recapture after every HTML/CSS/content/structure change;
 6. block commit/push on any critical or major defect.
@@ -172,7 +172,7 @@ Then inspect every mutation. Stage only promoted artifacts, declared assets, cur
 
 If remote main advances, reconcile once in the same primary checkout, regenerate affected indexes and visual evidence, then retry non-force push. A second integration failure is `BLOCKED_AT_INTEGRATION`.
 
-Public verification requires cache-busted checks for:
+Public verification uses a blocking detail-page check and a separate post-release evidence task. The blocking check requires cache-busted:
 
 ```text
 https://ccwq.github.io/infocard-pub/docs/<slug>.html
@@ -180,7 +180,7 @@ https://ccwq.github.io/infocard-pub/docs/<slug>.html
 /index.html
 ```
 
-Verify expected identity and release-specific fingerprint, then capture fresh public desktop/mobile evidence. HTTP 200 alone is not release proof.
+Verify detail HTTP `200` plus a release-specific fingerprint (slug/title/theme/structural token); this establishes `PUBLISHED_VERIFIED`. Index/home checks and fresh public desktop/mobile first-screen screenshots are recorded as post-release audit evidence. Screenshot failure becomes `PUBLIC_VISUAL_FAILED`/`PUBLIC_VISUAL_PENDING` and does not overwrite the release state; successful screenshots are sent to channel.
 
 ## Update, rebuild, and timeout recovery
 
@@ -201,10 +201,10 @@ Do not start Wiki automatically. Do not list, prune, remove, or otherwise operat
 - [ ] Author wrote only `.docs/<run-id>/<slug>/`
 - [ ] Manifest validates source-to-target allowlist
 - [ ] Promotion diff contains only declared formal artifacts
-- [ ] Desktop/mobile visual evidence captured with `runtime-configured agent-browser` and has 0 critical / 0 major
+- [ ] Four raw desktop/mobile regional captures and two labeled contact sheets are current and have 0 critical / 0 major per panel
 - [ ] Build, verify, taxonomy, and leak gates pass
 - [ ] Staged diff excludes ambient state
-- [ ] Public detail/index/home fingerprint and fresh visual evidence pass
+- [ ] Public detail HTTP/fingerprint release state is separate from public visual evidence state
 - [ ] `.docs` evidence retained; no cleanup side effect occurred
 
 ## Canonical references

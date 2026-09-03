@@ -11,6 +11,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { validateCapturePlan } = require('./lib/capture-plan');
 
 function error(field, message) { return { field, message }; }
 function sha256File(file) { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'); }
@@ -105,6 +106,48 @@ function checkDisposition(item, fieldPrefix, allowNonZero = false) {
   const screenshot = item.screenshot_path || item.screenshot || item.path;
   if (typeof screenshot !== 'string' || screenshot.trim() === '') {
     errors.push(error(fieldPrefix + '.screenshot_path', 'must point to the reviewed PNG'));
+  }
+  return errors;
+}
+
+function checkPanelDisposition(panel, fieldPrefix) {
+  const errors = [];
+  const critical = numberField(panel && panel.critical);
+  const major = numberField(panel && panel.major);
+  const minor = numberField(panel && panel.minor);
+  if (critical === null) errors.push(error(fieldPrefix + '.critical', 'must be a number'));
+  if (major === null) errors.push(error(fieldPrefix + '.major', 'must be a number'));
+  if (minor === null) errors.push(error(fieldPrefix + '.minor', 'must be a number'));
+  if (critical !== null && critical > 0) errors.push(error(fieldPrefix + '.critical', 'must be 0 before push'));
+  if (major !== null && major > 0) errors.push(error(fieldPrefix + '.major', 'must be 0 before push'));
+  if (!panel || typeof panel.label !== 'string' || panel.label.trim() === '') errors.push(error(fieldPrefix + '.label', 'must identify viewport and region'));
+  if (!panel || typeof panel.region !== 'string' || !['hero', 'complex'].includes(panel.region)) errors.push(error(fieldPrefix + '.region', 'must be hero or complex'));
+  if (panel && typeof panel.label === 'string' && panel.region && !panel.label.toLowerCase().includes(panel.region)) errors.push(error(fieldPrefix + '.label', 'must include the panel region'));
+  return errors;
+}
+
+function checkLightRouteEvidence(manifest) {
+  const errors = [];
+  const planResult = validateCapturePlan(manifest.capture_plan);
+  if (!planResult.valid) errors.push(...planResult.errors.map((message) => error('manifest.capture_plan', message)));
+  for (const viewport of ['desktop', 'mobile']) {
+    const evidence = manifest[viewport];
+    if (!evidence || !Array.isArray(evidence.regions) || evidence.regions.length !== 2) {
+      errors.push(error(`manifest.${viewport}.regions`, 'must contain exactly hero and complex raw screenshots'));
+    } else {
+      const names = evidence.regions.map((item) => item && item.region);
+      if (JSON.stringify(names) !== JSON.stringify(['hero', 'complex'])) errors.push(error(`manifest.${viewport}.regions`, 'must be ordered hero, complex'));
+      for (let i = 0; i < evidence.regions.length; i++) errors.push(...checkDisposition(evidence.regions[i], `manifest.${viewport}.regions[${i}]`, false));
+    }
+    const sheet = manifest.contact_sheets && manifest.contact_sheets[viewport];
+    if (!sheet || typeof sheet.screenshot_path !== 'string' || !sheet.screenshot_path.trim()) errors.push(error(`manifest.contact_sheets.${viewport}`, 'labeled contact sheet is required'));
+    if (!sheet || !Array.isArray(sheet.panels) || sheet.panels.length !== 2) {
+      errors.push(error(`manifest.contact_sheets.${viewport}.panels`, 'must contain independent hero and complex panels'));
+    } else {
+      const names = sheet.panels.map((item) => item && item.region);
+      if (JSON.stringify(names) !== JSON.stringify(['hero', 'complex'])) errors.push(error(`manifest.contact_sheets.${viewport}.panels`, 'must be ordered hero, complex'));
+      for (let i = 0; i < sheet.panels.length; i++) errors.push(...checkPanelDisposition(sheet.panels[i], `manifest.contact_sheets.${viewport}.panels[${i}]`));
+    }
   }
   return errors;
 }
@@ -228,11 +271,7 @@ function checkManifest(manifestPath, htmlRelative, htmlHash, htmlTextHash) {
   const status = manifest.review_status || manifest.status || manifest.visual_status;
 
   if (manifest.route === 'light') {
-    const plan = manifest.capture_plan;
-    const expected = ['hero', 'body', 'footer'];
-    if (!plan || JSON.stringify(plan.desktop) !== JSON.stringify(expected) || JSON.stringify(plan.mobile) !== JSON.stringify(expected) || plan.geometry !== true) {
-      errors.push(error('manifest.capture_plan', 'light route requires desktop/mobile hero/body/footer and geometry=true'));
-    }
+    errors.push(...checkLightRouteEvidence(manifest));
     for (const viewport of ['desktop', 'mobile']) {
       const geometry = manifest.geometry && manifest.geometry[viewport];
       if (!geometry || numberField(geometry.scrollWidth) === null || numberField(geometry.clientWidth) === null) {
@@ -246,7 +285,7 @@ function checkManifest(manifestPath, htmlRelative, htmlHash, htmlTextHash) {
   if (status === 'VISUAL_EXCEPTION_AFTER_MAX_REPAIRS') {
     // Exception path: require completed repair rounds with fresh evidence
     errors.push(...checkVisualException(manifest, htmlHash, htmlTextHash));
-  } else if (status) {
+  } else if (status && manifest.route !== 'light') {
     // Existing path: strict 0 critical / 0 major
     if (!['VISUAL_PASSED', 'PASSED', 'passed'].includes(status)) {
       errors.push(error('manifest.review_status', 'must be VISUAL_PASSED before push'));

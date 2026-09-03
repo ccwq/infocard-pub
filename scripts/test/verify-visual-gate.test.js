@@ -131,11 +131,48 @@ test('light route requires capture plan and desktop/mobile geometry', () => {
   manifest.route = 'light';
   fs.writeFileSync(f.manifestPath, JSON.stringify(manifest));
   assert.equal(main([f.htmlRel], f.root).code, 1);
-  manifest.capture_plan = { desktop: ['hero', 'body', 'footer'], mobile: ['hero', 'body', 'footer'], geometry: true };
+  manifest.capture_plan = { desktop: ['hero', 'complex'], mobile: ['hero', 'complex'], geometry: true, complex_region: { name: 'body', reason: 'risk_signal_tables', signals: ['tables_or_matrix'] }, conditional_regions: [] };
+  manifest.desktop = { regions: [
+    { region: 'hero', critical: 0, major: 0, minor: 0, screenshot_path: 'desktop-hero.png' },
+    { region: 'complex', critical: 0, major: 0, minor: 0, screenshot_path: 'desktop-complex.png' },
+  ] };
+  manifest.mobile = { regions: [
+    { region: 'hero', critical: 0, major: 0, minor: 0, screenshot_path: 'mobile-hero.png' },
+    { region: 'complex', critical: 0, major: 0, minor: 0, screenshot_path: 'mobile-complex.png' },
+  ] };
+  manifest.contact_sheets = {
+    desktop: { screenshot_path: 'desktop-sheet.png', panels: [
+      { label: 'desktop / hero', region: 'hero', critical: 0, major: 0, minor: 0 },
+      { label: 'desktop / complex', region: 'complex', critical: 0, major: 0, minor: 0 },
+    ] },
+    mobile: { screenshot_path: 'mobile-sheet.png', panels: [
+      { label: 'mobile / hero', region: 'hero', critical: 0, major: 0, minor: 0 },
+      { label: 'mobile / complex', region: 'complex', critical: 0, major: 0, minor: 0 },
+    ] },
+  };
   manifest.geometry = { desktop: { scrollWidth: 1280, clientWidth: 1280 }, mobile: { scrollWidth: 391, clientWidth: 390 } };
   fs.writeFileSync(f.manifestPath, JSON.stringify(manifest));
   assert.equal(main([f.htmlRel], f.root).code, 1);
   manifest.geometry.mobile.scrollWidth = 390;
   fs.writeFileSync(f.manifestPath, JSON.stringify(manifest));
   assert.equal(main([f.htmlRel], f.root).code, 0);
+});
+
+test('light route rejects aggregate contact-sheet disposition and missing panel labels', () => {
+  /**
+   * Given：light route 只有 contact sheet 总体结论，或 panel 缺少 viewport/region 标签。
+   * When：运行视觉机械门禁。
+   * Then：门禁拒绝该 evidence manifest。
+   * 防回归：一次 aggregate pass 不能隐藏单个复杂区域缺陷。
+   */
+  const f = makeFixture();
+  const manifest = JSON.parse(fs.readFileSync(f.manifestPath));
+  manifest.route = 'light';
+  manifest.capture_plan = { desktop: ['hero', 'complex'], mobile: ['hero', 'complex'], geometry: true, complex_region: { name: 'body', reason: 'fallback_body_no_risk_signals', signals: [] }, conditional_regions: [] };
+  manifest.desktop = { regions: [{ region: 'hero', critical: 0, major: 0, screenshot_path: 'd-h.png' }, { region: 'complex', critical: 0, major: 0, screenshot_path: 'd-c.png' }] };
+  manifest.mobile = { regions: [{ region: 'hero', critical: 0, major: 0, screenshot_path: 'm-h.png' }, { region: 'complex', critical: 0, major: 0, screenshot_path: 'm-c.png' }] };
+  manifest.contact_sheets = { desktop: { screenshot_path: 'd.png', panels: [{ label: 'desktop / hero', region: 'hero', critical: 0, major: 0, minor: 0 }, { label: 'desktop / complex', region: 'complex', critical: 1, major: 0, minor: 0 }] }, mobile: { screenshot_path: 'm.png', panels: [{ label: 'mobile / hero', region: 'hero', critical: 0, major: 0, minor: 0 }, { label: 'missing label', region: 'complex', critical: 0, major: 0, minor: 0 }] } };
+  manifest.geometry = { desktop: { scrollWidth: 1280, clientWidth: 1280 }, mobile: { scrollWidth: 390, clientWidth: 390 } };
+  fs.writeFileSync(f.manifestPath, JSON.stringify(manifest));
+  assert.equal(main([f.htmlRel], f.root).code, 1);
 });

@@ -49,6 +49,8 @@ A `1440×900` or `390×844` viewport screenshot is a crop. Do not call a long pa
 
 `web-capture` is the only approved screenshot gate. It wraps the repository-required `agent-browser`, handles tab selection, viewport switching, geometry checks, and PNG output.
 
+For the light route, consume the canonical risk-driven plan: capture `hero` and the selected `complex` region at desktop and mobile, then review one labeled contact sheet per viewport. Keep each raw screenshot and each panel disposition available for audit.
+
 Desktop / mobile / tablet capture are selected by the `web-capture` preset.
 
 ### 3. Run mechanical checks first
@@ -115,12 +117,14 @@ For mobile review, long code blocks are a first-class overflow trigger. A visibl
 
 ## Release language
 
-Keep visual state separate from static/build and public HTTP state:
+Keep local visual state, public release state, and public visual-evidence state separate:
 
 - `VISUAL_PASSED`: current required screenshots reviewed with zero critical/major defects;
 - `VISUAL_BLOCKED`: a verified critical/major defect remains;
 - `VISUAL_PENDING`: required capture/review evidence is unavailable or unreliable;
 - `PUBLISHED_PENDING_VISUAL`: public release succeeded under the explicitly allowed fallback, but visual pass was not established.
+- `PUBLISHED_VERIFIED`: public detail HTTP `200` and the current release fingerprint passed; this does not imply public screenshots are complete.
+- `PUBLIC_VISUAL_PENDING` / `PUBLIC_VISUAL_CAPTURED` / `PUBLIC_VISUAL_FAILED`: post-release screenshot delivery states; they never overwrite the primary release state.
 
 Never describe a card as fully verified using only build success, HTTP 200, DOM snapshots, or one cropped screenshot.
 

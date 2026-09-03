@@ -47,7 +47,7 @@ For a batch of two or more cards, visual review must record the selected theme a
 
 The following are mechanical preconditions only, never visual PASS evidence: build success, HTTP 200, DOM/accessibility snapshots, CSS/class presence, and `scrollWidth == clientWidth`.
 
-Before the first push of every card, require a current rendered screenshot manifest covering desktop and 390px mobile, with Hero, ordinary body, every table/matrix, code/deployment, risk, and footer/control regions. Each required image must have an explicit `critical / major / minor` disposition; any critical or major defect blocks push. If capture or analysis infrastructure fails after differentiated retries, keep `VISUAL_PENDING` and do not push unless an explicitly authorized pending-visual release path is used.
+Before the first push of every card, require a current rendered screenshot manifest with four raw captures: desktop/mobile `hero` and the planner-selected `complex` region. Package the two regions for each viewport as one labeled contact sheet, retaining independent panel dispositions. Geometry/DOM checks remain mandatory; footer/sticky evidence is conditional. Any critical or major panel defect blocks push. If capture or analysis infrastructure fails after differentiated retries, keep `VISUAL_PENDING` and do not push unless an explicitly authorized pending-visual release path is used.
 
 Any HTML/CSS/structure/content change invalidates all prior visual evidence. Re-render the exact public URL after CDN propagation and re-audit after every publish repair. For multi-card batches, track evidence per card; never infer batch visual status from HTTP 200 or one card's PASS.
 
@@ -62,7 +62,7 @@ Any HTML/CSS/structure/content change invalidates all prior visual evidence. Re-
    Tablet capture via `web-capture` preset `tablet` when needed.
    `web-capture` owns the runtime-configured `agent-browser` endpoint tab selection, viewport switch, geometry checks, and PNG output path.
 
-4. Run `vision_analyze` on each screenshot. Demand an explicit `critical / major / minor` defect list. Screenshot delivery to the user is evidence-sharing or requested human review; it never substitutes for the Agent's disposition.
+4. Run `vision_analyze` once per viewport contact sheet. Demand an explicit `critical / major / minor` defect list for each labeled panel. Screenshot delivery to the user is evidence-sharing or requested human review; it never substitutes for the Agent's disposition.
 
    Classify only observable release defects as critical/major: clipping, overlap, missing text, unreadable contrast, broken responsive layout, unintended overflow, or controls obscuring content. Treat subjective suggestions (different shadow, border weight, or stylistic preference) as minor unless they produce one of those observable failures. If an assessment is ambiguous, recapture the affected region at the same viewport and ask a narrow, defect-specific question before editing; do not let fluctuating aesthetic commentary trigger unbounded CSS churn.
 5. If vision infrastructure fails, retry up to five times with a different strategy each time: split the image/region, reduce size, recapture the affected region, or switch to an actually available visual entrypoint. Do not spend retries merely rephrasing the same prompt. From the second failure, record input, strategy, error category, and outcome in run-local evidence.
