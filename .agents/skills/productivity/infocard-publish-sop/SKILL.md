@@ -1,7 +1,7 @@
 ---
 name: infocard-publish-sop
 description: Use when creating or publishing an infocard through the mandatory .docs-to-promotion workflow.
-version: 4.3.0
+version: 4.4.0
 ---
 
 # Infocard Publish SOP: `.docs` → Promotion → Main Checkout
@@ -114,12 +114,30 @@ author, source, source_url, style
 
 For a batch, validate all manifests first, promote all declared artifacts, then build once in the same primary checkout.
 
-### Timestamp and hash order
+### Timestamp and hash order (updated 2026-09-05)
 
-`npm run build` normalizes a new sidecar's `date` and `updated`, so Publisher must not treat pre-build sidecar hashes as final. Required sequence:
+**Root cause of prior failure**: The SOP previously said "Publisher sets final promotion time" but did not mandate calling the timestamp script before promotion. In update-card scenarios, the old `updated` field survived the build because it was never refreshed before the first promotion.
+
+`npm run build` can refresh an existing card when its formal HTML/sidecar appears in the current diff, but this is implicit detection and cannot replace an update-card contract. The prior incident was more basic: the update authoring/promotion chain never completed, so no formal card change reached the build stage and the old sidecar remained untouched. The Publisher must explicitly call `npm run sync-publish-metadata` **before** promotion whenever updating an existing card, making the edit-date invariant independent of build heuristics.
+
+Required sequence for update cards:
 
 ```text
-promotion → build timestamp normalization → copy final formal sidecar back to candidate → recompute manifest hashes → verify → narrow commit/push
+1. node scripts/sync-publish-metadata.js --manifest .docs/<run-id>/<slug>/promotion-manifest.json --timestamp "YYYY-MM-DD HH:MM:SS"
+2. node scripts/promote-infocard.js --manifest .docs/<run-id>/<slug>/promotion-manifest.json
+3. npm run build
+4. (optional) node scripts/verify-meta-timestamps.js
+5. visual gate → verify → taxonomy → leak → commit/push
+```
+
+Required sequence for new cards (unchanged):
+
+```text
+1. node scripts/promote-infocard.js --manifest .docs/<run-id>/<slug>/promotion-manifest.json
+2. npm run build  ← build sets date=updated automatically via sync-build-timestamps
+3. copy final formal sidecar back to candidate directory
+4. recompute manifest hashes
+5. visual gate → verify → taxonomy → leak → commit/push
 ```
 
 This is one bounded synchronization step. A hash mismatch after it is `BLOCKED_AT_LOCAL_GATE`, not a reason to rerun authoring or repeat build indefinitely.
@@ -182,12 +200,15 @@ https://ccwq.github.io/infocard-pub/docs/<slug>.html
 
 Verify detail HTTP `200` plus a release-specific fingerprint (slug/title/theme/structural token); this establishes `PUBLISHED_VERIFIED`. Index/home checks and fresh public desktop/mobile first-screen screenshots are recorded as post-release audit evidence. Screenshot failure becomes `PUBLIC_VISUAL_FAILED`/`PUBLIC_VISUAL_PENDING` and does not overwrite the release state; successful screenshots are sent to channel.
 
-## Update, rebuild, and timeout recovery
+## Update, rebuild, and timeout recovery (hardened 2026-09-05)
 
 - New card vs update is decided before authoring through `infocard-update-vs-new-pattern`.
+- **Any update to an existing card means the edit date must change.** Before promotion, run `sync-publish-metadata.js`; never rely on `npm run build` or on the site build timestamp to refresh `updated`.
 - Theme changes rebuild a `.docs` candidate around the selected theme skeleton, preserve required content, then promote through the same gate.
-- Author timeout means inspect the declared `.docs/<run-id>/<slug>/` handoff. Continue valid artifacts or complete that directory; never search for or create a worktree.
+- Author timeout is a filesystem-first handoff: inspect exactly one declared `.docs/<run-id>/<slug>/` directory. If all three declared artifacts (`card.html`, `card.html.meta.yaml`, `promotion-manifest.json`) exist, continue at Publisher; otherwise Publisher completes the missing artifacts in that same directory after confirming frozen facts and theme decision. Never re-delegate the same slug, repeat research, create a worktree, or claim authoring completion from a child summary alone.
+- Record the timeout as an execution event (`timeout/no-authoring` or `timeout/partial-authoring`) and preserve the directory; it is not a release result.
 - Build/sidecar failure gets one targeted repair and full gate rerun. Second failure is `BLOCKED_AT_LOCAL_GATE`.
+- Before closeout, independently verify `updated` in the formal sidecar is newer than the prior value for an update card and verify its rank under the requested homepage sort mode.
 
 ## Closeout
 
@@ -212,5 +233,7 @@ Do not start Wiki automatically. Do not list, prune, remove, or otherwise operat
 - `references/publish-protocol-v3.md` — detailed release fields, states, and ownership.
 - `../visual-verification-gate/SKILL.md` — screenshot, visual disposition, retry, and exception rules.
 - `../infocard/infocard-theme-assignment/SKILL.md` — theme selection and decision-record rules.
+- `scripts/sync-publish-metadata.js` — authoritative timestamp refresh for update cards; MUST be called before promotion for any existing (non-new) card to ensure `updated` reflects the current publish time.
+- `../infocard-subagent-delegation/SKILL.md` — filesystem-first timeout handoff, no-redelegation rule, and publisher takeover contract.
 
 Historical worktree incident notes may be retained only for a separately authorized migration/cleanup investigation. They are not active publication instructions and must never be loaded to create, recover, publish, or clean a new information card.

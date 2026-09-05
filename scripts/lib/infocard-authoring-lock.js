@@ -33,8 +33,17 @@ function visualPreflight({ cdpAvailable, captureAvailable }) {
   return { status: 'VISUAL_PENDING', error_category: 'browser_capture_unavailable', retryPerCard: false };
 }
 
-function publishOrder() {
-  return ['promotion', 'build_timestamp_normalization', 'sync_candidate_sidecar', 'recompute_manifest_hashes', 'verify', 'commit_push'];
+function publishOrder({ update = false } = {}) {
+  const order = [];
+  if (update) order.push('sync_publish_metadata');
+  order.push('promotion', 'build_timestamp_normalization', 'sync_candidate_sidecar', 'recompute_manifest_hashes', 'verify', 'commit_push');
+  return order;
 }
 
-module.exports = { createAuthoringLock, authoringPlan, visualPreflight, publishOrder };
+function timeoutHandoffState({ cardHtml = false, meta = false, manifest = false, frozenContract = true } = {}) {
+  if (!frozenContract) return { state: 'BLOCKED_AT_PREFLIGHT', action: 'stop', redelegate: false };
+  if (cardHtml && meta && manifest) return { state: 'AUTHORING_COMPLETE', action: 'continue_at_publisher', redelegate: false };
+  return { state: 'TIMEOUT_NO_AUTHORING_OR_PARTIAL', action: 'publisher_takeover_same_directory', redelegate: false };
+}
+
+module.exports = { createAuthoringLock, authoringPlan, visualPreflight, publishOrder, timeoutHandoffState };

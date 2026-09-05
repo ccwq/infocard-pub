@@ -69,9 +69,33 @@ test('new metadata is not taxonomy-only and does not need a HEAD read', () => {
 });
 
 // Hashing must happen after timestamp normalization, so the sidecar remains stable.
-test('publish order normalizes timestamps before manifest hashing', () => {
+test('publish order refreshes updated before promotion for an existing card', () => {
   const { publishOrder } = require('../lib/infocard-authoring-lock');
   assert.deepEqual(publishOrder(), ['promotion', 'build_timestamp_normalization', 'sync_candidate_sidecar', 'recompute_manifest_hashes', 'verify', 'commit_push']);
+  assert.deepEqual(publishOrder({ update: true }), ['sync_publish_metadata', 'promotion', 'build_timestamp_normalization', 'sync_candidate_sidecar', 'recompute_manifest_hashes', 'verify', 'commit_push']);
+});
+
+test('update sidecar always refreshes updated while preserving original date', () => {
+  const { updateSidecar } = require('../sync-publish-metadata');
+  const raw = 'slug: demo\npath: docs/demo.html\ndate: "2026-01-01 10:00:00"\nupdated: "2026-01-01 10:00:00"\n';
+  const next = updateSidecar(raw, { isNew: false, changedHtml: true, timestamp: '2026-09-05 20:00:00' });
+  assert.match(next, /date: "2026-01-01 10:00:00"/);
+  assert.match(next, /updated: "2026-09-05 20:00:00"/);
+});
+
+test('new sidecar sets date and updated to the same timestamp', () => {
+  const { updateSidecar } = require('../sync-publish-metadata');
+  const raw = 'slug: demo\npath: docs/demo.html\n';
+  const next = updateSidecar(raw, { isNew: true, changedHtml: true, timestamp: '2026-09-05 20:01:00' });
+  assert.match(next, /date: "2026-09-05 20:01:00"/);
+  assert.match(next, /updated: "2026-09-05 20:01:00"/);
+});
+
+test('timeout handoff is filesystem-first and never redelegates the same slug', () => {
+  const { timeoutHandoffState } = require('../lib/infocard-authoring-lock');
+  assert.deepEqual(timeoutHandoffState({ cardHtml: true, meta: true, manifest: true }), { state: 'AUTHORING_COMPLETE', action: 'continue_at_publisher', redelegate: false });
+  assert.deepEqual(timeoutHandoffState({}), { state: 'TIMEOUT_NO_AUTHORING_OR_PARTIAL', action: 'publisher_takeover_same_directory', redelegate: false });
+  assert.deepEqual(timeoutHandoffState({ frozenContract: false }), { state: 'BLOCKED_AT_PREFLIGHT', action: 'stop', redelegate: false });
 });
 
 // Palette literals in :root are legal; component literals remain blocked.
