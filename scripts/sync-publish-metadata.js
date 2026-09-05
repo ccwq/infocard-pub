@@ -96,9 +96,9 @@ function main(argv = process.argv.slice(2)) {
   // update look unchanged and leaves the old `updated` value in place.
   const candidateChangedHtml = isNew || htmlChanged(htmlTarget, sourceHtml);
   const next = updateSidecar(sourceRaw, { isNew, changedHtml: candidateChangedHtml, timestamp });
+  // Candidate-only mutation: promotion remains the sole authority allowed to
+  // write formal docs/. The refreshed hash makes the subsequent copy exact.
   fs.writeFileSync(sourceMeta, next, 'utf8');
-  fs.mkdirSync(path.dirname(targetMeta), { recursive: true });
-  fs.writeFileSync(targetMeta, next, 'utf8');
   refreshManifest(manifest, authoringRoot);
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify({ ok: true, target: metaTarget, state: isNew ? 'new' : candidateChangedHtml ? 'updated' : 'unchanged', date: value(next, 'date'), updated: value(next, 'updated'), timestamp }));

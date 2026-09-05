@@ -123,11 +123,12 @@ For a batch, validate all manifests first, promote all declared artifacts, then 
 Required sequence for update cards:
 
 ```text
-1. node scripts/sync-publish-metadata.js --manifest .docs/<run-id>/<slug>/promotion-manifest.json --timestamp "YYYY-MM-DD HH:MM:SS"
+1. node scripts/sync-publish-metadata.js --manifest .docs/<run-id>/<slug>/promotion-manifest.json --timestamp "YYYY-MM-DD HH:MM:SS"  # candidate only
 2. node scripts/promote-infocard.js --manifest .docs/<run-id>/<slug>/promotion-manifest.json
 3. npm run build
 4. (optional) node scripts/verify-meta-timestamps.js
 5. visual gate → verify → taxonomy → leak → commit/push
+6. independently verify formal sidecar `updated` after build and after push
 ```
 
 Required sequence for new cards (unchanged):
