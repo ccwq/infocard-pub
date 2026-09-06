@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shopify Sidekick 的 continual learning loop：把生产失败压进模型权重</title>
+  <style>
+    :root{
+      --bg:#f6f4ef;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#5f5950;
+      --line:#111111;
+      --red:#d80018;
+      --blue:#1f63ff;
+      --green:#15803d;
+      --soft-red:#fde9eb;
+      --soft-blue:#eef4ff;
+      --soft-green:#dcfce7;
+      --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 var(--line);
+      --stripe:linear-gradient(180deg,var(--line) 0 1px,transparent 1px 42px);
+      --stripe-y:linear-gradient(90deg,var(--line) 0 1px,transparent 1px 42px);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        var(--stripe),
+        var(--stripe-y),
+        linear-gradient(135deg,var(--soft-red) 0 10%,transparent 10% 100%),
+        linear-gradient(225deg,var(--soft-blue) 0 10%,transparent 10% 100%),
+        var(--bg);
+      background-size:100% 42px,42px 100%,100% 100%,100% 100%,auto;
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      font-size:12.8px;
+    }
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+    .hero-bar{grid-column:1/-1;height:14px;background:var(--ink);border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:var(--white);padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:var(--white);font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:var(--white)}
+    .badge.blue{background:var(--blue);color:var(--white)}
+    .badge.dark{background:var(--ink);color:var(--white)}
+    .alert{border:2px solid var(--line);background:var(--ink);color:var(--white);padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:var(--soft-ink)}
+    .hero-visual{background:var(--white);display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,var(--ink) 0%,var(--line) 100%);color:var(--white)}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid var(--white);padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:var(--soft-ink);font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:var(--paper)}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58;color:var(--ink)}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:var(--white);padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:var(--ink)}
+
+    .section{margin-top:24px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:var(--white);font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:var(--white);min-width:0;padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:var(--muted);line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:16px}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:var(--muted);line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:var(--white);font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:var(--ink);color:var(--white)}
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58;color:var(--ink)}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:var(--white);padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,var(--ink));border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:var(--ink)}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,var(--ink));color:var(--white);font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:var(--muted)}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72;color:var(--ink)}
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    th,td{padding:8px 10px;border:1.5px solid var(--line);text-align:left;vertical-align:top}
+    th{background:var(--ink);color:var(--white);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+    tr:nth-child(even) td{background:var(--soft-blue)}
+    .check{color:var(--green);font-weight:900}
+    .cross{color:var(--red);font-weight:900}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+    .rule{height:3px;background:var(--ink);margin:8px 0 0}
+    @media (max-width:1080px){
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+  <header class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-copy">
+      <div class="kicker">硬蓝工业感 · 训练闭环</div>
+      <h1>Shopify Sidekick 的 continual learning loop：把生产失败压进模型权重</h1>
+      <p class="subtitle">从 rubric 和 judge 起步，把真实生产失败、用户纠正和反复报错当作训练信号，持续压缩进模型权重，而不是只在 prompt 和 harness 上打补丁。</p>
+      <div class="tagrow">
+        <span class="tag red">continual learning</span>
+        <span class="tag blue">production failures</span>
+        <span class="tag">judge first</span>
+        <span class="tag dark">gisting / SFT / GRPO</span>
+      </div>
+      <div class="alert">
+        <strong>一句话结论</strong>
+        <p>这不是“再调几个 prompt” 的故事，而是把线上失败收集成训练闭环，先用 harness 和 judge 找对信号，再把改进推进到参数空间。</p>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="panel-top">
+        <div class="eyebrow">Production flywheel</div>
+        <h3>失败 → 标注 → 校准 → 压缩 → 更新权重</h3>
+        <p>Shopify 把 Sidekick / GraphQL agent 的生产体验，转成持续学习的数据飞轮：定义 quality，校准 judge，再把失败压缩成更小更快的模型。</p>
+      </div>
+      <div class="panel-body">
+        <div class="quote">前端工具链会变，真正能沉淀的，是被验证过的生产信号。</div>
+        <div class="flow">
+          <div class="flow-item red"><div class="t">Step 1</div><div class="c">定义 quality & rubric</div></div>
+          <div class="flow-item blue"><div class="t">Step 2</div><div class="c">校准 judge / 回放生产轨迹</div></div>
+          <div class="flow-item dark"><div class="t">Step 3</div><div class="c">harness 改进 + 自压缩 + 训练权重</div></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">What it is</div>
+        <h2>这篇文章讲的是什么</h2>
+        <p>Shopify 讲的是 Sidekick 的 continual learning loop：如何把 production failures 变成训练信号，经过 rubric、judge、harness 和压缩步骤，最终更新到模型权重里。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>核心方向</h3>
+        <p>不是单点优化，而是一个持续学习飞轮。前面出错，后面就把错误转成可训练的东西。</p>
+      </div>
+      <div class="card">
+        <h3>为什么重要</h3>
+        <p>前线模型只能帮你起步，真正的大规模收益来自“从真实流量里学习”。这个 loop 试图把优势从 harness 推进到 weights。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">02</div>
+      <div class="section-meta">
+        <div class="label b">Loop order</div>
+        <h2>飞轮顺序：从 quality 到 weights</h2>
+        <p>文章把顺序讲得很清楚：先定义 quality，再 calibrate judge，然后改善 harness，接着用 autoresearch、gisting、SFT / GRPO 把经验压进权重。</p>
+      </div>
+    </div>
+    <div class="grid-4">
+      <div class="mini"><div class="lead">1</div><h4>定义 quality</h4><p>先写 rubric，把 completeness、execution、response quality 和 safety 变成可评分的契约。</p></div>
+      <div class="mini"><div class="lead">2</div><h4>校准 judge</h4><p>用人工标注、Cohen's kappa 和回放测试验证 judge 不只是会打分，而是真的接近人类判断。</p></div>
+      <div class="mini"><div class="lead">3</div><h4>改进 harness</h4><p>先用 autoresearch 和自修复流程把系统行为变好，再考虑进一步训练。</p></div>
+      <div class="mini"><div class="lead">4</div><h4>压进权重</h4><p>通过 self-healing pipeline、SFT、GRPO 和 gisting，把经验从 prompt 级推进到 parameter-space。</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">03</div>
+      <div class="section-meta">
+        <div class="label">Quality first</div>
+        <h2>先定义质量，再谈训练</h2>
+        <p>文章最强调的一点是：rubric 不是作文题，而是 reward signal。质量定义错了，后面的 judge、训练、压缩都会优化错目标。</p>
+      </div>
+    </div>
+    <div class="matrix">
+      <div class="mini"><div class="lead">Rubric</div><h4>四个维度</h4><p>completeness、execution、response quality、safety，每项都要有锚点。</p></div>
+      <div class="mini"><div class="lead">Calibration</div><h4>看一致性</h4><p>用两位最好的标注者盲标 25 个样本，检查 Cohen's kappa；太低说明 rubric 模糊。</p></div>
+      <div class="mini"><div class="lead">Ground truth</div><h4>别只看金标集</h4><p>随机流量能暴露真实生产里的坏样本，比 curated examples 更能说明问题。</p></div>
+      <div class="mini"><div class="lead">Judge ceiling</div><h4>不追求完美</h4><p>目标不是 100%，而是和人类专家大致对齐。</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">04</div>
+      <div class="section-meta">
+        <div class="label b">Harness to weights</div>
+        <h2>先改 harness，再进参数空间</h2>
+        <p>Shopify 强调先修 orchestration 和上下文压缩，再进入训练环节；比如用 autoresearch 找失败模式，用 gisting 压缩系统提示词，再做 SFT / GRPO。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Harness 改进</h3>
+        <ul>
+          <li>用 autoresearch 先找出失败模式和最优参数</li>
+          <li>把复杂 harness 先自修复，再考虑训练</li>
+          <li>GraphQL agent 是文章中最清晰的生产闭环示例</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>参数空间改进</h3>
+        <ul>
+          <li>SFT 和 GRPO 负责把经验推进到权重</li>
+          <li>Gisting 负责压缩超长系统提示词</li>
+          <li>目标是更快、更便宜，同时保持或提升质量</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">05</div>
+      <div class="section-meta">
+        <div class="label">Measured outcomes</div>
+        <h2>文章给出的结果和边界</h2>
+        <p>文章里最醒目的数字是：质量超过 frontier baseline，serving cost 降 96%，并在 gisting 下带来更低的 TTFT / E2E latency 和更少 GPU。</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <tr><th>结果</th><th>文章说了什么</th><th>这张卡怎么表述</th></tr>
+        <tr><td>质量</td><td class="check">✓ GraphQL agent 质量高于 frontier baseline</td><td class="check">✓ 作为官方结论引用</td></tr>
+        <tr><td>成本</td><td class="check">✓ serving cost down 96%</td><td class="check">✓ 作为官方结论引用</td></tr>
+        <tr><td>延迟 / GPU</td><td class="check">✓ gisting 带来更低 TTFT、E2E latency 和约 14% 更少 GPU</td><td class="check">✓ 只表述为文章结果，不夸成通用 benchmark</td></tr>
+        <tr><td>外推</td><td class="cross">✗ references 里的论文不等于现场实测</td><td class="cross">✗ 不把引用论文当成现场实测</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">06</div>
+      <div class="section-meta">
+        <div class="label b">Use cases</div>
+        <h2>适合什么场景，不适合什么场景</h2>
+        <p>这篇文章适合给 AI product / agent team 看，不适合被断章取义成“所有系统都应该直接训练权重”或“只要压缩提示词就能解决问题”。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>✓ 适合</h3>
+        <ul>
+          <li>已经有生产流量，能持续采样失败案例</li>
+          <li>愿意建立 rubric / judge / 标注闭环</li>
+          <li>目标是把 harness 经验进一步推进到模型权重</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>✗ 不适合</h3>
+        <ul>
+          <li>还没有稳定线上流量就想直接做 continual learning</li>
+          <li>没有质量定义，只想靠 prompt 微调碰运气</li>
+          <li>把文章中的结果当成对所有场景都成立的 benchmark</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">07</div>
+      <div class="section-meta">
+        <div class="label">Official links</div>
+        <h2>官方来源</h2>
+        <p>文章主来源是 Shopify engineering。补充引用指向论文列表，便于读者追到 rubric、prompt compression 和 fine-tuning 的上下文。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Shopify engineering 文章</h3>
+        <p><a href="https://shopify.engineering/sidekicks-continual-learning-loop" target="_blank" rel="noopener">Sidekick's continual learning loop</a></p>
+      </div>
+      <div class="card">
+        <h3>参考脉络</h3>
+        <p>GEPA、Agentic Context Engineering、Gisting / prompt compression、SFT / GRPO、LoRA vs full fine-tuning 等相关研究。</p>
+      </div>
+    </div>
+    <div class="source-note">来源：X discovery + Shopify 官方文章。X 原始 status URL 与数字 ID 未放入可见正文。</div>
+  </section>
+</main>
+<script>
+(function(){
+  function send(){var h=document.body.scrollHeight;window.parent.postMessage({type:'theme-height',slug:'shopify-loop-hardblue',height:h},'*');}
+  if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+  setTimeout(send,500);
+})();
+</script>
+</body>
+</html>
