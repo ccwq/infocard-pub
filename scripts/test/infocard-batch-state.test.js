@@ -4,16 +4,19 @@ const test = require('node:test');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createBatchState, transition, assertSharedStageOrder, saveBatchState, loadBatchState } = require('../lib/infocard-batch-state');
+const { createBatchState, transition, applyStageOutcome, ensureCard, assertSharedStageOrder, saveBatchState, loadBatchState } = require('../lib/infocard-batch-state');
 
 test('batch state records per-card progress and minimal recovery state', () => {
   const state = createBatchState({ runId: 'run-1', cards: ['demo'] });
   assert.equal(state.cards.demo.state, 'DISCOVERED');
-  transition(state, 'demo', 'AUTHORING_DONE', { artifact: 'card.html' });
-  transition(state, 'demo', 'BLOCKED_PROMOTION', { error: 'hash mismatch' });
+  ensureCard(state, 'extra');
+  assert.equal(state.cards.extra.state, 'DISCOVERED');
+  applyStageOutcome(state, 'demo', 'authoring', { result: 'completed', artifact: 'card.html' });
+  applyStageOutcome(state, 'demo', 'promotion', { result: 'failed', terminalState: 'BLOCKED_PROMOTION', error: 'hash mismatch' });
   assert.equal(state.cards.demo.state, 'BLOCKED_PROMOTION');
   assert.equal(state.cards.demo.last_error, 'hash mismatch');
-  assert.equal(state.cards.demo.stages.AUTHORING_DONE.artifact, 'card.html');
+  assert.equal(state.cards.demo.stages.authoring.artifact, 'card.html');
+  assert.equal(state.cards.demo.stages.promotion.error, 'hash mismatch');
 });
 
 test('shared stages are strictly ordered and state is durable', () => {

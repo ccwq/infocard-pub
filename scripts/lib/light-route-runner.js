@@ -42,8 +42,8 @@ async function runLightRoute({ runId, stages, monotonicClock = performance, wall
       result = await Promise.race([stagePromise, new Promise((resolve) => { timer = setTimeout(() => { controller.abort(); resolve({ result: 'stage_timeout', terminalState: 'BLOCKED_AT_LOCAL_GATE' }); }, timeoutMs); })]);
     } finally { clearTimeout(timer); }
     const ended = monoNow();
-    const duration = Math.max(0, ended - started);
-    const stageWallStart = wallStart + (started - start);
+    const duration = Math.max(0, Math.round(ended - started));
+    const stageWallStart = wallStart + Math.round(started - start);
     emit({ schema_version: 2, run_id: runId, stage: stage.stage, parent_stage: stage.parentStage || null, timer_mode: stage.timerMode || 'serial', work_type: stage.workType || 'execution', started_at: iso(stageWallStart), ended_at: iso(stageWallStart + duration), duration_ms: duration, budget_ms: stage.budgetMs || 0, budget_status: duration <= (stage.budgetMs || 0) ? 'within' : 'over', retry_count: result && result.retryCount || 0, rework_count: result && result.reworkCount || 0, result: result && result.result || 'completed' });
     if (result && result.terminalState) { if (!TERMINAL_STATES.includes(result.terminalState)) throw new Error(`invalid terminal state: ${result.terminalState}`); terminalState = result.terminalState; break; }
     if (monoNow() - start >= LIGHT_ROUTE_LIMIT_MS) { hardStop = HARD_STOPS.at(-1); terminalState = terminalState || 'BLOCKED_AT_LOCAL_GATE'; break; }

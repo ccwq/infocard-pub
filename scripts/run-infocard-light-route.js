@@ -12,12 +12,33 @@ const { createContactSheetSet } = require('./lib/contact-sheet');
 const { LIGHT_ROUTE_LIMIT_MS, LIGHT_ROUTE_STAGES, buildTargetedGateCommands } = require('./lib/infocard-light-route');
 const { runLightRoute } = require('./lib/light-route-runner');
 const { appendTimingRecord } = require('./lib/infocard-run-timing');
+const { createBatchState, ensureCard, applyStageOutcome, loadBatchState, saveBatchState } = require('./lib/infocard-batch-state');
+
+function resolveBatchCard(config) {
+  return config.slug || (config.preflight && config.preflight.authoringDir ? path.basename(config.preflight.authoringDir) : null);
+}
+
+function resolveBatchStatePath(config, root) {
+  if (config.batchStatePath) return path.resolve(root, config.batchStatePath);
+  if (config.preflight && config.preflight.authoringDir) return path.resolve(root, config.preflight.authoringDir, 'batch-state.json');
+  return null;
+}
+
+function stageRecordToOutcome(record) {
+  return {
+    result: record.result,
+    terminalState: record.terminal_state,
+    duration_ms: record.duration_ms,
+    retry_count: record.retry_count,
+    rework_count: record.rework_count,
+  };
+}
 
 function commandResult(command, cwd, timeout, extraEnv = {}) {
   if (!Array.isArray(command) || command.length === 0) return { ok: true, result: 'skipped' };
   const args = command.length === 2 && Array.isArray(command[1]) ? command[1] : command.slice(1);
   const executable = process.platform === 'win32' && command[0] === 'npm' ? 'npm.cmd' : command[0];
-  const child = spawnSync(executable, args, { cwd, encoding: 'utf8', shell: false, timeout: Math.max(1, timeout), env: { ...process.env, ...extraEnv } });
+  const child = spawnSync(executable, args, { cwd, encoding: 'utf8', shell: false, timeout: Math.max(1, Math.floor(timeout)), env: { ...process.env, ...extraEnv } });
   return { ok: child.status === 0, result: child.status === 0 ? 'completed' : 'failed', status: child.status, stdout: child.stdout, stderr: child.stderr, error: child.error && child.error.message };
 }
 
@@ -57,8 +78,25 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
   const route = classifyRoute(config.request || {});
   if (route.route !== 'light') return { route, terminalState: null, escalated: true };
   const diagnostics = config.diagnosticsPath ? path.resolve(root, config.diagnosticsPath) : null;
+  const batchStatePath = resolveBatchStatePath(config, root);
+  const batchSlug = resolveBatchCard(config);
+  let batchState = null;
+  if (batchStatePath && batchSlug) {
+    batchState = fs.existsSync(batchStatePath)
+      ? loadBatchState(batchStatePath)
+      : createBatchState({ runId: config.runId || batchSlug, cards: [batchSlug] });
+    ensureCard(batchState, batchSlug);
+    saveBatchState(batchStatePath, batchState);
+  }
   const result = await runLightRoute({ runId: config.runId, stages: buildStages(config, root, route), context: { route }, onRecord: diagnostics ? (record) => appendTimingRecord(diagnostics, record) : () => {} });
-  return { route, terminalState: result.terminalState, hardStop: result.hardStop, recordCount: result.records.length, capturePlanPath: result.context.capturePlanPath || null };
+  if (batchState && batchSlug) {
+    for (const record of result.records) {
+      if (record.stage === 'run_start' || record.stage === 'hard_stop') continue;
+      applyStageOutcome(batchState, batchSlug, record.stage, stageRecordToOutcome(record));
+    }
+    saveBatchState(batchStatePath, batchState);
+  }
+  return { route, terminalState: result.terminalState, hardStop: result.hardStop, recordCount: result.records.length, capturePlanPath: result.context.capturePlanPath || null, batchStatePath: batchStatePath || null };
 }
 
 if (require.main === module) main().then((result) => { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); process.exitCode = result.escalated || result.terminalState === 'PUBLISHED_VERIFIED' || result.terminalState === 'PAGES_PENDING' ? 0 : 1; }).catch((error) => { console.error(error.stack || error.message); process.exitCode = 2; });
