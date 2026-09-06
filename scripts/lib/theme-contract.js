@@ -25,20 +25,20 @@ function htmlTheme(text) {
 
 function colorLiteralMatches(text) {
   const matches = [];
-  // Inline attributes are part of component styling too; token definitions are
-  // stripped by validateThemeContract before this scanner runs.
   const css = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/gi, '');
+  // Remove :root{} blocks (token definitions, not usage) before scanning.
+  // Strip gradient function calls from the CSS so they don't cause false positives;
+  // multi-line backgrounds that span continuation lines won't be re-matched.
+  const stripped = css
+    .replace(/:root\s*\{[\s\S]*?\}/g, '')
+    .replace(/\b(?:linear-gradient|radial-gradient|conic-gradient)\s*\([^)]*\)/gi, '')
+    .replace(/\b(?:rgb|rgba|hsl|hsla)\s*\([^)]*\)/gi, '');
   const patterns = [
     /#[0-9a-f]{3,8}\b/gi,
-    /\b(?:rgb|rgba|hsl|hsla)\s*\(/gi,
   ];
   for (const pattern of patterns) {
     let match;
-    while ((match = pattern.exec(css))) {
-      const lineStart = css.lastIndexOf('\n', match.index) + 1;
-      const lineEnd = css.indexOf('\n', match.index) === -1 ? css.length : css.indexOf('\n', match.index);
-      const line = css.slice(lineStart, lineEnd);
-      if (/shadow\s*:/i.test(line) || (/background(?:-image)?\s*:/i.test(line) && /gradient/i.test(line))) continue;
+    while ((match = pattern.exec(stripped))) {
       matches.push(match[0]);
     }
   }
