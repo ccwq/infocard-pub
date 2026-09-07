@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>browser-use：让 AI 像真人一样操控浏览器</title>
+<style>
+:root{
+  --bg:#f6f4ef;
+  --paper:#fffdf8;
+  --ink:#111111;
+  --muted:#5f5950;
+  --line:#111111;
+  --red:#d80018;
+  --blue:#1f63ff;
+  --soft-red:#fde9eb;
+  --soft-blue:#e8f1ff;
+  --soft-ink:#f7f6f2;
+  --shadow:8px 8px 0 rgba(17,17,17,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;overflow-x:hidden}
+body{
+  color:var(--ink);line-height:1.58;
+  background:
+    linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+    linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+    radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+    radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+    var(--bg);
+  font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 88px}
+
+.hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden;box-shadow:var(--shadow)}
+.hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+.hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+.hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+.hero-copy{padding:22px;border-right:3px solid var(--line);display:grid;gap:14px;align-content:start}
+.kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:6px 10px;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.kicker::before{content:"■";color:var(--red);font-size:11px}
+h1.demo-title{margin:0;max-width:820px;font-size:clamp(26px,4vw,46px);line-height:.98;letter-spacing:-.05em}
+.subtitle{color:var(--muted);font-size:14px;line-height:1.6}
+.badge-row{display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:inline-flex;align-items:center;min-height:33px;padding:6px 10px;border:2px solid var(--line);background:#fff;font-size:12.1px;font-weight:850}
+.badge.red{background:var(--red);color:#fff}
+.badge.blue{background:var(--blue);color:#fff}
+.badge.dark{background:#111;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+.stat .k{display:block;margin-bottom:6px;font-size:10.8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.stat .v{display:block;font-size:13.5px;line-height:1.34;font-weight:900}
+.alert{border:3px solid var(--line);background:#111;color:#fff;padding:15px;display:grid;gap:10px}
+.alert strong{display:block;font-size:15px;line-height:1.35}
+.alert p{margin:0;font-size:14px;line-height:1.68;color:#f0ebe0!important}
+.mini-row{display:flex;flex-wrap:wrap;gap:6px}
+.mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+.hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+.hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+.panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+.panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+.panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+.quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58;font-size:14px}
+.flow{display:grid;gap:8px}
+.flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+.flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+.flow-item:last-child::after{display:none}
+.flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+.flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+.flow-item.red .c{color:var(--red)}
+.flow-item.blue .c{color:var(--blue)}
+.flow-item.dark .c{color:#111}
+
+.section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+.section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+.section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+.section-no.b{background:var(--blue)}
+.section-no.k{background:#111}
+.section-meta{display:grid;gap:7px;padding-top:4px}
+.section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+.section-meta .label.b{color:var(--blue)}
+.section-meta .label.k{color:#111}
+.section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+.section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+.grid-2,.grid-3,.grid-4,.grid-5{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.grid-5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+.card,.mini{padding:14px}
+.card{display:grid;gap:10px}
+.card h3,.mini h4{margin:0;letter-spacing:-.02em}
+.card h3{font-size:17px;line-height:1.16}
+.card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+.card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+.card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+.tag.red{background:var(--soft-red)}
+.tag.blue{background:var(--soft-blue)}
+.tag.dark{background:#111;color:#fff}
+.tag.blue-solid{background:var(--blue);color:#fff}
+
+.mini h4{font-size:15px;line-height:1.2}
+.mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.mini .red{color:var(--red)}
+.mini .blue{color:var(--blue)}
+.mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+.mini-icon{width:44px;height:44px;border:2px solid var(--line);display:grid;place-items:center;font-size:20px;margin-bottom:6px;background:var(--soft-ink)}
+
+.risk-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+.risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+.risk[data-accent="red"]{--accent:var(--red)}
+.risk[data-accent="blue"]{--accent:var(--blue)}
+.risk[data-accent="dark"]{--accent:#111}
+.risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+.risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+.risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+
+.quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+.quote-block b{color:#111}
+
+.code-block{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;overflow-x:auto;white-space:pre-wrap}
+
+.footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+.footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+.footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+.footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+.footer-block .meta{font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px}
+
+.rule{height:3px;background:#111;margin:8px 0 0}
+.source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+@media (max-width:1080px){
+  .hero{grid-template-columns:1fr}
+  .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+  .grid-4,.grid-5,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:720px){
+  .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+  .hero{display:flex;flex-direction:column}
+  .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+  .grid-4,.grid-3,.grid-2,.grid-5,.risk-grid{grid-template-columns:1fr}
+  .section-head{grid-template-columns:1fr;gap:10px}
+  .section-no{width:72px;height:72px;font-size:28px}
+  .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-copy">
+      <div class="kicker">browser-use · AI Browser Automation</div>
+      <h1 class="demo-title">browser-use：让 AI 像真人一样操控浏览器</h1>
+      <p class="subtitle">MIT 开源的 Browser Automation 工具，AI Agent 直接点击、滚动、登录、填表、抓取动态页面。两位苏黎世 ETH 研究员开发，Python 生态，异步架构。</p>
+      <div class="badge-row">
+        <span class="badge red">MIT License</span>
+        <span class="badge blue">Python</span>
+        <span class="badge dark">~94k Stars</span>
+        <span class="badge">异步架构</span>
+        <span class="badge">v0.13.x</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="k">GitHub Stars</span><span class="v">~94,000</span></div>
+        <div class="stat"><span class="k">最新版本</span><span class="v">0.13.x</span></div>
+        <div class="stat"><span class="k">协议</span><span class="v">MIT</span></div>
+        <div class="stat"><span class="k">语言</span><span class="v">Python</span></div>
+      </div>
+      <div class="alert">
+        <strong>AI 原生浏览器自动化</strong>
+        <p>突破传统爬虫瓶颈——动态渲染页面的克星；AI 驱动的工作流判断 + 执行一体化。</p>
+        <div class="mini-row">
+          <span class="mini-tag">动态抓取</span>
+          <span class="mini-tag">登录控制</span>
+          <span class="mini-tag">多模型</span>
+          <span class="mini-tag">Rust 重构 Beta</span>
+        </div>
+      </div>
+    </div>
+    <figure class="hero-visual">
+      <div class="panel-top">
+        <div class="eyebrow">QUICK START</div>
+        <h3>三步上手 browser-use</h3>
+        <p>pip install → 配置 API Key → 编写异步脚本，Agent 自动完成所有浏览器操作。</p>
+      </div>
+      <div class="panel-body">
+        <div class="quote"><b>一句话：</b>让 AI Agent 像真人一样操控浏览器，突破传统爬虫的动态页面瓶颈。</div>
+        <div class="flow">
+          <div class="flow-item blue"><div class="t">Step 1</div><div class="c">pip install browser-use</div></div>
+          <div class="flow-item red"><div class="t">Step 2</div><div class="c">设置 OpenAI / Anthropic Key</div></div>
+          <div class="flow-item dark"><div class="t">Step 3</div><div class="c">编写异步任务脚本 → Agent 接管</div></div>
+        </div>
+      </div>
+    </figure>
+  </header>
+
+  <!-- SECTION 01: Five Features -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">FIVE FEATURES</div>
+        <h2>五大核心功能</h2>
+        <p>browser-use 提供从通用控制到云端隐身浏览器的完整能力，覆盖 AI 自动化工作流全链路。</p>
+      </div>
+    </div>
+    <div class="grid-5">
+      <article class="card">
+        <div class="mini-icon">🖱</div>
+        <div class="tagrow"><span class="tag red">核心</span></div>
+        <h3>通用浏览器控制</h3>
+        <p>点击、滚动、登录、填表、页面切换，AI 像真人一样操控任意网站。</p>
+        <ul>
+          <li>DOM 元素定位与操作</li>
+          <li>多标签页管理</li>
+          <li>文件上传下载</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="mini-icon">🔄</div>
+        <div class="tagrow"><span class="tag blue">抓取</span></div>
+        <h3>动态页面抓取</h3>
+        <p>传统爬虫摸不到的动态渲染、需要交互、需要登录的页面，AI 直接上手。</p>
+        <ul>
+          <li>SPA / CSR 页面</li>
+          <li>需要滚动加载</li>
+          <li>登录墙后内容</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="mini-icon">🧠</div>
+        <div class="tagrow"><span class="tag dark">导航</span></div>
+        <h3>智能页面判断</h3>
+        <p>不仅能爬，还会判断页面该怎么走，AI 驱动的工作流决策引擎。</p>
+        <ul>
+          <li>页面状态识别</li>
+          <li>下一步推理</li>
+          <li>错误恢复</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="mini-icon">🤖</div>
+        <div class="tagrow"><span class="tag blue">多模型</span></div>
+        <h3>多模型支持</h3>
+        <p>支持 GPT、Claude、Gemini 等主流模型，提供 ChatBrowserUse 等统一接口。</p>
+        <ul>
+          <li>OpenAI GPT-4 系列</li>
+          <li>Anthropic Claude</li>
+          <li>Google Gemini</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="mini-icon">☁</div>
+        <div class="tagrow"><span class="tag blue-solid">云端</span></div>
+        <h3>云端隐身浏览器</h3>
+        <p>Browser Use Cloud 可选云端 Stealth Browser，无需本地配置即可远程运行。</p>
+        <ul>
+          <li>远程无头浏览器</li>
+          <li>隐身模式防检测</li>
+          <li>按需扩展</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- SECTION 02: Three Steps -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">02</div>
+      <div class="section-meta">
+        <div class="label b">QUICK START</div>
+        <h2>三步上手</h2>
+        <p>从安装到跑通第一个自动化任务，只需三步。支持 Python 3.10+，异步架构。</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <article class="card">
+        <div class="tagrow"><span class="tag red">安装</span></div>
+        <h3>pip install browser-use</h3>
+        <p>一行命令安装，支持 Python 3.10+。可选 Docker 方式运行。</p>
+        <div class="code-block">pip install browser-use
+# Docker（可选）
+docker run -p 9222:9222 browser-use/cloud</div>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">配置</span></div>
+        <h3>配置 API Key</h3>
+        <p>设置 OpenAI / Anthropic / Google API Key，通过环境变量或代码传入。</p>
+        <div class="code-block">export OPENAI_API_KEY="sk-..."
+# 或在代码中配置
+browser = BrowserUse(model="claude-3-5")</div>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag dark">运行</span></div>
+        <h3>编写异步任务脚本</h3>
+        <p>用 Python asyncio 编写任务脚本，Agent 自动完成所有浏览器操作。</p>
+        <div class="code-block">import asyncio
+from browser_use import Agent
+
+async def main():
+    agent = Agent(task="帮我搜索...") 
+    await agent.run()
+
+asyncio.run(main())</div>
+      </article>
+    </div>
+  </section>
+
+  <!-- SECTION 03: Advantages -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">03</div>
+      <div class="section-meta">
+        <div class="label k">ADVANTAGES</div>
+        <h2>核心优势</h2>
+        <p>相比传统爬虫和脚本自动化，browser-use 的差异化竞争力。</p>
+      </div>
+    </div>
+    <div class="risk-grid">
+      <article class="risk" data-accent="red">
+        <div class="n">1</div>
+        <h4>突破传统爬虫瓶颈</h4>
+        <p>动态渲染页面的克星。传统爬虫无法处理的 SPA、CSR、需要 JS 执行才能渲染的页面，browser-use 可以直接上手。</p>
+      </article>
+      <article class="risk" data-accent="blue">
+        <div class="n">2</div>
+        <h4>AI 原生自动化</h4>
+        <p>工作流判断 + 执行一体化。Agent 不只是执行指令，还会推理下一步该做什么，实现真正的端到端自动化。</p>
+      </article>
+      <article class="risk" data-accent="dark">
+        <div class="n">3</div>
+        <h4>活跃开源社区</h4>
+        <p>~94k GitHub Stars，贡献者众多，持续迭代。两位 ETH 苏黎世研究员主导，MIT 协议完全开源。</p>
+      </article>
+      <article class="risk" data-accent="red">
+        <div class="n">4</div>
+        <h4>Rust 重构 Beta</h4>
+        <p>0.13.x 引入 Rust 核心重构，性能大幅提升。Python 异步架构 + Rust 高性能核心的混合路线。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- SECTION 04: Closing -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">04</div>
+      <div class="section-meta">
+        <div class="label b">CLOSING</div>
+        <h2>为什么选择 browser-use</h2>
+        <p>一句话总结 browser-use 的定位与价值。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="quote-block">
+        <b>一句话：</b>browser-use 是目前最成熟的 AI Agent 浏览器自动化开源方案，让 AI 直接操控真实浏览器完成复杂任务，而非依赖 API 或静态解析。
+      </div>
+      <article class="card">
+        <div class="tagrow"><span class="tag dark">使用场景</span></div>
+        <h3>典型应用场景</h3>
+        <ul>
+          <li>自动化测试：替代 Selenium/Playwright，AI 驱动的端到端测试</li>
+          <li>数据采集：抓取需要登录、交互、滚动加载的动态页面</li>
+          <li>网页操作：自动填表、自动发布、批量操作后台</li>
+          <li>RPA 增强：传统 RPA 工具无法处理的复杂决策场景</li>
+          <li>研究与监控：定期抓取变化页面，AI 判断内容重要性</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <div class="rule"></div>
+  <p class="source-note">browser-use · AI Browser Automation · github.com/browser-use/browser-use · MIT License · ~94k Stars · 2026-09-07</p>
+</main>
+</body>
+</html>
