@@ -3,7 +3,9 @@ const fs = require('node:fs');
 const { classifyRoute } = require('./lib/infocard-route');
 
 function main(argv = process.argv.slice(2)) {
-  const input = argv[0] ? JSON.parse(fs.readFileSync(argv[0], 'utf8')) : JSON.parse(fs.readFileSync(0, 'utf8'));
+  const requestIndex = argv.indexOf('--request');
+  const request = requestIndex >= 0 ? argv[requestIndex + 1] : null;
+  const input = request ? JSON.parse(request) : (argv[0] ? JSON.parse(fs.readFileSync(argv[0], 'utf8')) : JSON.parse(fs.readFileSync(0, 'utf8')));
   const result = classifyRoute(input);
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   return 0;

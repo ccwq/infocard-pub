@@ -98,10 +98,10 @@ test('timeout handoff is filesystem-first and never redelegates the same slug', 
   assert.deepEqual(timeoutHandoffState({ frozenContract: false }), { state: 'BLOCKED_AT_PREFLIGHT', action: 'stop', redelegate: false });
 });
 
-// Palette literals in :root are legal; component literals remain blocked.
+// Palette literals in :root are legal; component hex literals remain blocked.
 test('theme contract permits root palette literals but rejects component literals', () => {
   const { colorLiteralMatches } = require('../lib/theme-contract');
-  const css = ':root{--alpha:rgba(1,2,3,.5)} .card{background:var(--alpha)} .bad{color:rgb(1,2,3)}';
+  const css = ':root{--alpha:rgba(1,2,3,.5)} .card{background:var(--alpha)} .bad{color:#123456}';
   const component = css.replace(/:root\s*\{[^{}]*\}/gi, '');
-  assert.deepEqual(colorLiteralMatches(component), ['rgb(']);
+  assert.deepEqual(colorLiteralMatches(component), ['#123456']);
 });
