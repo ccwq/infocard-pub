@@ -1,54 +1,4 @@
-<!doctype html>
-<html lang="zh-CN" data-theme="codex-notebook">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-contract" content="theme/codex-notebook.html">
-<title>pi-subagents 模型分配指南：按角色定位给每个子代理配对模型</title>
-<style>
-:root{--bg:#f5f1e8;--paper:#fffaf0;--paper2:#fff2d6;--ink:#1f1a16;--muted:#6d645a;--line:#2a241f;--red:#e24b3b;--green:#77bf52;--yellow:#f4d35e;--blue:#9fc7ef;--pink:#f5b7cd;--orange:#f2a65a;--white:#fff;--black:#222}
-*{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden}body{background:var(--bg);color:var(--ink);font:13px/1.7 Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}.page{width:min(1180px,calc(100% - 24px));margin:auto;padding:18px 0 60px}.card{background:var(--paper);border:2px solid var(--line);box-shadow:5px 5px 0 var(--line)}.hero{padding:18px;margin-bottom:14px;background:var(--paper2)}.kicker{display:inline-block;background:var(--black);color:var(--white);padding:6px 10px;font:800 11px/1 ui-monospace,monospace;letter-spacing:.06em}.hero h1{font:900 clamp(28px,5vw,58px)/1.02 Georgia,"PingFang SC","Microsoft YaHei",serif;margin:14px 0 10px;letter-spacing:-.04em}.hero h1 em{color:var(--red);font-style:normal}.hero p{max-width:70ch;color:var(--muted);font-size:14px}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{padding:5px 9px;border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);font:800 11px/1 ui-monospace,monospace}.chip:nth-child(3n){background:var(--yellow)}.chip:nth-child(3n+1){background:var(--green)}.chip:nth-child(3n+2){background:var(--blue)}.source{padding:16px;background:var(--paper);margin-bottom:14px}.source-head{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:2px solid var(--line);padding-bottom:10px;margin-bottom:12px}.source-head h2{margin:0;font:900 22px/1.1 Georgia,serif}.source-head span{background:var(--red);color:var(--white);padding:5px 8px;font:800 10px/1 ui-monospace,monospace}.markdown{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:12px/1.68 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--paper2);border:2px dashed var(--line);padding:16px;max-height:none}.footer{margin-top:14px;padding:12px 16px;background:var(--red);color:var(--white);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-weight:800}@media(max-width:720px){.page{width:calc(100% - 14px);padding:10px 0 30px}.card{box-shadow:3px 3px 0 var(--line)}.hero{padding:12px}.hero h1{font-size:39px}.source{padding:10px}.markdown{padding:10px;font-size:11px;line-height:1.62}.footer{flex-direction:column;align-items:flex-start}}
-</style></head><body><main class="page">
-<section class="hero card"><div class="kicker">PI-SUBAGENTS · MODEL ROUTING HANDBOOK</div><h1>按角色定位，给每个子代理配对模型</h1><p>完整保留原始 Markdown 文本，不做删节。本文把模型、thinking、优先级、预算边界与故障转移放进同一条可验证配置链。</p><div class="chips"><span class="chip">scout / researcher</span><span class="chip">worker / reviewer</span><span class="chip">oracle</span><span class="chip">settings.json</span><span class="chip">modelScope</span><span class="chip">fallbackModels</span></div></section>
-<section class="source card"><div class="source-head"><h2>原始 Markdown 全文</h2><span>VERBATIM · NO LOSS</span></div><pre class="markdown"># pi-subagents 模型分配指南：按角色定位给每个子代理配对模型
-
-&gt; **一句话结论**：pi-subagents 的子代理默认全部继承父会话模型；通过 `settings.json` 的分层配置，把 6 个内置角色按各自任务定位分配到不同档位的模型与 thinking 级别，就能在经济、性能、效率之间取得平衡。
-
-## 核心要点
-
-1. **一切调整都作用于同一条优先级链**：单次覆盖 &gt; 角色覆盖 &gt; agent 定义 &gt; 全局默认 &gt; 继承父会话。改任何一处，先想清楚它在链上的位置。
-2. **分配的第一依据是角色定位，模型只是参数**：侦察、实现、评审、咨询的任务形状不同，需要的档位不同；换模型目录时只需重排档位，角色定位不变。
-3. **thinking 级别是独立于模型的第二成本旋钮**：同一个模型，thinking 从 low 调到 high，成本和深度都会显著变化。
-4. **调整有闭环**：`/subagents-models` 看实际生效的映射，配合&quot;症状→调整&quot;对照表定位问题。
-5. **预算与故障各有兜底**：`modelScope` 兜住模型范围上限，`fallbackModels` 兜住供应商偶发故障。
-
-## 速览结论
-
-如果你已装好 pi 和 pi-subagents，只想快速配一个合理默认：在 `~/.pi/agent/settings.json` 写入 `subagents.defaultModel`（便宜的主力模型）和 `subagents.defaultThinking`（`low` 或 `medium`），这一步就能覆盖所有角色。之后按第 3 节给 `reviewer`、`oracle` 两个高杠杆角色单独升档即可。改完**重启 pi**，用 `/subagents-models` 验证。完整的分角色推荐见第 2 节表格，真实配置实例见附录 A。
-
-&gt; **快速阅读到此结束。**
-&gt;
-&gt; 以下逐项展开：从零的环境自查清单、优先级链的工作机制、每个角色的定位与档位推荐、配置步骤、验证命令、排障对照表与兜底策略。模型分档建议标注了证据性质——其中档位划分是**推断**，第 5 节给出了实测校准路径。
-
----
-
-## 0. 前置条件：从零检查清单
-
-本文假设你已安装 pi（`@earendil-works/pi-coding-agent`），但尚未安装 pi-subagents、未配置自定义模型。按顺序完成以下四项。
-
-### 0.1 安装 pi-subagents
-
-```bash
-pi install npm:pi-subagents
-```
-
-注意：后台（async）子代理要求 pi 以 npm 包形式安装（有包目录供 detached runner 引用）；单文件二进制版 pi 只能跑前台子代理。
-
-### 0.2 配置自定义 provider（`models.json`）
-
-pi 的自定义 OpenAI 兼容 provider 配置在 `~/.pi/agent/models.json`，结构如下（完整真实实例见附录 A）：
-
-```json
-{
+<!doctype html><html lang="zh-CN" data-theme="codex-notebook"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-contract" content="theme/codex-notebook.html"><title>pi-subagents 模型分配指南：按角色定位给每个子代理配对模型</title><style>:root{--bg:#f5f1e8;--paper:#fffaf0;--paper2:#fff2d6;--ink:#1f1a16;--muted:#6d645a;--line:#2a241f;--red:#e24b3b;--green:#77bf52;--yellow:#f4d35e;--blue:#9fc7ef;--white:#fff;--black:#222;--body:#3f3831;--link:#164b91;--codebg:#f0e7d7;--codeborder:#c8bca9;--listbg:#fff7df;--tableline:#cfc3b1;--tablestripe:#fff4dc}*{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden}body{background:var(--bg);color:var(--ink);font:14px/1.75 Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}.page{width:min(1180px,calc(100% - 24px));margin:auto;padding:18px 0 60px}.card{background:var(--paper);border:2px solid var(--line);box-shadow:5px 5px 0 var(--line)}.hero{padding:18px;margin-bottom:14px;background:var(--paper2)}.kicker{display:inline-block;background:var(--black);color:var(--white);padding:6px 10px;font:800 11px/1 ui-monospace,monospace;letter-spacing:.06em}.hero h1{font:900 clamp(28px,5vw,58px)/1.02 Georgia,"PingFang SC","Microsoft YaHei",serif;margin:14px 0 10px}.hero h1 em{color:var(--red);font-style:normal}.hero p{max-width:74ch;color:var(--muted);font-size:14px}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{padding:5px 9px;border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);font:800 11px/1 ui-monospace,monospace;background:var(--blue)}.source{padding:18px;background:var(--paper)}.source-head{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:2px solid var(--line);padding-bottom:10px;margin-bottom:16px}.source-head h2{margin:0;font:900 24px/1.1 Georgia,serif}.source-head span{background:var(--red);color:var(--white);padding:5px 8px;font:800 10px/1 ui-monospace,monospace}.content h2,.content h3,.content h4{font-family:Georgia,"PingFang SC","Microsoft YaHei",serif;line-height:1.15;margin:24px 0 8px}.content h2{font-size:27px;border-left:7px solid var(--red);padding-left:10px}.content h3{font-size:21px;border-bottom:2px solid var(--line);padding-bottom:5px}.content h4{font-size:17px}.content p{margin:10px 0;color:var(--body)}.content a{color:var(--link);text-decoration:underline}.content code{background:var(--codebg);border:1px solid var(--codeborder);padding:1px 4px;font:12px ui-monospace,monospace;overflow-wrap:anywhere}.code{background:var(--black);color:var(--white);padding:14px;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.65 ui-monospace,monospace;border-left:6px solid var(--red);margin:12px 0}.content blockquote{margin:14px 0;padding:12px 16px;background:var(--yellow);border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);font-weight:700}.content ul,.content ol{padding-left:26px;background:var(--listbg);border:1px dashed var(--line);padding-top:8px;padding-bottom:8px}.content li{margin:4px 0}.table-wrap{overflow-x:auto;margin:14px 0}.content table{width:100%;border-collapse:collapse;min-width:620px;font-size:12px}.content th{background:var(--ink);color:var(--white);text-align:left;padding:8px}.content td{padding:8px;border-bottom:1px solid var(--tableline);vertical-align:top}.content tr:nth-child(even) td{background:var(--tablestripe)}.content hr{border:0;border-top:3px dashed var(--line);margin:24px 0}.footer{margin-top:14px;padding:12px 16px;background:var(--red);color:var(--white);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-weight:800}@media(max-width:720px){.page{width:calc(100% - 14px);padding:10px 0 30px}.hero,.source{padding:12px}.hero h1{font-size:39px}.source-head{align-items:flex-start;flex-direction:column}.content h2{font-size:23px}.content h3{font-size:19px}.content p{font-size:13px}.content table{font-size:11px}.footer{flex-direction:column;align-items:flex-start}}</style></head><body><main class="page"><section class="hero card"><div class="kicker">PI-SUBAGENTS · MODEL ROUTING HANDBOOK</div><h1>按角色定位，给每个子代理配对模型</h1><p>完整保留原始 Markdown 的全部信息，并将标题、段落、代码块、引用、列表、表格和参考文献按手册结构排版。模型档位推荐仍按原文标注为推断。</p><div class="chips"><span class="chip">scout / researcher</span><span class="chip">worker / reviewer</span><span class="chip">oracle</span><span class="chip">settings.json</span><span class="chip">modelScope</span><span class="chip">fallbackModels</span></div></section><section class="source card"><div class="source-head"><h2>pi-subagents 模型分配指南</h2><span>FULL CONTENT · NO LOSS</span></div><article class="content"><h2>pi-subagents 模型分配指南：按角色定位给每个子代理配对模型</h2><blockquote><strong>一句话结论</strong>：pi-subagents 的子代理默认全部继承父会话模型；通过 <code>settings.json</code> 的分层配置，把 6 个内置角色按各自任务定位分配到不同档位的模型与 thinking 级别，就能在经济、性能、效率之间取得平衡。</blockquote><h3>核心要点</h3><ol><li><strong>一切调整都作用于同一条优先级链</strong>：单次覆盖 &gt; 角色覆盖 &gt; agent 定义 &gt; 全局默认 &gt; 继承父会话。改任何一处，先想清楚它在链上的位置。</li><li><strong>分配的第一依据是角色定位，模型只是参数</strong>：侦察、实现、评审、咨询的任务形状不同，需要的档位不同；换模型目录时只需重排档位，角色定位不变。</li><li><strong>thinking 级别是独立于模型的第二成本旋钮</strong>：同一个模型，thinking 从 low 调到 high，成本和深度都会显著变化。</li><li><strong>调整有闭环</strong>：<code>/subagents-models</code> 看实际生效的映射，配合"症状→调整"对照表定位问题。</li><li><strong>预算与故障各有兜底</strong>：<code>modelScope</code> 兜住模型范围上限，<code>fallbackModels</code> 兜住供应商偶发故障。</li></ol><h3>速览结论</h3><p>如果你已装好 pi 和 pi-subagents，只想快速配一个合理默认：在 <code>~/.pi/agent/settings.json</code> 写入 <code>subagents.defaultModel</code>（便宜的主力模型）和 <code>subagents.defaultThinking</code>（<code>low</code> 或 <code>medium</code>），这一步就能覆盖所有角色。之后按第 3 节给 <code>reviewer</code>、<code>oracle</code> 两个高杠杆角色单独升档即可。改完<strong>重启 pi</strong>，用 <code>/subagents-models</code> 验证。完整的分角色推荐见第 2 节表格，真实配置实例见附录 A。</p><blockquote><strong>快速阅读到此结束。</strong>  以下逐项展开：从零的环境自查清单、优先级链的工作机制、每个角色的定位与档位推荐、配置步骤、验证命令、排障对照表与兜底策略。模型分档建议标注了证据性质——其中档位划分是<strong>推断</strong>，第 5 节给出了实测校准路径。</blockquote><hr><h3>0. 前置条件：从零检查清单</h3><p>本文假设你已安装 pi（<code>@earendil-works/pi-coding-agent</code>），但尚未安装 pi-subagents、未配置自定义模型。按顺序完成以下四项。</p><h4>0.1 安装 pi-subagents</h4><pre class="code" data-lang="bash"><code>pi install npm:pi-subagents</code></pre><p>注意：后台（async）子代理要求 pi 以 npm 包形式安装（有包目录供 detached runner 引用）；单文件二进制版 pi 只能跑前台子代理。</p><h4>0.2 配置自定义 provider（<code>models.json</code>）</h4><p>pi 的自定义 OpenAI 兼容 provider 配置在 <code>~/.pi/agent/models.json</code>，结构如下（完整真实实例见附录 A）：</p><pre class="code" data-lang="json"><code>{
   &quot;providers&quot;: {
     &quot;lin&quot;: {
       &quot;api&quot;: &quot;openai-responses&quot;,
@@ -59,90 +9,13 @@ pi 的自定义 OpenAI 兼容 provider 配置在 `~/.pi/agent/models.json`，结
       ]
     }
   }
-}
-```
-
-关键字段：`api` 选协议（`openai-responses` / `openai-completions` 等）、`baseUrl` 网关地址、`models[].id` 决定你在配置里引用什么名字、`reasoning` 声明该模型是否支持 thinking。详见参考文献 [7]。
-
-### 0.3 确认默认指向
-
-`~/.pi/agent/settings.json` 中的 `defaultModel` / `defaultProvider` 决定父会话模型和裸模型 id 的解析归属。**自查项**：如果你改过 provider 名字，检查 `defaultProvider` 是否还指向旧名字——指向不存在的 provider 会让裸 id（如 `glm-5.3`）解析失败。
-
-### 0.4 重启并体检
-
-配置改动需**重启 pi** 才生效。启动后运行：
-
-```text
-/subagents-doctor
-```
-
-检查子代理扩展与依赖是否正常。
-
----
-
-## 1. 模型解析优先级链（一切调整的基础）
-
-&gt; 出处：pi-subagents `docs/models.md`（参考文献 [1]）
-
-子代理启动时按以下顺序解析模型，**强者优先**：
-
-| 优先级 | 来源 | 配置位置 |
-| --- | --- | --- |
-| 1（最强） | 单次运行覆盖 | `/run reviewer[model=lin/gpt-5.6-luna:high] &quot;...&quot;` 或工具调用的 `model` 参数 |
-| 2 | provider 作用域角色覆盖 | `subagents.agentOverridesByProvider.&lt;provider&gt;.&lt;name&gt;.model` |
-| 3 | 角色覆盖 | `subagents.agentOverrides.&lt;name&gt;.model` |
-| 4 | agent 定义 | 自定义 agent frontmatter 的 `model`（builtin 角色不设置） |
-| 5 | 全局默认 | `subagents.defaultModel` |
-| 6（最弱） | 继承父会话 | 你当前 pi 会话的模型 |
-
-两条解析规则需要特别注意：
-
-- **`defaultProvider` 只解决歧义，不参与优先级**：当裸 id（`glm-5.3`）在多个 provider 下重名时，用它决定归属；全限定写法 `lin/glm-5.3` 永远精确命中。多 provider 环境下建议**全部用全限定写法**。
-- **`model: &quot;inherit&quot;` 是显式继承**：写在哪一层就继承&quot;启动那一刻&quot;的直接父会话模型，嵌套子代理继承的是它的直接父，而非最初的顶层会话。
-
-## 2. 分配依据：六个内置角色的定位
-
-&gt; 角色职责出处：pi-subagents README 与 `docs/agents.md`；档位推荐为**推断**（依据模型命名与通用分档经验，未经实测），校准方法见第 5 节。
-
-角色定位是稳定的设计判断，模型档位是可以随时重排的参数：
-
-| 角色 | 职责 | 任务形状 | 推荐档位【推断】 | 推荐 thinking |
-| --- | --- | --- | --- | --- |
-| `scout` | 本地代码侦察：找文件、入口、数据流、风险 | 大量小请求，容错高 | 工兵档：`glm-5.3-flash` / `gpt-5.3-codex-spark` | `low` |
-| `researcher` | 外部/文档调研，产出带来源的简报 | 大量小请求 | 工兵档：`glm-5.3-flash` | `low` |
-| `delegate` | 轻量通用代理，行为接近父会话 | 混合 | 主力档：`glm-5.3` | `medium` |
-| `worker` | 实现工作：改文件、验证、上报未授权决策 | 中等复杂度多文件编辑 | 主力档：`glm-5.3` / `MiniMax-M3` | `medium` |
-| `reviewer` | 代码评审：测试、边界、简洁性 | 需要细读和判断 | 评审档：`gpt-5.6-luna` | `high` |
-| `oracle` | 决策前的第二意见，挑战假设 | 难题攻关，高杠杆低频次 | 深度档：`gpt-5.6-sol` / `gpt-5.6-terra` | `high` |
-
-分档逻辑（对应&quot;经济 × 性能 × 效率&quot;三个轴）：
-
-- **工兵档 = 经济**：工作流场景下侦察类子代理数量最多（几十个），单价是第一变量。便宜模型 + 低 thinking 足够，因为它们的产出会被下游核验。
-- **主力档 = 效率**：worker 覆盖大部分 token 消耗，选&quot;能一次改对&quot;的性价比模型，medium thinking 防止在常规任务上欠思考。
-- **评审/深度档 = 性能**：reviewer 和 oracle 出场次数少但决策杠杆高，漏掉一个 bug 的代价远高于省下的 token。注意：**强推理模型在模糊目标上容易空转循环**，oracle 类角色接到的任务必须有明确目标和完成标准。
-
-## 3. 三步配置
-
-&gt; 参数出处：pi-subagents `docs/models.md`（参考文献 [1]）。配置写在 `~/.pi/agent/settings.json`（用户级）或项目 `.pi/settings.json`（项目级，优先）。
-
-### 第一步：全局默认（覆盖所有未单独设置的角色）
-
-```json
-{
+}</code></pre><p>关键字段：<code>api</code> 选协议（<code>openai-responses</code> / <code>openai-completions</code> 等）、<code>baseUrl</code> 网关地址、<code>models[].id</code> 决定你在配置里引用什么名字、<code>reasoning</code> 声明该模型是否支持 thinking。详见参考文献 [7]。</p><h4>0.3 确认默认指向</h4><p><code>~/.pi/agent/settings.json</code> 中的 <code>defaultModel</code> / <code>defaultProvider</code> 决定父会话模型和裸模型 id 的解析归属。<strong>自查项</strong>：如果你改过 provider 名字，检查 <code>defaultProvider</code> 是否还指向旧名字——指向不存在的 provider 会让裸 id（如 <code>glm-5.3</code>）解析失败。</p><h4>0.4 重启并体检</h4><p>配置改动需<strong>重启 pi</strong> 才生效。启动后运行：</p><pre class="code" data-lang="text"><code>/subagents-doctor</code></pre><p>检查子代理扩展与依赖是否正常。</p><hr><h3>1. 模型解析优先级链（一切调整的基础）</h3><blockquote>出处：pi-subagents <code>docs/models.md</code>（参考文献 [1]）</blockquote><p>子代理启动时按以下顺序解析模型，<strong>强者优先</strong>：</p><div class="table-wrap"><table><thead><tr><th>优先级</th><th>来源</th><th>配置位置</th></tr></thead><tbody><tr><td>1（最强）</td><td>单次运行覆盖</td><td><code>/run reviewer[model=lin/gpt-5.6-luna:high] "..."</code> 或工具调用的 <code>model</code> 参数</td></tr><tr><td>2</td><td>provider 作用域角色覆盖</td><td><code>subagents.agentOverridesByProvider.&lt;provider&gt;.&lt;name&gt;.model</code></td></tr><tr><td>3</td><td>角色覆盖</td><td><code>subagents.agentOverrides.&lt;name&gt;.model</code></td></tr><tr><td>4</td><td>agent 定义</td><td>自定义 agent frontmatter 的 <code>model</code>（builtin 角色不设置）</td></tr><tr><td>5</td><td>全局默认</td><td><code>subagents.defaultModel</code></td></tr><tr><td>6（最弱）</td><td>继承父会话</td><td>你当前 pi 会话的模型</td></tr></tbody></table></div><p>两条解析规则需要特别注意：</p><ul><li><strong><code>defaultProvider</code> 只解决歧义，不参与优先级</strong>：当裸 id（<code>glm-5.3</code>）在多个 provider 下重名时，用它决定归属；全限定写法 <code>lin/glm-5.3</code> 永远精确命中。多 provider 环境下建议<strong>全部用全限定写法</strong>。</li><li><strong><code>model: "inherit"</code> 是显式继承</strong>：写在哪一层就继承"启动那一刻"的直接父会话模型，嵌套子代理继承的是它的直接父，而非最初的顶层会话。</li></ul><h3>2. 分配依据：六个内置角色的定位</h3><blockquote>角色职责出处：pi-subagents README 与 <code>docs/agents.md</code>；档位推荐为<strong>推断</strong>（依据模型命名与通用分档经验，未经实测），校准方法见第 5 节。</blockquote><p>角色定位是稳定的设计判断，模型档位是可以随时重排的参数：</p><div class="table-wrap"><table><thead><tr><th>角色</th><th>职责</th><th>任务形状</th><th>推荐档位【推断】</th><th>推荐 thinking</th></tr></thead><tbody><tr><td><code>scout</code></td><td>本地代码侦察：找文件、入口、数据流、风险</td><td>大量小请求，容错高</td><td>工兵档：<code>glm-5.3-flash</code> / <code>gpt-5.3-codex-spark</code></td><td><code>low</code></td></tr><tr><td><code>researcher</code></td><td>外部/文档调研，产出带来源的简报</td><td>大量小请求</td><td>工兵档：<code>glm-5.3-flash</code></td><td><code>low</code></td></tr><tr><td><code>delegate</code></td><td>轻量通用代理，行为接近父会话</td><td>混合</td><td>主力档：<code>glm-5.3</code></td><td><code>medium</code></td></tr><tr><td><code>worker</code></td><td>实现工作：改文件、验证、上报未授权决策</td><td>中等复杂度多文件编辑</td><td>主力档：<code>glm-5.3</code> / <code>MiniMax-M3</code></td><td><code>medium</code></td></tr><tr><td><code>reviewer</code></td><td>代码评审：测试、边界、简洁性</td><td>需要细读和判断</td><td>评审档：<code>gpt-5.6-luna</code></td><td><code>high</code></td></tr><tr><td><code>oracle</code></td><td>决策前的第二意见，挑战假设</td><td>难题攻关，高杠杆低频次</td><td>深度档：<code>gpt-5.6-sol</code> / <code>gpt-5.6-terra</code></td><td><code>high</code></td></tr></tbody></table></div><p>分档逻辑（对应"经济 × 性能 × 效率"三个轴）：</p><ul><li><strong>工兵档 = 经济</strong>：工作流场景下侦察类子代理数量最多（几十个），单价是第一变量。便宜模型 + 低 thinking 足够，因为它们的产出会被下游核验。</li><li><strong>主力档 = 效率</strong>：worker 覆盖大部分 token 消耗，选"能一次改对"的性价比模型，medium thinking 防止在常规任务上欠思考。</li><li><strong>评审/深度档 = 性能</strong>：reviewer 和 oracle 出场次数少但决策杠杆高，漏掉一个 bug 的代价远高于省下的 token。注意：<strong>强推理模型在模糊目标上容易空转循环</strong>，oracle 类角色接到的任务必须有明确目标和完成标准。</li></ul><h3>3. 三步配置</h3><blockquote>参数出处：pi-subagents <code>docs/models.md</code>（参考文献 [1]）。配置写在 <code>~/.pi/agent/settings.json</code>（用户级）或项目 <code>.pi/settings.json</code>（项目级，优先）。</blockquote><h4>第一步：全局默认（覆盖所有未单独设置的角色）</h4><pre class="code" data-lang="json"><code>{
   &quot;defaultModel&quot;: &quot;lin/glm-5.3-flash&quot;,
   &quot;subagents&quot;: {
     &quot;defaultModel&quot;: &quot;lin/glm-5.3-flash&quot;,
     &quot;defaultThinking&quot;: &quot;low&quot;
   }
-}
-```
-
-外层 `defaultModel` 是父会话模型；`subagents.defaultModel` 只填充&quot;没有自己 model&quot;的子代理。如果你的 provider 拒绝带 thinking 后缀的模型 id，加 `&quot;disableThinking&quot;: true` 一次清掉内置默认。
-
-### 第二步：角色覆盖（把高杠杆角色升档）
-
-```json
-{
+}</code></pre><p>外层 <code>defaultModel</code> 是父会话模型；<code>subagents.defaultModel</code> 只填充"没有自己 model"的子代理。如果你的 provider 拒绝带 thinking 后缀的模型 id，加 <code>"disableThinking": true</code> 一次清掉内置默认。</p><h4>第二步：角色覆盖（把高杠杆角色升档）</h4><pre class="code" data-lang="json"><code>{
   &quot;subagents&quot;: {
     &quot;defaultModel&quot;: &quot;lin/glm-5.3-flash&quot;,
     &quot;defaultThinking&quot;: &quot;low&quot;,
@@ -154,94 +27,14 @@ pi 的自定义 OpenAI 兼容 provider 配置在 `~/.pi/agent/models.json`，结
       &quot;oracle&quot;:   { &quot;model&quot;: &quot;lin/gpt-5.6-sol&quot;,  &quot;thinking&quot;: &quot;high&quot; }
     }
   }
-}
-```
-
-- `maxThinking` 是硬顶（级别从低到高：`off` &lt; `minimal` &lt; `low` &lt; `medium` &lt; `high` &lt; `xhigh` &lt; `max`），超限的请求在启动前直接失败，防止某个角色的配置失控烧 token。
-- 同一个 `agentOverrides` 块还可以改角色的 `tools`、`skills`、prompt 等，但那超出本文范围。
-- 多 provider 环境可用 `agentOverridesByProvider` 让同一角色在不同 provider 下用不同模型，见参考文献 [1]。
-
-### 第三步：单次覆盖（不写死配置的临时调整）
-
-```text
-/run reviewer[model=lin/gpt-5.6-luna:high] &quot;Review this diff&quot;
-```
-
-模型串尾的 `:high` 是 thinking 后缀，只作用于这一次运行。工作流脚本里每个子代理也可单独传 `model`。
-
-## 4. 验证
-
-```text
-/subagents-models              # 查看所有角色实际生效的模型+thinking 映射
-/subagents-models reviewer     # 只看一个角色
-```
-
-注意它报告的是**运行时映射**——磁盘上的 `settings.json` 改了但没重启 pi 时，两者会不一致。最后用一个小任务实跑验证（如 `Use scout to list the entry points of this project`），确认子代理正常启动、无模型解析报错。
-
-## 5. 校准推断档位：用 profile 实测
-
-第 2 节的分档是推断。pi-subagents 提供了从 provider 真实目录生成并探活校准的工具链：
-
-```text
-/subagents-refresh-provider-models lin   # 拉取目录 + 小请求探活每个模型
+}</code></pre><ul><li><code>maxThinking</code> 是硬顶（级别从低到高：<code>off</code> &lt; <code>minimal</code> &lt; <code>low</code> &lt; <code>medium</code> &lt; <code>high</code> &lt; <code>xhigh</code> &lt; <code>max</code>），超限的请求在启动前直接失败，防止某个角色的配置失控烧 token。</li><li>同一个 <code>agentOverrides</code> 块还可以改角色的 <code>tools</code>、<code>skills</code>、prompt 等，但那超出本文范围。</li><li>多 provider 环境可用 <code>agentOverridesByProvider</code> 让同一角色在不同 provider 下用不同模型，见参考文献 [1]。</li></ul><h4>第三步：单次覆盖（不写死配置的临时调整）</h4><pre class="code" data-lang="text"><code>/run reviewer[model=lin/gpt-5.6-luna:high] &quot;Review this diff&quot;</code></pre><p>模型串尾的 <code>:high</code> 是 thinking 后缀，只作用于这一次运行。工作流脚本里每个子代理也可单独传 <code>model</code>。</p><h3>4. 验证</h3><pre class="code" data-lang="text"><code>/subagents-models              # 查看所有角色实际生效的模型+thinking 映射
+/subagents-models reviewer     # 只看一个角色</code></pre><p>注意它报告的是<strong>运行时映射</strong>——磁盘上的 <code>settings.json</code> 改了但没重启 pi 时，两者会不一致。最后用一个小任务实跑验证（如 <code>Use scout to list the entry points of this project</code>），确认子代理正常启动、无模型解析报错。</p><h3>5. 校准推断档位：用 profile 实测</h3><p>第 2 节的分档是推断。pi-subagents 提供了从 provider 真实目录生成并探活校准的工具链：</p><pre class="code" data-lang="text"><code>/subagents-refresh-provider-models lin   # 拉取目录 + 小请求探活每个模型
 /subagents-generate-profiles lin          # 生成 quota（省钱）和 quality（效果）两套角色→模型映射
 /subagents-load-profile lin.quota         # 加载
-/subagents-check-profile                           # 之后随时复查模型是否被移除/失效
-```
-
-`quota` 和 `quality` 两套 profile 的差异本身就是对你推断档位的一次实证校准。
-
-## 6. 排障：症状 → 调整对照表
-
-| 症状 | 先查 | 调整动作 |
-| --- | --- | --- |
-| 子代理报&quot;模型不存在/provider 解析失败&quot; | 是否用了裸 id 且多 provider 重名 | 改全限定写法 `lin/模型名`；核对 `defaultProvider` 指向 |
-| reviewer 评审太浅、漏问题 | `/subagents-models reviewer` | thinking 升 `high`；仍不足则升评审档模型 |
-| worker 反复试错改不动 | 任务描述是否明确 | 先升主力档模型；仍不行说明任务定义模糊，先派 scout |
-| oracle 空转循环、迟迟不收敛 | 任务有无明确目标+完成标准 | 强推理模型的天性：给明确目标，或降为 `gpt-5.6-luna` |
-| token 消耗超预期 | `/subagents-models` 看各角色档位 | `defaultThinking` 降档、`maxThinking` 设顶、工兵角色降档、加 `modelScope`（第 7 节） |
-| provider 偶发限流/失败 | 失败是否发生在任何工具调用之前 | 给角色加 `fallbackModels`（第 7 节） |
-| 改了配置不生效 | 是否重启过 pi | 重启；用 `/subagents-models` 对比磁盘配置与运行时映射 |
-
-## 7. 兜底：预算上限与故障转移
-
-**预算上限——`modelScope`**（防止某次覆盖或 fallback 意外跑出预算范围）：
-
-```json
-&quot;modelScope&quot;: {
+/subagents-check-profile                           # 之后随时复查模型是否被移除/失效</code></pre><p><code>quota</code> 和 <code>quality</code> 两套 profile 的差异本身就是对你推断档位的一次实证校准。</p><h3>6. 排障：症状 → 调整对照表</h3><div class="table-wrap"><table><thead><tr><th>症状</th><th>先查</th><th>调整动作</th></tr></thead><tbody><tr><td>子代理报"模型不存在/provider 解析失败"</td><td>是否用了裸 id 且多 provider 重名</td><td>改全限定写法 <code>lin/模型名</code>；核对 <code>defaultProvider</code> 指向</td></tr><tr><td>reviewer 评审太浅、漏问题</td><td><code>/subagents-models reviewer</code></td><td>thinking 升 <code>high</code>；仍不足则升评审档模型</td></tr><tr><td>worker 反复试错改不动</td><td>任务描述是否明确</td><td>先升主力档模型；仍不行说明任务定义模糊，先派 scout</td></tr><tr><td>oracle 空转循环、迟迟不收敛</td><td>任务有无明确目标+完成标准</td><td>强推理模型的天性：给明确目标，或降为 <code>gpt-5.6-luna</code></td></tr><tr><td>token 消耗超预期</td><td><code>/subagents-models</code> 看各角色档位</td><td><code>defaultThinking</code> 降档、<code>maxThinking</code> 设顶、工兵角色降档、加 <code>modelScope</code>（第 7 节）</td></tr><tr><td>provider 偶发限流/失败</td><td>失败是否发生在任何工具调用之前</td><td>给角色加 <code>fallbackModels</code>（第 7 节）</td></tr><tr><td>改了配置不生效</td><td>是否重启过 pi</td><td>重启；用 <code>/subagents-models</code> 对比磁盘配置与运行时映射</td></tr></tbody></table></div><h3>7. 兜底：预算上限与故障转移</h3><p><strong>预算上限——<code>modelScope</code></strong>（防止某次覆盖或 fallback 意外跑出预算范围）：</p><pre class="code" data-lang="json"><code>&quot;modelScope&quot;: {
   &quot;enforce&quot;: true,
   &quot;allow&quot;: [&quot;lin/glm-5.3*&quot;, &quot;lin/gpt-5.6-*&quot;, &quot;inherit&quot;]
-}
-```
-
-`allow` 是 glob 列表，匹配解析后的 `provider/id`；字面量 `inherit` 代表父会话模型。默认只警告，`strict: true` 时越界即失败。它只是策略闸门，不会替你选更便宜的模型——选型仍靠第 3 节。
-
-**故障转移——`fallbackModels`**：角色覆盖里附带的候选链，在**可重试的供应商错误**（限流、过载、模型不可用、provider 超时）且发生在**任何工具活动之前**时自动切换。工具活动开始后的失败是终态，不会自动重放任务。
-
-## 8. 何时该上工作流
-
-单个子代理能完成的事，直接 `/run` 或自然语言委派即可，不需要编排。当出现以下信号时再考虑 scripted workflow（`workflowScript`）：需要**几十个**子代理、中间结果不想挤占你的上下文窗口、编排逻辑想固化为可重跑的脚本。这与 Claude Code 的 dynamic workflows 是同构设计，概念对照与用法另见参考文献 [9][10]。
-
-## 边界与行动
-
-**适用条件**：pi + pi-subagents + OpenAI 兼容自定义 provider；单文件版 pi 仅支持前台子代理；thinking 相关配置要求模型声明了 `reasoning: true`。
-
-**风险**：① token 消耗随子代理数量线性放大，工作流场景尤其明显——先配好第 7 节再上规模；② 档位划分是推断，以第 5 节实测校准为准；③ provider 的模型目录可能增删，`/subagents-check-profile` 定期复查。
-
-**下一步**：跑通本文配置后，可延伸至自定义 agent（frontmatter 定义新角色，见 `docs/agents.md`）、成本观测（`docs/observability.md`）与工作流编排（`docs/workflows.md`）。
-
-**验证方法**：改配置 → 重启 → `/subagents-models` 核对 → 小任务实跑 → 观察 token 用量变化。
-
----
-
-## 附录 A：lin 真实配置实例
-
-&gt; API key 已脱敏。此实例对应 `http://localhost:8310/v1` 网关。**注意**：这是推荐的目标配置；你的 `settings.json` 中 `defaultProvider` 若仍是历史残留值（如改名前的旧 provider 名），需按 §0.3 自查后手动修正为 `&quot;lin&quot;`。
-
-`~/.pi/agent/models.json`：
-
-```json
-{
+}</code></pre><p><code>allow</code> 是 glob 列表，匹配解析后的 <code>provider/id</code>；字面量 <code>inherit</code> 代表父会话模型。默认只警告，<code>strict: true</code> 时越界即失败。它只是策略闸门，不会替你选更便宜的模型——选型仍靠第 3 节。</p><p><strong>故障转移——<code>fallbackModels</code></strong>：角色覆盖里附带的候选链，在<strong>可重试的供应商错误</strong>（限流、过载、模型不可用、provider 超时）且发生在<strong>任何工具活动之前</strong>时自动切换。工具活动开始后的失败是终态，不会自动重放任务。</p><h3>8. 何时该上工作流</h3><p>单个子代理能完成的事，直接 <code>/run</code> 或自然语言委派即可，不需要编排。当出现以下信号时再考虑 scripted workflow（<code>workflowScript</code>）：需要<strong>几十个</strong>子代理、中间结果不想挤占你的上下文窗口、编排逻辑想固化为可重跑的脚本。这与 Claude Code 的 dynamic workflows 是同构设计，概念对照与用法另见参考文献 [9][10]。</p><h3>边界与行动</h3><p><strong>适用条件</strong>：pi + pi-subagents + OpenAI 兼容自定义 provider；单文件版 pi 仅支持前台子代理；thinking 相关配置要求模型声明了 <code>reasoning: true</code>。</p><p><strong>风险</strong>：① token 消耗随子代理数量线性放大，工作流场景尤其明显——先配好第 7 节再上规模；② 档位划分是推断，以第 5 节实测校准为准；③ provider 的模型目录可能增删，<code>/subagents-check-profile</code> 定期复查。</p><p><strong>下一步</strong>：跑通本文配置后，可延伸至自定义 agent（frontmatter 定义新角色，见 <code>docs/agents.md</code>）、成本观测（<code>docs/observability.md</code>）与工作流编排（<code>docs/workflows.md</code>）。</p><p><strong>验证方法</strong>：改配置 → 重启 → <code>/subagents-models</code> 核对 → 小任务实跑 → 观察 token 用量变化。</p><hr><h3>附录 A：lin 真实配置实例</h3><blockquote>API key 已脱敏。此实例对应 <code>http://localhost:8310/v1</code> 网关。<strong>注意</strong>：这是推荐的目标配置；你的 <code>settings.json</code> 中 <code>defaultProvider</code> 若仍是历史残留值（如改名前的旧 provider 名），需按 §0.3 自查后手动修正为 <code>"lin"</code>。</blockquote><p><code>~/.pi/agent/models.json</code>：</p><pre class="code" data-lang="json"><code>{
   &quot;providers&quot;: {
     &quot;lin&quot;: {
       &quot;api&quot;: &quot;openai-responses&quot;,
@@ -263,13 +56,7 @@ pi 的自定义 OpenAI 兼容 provider 配置在 `~/.pi/agent/models.json`，结
       ]
     }
   }
-}
-```
-
-`~/.pi/agent/settings.json`（子代理相关部分）：
-
-```json
-{
+}</code></pre><p><code>~/.pi/agent/settings.json</code>（子代理相关部分）：</p><pre class="code" data-lang="json"><code>{
   &quot;defaultProvider&quot;: &quot;lin&quot;,
   &quot;defaultModel&quot;: &quot;glm-5.3-flash&quot;,
   &quot;subagents&quot;: {
@@ -286,25 +73,4 @@ pi 的自定义 OpenAI 兼容 provider 配置在 `~/.pi/agent/models.json`，结
       &quot;oracle&quot;:     { &quot;model&quot;: &quot;lin/gpt-5.6-sol&quot;,   &quot;thinking&quot;: &quot;high&quot; }
     }
   }
-}
-```
-
----
-
-## 参考文献
-
-| # | 出处 | 内容 |
-| --- | --- | --- |
-| [1] | `~/.pi/agent/npm/node_modules/pi-subagents/docs/models.md` | 优先级链、`defaultModel`/`agentOverrides`/`agentOverridesByProvider`、thinking 默认与上限、`modelScope`、`fallbackModels`、profiles、模糊匹配、fast mode |
-| [2] | `~/.pi/agent/npm/node_modules/pi-subagents/docs/agents.md` | 内置角色职责、自定义 agent frontmatter |
-| [3] | `~/.pi/agent/npm/node_modules/pi-subagents/docs/configuration.md` | 全部 config 键与环境变量 |
-| [4] | `~/.pi/agent/npm/node_modules/pi-subagents/docs/tool-reference.md` | `subagent` 工具全部参数（含 `model`、单次覆盖） |
-| [5] | `~/.pi/agent/npm/node_modules/pi-subagents/docs/observability.md` | 运行观测（延伸阅读） |
-| [6] | `~/.pi/agent/npm/node_modules/pi-subagents/docs/workflows.md` | 工作流编排（延伸阅读） |
-| [7] | `@earendil-works/pi-coding-agent/docs/custom-provider.md`（pi 安装目录内） | `models.json` 自定义 provider 结构、`registerProvider` |
-| [8] | pi-subagents `README.md` | 安装、内置角色速查、npm 包要求 |
-| [9] | &lt;https://code.claude.com/docs/en/workflows&gt; | Claude Code dynamic workflows 官方文档（第 8 节对照出处） |
-| [10] | &lt;https://claude.com/blog/introducing-dynamic-workflows-in-claude-code&gt; | dynamic workflows 官方博客 |
-</pre></section>
-<footer class="footer"><span>pi-subagents 模型分配指南 · 原文完整收录</span><span>source SHA256: 05b25e25…f2edbe</span></footer>
-</main></body></html>
+}</code></pre><hr><h3>参考文献</h3><div class="table-wrap"><table><thead><tr><th>#</th><th>出处</th><th>内容</th></tr></thead><tbody><tr><td>[1]</td><td><code>~/.pi/agent/npm/node_modules/pi-subagents/docs/models.md</code></td><td>优先级链、<code>defaultModel</code>/<code>agentOverrides</code>/<code>agentOverridesByProvider</code>、thinking 默认与上限、<code>modelScope</code>、<code>fallbackModels</code>、profiles、模糊匹配、fast mode</td></tr><tr><td>[2]</td><td><code>~/.pi/agent/npm/node_modules/pi-subagents/docs/agents.md</code></td><td>内置角色职责、自定义 agent frontmatter</td></tr><tr><td>[3]</td><td><code>~/.pi/agent/npm/node_modules/pi-subagents/docs/configuration.md</code></td><td>全部 config 键与环境变量</td></tr><tr><td>[4]</td><td><code>~/.pi/agent/npm/node_modules/pi-subagents/docs/tool-reference.md</code></td><td><code>subagent</code> 工具全部参数（含 <code>model</code>、单次覆盖）</td></tr><tr><td>[5]</td><td><code>~/.pi/agent/npm/node_modules/pi-subagents/docs/observability.md</code></td><td>运行观测（延伸阅读）</td></tr><tr><td>[6]</td><td><code>~/.pi/agent/npm/node_modules/pi-subagents/docs/workflows.md</code></td><td>工作流编排（延伸阅读）</td></tr><tr><td>[7]</td><td><code>@earendil-works/pi-coding-agent/docs/custom-provider.md</code>（pi 安装目录内）</td><td><code>models.json</code> 自定义 provider 结构、<code>registerProvider</code></td></tr><tr><td>[8]</td><td>pi-subagents <code>README.md</code></td><td>安装、内置角色速查、npm 包要求</td></tr><tr><td>[9]</td><td>&lt;https://code.claude.com/docs/en/workflows&gt;</td><td>Claude Code dynamic workflows 官方文档（第 8 节对照出处）</td></tr><tr><td>[10]</td><td>&lt;https://claude.com/blog/introducing-dynamic-workflows-in-claude-code&gt;</td><td>dynamic workflows 官方博客</td></tr></tbody></table></div></article></section><footer class="footer"><span>原始 Markdown 全文结构化排版</span><span>source SHA256: 05b25e25…f2edbe</span></footer></main></body></html>
