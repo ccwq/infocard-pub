@@ -1,0 +1,189 @@
+<!doctype html><html lang="zh-CN" data-theme="black"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-contract" content="theme/black.html"><title>audio.cpp：本地跑语音 AI 的纯 C++ ggml 引擎——TTS/ASR/变声/音乐生成，无 Python 依赖</title><style>
+:root{--ink:#070707;--red:#c8102e;--redsoft:#fff5f6;--blue:#1b4fff;--bluesoft:#eef4ff;--green:#15803d;--greensoft:#f0fdf4;--paper:#fff;--fg:#111;--body:#333;--muted:#555;--prebg:#0e0e0e;--prefix:#e6e6e6;--white:#fff;--line:#e2e2e2;--gsub:#bbb;--vertext:#eee;--codesub:#f2f2f2;--precomment:#7fbf7f;--quotesub:#8a4040}
+*{box-sizing:border-box}html,body{margin:0;padding:0;overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--paper);color:var(--fg);font-size:13px;line-height:1.65}
+code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:inherit;text-decoration:none}
+.page{width:100%;max-width:760px;margin:0 auto;padding:0 0 60px}
+header{background:var(--ink);color:var(--white);padding:12px 16px 11px;border-bottom:3px solid var(--red)}
+header .tag{display:inline-block;padding:2px 8px;border:1.5px solid var(--white);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+header h1{font-size:19px;font-weight:700;margin:0;letter-spacing:-.02em;line-height:1.25}
+header .sub{margin-top:5px;font-size:11.5px;color:var(--gsub);line-height:1.5}
+.quote{border-left:4px solid var(--red);padding:10px 14px;background:var(--redsoft);margin:14px 16px 0;font-size:13px;line-height:1.7;font-weight:700;color:var(--red)}
+section{padding:14px 16px 0}
+h2{font-size:15px;font-weight:700;margin:0 0 9px;padding-bottom:6px;border-bottom:1.5px solid var(--ink)}
+h2 .en{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-left:8px}
+p{margin:0 0 9px;font-size:12.8px;line-height:1.7;color:var(--body)}
+p b{color:var(--fg)}
+.points{display:grid;gap:7px;margin-bottom:12px}
+.point{display:flex;align-items:flex-start;gap:9px;font-size:12.6px;line-height:1.66}
+.point .num{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;background:var(--ink);color:var(--white);font-size:11px;font-weight:700;border-radius:50%;flex-shrink:0;margin-top:1px}
+.point .num.red{background:var(--red)}
+.verdict{background:var(--ink);color:var(--white);padding:12px 14px;margin:2px 16px 12px}
+.verdict .label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:4px}
+.verdict p{font-size:12.8px;line-height:1.68;margin:0;color:var(--vertext)}
+.verdict p b{color:var(--white)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.chip{padding:3px 9px;border:1.5px solid var(--ink);font-size:11px;font-weight:700}
+.chip.red{border-color:var(--red);color:var(--red);background:var(--redsoft)}
+.chip.blue{border-color:var(--blue);color:var(--blue);background:var(--bluesoft)}
+.chip.green{border-color:var(--green);color:var(--green);background:var(--greensoft)}
+hr{border:none;border-top:1.5px solid var(--ink);margin:13px 16px}
+.twrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1.5px solid var(--ink);margin:8px 0 12px}
+.twrap table{width:100%;border-collapse:collapse;font-size:11.6px;min-width:560px}
+.twrap th,.twrap td{padding:7px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;vertical-align:top;line-height:1.55}
+.twrap th{background:var(--ink);color:var(--white);font-weight:700;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+.twrap tr:last-child td{border-bottom:none}
+.twrap td:last-child,.twrap th:last-child{border-right:none}
+.twrap .mono-cell{font:600 10.8px ui-monospace,monospace;color:var(--red)}
+p code,li code{background:var(--codesub);padding:1px 5px;font-size:11px;color:var(--ink);word-break:break-all}
+pre{background:var(--prebg);color:var(--prefix);padding:12px 14px;font-size:11.2px;line-height:1.7;overflow-x:auto;margin:8px 0 12px;white-space:pre-wrap;word-break:break-word}
+pre .c{color:var(--precomment)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 12px}
+.step{border:1.5px solid var(--ink);padding:9px 8px 7px;text-align:center;font-size:11px;font-weight:700}
+.step strong{display:block;font-size:15px;margin-bottom:2px}
+.step p{margin:2px 0 0;font-size:10.5px;font-weight:400;color:var(--muted);line-height:1.45}
+.step.done{background:var(--greensoft);border-color:var(--green)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 12px}
+.stats div{border:1.5px solid var(--ink);padding:9px 6px;text-align:center}
+.stats b{display:block;font-size:16px;letter-spacing:-.02em}
+.stats span{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.warn{border:1.5px solid var(--red);background:var(--redsoft);padding:10px 13px;margin:10px 0 12px}
+.warn .wl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:4px}
+.warn p{margin:0;font-size:12.3px;line-height:1.65;color:var(--body)}
+.checklist{list-style:none;margin:6px 0 10px;padding:0}
+.checklist li{padding:6px 0 6px 22px;position:relative;border-bottom:1px solid var(--line);font-size:12.4px;line-height:1.62}
+.checklist li:last-child{border-bottom:none}
+.checklist li::before{content:"✓";position:absolute;left:3px;color:var(--green);font-weight:700}
+.footer{margin:14px 16px 0;padding:10px 0;border-top:1.5px solid var(--ink);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:10.5px;color:var(--muted)}
+.footer a{color:var(--red);font-weight:700}
+@media(max-width:720px){header h1{font-size:17px}.steps{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr}section{padding:12px 13px 0}.quote{margin:12px 13px 0}.verdict{margin:2px 13px 12px}hr{margin:12px 13px}p{font-size:12.5px}}
+@media(max-width:420px){.steps{grid-template-columns:1fr}}
+</style></head><body><div class="page">
+
+<header>
+  <div class="tag">Local Audio AI · 2026-09-10 快照</div>
+  <h1>audio.cpp：本地跑语音 AI 的纯 C++ ggml 引擎</h1>
+  <div class="sub">TTS / ASR / 变声 / 音乐生成 / 声纹分离，62+ 模型家族，推理核心无 Python 依赖 · v0.7.3 · ⭐2453（快照）</div>
+</header>
+
+<div class="quote">"本地跑语音 AI，少折腾几套 Python 环境。"<br><span style="font-size:11px;font-weight:400;color:var(--quotesub)">—— @AISuperDomain，2026-09-10。这句评价切中项目要害：语音 AI 工具链长期被 Python 环境地狱绑架，audio.cpp 用一个 C++ 引擎统一了入口。</span></div>
+
+<section>
+  <h2>一 · 它解决什么问题<span class="en">why</span></h2>
+  <p>想本地跑语音合成（TTS）、语音识别（ASR）或变声，通常要在 Conda/venv 里为每个项目单独配 Python 环境：CUDA 版本打架、依赖互相冲突、模型加载代码各写一套。audio.cpp 的做法是把推理引擎下沉到 <b>ggml（llama.cpp 同源的 C++ 推理层）</b>：一个二进制覆盖全部语音任务，<b>推理核心零 Python 依赖</b>，统一走 CLI、WebUI 或 REST API。Python 只在个别模型需要从 HuggingFace 下载或做 checkpoint 转换时出场（模型管理脚本），推理路径与它无关。</p>
+  <div class="stats">
+    <div><b>2453</b><span>Stars 快照</span></div>
+    <div><b>62+</b><span>模型家族</span></div>
+    <div><b>5</b><span>计算后端</span></div>
+    <div><b>v0.7.3</b><span>最新版本</span></div>
+  </div>
+  <div class="chips">
+    <span class="chip">C++ / ggml</span>
+    <span class="chip green">无 Python 推理</span>
+    <span class="chip blue">CUDA 优先</span>
+    <span class="chip red">License 未声明 ⚠</span>
+  </div>
+</section>
+
+<section>
+  <h2>二 · 能力地图：一个引擎覆盖哪些语音任务<span class="en">capabilities</span></h2>
+  <div class="twrap"><table>
+    <tr><th>任务</th><th>说明</th><th>代表模型（README 模型表）</th></tr>
+    <tr><td>TTS 合成</td><td>文本转语音，支持流式</td><td class="mono-cell">Qwen3-TTS · PocketTTS · Supertonic 3</td></tr>
+    <tr><td>ASR 识别</td><td>语音转文本，含详细字段版输出</td><td class="mono-cell">Qwen3-ASR · Nemotron 3.5 · VibeVoice ASR</td></tr>
+    <tr><td>Clone 克隆</td><td>参考音频复刻音色</td><td class="mono-cell">Qwen3-TTS 克隆路径</td></tr>
+    <tr><td>VC 变声</td><td>说话人音色转换</td><td class="mono-cell">Chatterbox 等</td></tr>
+    <tr><td>Music 音乐生成</td><td>文本条件音乐合成</td><td class="mono-cell">Supertonic 3 · MiniMax Music 3</td></tr>
+    <tr><td>Diar / Sep / Align</td><td>说话人分离 / 音源分离 / 强制对齐</td><td class="mono-cell">独立任务族</td></tr>
+    <tr><td>VAD / S2S / Spk</td><td>端点检测 / 语音到语音 / 声纹</td><td class="mono-cell">独立任务族</td></tr>
+  </table></div>
+  <p><b>三个统一入口</b>：CLI（<code>audiocpp_cli --task &lt;task&gt; --model &lt;path&gt; --backend &lt;backend&gt;</code>）、WebUI（<code>audiocpp_server --ui --ui-management</code>，含 Arena 多模型对比页）、REST API（<code>/v1/audio/speech</code>、<code>/v1/audio/transcriptions</code>、<code>/v1/audio/alignments</code>、<code>/v1/tasks/run</code>）。</p>
+  <p><b>性能定位（v0.7 发布基准，RTX 5090 单卡）</b>：官方 README 给出的数字是部分 TTS 路径比 Python 快 <b>1.8x–8x</b>（Qwen3 TTS 1.83x，PocketTTS 3.68x，不同模型差异大）、端到端延迟降低 <b>45%–85%</b>；PocketTTS 离线 RTF=0.021（约 48x 实时），Supertonic 3 达 RTF=0.005（约 187x 实时）。GGUF Q8 量化包在部分模型路由上峰值显存降约 37%、速度最高 1.53x。这些是发布时基线数字，引用需带模型与硬件上下文。</p>
+</section>
+
+<section>
+  <h2>三 · 安装：三条路径按机器选<span class="en">install</span></h2>
+  <div class="steps">
+    <div class="step done"><strong>①</strong>macOS<div>p=Homebrew 一行装</div></div>
+    <div class="step done"><strong>②</strong>Windows/Linux<div>p=预编译包免编译</div></div>
+    <div class="step"><strong>③</strong>源码编译<div>p=定制模型集减体积</div></div>
+    <div class="step"><strong>④</strong>Docker<div>p=docs/docker.md</div></div>
+  </div>
+  <pre><span class="c"># macOS（最简路径）</span>
+brew tap 0xShug0/audio-cpp &amp;&amp; brew install audio-cpp
+
+<span class="c"># Linux 源码编译（CUDA 后端 + CLI/server 两个产物）</span>
+scripts/build_linux.sh --backend cuda --target audiocpp_cli --target audiocpp_server
+<span class="c"># 前置：GCC 13+、CMake、NVIDIA CUDA Toolkit</span>
+
+<span class="c"># 定制模型集，显著缩短编译时间</span>
+scripts/build_linux.sh --model-set custom --models qwen3_tts,pocket_tts,qwen3_asr
+
+<span class="c"># 下载模型（GGUF：HF audio-cpp/audio.cpp-gguf 或 ModelScope 镜像）</span>
+audiocpp_model_manager list
+audiocpp_model_manager install qwen3_asr_0_6b_q8_0 --models-dir models</pre>
+  <p><b>预编译覆盖</b>：Windows（CUDA 12.4/13.3、Vulkan、CPU）、Ubuntu（Vulkan、CPU）、macOS（Metal）。<b>注意 Linux 官方预编译不含 CUDA 包</b>，CUDA 用户要么自行编译要么用 Docker。</p>
+</section>
+
+<section>
+  <h2>四 · 首用：15 分钟跑通第一条语音<span class="en">first run</span></h2>
+  <p><b>新手推荐 WebUI 路径</b>（模型目录浏览、下载、切换、麦克风录音、语音库都有界面）：</p>
+  <pre>audiocpp_server --ui --ui-management --backend cuda
+<span class="c"># 浏览器打开 http://127.0.0.1:8080</span></pre>
+  <p>想先走 CLI 验证推理，用中文最稳的 Qwen3 家族：</p>
+  <pre><span class="c"># TTS：中文合成</span>
+audiocpp_cli --task tts --family qwen3_tts --model models/&lt;gguf&gt; --backend cuda
+
+<span class="c"># ASR：中文识别（offline 批处理 / streaming 流式两种模式）</span>
+audiocpp_cli --task asr --family qwen3_asr --model models/&lt;gguf&gt; --backend cuda</pre>
+  <p>任务类型全景：<code>vad|asr|diar|sep|gen|tts|clon|vc|s2s|align|vdes|spk|svc</code>；后端可选 <code>cpu|cuda|vulkan|metal|best</code>。装完多个模型后，去 WebUI 的 <b>Arena 标签</b>（2026-09-09 新增）：多个模型共享同一输入并排生成、支持队列批量推理、附指标——选音色不用再一个个试。</p>
+</section>
+
+<section>
+  <h2>五 · 验证与接入 API<span class="en">verify</span></h2>
+  <ul class="checklist">
+    <li><b>健康检查</b>：<code>GET /health</code> 返回正常即服务可用；<code>GET /v1/models</code> 列出已加载模型</li>
+    <li><b>TTS 接口</b>：<code>POST /v1/audio/speech</code>，OpenAI 兼容形态，可直接替换现有代码里的 base URL</li>
+    <li><b>ASR 接口</b>：<code>POST /v1/audio/transcriptions</code>；要词级时间戳等细节走 <code>/v1/audio/transcriptions/details</code></li>
+    <li><b>流式验证</b>：同请求切 <code>streaming</code> 模式，确认首包延迟满足实时场景</li>
+    <li><b>量化验证</b>：BF16 与 Q8 各跑一次同文本，比对音质与显存占用后再定生产配置</li>
+    <li><b>性能基线</b>：用自己的主力模型记录 RTF，与 README 基线（RTX 5090）对比判断硬件是否达标</li>
+  </ul>
+</section>
+
+<section>
+  <h2>六 · 排障：高频坑位清单<span class="en">troubleshooting</span></h2>
+  <div class="points">
+    <div class="point"><span class="num red">1</span><span><b>Windows CUDA 包启动失败</b>：需把 cudart 压缩包解压到二进制旁边，否则 <code>ggml-cuda.dll</code> 加载失败——这是 Windows 用户最常见的第一坑。</span></div>
+    <div class="point"><span class="num">2</span><span><b>编译失败</b>：Linux 检查 GCC 是否 13+；Windows 检查 Visual Studio Build Tools 是否勾选 C++ 桌面开发负载。</span></div>
+    <div class="point"><span class="num">3</span><span><b>非 CUDA 后端表现差</b>：官方明确 CPU/Vulkan/Metal/HIP 是可移植性与测试路径，性能与模型覆盖低于 CUDA，属预期行为不是 bug。</span></div>
+    <div class="point"><span class="num">4</span><span><b>显存吃紧</b>：<code>lazy_load=true</code> 只延迟首次加载，用过的模型仍常驻到服务退出；把 <code>max_loaded_models</code> 设为 1 可强制单模型内存隔离。</span></div>
+    <div class="point"><span class="num">5</span><span><b>个别模型安装时要 Python</b>：部分模型包需要 HF 下载或 checkpoint 转换，此时调用 Python manager；推理本身仍无 Python。</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>七 · 边界与选用建议<span class="en">boundaries</span></h2>
+  <div class="warn">
+    <div class="wl">License 未声明</div>
+    <p>仓库 License 字段为 NOASSERTION（无 LICENSE 文件），生产或商用前务必先与作者确认使用条款。</p>
+  </div>
+  <div class="points">
+    <div class="point"><span class="num">1</span><span><b>CUDA 之外要有预期</b>：项目当前重点优化 CUDA；帖子原话"其他后端的性能和模型覆盖可能较低"与 README 一致。AMD 显卡走 Vulkan/HIP、Mac 走 Metal 可用但要接受性能折让。</span></div>
+    <div class="point"><span class="num">2</span><span><b>平台限制</b>：Linux 预编译无 CUDA 包（自行编译或 Docker）；macOS 仅 Metal（M 系列原生可用）。</span></div>
+    <div class="point"><span class="num">3</span><span><b>性能数字是快照</b>：1.8x–8x 加速与 Q8 显存数据均为发布基线，随版本演进会变化，引用需带模型与硬件上下文。</span></div>
+    <div class="point"><span class="num">4</span><span><b>适用判断</b>："本地语音助手、配音工具"是社区推断用例而非官方定位——从 WebUI + streaming + REST API 的组合看成立，但官方 README 未直接承诺这两个场景。</span></div>
+  </div>
+  <div class="verdict">
+    <div class="label">关键判断</div>
+    <p><b>适合</b>：有 NVIDIA 显卡、想给本地语音 AI 做统一引擎、被 Python 环境管理消耗过多时间、或需要 REST API 接入现有服务的开发者。<b>不适合</b>：无 CUDA 且对性能敏感的场景（后端折让大）、需要官方商业授权背书的生产环境（License 未声明）、只想快速试一次 TTS 的用户（此时直接用模型官方 Python demo 反而更省事）。</p>
+  </div>
+</section>
+
+<div class="footer">
+  <div>来源：<a href="https://x.com/AISuperDomain">@AISuperDomain</a> · 仓库：<a href="https://github.com/0xShug0/audio.cpp">0xShug0/audio.cpp</a></div>
+  <div>Star/版本数据为 2026-09-10 快照</div>
+</div>
+
+</div></body></html>
