@@ -60,6 +60,27 @@ See `references/color-material-wechat-inline-recipe.md` for the Color Material e
 See `references/graph-paper-wechat-inline-recipe.md` for the graph-paper/manual strict-tag migration, independent allowlist scan, and the `<br>` to whitespace-leaf correction.
 See `references/vscode-marketplace-card-build-notes.md` for the VS Code Marketplace / Open VSX marketplace-card workflow, provenance split, and build/commit notes from the 2026-08-15 card.
 
+### GitHub 来源子智能体委派：必须内联已验证事实（2026-09-10 实测）
+
+当来源是 GitHub URL 时，**父线程先用 `web_extract` 提取项目元数据**，再把结构化事实内联到 delegate_task 的 context 中。不要只给 URL 让子智能体自己重新抓取。
+
+**失败根因**：delegate_task 的 `goal` 字符串中包含未展开的模板标记（如 `<clear Chinese title>`）时，batch 报错 `"unexpanded template marker"`。子智能体上下文无法从工作目录访问父线程的 web 提取结果。
+
+**已验证的稳定委派模式**：
+```python
+# 父线程先提取
+web_extract(urls=['https://github.com/shaom/infocard-skills'], char_limit=15000)
+# → 获得 Stars/Forks/Description 等字段
+
+# 在 delegate_task goal 中内联实际值（不用占位符）
+goal = f"""Write a card for infocard-skills.
+Stars: {stars} | License: {license}
+Core skill: {skill_name} — {description}
+Supported layouts: {layouts}"""
+```
+
+**实测教训**：在 goal 中写 `<clear Chinese title>` 等裸占位符 → subagent 报错 `"unexpanded template marker"` → 必须替换为具体值。`theme-decision.json` 等父线程已生成的辅助文件也要在 context 中注明路径。
+
 ## Direct authoring rule
 
 Authoring happens only inside the primary repository checkout's `.docs/<run-id>/<slug>/` directory. This is the correct and only authoring location.
