@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Astro — 多框架静态站生成器</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+      --grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,var(--bg-2) 0%,var(--bg-2) 46%,var(--bg) 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:var(--ink);margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:var(--ink);font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:var(--ink)}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:var(--muted)}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:var(--ink);font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:var(--cyan)}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:var(--green)}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:var(--yellow)}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:var(--purple)}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:var(--ink)}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:var(--ink);font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:var(--ink)}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:var(--muted)}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:var(--ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, var(--cyan) 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .workbench{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%, var(--panel-2) 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+    .panel-head .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--ink);font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+    .panel-body{padding:12px;display:grid;gap:10px;color:var(--ink)}
+    .section-no{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .section-no .num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--blue));font-size:11px;font-weight:950;color:var(--ink);flex-shrink:0}
+    .section-no .label{font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--ink)}
+    .section-text{font-size:12.5px;line-height:1.6;color:var(--muted);margin:0 0 10px}
+    .framework-grid{display:flex;flex-wrap:wrap;gap:6px}
+    .fw-tag{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);font-size:11.5px;font-weight:800;color:var(--ink)}
+    .fw-tag.react{border-color:rgba(88,195,255,.3);background:rgba(88,195,255,.1);color:var(--cyan)}
+    .fw-tag.svelte{border-color:rgba(244,200,76,.3);background:rgba(244,200,76,.1);color:var(--yellow)}
+    .fw-tag.vue{border-color:rgba(45,179,106,.3);background:rgba(45,179,106,.1);color:var(--green)}
+    .fw-tag.solid{border-color:rgba(132,89,255,.3);background:rgba(132,89,255,.1);color:var(--purple)}
+    .fw-tag.preact{border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:var(--ink)}
+    .integration-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .int-item{display:flex;align-items:center;gap:6px;padding:7px 8px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:10px;font-size:11.5px;color:var(--muted)}
+    .int-item .dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);flex-shrink:0}
+    .adapter-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .adp-item{display:flex;align-items:center;gap:6px;padding:7px 8px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:10px;font-size:11.5px;color:var(--muted)}
+    .adp-item .dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+    .term{background:var(--bg-2);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;flex:1}
+    .term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:var(--bg-2);border-bottom:1px solid rgba(255,255,255,.08);color:var(--ink);font-size:11px}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--green);font-size:12px;line-height:1.7;white-space:pre-wrap}
+    .term .url{color:var(--cyan)}
+    .stats{background:var(--bg-2);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .stats-top{padding:9px 12px;background:var(--panel);color:var(--ink);border-bottom:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .stats-body{padding:12px;display:grid;gap:12px;color:var(--muted)}
+    .stat{display:grid;gap:6px}
+    .stat .label{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+    .bar{height:10px;border-radius:999px;background:var(--bg-2);border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .bar > span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--purple))}
+    .theme-row{display:grid;gap:7px}
+    .theme-item{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:10px;font-size:12px;color:var(--muted)}
+    .theme-item .name{font-weight:800;color:var(--ink)}
+    .theme-item .stars{font-family:ui-monospace,monospace;color:var(--muted);font-size:11px}
+    .feature-row{margin-top:14px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+    .feature{background:var(--panel);border:1.5px solid rgba(255,255,255,.08);border-radius:16px;padding:11px 9px;color:var(--ink);text-align:center;display:grid;gap:7px;min-width:0}
+    .icon{width:28px;height:28px;margin:0 auto;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;font-size:14px;color:var(--ink)}
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+    .footer{margin-top:14px;background:var(--bg-2);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:var(--ink);font-size:12px;flex-wrap:wrap}
+    .footer .stars{font-weight:900}
+    .cta{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .cta-card{background:var(--panel);border:1.5px solid rgba(255,255,255,.1);border-radius:16px;padding:14px 16px;display:grid;gap:6px}
+    .cta-card .cta-title{font-size:13px;font-weight:900;color:var(--ink)}
+    .cta-card .cta-desc{font-size:11.5px;line-height:1.5;color:var(--muted)}
+    .cta-card.cyan{border-color:rgba(88,195,255,.2);background:linear-gradient(135deg,rgba(88,195,255,.08),rgba(88,195,255,.03))}
+    .cta-card.purple{border-color:rgba(132,89,255,.2);background:linear-gradient(135deg,rgba(132,89,255,.08),rgba(132,89,255,.03))}
+    .cta-card .cta-tag{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;width:fit-content}
+    .cta-card.cyan .cta-tag{background:rgba(88,195,255,.15);color:var(--cyan);border:1px solid rgba(88,195,255,.3)}
+    .cta-card.purple .cta-tag{background:rgba(132,89,255,.15);color:var(--purple);border:1px solid rgba(132,89,255,.3)}
+    @media (max-width:1080px){.hero,.workbench{grid-template-columns:1fr}.feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}.cta{grid-template-columns:1fr}}
+    @media (max-width:720px){.page{width:min(100% - 16px,1180px);padding:10px 0 58px}.hero{gap:12px}.title{font-size:clamp(34px,13vw,54px)}.subtitle{font-size:14px}.subcn{font-size:13px}.workbench{padding:10px;gap:10px}.feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero-bar"></div>
+
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">⚡ SSG · Multi-Framework</div>
+        <div class="source">github.com/withastro/astro</div>
+      </div>
+      <h1 class="title">Astro</h1>
+      <p class="subtitle">The web framework for content-driven websites</p>
+      <p class="subcn">多框架内容站生成器：一套代码，React/Vue/Svelte 任选组合，零 JS 默认输出</p>
+      <div class="pill-row">
+        <span class="pill cyan">TypeScript</span>
+        <span class="pill green">Zero JS 默认</span>
+        <span class="pill yellow">MDX</span>
+        <span class="pill purple">Island Arch</span>
+        <span class="pill">v7.3</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">A</div>
+        <div class="visual-meta">
+          <div class="big">62.5k ★</div>
+          <div class="small">GitHub Stars</div>
+          <div class="small">TS · 3.7k Forks</div>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <div class="mini-card">
+          <div class="mini-icon cyan">
+            <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <div class="label">集成</div>
+          <div class="value">5+ 官方</div>
+          <div class="desc">sitemap / RSS / MDX / Tailwind / Partytown</div>
+        </div>
+        <div class="mini-card">
+          <div class="mini-icon purple">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div class="label">部署适配器</div>
+          <div class="value">4 官方</div>
+          <div class="desc">Vercel / Cloudflare / Netlify / Node</div>
+        </div>
+        <div class="mini-card">
+          <div class="mini-icon green">
+            <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </div>
+          <div class="label">主题生态</div>
+          <div class="value">5k+ ★</div>
+          <div class="desc">AstroPaper 5k · AstroWind 5.9k</div>
+        </div>
+        <div class="mini-card">
+          <div class="mini-icon yellow">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="label">最新版本</div>
+          <div class="value">v7.3.2</div>
+          <div class="desc">2025年9月5日发布</div>
+        </div>
+      </div>
+      <div class="visual-strip"></div>
+    </div>
+  </div>
+
+  <div class="workbench">
+
+    <!-- Panel 1: What problem & How it works -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>🚀 解决的问题</h3>
+        <span class="badge">Problem</span>
+      </div>
+      <div class="panel-body">
+        <div class="section-no">
+          <div class="num">1</div>
+          <div class="label">痛点</div>
+        </div>
+        <p class="section-text">现代框架（Next.js 等）默认全量 hydrated JS，博客/Doc 站性能浪费严重，首屏白屏时间不可控。</p>
+        <div class="section-no">
+          <div class="num">2</div>
+          <div class="label">解法</div>
+        </div>
+        <p class="section-text">Astro 默认零 JS 输出，仅在需要交互的组件上启用 <strong style="color:var(--cyan)">client:*</strong> 指令，页面可接近纯 HTML 性能。</p>
+        <div class="section-no">
+          <div class="num">3</div>
+          <div class="label">机制</div>
+        </div>
+        <p class="section-text"><strong style="color:var(--ink)">Island Architecture</strong>：页面被拆为静态岛屿（零 JS）与交互岛屿（选择性 hydrate），通过 <code style="color:var(--green)">client:load/idle/visible/offline</code> 控制加载时机。</p>
+      </div>
+    </div>
+
+    <!-- Panel 2: What you get -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>📦 生态数据</h3>
+        <span class="badge">Ecosystem</span>
+      </div>
+      <div class="panel-body">
+        <div class="section-no">
+          <div class="num">1</div>
+          <div class="label">UI 框架支持</div>
+        </div>
+        <div class="framework-grid">
+          <span class="fw-tag react">React</span>
+          <span class="fw-tag vue">Vue</span>
+          <span class="fw-tag svelte">Svelte</span>
+          <span class="fw-tag solid">Solid</span>
+          <span class="fw-tag preact">Preact</span>
+        </div>
+        <div class="section-no" style="margin-top:6px">
+          <div class="num">2</div>
+          <div class="label">官方集成</div>
+        </div>
+        <div class="integration-row">
+          <div class="int-item"><div class="dot"></div>@astrojs/sitemap</div>
+          <div class="int-item"><div class="dot"></div>@astrojs/rss</div>
+          <div class="int-item"><div class="dot"></div>@astrojs/mdx</div>
+          <div class="int-item"><div class="dot"></div>@astrojs/tailwind</div>
+        </div>
+        <div class="section-no" style="margin-top:6px">
+          <div class="num">3</div>
+          <div class="label">部署适配器</div>
+        </div>
+        <div class="adapter-row">
+          <div class="adp-item"><div class="dot" style="background:var(--green)"></div>Vercel</div>
+          <div class="adp-item"><div class="dot" style="background:var(--green)"></div>Cloudflare</div>
+          <div class="adp-item"><div class="dot" style="background:var(--green)"></div>Netlify</div>
+          <div class="adp-item"><div class="dot" style="background:var(--green)"></div>Node.js</div>
+        </div>
+        <div class="section-no" style="margin-top:6px">
+          <div class="num">4</div>
+          <div class="label">主题生态</div>
+        </div>
+        <div class="theme-row">
+          <div class="theme-item"><span class="name">AstroWind</span><span class="stars">5.9k ★</span></div>
+          <div class="theme-item"><span class="name">AstroPaper</span><span class="stars">5k ★</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel 3: Code + Stats -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>⚡ 快速上手</h3>
+        <span class="badge">Install</span>
+      </div>
+      <div class="panel-body" style="gap:12px">
+        <div class="term">
+          <div class="term-top">
+            <span>Terminal</span>
+            <span class="url">npm create astro@latest</span>
+          </div>
+          <div class="term-body"># 1 分钟初始化
+npm create astro@latest my-site
+cd my-site
+
+# 开发
+npm run dev
+
+# 构建（输出 dist/）
+npm run build</div>
+        </div>
+        <div class="stats">
+          <div class="stats-top">核心指标</div>
+          <div class="stats-body">
+            <div class="stat">
+              <div class="label"><span>GitHub Stars</span><span style="color:var(--cyan)">62.5k</span></div>
+              <div class="bar"><span style="width:100%"></span></div>
+            </div>
+            <div class="stat">
+              <div class="label"><span>Forks</span><span style="color:var(--purple)">3.7k</span></div>
+              <div class="bar"><span style="width:42%"></span></div>
+            </div>
+            <div class="stat">
+              <div class="label"><span>AstroWind</span><span style="color:var(--yellow)">5.9k</span></div>
+              <div class="bar"><span style="width:59%"></span></div>
+            </div>
+            <div class="stat">
+              <div class="label"><span>AstroPaper</span><span style="color:var(--green)">5k</span></div>
+              <div class="bar"><span style="width:50%"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="feature-row">
+    <div class="feature">
+      <div class="icon">⚡</div>
+      <span>Zero JS<br>默认</span>
+    </div>
+    <div class="feature">
+      <div class="icon">🏝</div>
+      <span>Island<br>Architecture</span>
+    </div>
+    <div class="feature">
+      <div class="icon">📄</div>
+      <span>MDX<br>原生支持</span>
+    </div>
+    <div class="feature">
+      <div class="icon">🔗</div>
+      <span>官方<br>Sitemap/RSS</span>
+    </div>
+    <div class="feature">
+      <div class="icon">🌐</div>
+      <span>Vercel / CF<br>适配器</span>
+    </div>
+    <div class="feature">
+      <div class="icon">🎨</div>
+      <span>AstroWind<br>5.9k ★</span>
+    </div>
+  </div>
+
+  <div class="cta">
+    <div class="cta-card cyan">
+      <div class="cta-tag">上手</div>
+      <div class="cta-title">博客 / Doc 站首选</div>
+      <div class="cta-desc">想快速搭建内容驱动的静态站（博客、文档、作品集）？Astro 的多框架兼容让你迁移零成本，性能开箱即用。</div>
+    </div>
+    <div class="cta-card purple">
+      <div class="cta-tag">生态</div>
+      <div class="cta-title">npm create astro@latest</div>
+      <div class="cta-desc">5 个 UI 框架支持、官方主题生态、4 大部署平台适配器。想验证哪个主题？直接 <code>npx astro add [react|svelte|vue]</code>。</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>github.com/withastro/astro · TypeScript · v7.3.2</span>
+    <span class="stars">★ 62.5k</span>
+  </div>
+
+</div>
+</body>
+</html>
