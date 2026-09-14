@@ -1,7 +1,7 @@
 ---
 name: infocard-ivy-architecture-style
 description: Ivy 架构图谱。分层式系统架构信息卡主题：左侧层级标签 + 右侧模块面板，蓝/紫/绿/红/橙五色语义，实线调用与虚线触发，适合 Agent 编排、基础设施拓扑和可观测性内容；不适合散文、人物或轻量清单。
-version: 1.0.0
+version: 1.1.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -50,21 +50,22 @@ metadata:
 
 ```css
 :root{
-  --bg:#f4f6fb;        /* 蓝图纸底 */
+  --bg:#eef1f9;        /* 蓝图纸底 */
   --paper:#ffffff;     /* 层面板底 */
   --ink:#0f1b2d;       /* 主墨色 */
-  --muted:#5a6b82;     /* 次级说明 */
-  --line:#d7deea;      /* 边界线 */
+  --muted:#54657e;     /* 次级说明 */
+  --muted-strong:#3f4f68; /* 辅助文字（对比度加固） */
+  --line:#c9d3e4;      /* 边界线 */
   --blue:#2563eb;      /* 系统入口 / 平台边界 */
-  --blue-soft:#e8effd;
+  --blue-soft:#dbe7fd; --blue-tint:#eaf1fe;
   --purple:#7c3aed;    /* Agent / 编排 / 推理 */
-  --purple-soft:#f1ebfd;
+  --purple-soft:#e9e0fc; --purple-tint:#f2ecfe; --purple-hero:#6d28d9; /* 英雄层底 */
   --green:#059669;     /* 执行链 / 工具 / 任务流 */
-  --green-soft:#e5f5ef;
+  --green-soft:#d7f0e6; --green-tint:#e6f6f0;
   --red:#dc2626;       /* 队列 / 数据库 / 持久化 */
-  --red-soft:#fdecec;
+  --red-soft:#fbdcdc; --red-tint:#fdeaea;
   --orange:#d97706;    /* 监控 / 告警 / 人工介入 */
-  --orange-soft:#fdf3e3;
+  --orange-soft:#fce8cc; --orange-tint:#fdf1df;
   --code:#0f1b2d;      /* 代码块底 */
   --code-ink:#e8eefb;
 }
@@ -95,9 +96,14 @@ page
 
 ## Component Rules
 
-- 层标签：等宽大写 + 语义色圆点；一个层一个语义色，不混用
-- 节点卡：白底 + 1px line 边框 + 4px 左侧语义色条；标题下加一句职责
-- 流向条：用“↓ 调用 / ⇢ 触发”字符 + 文案表达，不画跨层长线
+- 英雄层：ORCHESTRATION 整层用 `--purple-hero` 中饱和渐变底 + 白字层标签，是全卡唯一饱和区（海报中枢）
+- 层底色：其余层 `layer-panel` 使用各自语义 Tint（`*-tint`），形成彩底节奏；英雄层节点卡白底浮于紫底上
+- 层标签：等宽大写 + 编号（`01 CLIENTS`）+ 语义色；英雄层标签反白
+- 节点卡：白底 + 1px line 边框 + 4px 左侧语义色条 + 微投影；标题行 = Tint 底衬几何图标（chip）+ 标题
+- 图标：内联 SVG 几何符号（终端/盾牌/菱形/钩子/圆柱/脉冲/仪表/指南针等），放 26px 圆角 chip 内，禁用 emoji
+- 主控卡：Dispatcher 横跨两列，双紫边 + 水印编号 00 + agent 流水线胶囊链（PLAN → REVIEW）
+- 元数据胶囊：节点卡内 1–2 个 `meta` 微胶囊（协议/同步性/风险），高亮款用语义色实底；720px 以下只保留前 2 个
+- 流向条：导轨渐变线 + 圆角胶囊文案（“↓ 调用 / ⇢ 触发”），不画跨层长线
 - 矩阵：表头深墨底白字；单元格语义色点 + 短语
 - 代码块：`--code` 深底 + `--code-ink`，等宽，可横向滚动
 - 风险面板：`--red-soft` 底 + `--red` 左条，只用于边界/风险
@@ -115,7 +121,8 @@ page
 - 不用跨层绝对定位连线；关系一律用文字化流向条表达
 - 不把语义色当装饰：紫色块里不放“监控”，橙色只用于观测/人工
 - 不用大面积深底；深色只出现在代码块
-- 不使用投影堆叠制造层级；层级靠背景与边框
+- 不使用多层投影堆叠；单层微投影只用于浮起卡片
+- 饱和底只允许出现在英雄层与 chip/胶囊小面积上；其余层禁止中饱和大色底
 - 移动端不保留多列层面板
 
 ## Acceptance Checklist
@@ -127,6 +134,8 @@ page
 - [ ] 矩阵/代码块/风险面板各至少一个
 - [ ] 390px 无横向溢出，节点单列
 - [ ] 颜色全部走 CSS 变量，组件无硬编码
+- [ ] 英雄层紫底上文字对比度达标（白字/标签）
+- [ ] 每个节点有 chip 图标与 meta 胶囊；层标签有编号
 - [ ] data-theme="ivy-architecture" 与 bundle.style、meta.style 一致
 
 ## Naming / Aliases
