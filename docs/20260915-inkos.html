@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="ivy-architecture">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InkOS：把长篇小说交给一条可审计的 Agent 流水线</title>
+<style>
+:root{
+  --bg:#eef1f9;--paper:#ffffff;--ink:#0f1b2d;--muted:#54657e;--muted-strong:#3f4f68;--line:#c9d3e4;
+  --blue:#2563eb;--blue-soft:#dbe7fd;--blue-tint:#eaf1fe;
+  --purple:#7c3aed;--purple-soft:#e9e0fc;--purple-tint:#f2ecfe;--purple-hero:#6d28d9;
+  --green:#059669;--green-soft:#d7f0e6;--green-tint:#e6f6f0;
+  --red:#dc2626;--red-soft:#fbdcdc;--red-tint:#fdeaea;
+  --orange:#d97706;--orange-soft:#fce8cc;--orange-tint:#fdf1df;
+  --code:#0f1b2d;--code-ink:#e8eefb;--solid:#ffffff;--purple-wash:#f4ecff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6;overflow-x:hidden}
+.page{max-width:1120px;margin:0 auto;padding:20px 24px 60px}
+.arch-header{border:1px solid var(--line);background:var(--paper);padding:20px 24px 16px}
+.kicker{font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.16em;color:var(--purple)}
+.arch-header h1{margin:8px 0 6px;font-size:clamp(30px,4.2vw,46px);line-height:1.1;letter-spacing:-.03em;max-width:24ch;word-break:keep-all;overflow-wrap:anywhere;text-wrap:balance}
+.arch-header p.summary{margin:0;max-width:70ch;color:var(--muted-strong);font-size:14.5px}
+.legend{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.legend span{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);padding:5px 10px;font:700 11px ui-monospace,Menlo,monospace;color:var(--muted-strong);border-radius:999px}
+.legend span:nth-child(1){background:var(--blue-soft)}.legend span:nth-child(2){background:var(--purple-soft)}.legend span:nth-child(3){background:var(--green-soft)}.legend span:nth-child(4){background:var(--red-soft)}.legend span:nth-child(5){background:var(--orange-soft)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.blue{background:var(--blue)}.dot.purple{background:var(--purple)}.dot.green{background:var(--green)}.dot.red{background:var(--red)}.dot.orange{background:var(--orange)}
+.layer-stack{display:grid;gap:0;margin-top:16px}
+.layer{display:grid;grid-template-columns:168px 1fr;border:1px solid var(--line);border-top:0;background:var(--paper)}
+.layer:first-child{border-top:1px solid var(--line)}
+.layer-label{padding:13px 14px;border-right:1px solid var(--line);background:var(--bg)}
+.layer-label b{display:block;font:700 12px ui-monospace,Menlo,monospace;letter-spacing:.1em}
+.layer-label i{display:block;font-style:normal;font-size:11px;color:var(--muted-strong);margin-top:5px;line-height:1.5}
+.layno{display:inline-block;font:900 10px ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.12em;margin-bottom:4px}
+.layer-panel{padding:13px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-width:0}
+.layer:nth-child(1) .layer-panel{background:linear-gradient(135deg,#dce9fb,#d3e3f8)}
+.layer:nth-child(3) .layer-panel{background:linear-gradient(135deg,#eef2fb,#ffffff)}
+.layer:nth-child(5) .layer-panel{background:linear-gradient(135deg,var(--purple-hero),var(--purple));padding:12px}
+.layer:nth-child(5) .layer-label{background:linear-gradient(180deg,#5b21b6,var(--purple-hero));border-right:0}
+.layer:nth-child(5) .layer-label b,.layer:nth-child(5) .layer-label i{color:var(--solid)}
+.layer:nth-child(5) .layno{color:rgba(255,255,255,.75)}
+.layer:nth-child(7) .layer-panel{background:var(--green-tint)}
+.layer:nth-child(9) .layer-panel{background:var(--red-tint)}
+.layer:nth-child(11) .layer-panel{background:var(--orange-tint)}
+.node-card{border:1px solid var(--line);border-left:4px solid var(--blue);background:var(--paper);padding:11px 12px;min-width:0;box-shadow:0 1px 0 rgba(15,27,45,.05)}
+.node-card.purple{border-left-color:var(--purple)}.node-card.green{border-left-color:var(--green)}.node-card.red{border-left-color:var(--red)}.node-card.orange{border-left-color:var(--orange)}
+.layer:nth-child(5) .node-card{background:rgba(255,255,255,.94);border-left-width:5px}
+.node-card b{display:flex;align-items:center;gap:7px;font-size:15px}
+.node-card p{margin:6px 0 0;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.chip{width:26px;height:26px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;flex:none;margin-right:0}
+.chip svg{width:14px;height:14px;display:block}
+.chip.blue{background:var(--blue-soft);color:var(--blue)}.chip.purple{background:var(--purple-soft);color:var(--purple)}.chip.green{background:var(--green-soft);color:var(--green)}.chip.red{background:var(--red-soft);color:var(--red)}.chip.orange{background:var(--orange-soft);color:var(--orange)}
+.layer:nth-child(5) .chip{background:var(--purple-hero);color:var(--solid)}
+.meta{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.meta span{font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted-strong);background:var(--bg)}
+.meta span.hl{border-color:transparent}
+.meta span.hl.b{background:var(--blue-soft);color:var(--blue)}.meta span.hl.p{background:var(--purple-soft);color:var(--purple)}.meta span.hl.g{background:var(--green-soft);color:var(--green)}.meta span.hl.r{background:var(--red-soft);color:var(--red)}.meta span.hl.o{background:var(--orange-soft);color:var(--orange)}
+.layer:nth-child(5) .meta span{background:var(--solid);border-color:rgba(255,255,255,.5)}
+.master{grid-column:span 2;background:linear-gradient(135deg,var(--solid),var(--purple-wash));border:2px solid var(--purple);position:relative;padding:13px 14px}
+.master .no{position:absolute;top:8px;right:10px;font:900 20px ui-monospace,Menlo,monospace;color:var(--purple-soft);-webkit-text-stroke:1px var(--purple)}
+.pipe{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:9px}
+.pipe b{font:700 10px ui-monospace,Menlo,monospace;color:var(--solid);background:var(--purple);padding:3px 8px;border-radius:999px;letter-spacing:.05em}
+.pipe i{font-style:normal;color:var(--purple);font:900 10px ui-monospace,Menlo,monospace}
+.flow-strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding:10px 16px;border:1px solid var(--line);border-top:0;background:linear-gradient(90deg,var(--bg),var(--paper));font:11.5px ui-monospace,Menlo,monospace;color:var(--muted-strong);position:relative}
+.flow-strip:before{content:'';position:absolute;left:16px;right:16px;top:50%;height:2px;background:linear-gradient(90deg,var(--line),transparent);z-index:0}
+.flow-strip span{position:relative;z-index:1;background:var(--bg);padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.matrix-wrap{margin-top:22px;border:1px solid var(--line);overflow-x:auto;background:var(--paper)}
+.matrix{width:100%;min-width:760px;border-collapse:collapse}
+.matrix th,.matrix td{border:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top;font-size:12.5px}
+.matrix th{background:var(--ink);color:var(--solid);font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em}
+.matrix td:first-child{font-weight:700;white-space:nowrap}
+.code-block{margin-top:22px;background:var(--code);color:var(--code-ink);padding:16px;overflow-x:auto}
+.code-block pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 ui-monospace,Menlo,monospace}
+.risk-panel{margin-top:22px;border:1px solid var(--line);border-left:5px solid var(--red);background:var(--red-soft);padding:14px 16px}
+.risk-panel b{color:var(--red)}
+.risk-panel p{margin:6px 0 0;font-size:13px;color:var(--muted)}
+.arch-footer{margin-top:22px;display:flex;justify-content:space-between;gap:14px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font:10.5px ui-monospace,Menlo,monospace}
+@media(max-width:900px){.layer{grid-template-columns:1fr}.layer-label{border-right:0;border-bottom:1px solid var(--line)}.layer-panel{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.layer-panel{grid-template-columns:1fr}.master{grid-column:span 1}.meta span:nth-child(n+3){display:none}}
+@media(max-width:520px){
+  .page{padding:18px 12px 60px}
+  .arch-header{padding:20px 14px 16px}
+  .arch-header h1{font-size:clamp(23px,6.6vw,32px);line-height:1.32;max-width:15ch;margin-left:auto;margin-right:auto;text-wrap:balance}
+  .arch-header p.summary{font-size:13.5px}
+  .kicker{font-size:10px;letter-spacing:.12em}
+  .layer-label,.layer-panel{padding:12px}
+  .layer:nth-child(5) .layer-panel{background:linear-gradient(160deg,var(--purple-hero),var(--purple))}
+  .arch-footer{display:block}.arch-footer span{display:block;margin-top:6px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="arch-header">
+    <div class="kicker">INKOS · STORY CREATION AGENT PIPELINE</div>
+    <h1>InkOS：把长篇小说交给一条可审计的 Agent 流水线</h1>
+    <p class="summary">InkOS 用 10 个分工 agent、三层记忆和控制面文档管理长篇、短篇、剧本、互动影游与翻译创作。安装只要一条 npm 命令，但真正决定成稿质量的是“<span style="white-space:nowrap">规划→</span><span style="white-space:nowrap">编排→</span><span style="white-space:nowrap">写作→</span><span style="white-space:nowrap">审计→</span>修订”这条链路怎么配置。</p>
+    <div class="legend">
+      <span><i class="dot blue"></i>入口 / 交互</span>
+      <span><i class="dot purple"></i>Agent 编排</span>
+      <span><i class="dot green"></i>记忆 / 状态</span>
+      <span><i class="dot red"></i>命令 / 数据</span>
+      <span><i class="dot orange"></i>观测 / 人工</span>
+    </div>
+  </header>
+
+  <section class="layer-stack">
+    <div class="layer">
+      <div class="layer-label"><span class="layno">01</span><b>ENTRY 交互入口</b><i>Studio · TUI · CLI · 外部 Agent</i></div>
+      <div class="layer-panel">
+        <div class="node-card "><b><i class="chip blue"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-4 4-4 8 0 12 4-4 4-8 0-12z"/></svg></i>Studio</b><p>网页工作台：聊天、建书、短篇、封面、Play、模型配置都在这里。</p><div class="meta"><span class="hl b">WEB</span><span class="hl ">CHAT</span></div></div>
+        <div class="node-card "><b><i class="chip blue"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4l4 4-4 4"/><path d="M8 12h6"/></svg></i>TUI / CLI</b><p>inkos tui 全屏终端交互；CLI 承担原子命令与脚本编排。</p><div class="meta"><span class="hl b">TERM</span><span class="hl ">NODE 22+</span></div></div>
+        <div class="node-card "><b><i class="chip blue"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v6a3 3 0 1 1-6 0"/><circle cx="12.5" cy="3.5" r="1.5"/></svg></i>外部 Agent</b><p>inkos interact --json 提供结构化入口；OpenClaw 可直接调用。</p><div class="meta"><span class="hl ">JSON</span><span class="hl g">SKILL</span></div></div>
+      </div>
+    </div>
+    <div class="flow-strip"><span><b>↓ 调用</b> 四个入口共用同一套 pi-agent 执行内核</span></div>
+
+    <div class="layer">
+      <div class="layer-label"><span class="layno">02</span><b>CONFIG 配置面</b><i>Studio 可视化 与 CLI env 双路径</i></div>
+      <div class="layer-panel">
+        <div class="node-card "><b><i class="chip blue"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2l5 2v4c0 3-2.5 5-5 6-2.5-1-5-3-5-6V4z"/></svg></i>Studio 服务配置</b><p>API Key 存 .inkos/secrets.json；Studio 不读 env 覆盖。</p><div class="meta"><span class="hl b">SECRETS</span><span class="hl ">ISOLATE</span></div></div>
+        <div class="node-card "><b><i class="chip blue"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5.5 4L2 8l3.5 4M10.5 4L14 8l-3.5 4"/></svg></i>env 覆盖</b><p>~/.inkos/.env 或项目 .env；CLI 合成顺序明确。</p><div class="meta"><span class="hl b">ENV</span><span class="hl ">OVERRIDE</span></div></div>
+        <div class="node-card "><b><i class="chip blue"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5.5" cy="5" r="2.2"/><circle cx="11" cy="6.5" r="1.8"/><path d="M2 13c0-2 1.6-3.2 3.5-3.2S9 11 9 13M9.5 12.5c.3-1.6 1.4-2.4 2.8-2.4 1.2 0 2 .6 2.2 1.6"/></svg></i>多模型路由</b><p>writer / auditor 按 agent 粒度配不同模型，未配则回退全局。</p><div class="meta"><span class="hl ">ROUTING</span><span class="hl ">COST</span></div></div>
+      </div>
+    </div>
+    <div class="flow-strip"><span><b>↓ 调用</b> 配置就绪后进入章节生产管线</span></div>
+
+    <div class="layer">
+      <div class="layer-label"><span class="layno">03</span><b>ORCHESTRATION 章节管线</b><i>Dispatcher 思想的完整落地：10 agent 分工</i></div>
+      <div class="layer-panel">
+        <div class="node-card purple master"><span class="no">00</span><b><i class="chip purple"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4.5" y="4.5" width="7" height="7" transform="rotate(45 8 8)"/></svg></i>章节生产链</b><p>每章按固定顺序推进；审计不过默认只自动修订 1 轮，其余问题留给人。</p><div class="pipe"><b>PLAN</b><i>→</i><b>COMPOSE</b><i>→</i><b>WRITE</b><i>→</i><b>AUDIT</b><i>→</i><b>REVISE</b><i>→</i><b>SYNC</b></div><div class="meta"><span class="hl p">PI-AGENT</span><span class="hl p">37 维审计</span><span>reviewRetries 可调</span></div></div>
+        <div class="node-card purple"><b><i class="chip purple"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M10.5 5.5l-1.6 4-3.4 1 1.6-4z"/></svg></i>Planner 规划师</b><p>读作者意图 + 当前焦点 + 记忆检索，产出本章意图与 must-keep/must-avoid。</p><div class="meta"><span class="hl p">INTENT</span></div></div>
+        <div class="node-card purple"><b><i class="chip purple"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="9" height="3" rx="1"/><rect x="5" y="7" width="9" height="3" rx="1"/><rect x="2" y="11" width="9" height="3" rx="1"/></svg></i>Composer 编排师</b><p>从结构化状态和控制文档按任务选择上下文，编译规则栈。</p><div class="meta"><span class="hl p">CONTEXT</span><span class="hl ">RULES</span></div></div>
+        <div class="node-card purple"><b><i class="chip purple"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5.5 4L2 8l3.5 4M10.5 4L14 8l-3.5 4"/></svg></i>Writer 写手</b><p>基于精简上下文生成正文；内置字数治理与去 AI 味规则。</p><div class="meta"><span class="hl p">DRAFT</span><span class="hl ">25+ 规则</span></div></div>
+        <div class="node-card purple"><b><i class="chip purple"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg></i>Auditor 审计员</b><p>37 个维度对照结构化状态审草稿：连续性、伏笔、节奏、AI 味。</p><div class="meta"><span class="hl p">AUDIT</span><span class="hl ">AI-DETECT</span></div></div>
+        <div class="node-card purple"><b><i class="chip purple"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5.5" cy="5" r="2.2"/><circle cx="11" cy="6.5" r="1.8"/><path d="M2 13c0-2 1.6-3.2 3.5-3.2S9 11 9 13M9.5 12.5c.3-1.6 1.4-2.4 2.8-2.4 1.2 0 2 .6 2.2 1.6"/></svg></i>Reviser 修订者</b><p>修复关键问题；默认 1 轮，其余标记给人工审核。</p><div class="meta"><span class="hl p">REVISE</span><span class="hl o">HITL</span></div></div>
+      </div>
+    </div>
+    <div class="flow-strip"><span><b>↓ 写入</b> 正文与状态原子落盘，先工作区校验再提交</span><span><b>⇢ 观察</b> Observer 提取 9 类事实 → Reflector 输出 JSON delta</span></div>
+
+    <div class="layer">
+      <div class="layer-label"><span class="layno">04</span><b>STATE 记忆三层</b><i>权威状态 · 可读投影 · 时序检索</i></div>
+      <div class="layer-panel">
+        <div class="node-card green"><b><i class="chip green"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="8" cy="3.5" rx="5.5" ry="1.8"/><path d="M2.5 3.5v9c0 1 2.5 1.8 5.5 1.8s5.5-.8 5.5-1.8v-9M2.5 8c0 1 2.5 1.8 5.5 1.8s5.5-.8 5.5-1.8"/></svg></i>story/state/*.json</b><p>权威结构化状态：伏笔、章节摘要等，Zod schema 校验后才写入。</p><div class="meta"><span class="hl g">ZOD</span><span class="hl ">IMMUTABLE</span></div></div>
+        <div class="node-card green"><b><i class="chip green"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5.5 4L2 8l3.5 4M10.5 4L14 8l-3.5 4"/></svg></i>story/*.md</b><p>人类可读投影：当前状态、待收伏笔、章节摘要、角色矩阵。</p><div class="meta"><span class="hl g">PROJECTION</span><span class="hl ">READABLE</span></div></div>
+        <div class="node-card green"><b><i class="chip green"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 2L4 9h3.5L7 14l5-7H8.5z"/></svg></i>story/memory.db</b><p>Node 22+ 自动启用 SQLite 时序记忆，按相关性检索，避免全量注入。</p><div class="meta"><span class="hl g">SQLITE</span><span class="hl ">FTS5/BM25</span></div></div>
+      </div>
+    </div>
+    <div class="flow-strip"><span><b>↓ 调用</b> 原子命令可直接调用管线各环节，--json 输出结构化结果</span></div>
+
+    <div class="layer">
+      <div class="layer-label"><span class="layno">05</span><b>COMMANDS 命令层</b><i>一键管线 · 原子命令 · 自然语言</i></div>
+      <div class="layer-panel">
+        <div class="node-card red"><b><i class="chip red"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 2L4 9h3.5L7 14l5-7H8.5z"/></svg></i>write next</b><p>完整管线：草稿 → 审计 → 按配置修订；--count 5 连写五章。</p><div class="meta"><span class="hl r">PIPELINE</span></div></div>
+        <div class="node-card red"><b><i class="chip red"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="9" height="3" rx="1"/><rect x="5" y="7" width="9" height="3" rx="1"/><rect x="2" y="11" width="9" height="3" rx="1"/></svg></i>原子命令</b><p>plan / compose / draft / audit / revise 独立执行，--json 可组合。</p><div class="meta"><span class="hl r">COMPOSABLE</span><span class="hl ">JSON</span></div></div>
+        <div class="node-card red"><b><i class="chip red"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 2h6M6.5 2v4L3 12.5A1.5 1.5 0 0 0 4.4 14h7.2a1.5 1.5 0 0 0 1.4-1.5L9.5 6V2"/><path d="M5 10h6"/></svg></i>short / play / fanfic</b><p>短篇一键成稿；Play 开放世界；同人四种模式（canon/au/ooc/cp）。</p><div class="meta"><span class="hl r">SHORT</span><span class="hl ">WORLD</span></div></div>
+      </div>
+    </div>
+    <div class="flow-strip"><span><b>⇢ 上报</b> 守护进程 inkos up 推进任务并推送通知</span></div>
+
+    <div class="layer">
+      <div class="layer-label"><span class="layno">06</span><b>SUPERVISION 守护与交付</b><i>后台写作 · 通知 · 导出</i></div>
+      <div class="layer-panel">
+        <div class="node-card orange"><b><i class="chip orange"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11a5 5 0 1 1 10 0"/><path d="M8 11l3-3.5"/></svg></i>inkos up</b><p>后台循环自动写章；关键问题暂停留审，非关键自动推进。</p><div class="meta"><span class="hl o">DAEMON</span></div></div>
+        <div class="node-card orange"><b><i class="chip orange"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/></svg></i>通知推送</b><p>Telegram / 飞书 / 企业微信 / Webhook（HMAC-SHA256 签名 + 事件过滤）。</p><div class="meta"><span class="hl o">PUSH</span><span class="hl ">SIGNED</span></div></div>
+        <div class="node-card orange"><b><i class="chip orange"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 14V8M6 14V4M10 14v-4M14 14V6"/></svg></i>export / doctor</b><p>导出 EPUB/TXT；doctor 检查配置来源与 API 连通性。</p><div class="meta"><span class="hl o">EPUB</span><span class="hl ">DIAG</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="matrix-wrap">
+    <table class="matrix">
+      <thead><tr><th>读者决策</th><th>官方事实</th><th>怎么验证</th><th>边界</th></tr></thead>
+      <tbody>
+        <tr><td>是否适合长篇连载</td><td>章节管线 + 三层记忆 + 37 维审计专为连续性设计</td><td>建书后先写 1 章，回读 intent/context/trace 与审稿记录</td><td>成稿质量取决于模型与配置，项目不承诺“出版级”</td></tr>
+        <tr><td>不想用网页版</td><td>TUI 与 CLI 功能对齐，原子命令可脚本化</td><td>inkos tui 打开仪表盘，跑 /new、/write</td><td>Studio 独有：可视化模型配置与 Play 界面</td></tr>
+        <tr><td>已有旧稿想续写</td><td>inkos import chapters 重建状态、伏笔与角色关系</td><td>导入后 write next 续写并检查记忆投影</td><td>复杂分卷需检查分割正确性</td></tr>
+        <tr><td>接入自己的模型</td><td>任何 OpenAI 兼容端点；provider bank 含主流服务商</td><td>inkos doctor 看 effective config 与连通性</td><td>--service 与 --model 必须归属一致，错配直接报错</td></tr>
+        <tr><td>成本控制</td><td>多模型路由：写作/审计可分用不同模型</td><td>inkos config show-models 查看路由</td><td>未配置的 agent 回退全局模型</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code-block"><pre># 安装（要求 Node.js 22+）
+npm i -g @actalk/inkos
+
+# 建书（可传入创作简报）
+inkos init my-novel && cd my-novel
+inkos book create --title "书名" --genre xuanhuan --brief my-ideas.md
+
+# 写第一章并回读证据
+inkos write next 书名
+inkos status && inkos review list 书名
+
+# 验证控制输入（无需 API Key 即可跑 compose）
+inkos plan chapter 书名 --context "本章聚焦师徒矛盾" --json
+inkos compose chapter 书名 --json
+
+# 守护进程 + 导出
+inkos up -q
+inkos export 书名 --format epub</pre></div>
+
+  <div class="risk-panel"><b>使用边界</b><p>AGPL-3.0：修改或托管服务需遵守开源义务，商用前核对许可证。API Key 只存本机 .inkos/secrets.json，但内容会发送到你配置的模型服务商；涉密题材先评估数据流。生成内容版权归按平台与法律判断，审计机制降低而非消除连续性错误。Node.js 版本低于 22 时 SQLite 记忆库不启用。</p></div>
+
+  <footer class="arch-footer"><span>InkOS · snapshot 2026-09-15 · Narcooo/inkos master · v1.8.0</span><span>9,838 stars / 1,799 forks / 233 issues · AGPL-3.0 · 本机未安装执行</span></footer>
+</main>
+</body>
+</html>
