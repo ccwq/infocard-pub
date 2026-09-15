@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="darkblue">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>inurl — BYOK AI 模型融合平台</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0b1225;
+  --surface: #111c3a;
+  --surface2: #162040;
+  --border: #1e3058;
+  --ink: #e8edf8;
+  --muted: #7a8db5;
+  --cyan: #4fd9ff;
+  --blue: #4a94ff;
+  --green: #3dffa0;
+  --yellow: #ffd04f;
+  --purple: #b87dff;
+  --red: #ff5f7e;
+  --font: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html { font-size: 15px; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  line-height: 1.6;
+  padding: 24px 16px 80px;
+  min-height: 100vh;
+}
+
+.infocard-wrapper {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+/* ── Header ── */
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.card-icon {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.card-title-block { flex: 1; }
+.card-title {
+  font-size: 1.5rem; font-weight: 700;
+  color: var(--ink); line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.card-subtitle {
+  font-size: 0.85rem; color: var(--muted); margin-top: 2px;
+}
+.card-badges {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+}
+.badge {
+  font-size: 0.72rem; padding: 2px 8px;
+  border-radius: 20px; font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.badge-byok { background: rgba(61,255,160,0.15); color: var(--green); }
+.badge-not-relay { background: rgba(79,217,255,0.12); color: var(--cyan); }
+.badge-dev { background: rgba(132,125,255,0.12); color: var(--purple); }
+.badge-risk { background: rgba(255,95,126,0.12); color: var(--red); }
+
+/* ── Stat pills ── */
+.stats-row {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+}
+.stat-pill {
+  flex: 1; min-width: 130px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px;
+  text-align: center;
+}
+.stat-val { font-size: 1.05rem; font-weight: 700; color: var(--cyan); }
+.stat-lbl { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+/* ── Section ── */
+.section { margin-bottom: 18px; }
+.section-label {
+  font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); margin-bottom: 8px;
+}
+.section-title {
+  font-size: 1.05rem; font-weight: 700;
+  color: var(--ink); margin-bottom: 8px;
+}
+
+/* ── Pain point ── */
+.pain-box {
+  background: rgba(255,95,126,0.08);
+  border: 1px solid rgba(255,95,126,0.25);
+  border-radius: 10px; padding: 12px 14px;
+}
+.pain-box p { font-size: 0.9rem; color: var(--ink); }
+.pain-highlight { color: var(--yellow); font-weight: 600; }
+.mono { font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace; }
+
+/* ── Feature cards ── */
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px;
+}
+.feature-card.full { grid-column: 1 / -1; }
+.feat-num {
+  font-size: 0.72rem; font-weight: 700;
+  color: var(--cyan); letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.feat-name { font-size: 0.92rem; font-weight: 700; color: var(--ink); }
+.feat-desc { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.feat-cmd {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.72rem; color: var(--green);
+  background: rgba(61,255,160,0.07);
+  border-radius: 6px; padding: 6px 8px;
+  margin-top: 6px; word-break: break-all;
+  display: block; line-height: 1.5;
+}
+
+/* ── Code blocks ── */
+.code-block {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden; margin-bottom: 10px;
+}
+.code-header {
+  display: flex; align-items: center;
+  padding: 8px 12px;
+  background: rgba(30,48,88,0.6);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+.code-dots { display: flex; gap: 5px; }
+.dot-r { width: 10px; height: 10px; border-radius: 50%; background: var(--red); }
+.dot-y { width: 10px; height: 10px; border-radius: 50%; background: var(--yellow); }
+.dot-g { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+.code-label { font-size: 0.72rem; color: var(--muted); font-family: 'Fira Code', monospace; }
+.code-body {
+  padding: 12px;
+  overflow-x: auto;
+}
+.code-body pre {
+  font-family: 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.78rem; line-height: 1.65;
+  color: var(--ink); margin: 0;
+  white-space: pre;
+}
+.code-comment { color: var(--muted); }
+.code-kw { color: var(--purple); font-weight: 600; }
+.code-str { color: var(--green); }
+.code-fn { color: var(--cyan); }
+.code-punct { color: var(--muted); }
+.code-red { color: var(--red); }
+.code-yellow { color: var(--yellow); }
+
+/* ── Comparison table ── */
+.compare-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.compare-table th {
+  background: var(--surface2);
+  color: var(--muted); font-weight: 600;
+  text-align: left; padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.compare-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(30,48,88,0.5);
+  color: var(--ink);
+}
+.compare-table tr:last-child td { border-bottom: none; }
+.td-green { color: var(--green); }
+.td-red { color: var(--red); }
+.td-cyan { color: var(--cyan); }
+.td-yellow { color: var(--yellow); }
+.td-purple { color: var(--purple); }
+.td-muted { color: var(--muted); }
+.td-bold { font-weight: 700; color: var(--ink); }
+
+/* ── Flow diagram ── */
+.flow-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px;
+  margin-bottom: 10px;
+}
+.flow-step {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0;
+}
+.flow-step-num {
+  width: 22px; height: 22px;
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 700; color: var(--ink);
+  flex-shrink: 0;
+}
+.flow-step-text {
+  font-size: 0.85rem; color: var(--ink);
+}
+.flow-step-text .flow-mono {
+  font-family: 'Fira Code', monospace;
+  color: var(--cyan);
+}
+.flow-step-text .flow-green {
+  color: var(--green); font-weight: 600;
+}
+.flow-step-text .flow-muted {
+  color: var(--muted);
+}
+.flow-arrow {
+  text-align: center;
+  font-size: 0.75rem; color: var(--muted);
+  padding: 2px 0;
+}
+.flow-absent {
+  background: rgba(255,95,126,0.06);
+  border: 1px dashed rgba(255,95,126,0.3);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  color: var(--red);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ── Self-test checklist ── */
+.checklist {
+  display: grid; gap: 8px;
+}
+.check-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.check-num {
+  width: 20px; height: 20px;
+  background: rgba(79,217,255,0.15);
+  border: 1px solid rgba(79,217,255,0.3);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 700; color: var(--cyan);
+  flex-shrink: 0;
+}
+.check-text { font-size: 0.85rem; color: var(--ink); line-height: 1.45; }
+.check-result {
+  margin-top: 10px;
+  background: rgba(255,95,126,0.08);
+  border: 1px solid rgba(255,95,126,0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.8rem; color: var(--red);
+}
+
+/* ── Selection questions ── */
+.question-list {
+  display: grid; gap: 10px;
+}
+.question-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+}
+.question-q {
+  font-size: 0.85rem; font-weight: 700; color: var(--yellow);
+  margin-bottom: 4px;
+}
+.question-a {
+  font-size: 0.8rem; color: var(--muted);
+  padding-left: 10px;
+  border-left: 2px solid var(--green);
+}
+.question-a.good { border-left-color: var(--green); }
+.question-a.bad { border-left-color: var(--red); }
+
+/* ── Three principles ── */
+.principle-row {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.principle-pill {
+  flex: 1; min-width: 120px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px;
+  text-align: center;
+}
+.principle-icon { font-size: 1.2rem; margin-bottom: 4px; }
+.principle-val { font-size: 0.9rem; font-weight: 700; color: var(--green); }
+.principle-lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+/* ── Links ── */
+.link-row {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 4px;
+}
+a.link {
+  font-size: 0.78rem; color: var(--cyan);
+  text-decoration: none;
+  background: rgba(79,217,255,0.08);
+  border: 1px solid rgba(79,217,255,0.2);
+  border-radius: 8px; padding: 4px 10px;
+}
+a.link:hover { background: rgba(79,217,255,0.15); }
+a.link.green {
+  color: var(--green);
+  background: rgba(61,255,160,0.08);
+  border-color: rgba(61,255,160,0.2);
+}
+a.link.green:hover { background: rgba(61,255,160,0.15); }
+
+/* ── CTA ── */
+.cta-box {
+  background: linear-gradient(135deg, rgba(79,217,255,0.12), rgba(132,125,255,0.12));
+  border: 1.5px solid rgba(79,217,255,0.3);
+  border-radius: 12px; padding: 14px 16px;
+  text-align: center;
+}
+.cta-title {
+  font-size: 0.95rem; font-weight: 700; color: var(--ink); margin-bottom: 4px;
+}
+.cta-desc {
+  font-size: 0.78rem; color: var(--muted); margin-bottom: 10px;
+}
+.cta-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
+  color: var(--ink); font-weight: 700; font-size: 0.88rem;
+  border-radius: 20px; padding: 8px 18px;
+  text-decoration: none;
+}
+
+/* ── Source ── */
+.source-row {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem; color: var(--muted);
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+}
+.source-row a { color: var(--muted); }
+
+/* ── Divider ── */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 16px 0;
+}
+</style>
+</head>
+<body>
+<div class="infocard-wrapper">
+
+  <!-- Header -->
+  <div class="card-header">
+    <div class="card-icon">🔑</div>
+    <div class="card-title-block">
+      <div class="card-title">inurl — BYOK AI 模型融合平台</div>
+      <div class="card-subtitle">密钥本地加密 · Agent 直连提供商 · 非 Relay/中转</div>
+      <div class="card-badges">
+        <span class="badge badge-byok">BYOK</span>
+        <span class="badge badge-not-relay">非中转</span>
+        <span class="badge badge-dev">API Gateway</span>
+        <span class="badge badge-risk">低封号风险</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-pill">
+      <div class="stat-val">BYOK</div>
+      <div class="stat-lbl">密钥存储方式</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-val">直连</div>
+      <div class="stat-lbl">调用路径</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-val">低</div>
+      <div class="stat-lbl">封号风险</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-val">byok_live_</div>
+      <div class="stat-lbl">Token 前缀</div>
+    </div>
+  </div>
+
+  <!-- 痛点 -->
+  <div class="section">
+    <div class="section-label">Pain Point · 痛点</div>
+    <div class="pain-box">
+      <p>你以为在用「聚合工具」，实际上在用 <span class="pain-highlight">Relay（中转）平台</span>：<br><br>
+      你把 API Key 交给平台 → 平台代替你调用提供商 → 提供商看到的是<span class="pain-highlight">平台的 IP + 平台的身份</span>。<br><br>
+      大量聚合工具用 Relay 模式却不告诉你，导致你的 Key 被共享 IP 池拖累，遭遇<span class="pain-highlight">高封号风险</span>。</p>
+    </div>
+  </div>
+
+  <!-- inurl 是什么 -->
+  <div class="section">
+    <div class="section-label">Core Value · 核心价值</div>
+    <div class="section-title">inurl 是什么</div>
+    <p style="font-size:0.9rem;color:var(--muted);margin-bottom:12px;">
+      BYOK（Bring Your Own Key）AI 模型融合平台。密钥在本地加密保管，Agent 直接调用提供商，平台完全不在调用链路中。统一 Token（<span class="mono" style="color:var(--cyan)">Bearer byok_live_xxxx...</span>）仅用于本地 Agent ↔ 控制台鉴权，从不出现在对提供商的请求中。
+    </p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feat-num">KEY STORAGE</div>
+        <div class="feat-name">本地加密保险库</div>
+        <div class="feat-desc">提供商 API Key 端到端加密，云端只看见密文</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-num">CALL PATH</div>
+        <div class="feat-name">直连提供商</div>
+        <div class="feat-desc">你的 Agent 直接调用，不经过平台服务器</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-num">TOKEN SCOPE</div>
+        <div class="feat-name">仅用于鉴权</div>
+        <div class="feat-desc">统一 Token 从不出现在 provider 请求中</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-num">PLATFORM ROLE</div>
+        <div class="feat-name">调用时缺席</div>
+        <div class="feat-desc">平台在「调用 provider」步骤完全不存在</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Relay vs BYOK 对比表 -->
+  <div class="section">
+    <div class="section-label">Comparison · 五维对比</div>
+    <div class="section-title">Relay（中转）vs BYOK（自带密钥）</div>
+    <div style="overflow-x:auto;">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>维度</th><th>Relay 中转</th><th>BYOK 自带密钥</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="td-bold">密钥存储</td>
+          <td class="td-red">平台服务器</td>
+          <td class="td-green">本地加密保险库</td>
+        </tr>
+        <tr>
+          <td class="td-bold">调用路径</td>
+          <td class="td-red">你 → 平台服务器 → 提供商</td>
+          <td class="td-green">你的 Agent → 提供商（直接）</td>
+        </tr>
+        <tr>
+          <td class="td-bold">封号风险</td>
+          <td class="td-red">高：共享出口 IP，被识别为代理</td>
+          <td class="td-green">低：你的密钥、你的身份</td>
+        </tr>
+        <tr>
+          <td class="td-bold">平台可见数据</td>
+          <td class="td-red">你的密钥 + 请求内容</td>
+          <td class="td-green">密文 + Token 认证信息</td>
+        </tr>
+        <tr>
+          <td class="td-bold">合规性</td>
+          <td class="td-red">弱：第三方看见全部</td>
+          <td class="td-green">强：最小数据，密钥自托管</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- inurl BYOK 架构 -->
+  <div class="section">
+    <div class="section-label">Architecture · 架构流程</div>
+    <div class="section-title">inurl BYOK 调用链路</div>
+    <div class="flow-block">
+      <div class="flow-step">
+        <div class="flow-step-num">1</div>
+        <div class="flow-step-text">
+          你的代码发起请求
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="flow-step-num">2</div>
+        <div class="flow-step-text">
+          <span class="flow-mono">本地 Agent</span>（用 <span class="flow-mono">Bearer byok_live_xxxx...</span> Token 鉴权）
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="flow-step-num">3</div>
+        <div class="flow-step-text">
+          解密本地保险库，取出 <span class="flow-green">你的提供商 Key</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="flow-step-num">4</div>
+        <div class="flow-step-text">
+          直连 <span class="flow-green">OpenAI / Claude / Gemini...</span>（<span class="flow-muted">你的 IP · 你的 Key · 你的身份</span>）
+        </div>
+      </div>
+      <div class="flow-absent">
+        ⚠ 平台（inurl 云端）在步骤 4 完全不存在
+      </div>
+    </div>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
+        <span class="code-label">调用示例（概念）</span>
+      </div>
+      <div class="code-body">
+        <pre><span class="code-comment"># 1. 统一 Token 只在这里出现——Agent ↔ Console 鉴权</span>
+<span class="code-kw">curl</span> -H <span class="code-str">"Authorization: Bearer byok_live_xxxx..."</span> \
+     http://localhost:<span class="code-fn">11434</span>/api/generate
+
+<span class="code-comment"># 2. Agent 内部：从本地 vault 取 key，直连 provider</span>
+<span class="code-comment"># Provider 只看到：你的 IP + 你的 key + 你的请求</span>
+<span class="code-kw">curl</span> -H <span class="code-str">"Authorization: Bearer sk-..."</span> \
+     https://api.openai.com/v1/chat/completions
+
+<span class="code-comment"># 3. 统一 Token 从不出现对 provider 的请求里</span>
+<span class="code-red"># byok_live_xxx 只在本地 Agent ↔ Console 之间流转</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 为什么 BYOK 避免封号 -->
+  <div class="section">
+    <div class="section-label">Anti-Ban · 抗封号原理</div>
+    <div class="section-title">BYOK 为什么能避免封号</div>
+    <div class="principle-row">
+      <div class="principle-pill">
+        <div class="principle-icon">🌐</div>
+        <div class="principle-val">你的 IP</div>
+        <div class="principle-lbl">IP 地址属于你</div>
+      </div>
+      <div class="principle-pill">
+        <div class="principle-icon">🔑</div>
+        <div class="principle-val">你的 Key</div>
+        <div class="principle-lbl">密钥由你持有</div>
+      </div>
+      <div class="principle-pill">
+        <div class="principle-icon">🆔</div>
+        <div class="principle-val">你的身份</div>
+        <div class="principle-lbl">提供商识别你</div>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--muted);">
+      Relay 模式：提供商看见平台 IP 段 + 平台账户，所有用户共享身份，一旦有人违规整个 IP 段被封。<br>
+      BYOK 模式：提供商看见你的真实 IP + 你的真实 Key，每个用户独立身份，互不影响。
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 自测清单 -->
+  <div class="section">
+    <div class="section-label">Self-Test · 自测清单</div>
+    <div class="section-title">3 个问题识别 Relay 平台</div>
+    <div class="checklist">
+      <div class="check-item">
+        <div class="check-num">1</div>
+        <div class="check-text">是否要求你把提供商 Key 粘贴到其 Web 后台，<strong>无任何本地组件</strong>？</div>
+      </div>
+      <div class="check-item">
+        <div class="check-num">2</div>
+        <div class="check-text">文档是否让你把请求发到其<strong>公开域名</strong>，而非本地地址？</div>
+      </div>
+      <div class="check-item">
+        <div class="check-num">3</div>
+        <div class="check-text">是否<strong>从不提「本地 Agent / 直连」</strong>，只说「我们帮你转发」？</div>
+      </div>
+    </div>
+    <div class="check-result">
+      🔴 3 题中 2+ 题回答「是」→ 该平台是 Relay，不要用于生产环境
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 选型三问 -->
+  <div class="section">
+    <div class="section-label">Selection · 选型三问</div>
+    <div class="section-title">评估任何聚合工具时必问</div>
+    <div class="question-list">
+      <div class="question-card">
+        <div class="question-q">❓ 调用从哪台机器发出？</div>
+        <div class="question-a bad">如果不是「你的机器 / 你的 Key 直连」，生产环境不要用</div>
+      </div>
+      <div class="question-card">
+        <div class="question-q">❓ 平台能否看到我的 Key？</div>
+        <div class="question-a bad">只有「云端只看见密文，主密钥在本地」才可信</div>
+      </div>
+      <div class="question-card">
+        <div class="question-q">❓ 统一 Token 会出现在哪？</div>
+        <div class="question-a bad">如果出现在对 provider 的请求里，仍然是中转</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="section">
+    <div class="cta-box">
+      <div class="cta-title">🚀 开始使用 inurl（免费注册）</div>
+      <div class="cta-desc">BYOK 架构，密钥本地保管，直连各大 AI 提供商</div>
+      <div class="link-row" style="justify-content:center;">
+        <a class="link green" href="https://token.inurl.link/" target="_blank">🌐 官网 token.inurl.link</a>
+        <a class="link" href="https://token.inurl.link/app?tab=register" target="_blank">📋 免费注册</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Source -->
+  <div class="source-row">
+    <span>📌 Source:</span>
+    <a href="https://mp.weixin.qq.com/s?__biz=MzkwNzg3Mjc0Ng==&mid=2247485149" target="_blank">聚合派 公众号</a>
+    <span>·</span>
+    <span>Category: dev-tool / productivity</span>
+    <span>·</span>
+    <span>Tags: inurl, byok, api-gateway, ai-model, ban-risk</span>
+  </div>
+
+</div>
+</body>
+</html>
