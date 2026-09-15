@@ -26,21 +26,61 @@ function htmlTheme(text) {
 function colorLiteralMatches(text) {
   const matches = [];
   const css = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/gi, '');
-  // Remove :root{} blocks (token definitions, not usage) before scanning.
-  // Strip gradient function calls from the CSS so they don't cause false positives;
-  // multi-line backgrounds that span continuation lines won't be re-matched.
-  const stripped = css
-    .replace(/:root\s*\{[\s\S]*?\}/g, '')
-    .replace(/\b(?:linear-gradient|radial-gradient|conic-gradient)\s*\([^)]*\)/gi, '')
-    .replace(/\b(?:rgb|rgba|hsl|hsla)\s*\([^)]*\)/gi, '');
-  const patterns = [
-    /#[0-9a-f]{3,8}\b/gi,
+
+  // Strip :root{} blocks first using brace counting (handles any nesting)
+  let depth = 0, inRoot = false, rootStart = -1;
+  const rootRemoved = [];
+  for (let i = 0; i < css.length; i++) {
+    if (!inRoot && css.slice(i, i + 6) === ':root ') { inRoot = true; rootStart = i; }
+    else if (!inRoot && css.slice(i, i + 5) === ':root{') { inRoot = true; rootStart = i; }
+    if (inRoot) {
+      if (css[i] === '{') depth++;
+      else if (css[i] === '}') { depth--; if (depth === 0) { rootRemoved.push(css.slice(rootStart, i + 1)); inRoot = false; } }
+    }
+  }
+  let stripped = css;
+  for (const block of rootRemoved) stripped = stripped.split(block).join('');
+
+  // Strip color function calls using bracket counting to handle nested parens
+  // (e.g. rgba(255,255,255,.58) — nested commas stop non-greedy regex).
+  const COLOR_FNS = [
+    'linear-gradient', 'radial-gradient', 'conic-gradient',
+    'repeating-linear-gradient', 'repeating-radial-gradient',
+    'rgb', 'rgba', 'hsl', 'hsla',
   ];
+  const colorFnRe = new RegExp(
+    '\\b(?:' + COLOR_FNS.join('|') + ')\\s*\\('
+  );
+  let out = '';
+  let i = 0;
+  while (i < stripped.length) {
+    if (colorFnRe.test(stripped.slice(i))) {
+      // Consume the fn name + opening paren
+      const fnMatch = stripped.slice(i).match(colorFnRe);
+      out += stripped.slice(i, i + fnMatch[0].length);
+      i += fnMatch[0].length;
+      // Count brackets to find the true closing paren
+      let parenDepth = 1;
+      while (i < stripped.length && parenDepth > 0) {
+        const ch = stripped[i];
+        if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth--;
+        i++;
+      }
+    } else {
+      out += stripped[i];
+      i++;
+    }
+  }
+  stripped = out;
+
+  // Also strip var() tokens (they're not color literals we flag)
+  stripped = stripped.replace(/var\s*\([^)]*\)/g, '');
+
+  const patterns = [/#([0-9a-f]{3,8})\b/gi];
   for (const pattern of patterns) {
     let match;
-    while ((match = pattern.exec(stripped))) {
-      matches.push(match[0]);
-    }
+    while ((match = pattern.exec(stripped))) matches.push(match[0]);
   }
   return matches;
 }
