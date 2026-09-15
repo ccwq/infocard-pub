@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="editorial-system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Delta Agentic IDE：持久态多 Agent 代码生成环境</title>
+<style>
+:root{
+  --bg:#f8f9fa;--paper:#ffffff;--ink:#1a1a2e;--accent:#1a56db;
+  --muted:#6c757d;--line:#dee2e6;--soft:#e8e9ea;--highlight:#e7edf7;
+  --navy:#17324d;--navy-soft:#dfe9f2;--mint:#e4eee8;--sky:#e5eef4;
+  --green:#2e7d32;--amber:#b45309;--red:#c0392b;
+  --shadow:0 8px 22px rgba(23,23,23,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:Georgia,"PingFang SC","Microsoft YaHei",serif;font-size:13px;line-height:1.7;color:var(--ink);background:var(--bg)}
+.page{max-width:960px;margin:auto;padding:0 0 60px}
+
+/* ── masthead ── */
+.masthead{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:10px 0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);font:700 11px/1.2 ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase}
+.masthead span:last-child{color:var(--muted);text-align:right}
+
+/* ── hero ── */
+.hero{display:grid;grid-template-columns:minmax(250px,.65fr) minmax(0,1.35fr);gap:24px;padding:28px 0 22px;border-bottom:1px solid var(--line)}
+.hero-left{padding:0 20px 0 0;border-right:1px solid var(--soft)}
+.kicker{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);margin-bottom:8px}
+.demo-title{font-size:clamp(18px,4vw,34px);line-height:1.1;letter-spacing:-.02em;margin:0 0 8px;font-family:Georgia,serif}
+.sub-line{font-size:12.5px;color:var(--muted);margin:0;max-width:54ch;line-height:1.6}
+.tagline{display:inline-block;padding:3px 10px;border:2px solid var(--navy);background:var(--navy);color:white;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-top:10px}
+.hero-right{padding:0}
+.stat-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.stat-chip{flex:1;min-width:80px;border:2px solid var(--ink);padding:8px 10px;text-align:center;background:var(--paper)}
+.stat-chip strong{display:block;font-size:16px;font-weight:900}
+.stat-chip span{display:block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:2px}
+
+/* ── overview bar ── */
+.overview-bar{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid var(--ink);background:var(--paper)}
+.stat-box{flex:1;padding:11px 12px;border-right:2px solid var(--ink);text-align:center}
+.stat-box:last-child{border-right:none}
+.stat-box strong{display:block;font-size:20px;font-weight:900;font-family:Georgia,serif}
+.stat-box span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:2px;display:block}
+
+/* ── sections ── */
+section{padding:22px 0 0}
+.sec-head{background:var(--ink);color:white;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.sec-head .num{font:900 11px Georgia,serif;color:#58a6ff}
+.sec-head .label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+
+/* ── grids ── */
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.card{border:2px solid var(--ink);background:var(--paper);padding:13px 15px;min-width:0}
+.card .cat-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:6px;vertical-align:middle}
+.card .cat-name{font-size:12.5px;font-weight:800;margin:0 0 5px;font-family:Georgia,serif}
+.card p{font-size:11.5px;color:var(--muted);margin:0;line-height:1.6}
+.card p code{font-family:ui-monospace,monospace;font-size:11px;padding:1px 4px;background:var(--soft);border-radius:3px;color:var(--navy)}
+.card p strong{color:var(--ink)}
+
+/* ── contrast card (vs cards) ── */
+.contrast-card{border:2px solid var(--ink);padding:12px 14px;background:var(--paper)}
+.contrast-card h4{font-size:13px;font-weight:900;margin:0 0 6px;font-family:Georgia,serif}
+.contrast-card p{font-size:11.5px;color:var(--muted);margin:0;line-height:1.6}
+.contrast-card .verdict{display:inline-block;padding:2px 8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;border-radius:999px;margin-top:6px}
+.contrast-card .verdict.green{background:#e4eee8;color:#2e7d32}
+.contrast-card .verdict.yellow{background:#fef3c7;color:#b45309}
+.contrast-card .verdict.red{background:#fee2e2;color:#c0392b}
+.contrast-card .verdict.blue{background:#dbeafe;color:#1a56db}
+
+/* ── workflow steps ── */
+.wf-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.wf-step{background:var(--ink);color:white;padding:13px 11px;text-align:center}
+.wf-step b{display:block;font:900 18px Georgia,serif;color:#58a6ff;margin-bottom:5px}
+.wf-step span{font-size:11.5px;line-height:1.45}
+.wf-step .note{font-size:10px;color:rgba(255,255,255,.55);margin-top:4px;display:block}
+
+/* ── tables ── */
+.twrap{overflow-x:auto;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:11.5px;white-space:nowrap}
+th{background:var(--ink);color:white;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;text-align:left}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:var(--soft)}
+td:first-child{font-weight:700;color:var(--ink);white-space:normal}
+td .check{color:#2e7d32;font-weight:900}
+td .cross{color:#c0392b;font-weight:900}
+td .partial{color:#b45309}
+.highlight-cell{background:#e7edf7 !important}
+
+/* ── code blocks ── */
+.code-block{background:#1a1a2e;color:#e0e0e0;border:2px solid var(--ink);border-radius:0;overflow:hidden;margin-bottom:14px}
+.code-top{background:#111827;padding:7px 12px;font:700 10px/1 ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.5);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)}
+.code-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre;overflow-x:auto}
+.code-body .c{color:#6c757d}
+.code-body .k{color:#60a5fa}
+.code-body .s{color:#86efac}
+.code-body .fn{color:#fbbf24}
+.code-body .v{color:#e0e0e0}
+.code-body .cm{color:#9ca3af;font-style:italic}
+
+/* ── alert / callout boxes ── */
+.alert-box{border-left:5px solid var(--accent);background:var(--highlight);padding:11px 14px;margin-bottom:14px}
+.alert-box p{font-size:12px;color:var(--muted);margin:0;line-height:1.6}
+.callout{border:2px solid var(--accent);background:var(--highlight);padding:11px 14px;margin-bottom:14px}
+.callout p{font-size:12px;color:var(--muted);margin:0;line-height:1.6}
+.callout strong{color:var(--ink)}
+
+/* ── dark closing ── */
+.dark-closing{background:var(--ink);color:#f8f5ee;padding:22px 24px;margin-top:14px}
+.dark-closing h2{font-size:16px;font-weight:900;font-family:Georgia,serif;margin:0 0 12px}
+.dark-closing p{font-size:12px;color:rgba(248,245,238,.75);margin:0 0 8px;line-height:1.65}
+.benefits-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
+.benefit-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#eef0ee}
+.benefit-item::before{content:'✓';color:#86efac;font-weight:900;flex-shrink:0}
+
+/* ── h2 divider ── */
+.h2-divider{display:flex;align-items:center;gap:10px;margin:14px 0 10px}
+.h2-divider h2{flex:1;margin:0;font-size:12.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-family:ui-monospace,monospace}
+.h2-divider::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* ── feature badges ── */
+.badge-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px}
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border:1.5px solid var(--ink);background:var(--paper);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.badge.blue{border-color:#1a56db;background:#dbeafe;color:#1a56db}
+.badge.green{border-color:#2e7d32;background:#e4eee8;color:#2e7d32}
+.badge.amber{border-color:#b45309;background:#fef3c7;color:#b45309}
+.badge.red{border-color:#c0392b;background:#fee2e2;color:#c0392b}
+
+/* ── decision cards ── */
+.decision-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
+.decision-card{border:2px solid var(--ink);padding:14px;background:var(--paper)}
+.decision-card .dc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.decision-card h4{margin:0;font-size:13px;font-weight:900;font-family:Georgia,serif;color:var(--ink)}
+.decision-card p{font-size:11.5px;color:var(--muted);margin:0;line-height:1.6}
+.decision-card .scenarios{font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+
+/* ── pricing table ── */
+.pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.price-col{border:2px solid var(--ink);text-align:center;padding:14px 10px;background:var(--paper)}
+.price-col.featured{border-color:var(--accent);background:var(--highlight)}
+.price-col h4{font-size:12px;font-weight:900;margin:0 0 4px;text-transform:uppercase;letter-spacing:.06em}
+.price-col .amount{font-size:22px;font-weight:900;font-family:Georgia,serif;margin:6px 0}
+.price-col .period{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.price-col .note{font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+.price-col.featured h4{color:var(--accent)}
+
+/* ── mcp table ── */
+.mcp-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.mcp-card{border:2px solid var(--ink);padding:11px 13px;background:var(--paper)}
+.mcp-card h4{font-size:12px;font-weight:900;margin:0 0 5px;font-family:ui-monospace,monospace;text-transform:uppercase;letter-spacing:.05em}
+.mcp-card p{font-size:11.5px;color:var(--muted);margin:0;line-height:1.55}
+
+/* ── footer ── */
+footer{margin:28px 0 0;border-top:3px solid var(--ink);padding:12px 0 0;color:var(--muted);font-size:11.5px;text-align:center}
+
+/* ── responsive ── */
+@media(max-width:720px){
+  .grid-2,.grid-3,.grid-4,.wf-row,.overview-bar,.pricing-grid,.decision-grid,.mcp-row{grid-template-columns:1fr}
+  .hero{grid-template-columns:1fr;gap:20px}
+  .hero-left{border-right:none;border-bottom:1px solid var(--soft);padding:0 0 20px}
+  .benefits-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+<!-- MASTHEAD ─────────────────────────────────────────────── -->
+<div class="masthead">
+  <span>AGENTIC IDE · AI CODING · PERSISTENT AGENT STATE</span>
+  <span>初学者上手指南 · 2025 年 9 月</span>
+</div>
+
+<!-- HERO ────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="hero-left">
+    <div class="kicker">AGENTIC IDE · AI CODING · PERSISTENT AGENT STATE</div>
+    <h1 class="demo-title">Delta Agentic IDE</h1>
+    <p class="sub-line">下一代 AI 原生 IDE：跨会话持久化的 Agent 状态、上下文感知生成，内置工具调用与人机协作检查点，把"一次对话"变成"可持续维护的项目记忆"。</p>
+    <div class="tagline">AGENTIC IDE</div>
+  </div>
+  <div class="hero-right">
+    <div class="stat-row">
+      <div class="stat-chip"><strong>Persistent</strong><span>多会话状态</span></div>
+      <div class="stat-chip"><strong>Checkpoint</strong><span>人工审核点</span></div>
+      <div class="stat-chip"><strong>Local-First</strong><span>数据留本地</span></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-chip"><strong>Skill System</strong><span>自演进技能</span></div>
+      <div class="stat-chip"><strong>Multi-Agent</strong><span>多 Agent 架构</span></div>
+      <div class="stat-chip"><strong>Tool Use</strong><span>内置工具调用</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- OVERVIEW STATS ──────────────────────────────────────── -->
+<div class="overview-bar">
+  <div class="stat-box"><strong>Persistent</strong><span>跨会话状态</span></div>
+  <div class="stat-box"><strong>Skill System</strong><span>自演进技能</span></div>
+  <div class="stat-box"><strong>Checkpoint</strong><span>人工审核点</span></div>
+  <div class="stat-box"><strong>Local</strong><span>项目数据本地</span></div>
+</div>
+
+<!-- SECTION 01: CORE CAPABILITIES ─────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">01</span><span class="label">核心能力定位</span></div>
+  <div class="grid-2">
+    <div class="card"><span class="cat-dot"></span><div class="cat-name">持久态 Agent 上下文</div><p>与每次对话重置的 Copilot 不同，Delta 在整个项目周期内保持 Agent 状态，代码生成带项目记忆，不丢上下文。新成员打开项目，Agent 立即知道之前的所有决策。</p></div>
+    <div class="card"><span class="cat-dot"></span><div class="cat-name">内置工具调用</div><p>Agent 可直接调用浏览器、搜索引擎、文件系统等工具，不需要手动复制粘贴工具输出；结果自动回注到对话上下文，形成完整的推理链。</p></div>
+    <div class="card"><span class="cat-dot"></span><div class="cat-name">双向人机协作</div><p>Agent 提出方案后暂停等待人工审核；用户可以批准、修改或重定向，Agent 根据反馈继续执行。避免自主执行后才发现方向偏差。</p></div>
+    <div class="card"><span class="cat-dot"></span><div class="cat-name">自演进 Skill 系统</div><p>安装 Marketplace 技能或自定义技能，Agent 自动学习并在后续任务中调用，类似"学会使用工具"的能力积累，不需要每次重新教。</p></div>
+    <div class="card"><span class="cat-dot"></span><div class="cat-name">精细化代码理解</div><p>使用针对代码理解微调的模型，理解项目结构、依赖关系和架构模式，不是通用 LLM 的粗粒度代码补全。</p></div>
+    <div class="card"><span class="cat-dot"></span><div class="cat-name">本地优先 Privacy</div><p>项目数据默认保存在本地设备，不强制上传云端；企业场景可配置私有部署，满足数据合规要求。</p></div>
+  </div>
+</section>
+
+<!-- SECTION 02: THE LANDSCAPE ─────────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">02</span><span class="label">2025 年 Agentic IDE 生态全景</span></div>
+
+  <div class="h2-divider"><h2>主流工具横向对比</h2></div>
+  <div class="twrap">
+    <table>
+      <tr><th>工具</th><th>定位</th><th>Agent 状态</th><th>上下文持久</th><th>内置工具</th><th>模型选择</th><th>月费</th></tr>
+      <tr><td>Delta Agentic IDE</td><td>持久态多 Agent IDE</td><td class="check">跨会话持久</td><td class="check">项目全生命周期</td><td class="check">Browser/Search/FS 原生</td><td>自微调 + BYOK</td><td>Freemium</td></tr>
+      <tr class="highlight-cell"><td>Claude Code</td><td>终端原生 Agent</td><td class="partial">每次调用重置（CLAUDE.md 可持久）</td><td class="partial">CLAUDE.md 文件持久</td><td class="check">MCP 生态（1000+ 服务器）</td><td>Anthropic 模型</td><td>$20（Pro）</td></tr>
+      <tr><td>Cursor</td><td>AI-first IDE（VS Code 分支）</td><td class="partial">会话内持久，重启清零</td><td class="partial">向量数据库索引 + Rules</td><td class="partial">Composer + MCP</td><td>最宽选择（含 GPT-4o、Claude、Sonnet）</td><td>$0–$20</td></tr>
+      <tr><td>Windsurf（Cascade）</td><td>AI-first IDE（Riptide 索引）</td><td class="cross">每次重启重置</td><td class="cross">无（但有"Continue My Work"恢复）</td><td class="partial">Terminal + MCP（21+ 工具）</td><td>Codeium 自有模型 + Claude</td><td>$0–$15</td></tr>
+      <tr><td>GitHub Copilot</td><td>IDE 嵌入式补全+Chat</td><td class="cross">每次对话重置</td><td class="partial">2026 年新增 Agentic Memory</td><td class="partial">GitHub 原生集成</td><td>GPT-4o 等</td><td>$10–$19</td></tr>
+    </table>
+  </div>
+
+  <div class="h2-divider"><h2>各工具详解</h2></div>
+
+  <div class="grid-2">
+    <div class="contrast-card">
+      <h4>Claude Code（Anthropic）</h4>
+      <p>2025 年 2 月发布，终端原生 CLI，支持 macOS/Linux/Windows。通过 <code>CLAUDE.md</code> 文件持久化项目上下文是核心差异——文档化的项目规范不会随对话消失。v2.x 新增 Agent Teams（并行子 Agent）、Checkpoints（/rewind 编辑历史）、1M token 上下文窗口（Opus 4.6）。有 VS Code 扩展和 JetBrains 插件（v2.1.83）。</p>
+      <span class="verdict blue">终端 Agent + 文档化记忆</span>
+    </div>
+    <div class="contrast-card">
+      <h4>Cursor（AI-first IDE）</h4>
+      <p>VS Code 分叉（保留所有扩展和快捷键），AI 深度嵌入编辑器内核。Composer Agent 模式最自主：描述功能需求后自主规划→编辑→运行→修复→迭代。72% 代码接受率，内置 Tab 多行补全最强。缺点：$20/月，Agent 长序列可能跑偏，需人工干预。</p>
+      <span class="verdict green">最强自主编辑 + 精准补全</span>
+    </div>
+    <div class="contrast-card">
+      <h4>Windsurf Cascade（Codeium）</h4>
+      <p>VS Code 分叉，Wave 13（2026）后 Cascade Agent 显著改进：15 文件重构任务单次完成（之前需多次人工干预）。Riptide 索引可在数秒内扫描上百万行代码。$15/月是最低成本方案，缺点：无 CLAUDE.md 等持久化机制，长任务性能会下降。</p>
+      <span class="verdict yellow">大代码库 + 性价比</span>
+    </div>
+    <div class="contrast-card">
+      <h4>GitHub Copilot</h4>
+      <p>与 GitHub 生态深度集成，Issue → PR 自动化是独家能力。2026 年 1 月新增 Agentic Memory（项目洞察持久化预览）。$10/月门槛最低，适合 GitHub 工作流重度用户。Agent 模式比其他工具更保守（显式审批门控），适合企业合规场景。</p>
+      <span class="verdict yellow">GitHub 生态 + 企业合规</span>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:14px">
+    <p><strong>Delta 的差异化定位：</strong>Delta 区别于上述工具的核心是"跨会话持久 Agent 状态"——Claude Code 需要手动写 CLAUDE.md，Cursor/Windsurf 每次重启清零，Delta 的 Agent 上下文在项目生命周期内自动保持，无需每次重新说明背景。</p>
+  </div>
+</section>
+
+<!-- SECTION 03: INSTALLATION ─────────────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">03</span><span class="label">初学者安装路径（对比式）</span></div>
+
+  <div class="code-block">
+    <div class="code-top">Delta Agentic IDE — 安装</div>
+    <div class="code-body"><span class="cm"># 方式 1：npm 安装</span>
+<span class="k">npm</span> install -g delta-ide
+<span class="k">delta</span> doctor          <span class="cm"># 诊断检查</span>
+
+<span class="cm"># 方式 2：Go 安装</span>
+<span class="k">go</span> install github.com/delta-ai/delta@latest
+<span class="k">delta</span> init            <span class="cm"># 初始化项目上下文</span>
+
+<span class="cm"># 首次运行向导：选择 AI Provider + 粘贴 API Key</span>
+<span class="k">delta</span>                  <span class="cm"># 自动启动设置向导</span></div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-top">Claude Code — 安装（对比）</div>
+    <div class="code-body"><span class="cm"># macOS / Linux</span>
+curl -fsSL https://claude.ai/install.sh | bash
+
+<span class="cm"># Windows PowerShell</span>
+irm https://claude.ai/install.ps1 | iex
+
+<span class="cm"># 或通过 Homebrew / WinGet</span>
+brew install claude-code
+winget install Anthropic.ClaudeCode
+
+<span class="cm"># 验证</span>
+claude --version          <span class="cm"># v2.1.83（2026 年 3 月）</span>
+
+<span class="cm"># 项目根目录放 CLAUDE.md 即持久化上下文</span>
+<span class="k">touch</span> CLAUDE.md</div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-top">Cursor / Windsurf — 安装（对比）</div>
+    <div class="code-body"><span class="cm"># Cursor：下载 cursor.com（VS Code 分叉）</span>
+<span class="cm"># Cursor Pro $20/月，支持 Composer Agent 模式</span>
+
+<span class="cm"># Windsurf：下载 windsurf.ai（Codeium 产品）</span>
+<span class="cm"># Windsurf Pro $15/月，含 Cascade Agent</span>
+
+<span class="cm"># Copilot：在 VS Code 扩展市场搜索"GitHub Copilot"</span>
+<span class="cm"># VS Code / JetBrains 均支持，$10/月起</span></div>
+  </div>
+
+  <div class="h2-divider"><h2>最短上手 4 步</h2></div>
+  <div class="wf-row">
+    <div class="wf-step"><b>01</b><span>下载安装 Delta</span><span class="note">npm / Go / 下载链接</span></div>
+    <div class="wf-step"><b>02</b><span>运行 delta init，初始化项目上下文</span><span class="note">选择 AI Provider，填入 API Key</span></div>
+    <div class="wf-step"><b>03</b><span>用自然语言描述任务</span><span class="note">如"帮我写一个用户登录 API"</span></div>
+    <div class="wf-step"><b>04</b><span>在 Checkpoint 审核计划</span><span class="note">批准 / 修改 / 重定向，Agent 继续</span></div>
+  </div>
+  <div class="wf-row" style="margin-top:10px">
+    <div class="wf-step"><b>05</b><span>Agent 执行计划，分裂视窗查看生成文件</span><span class="note">实时预览代码变更</span></div>
+    <div class="wf-step"><b>06</b><span>Marketplace 安装技能包</span><span class="note">或自建 Skill，Agent 持续学习</span></div>
+    <div class="wf-step"><b>07</b><span>随时重新打开项目</span><span class="note">Agent 记得所有历史上下文</span></div>
+    <div class="wf-step"><b>08</b><span>数据全程留本地</span><span class="note">无需强制上传云端</span></div>
+  </div>
+</section>
+
+<!-- SECTION 04: CLAUDE.MD SYSTEM ───────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">04</span><span class="label">持久化上下文：CLAUDE.md 体系（Claude Code 对比）</span></div>
+
+  <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Delta 的核心持久化机制与 Claude Code 的 CLAUDE.md 系统高度相似——理解这个体系对初学者选择工具至关重要。</p>
+
+  <div class="code-block">
+    <div class="code-top">CLAUDE.md — 层级结构（Claude Code / Delta 均支持）</div>
+    <div class="code-body"><span class="cm"># 全局设置（对所有项目生效）</span>
+~<span class="k">/</span>.claude<span class="k">/</span>CLAUDE.md
+
+<span class="cm"># 项目级设置（仅当前项目生效）</span>
+<span class="k">/project-root/</span>CLAUDE.md
+
+<span class="cm"># 目录级设置（仅子目录生效，优先级最高）</span>
+<span class="k">/project-root/</span>frontend<span class="k">/</span>CLAUDE.md
+
+<span class="cm"># 本地个人偏好（.gitignore，通常不提交）</span>
+<span class="k">/project-root/</span>CLAUDE.local.md</div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-top">CLAUDE.md — 典型内容示例</div>
+    <div class="code-body"><span class="cm"># 项目架构</span>
+<span class="cm"># 本项目使用 Next.js App Router，前端在 /app，后端 API 在 /pages/api</span>
+
+<span class="cm"># 构建命令</span>
+<span class="k">npm</span> run dev     <span class="cm"># 开发</span>
+<span class="k">npm</span> run build   <span class="cm"># 生产构建</span>
+<span class="k">npm</span> test        <span class="cm"># 测试</span>
+
+<span class="cm"># 代码规范</span>
+<span class="cm"># - 使用 TypeScript strict 模式</span>
+<span class="cm"># - 组件放在 /components，以 PascalCase 命名</span>
+<span class="cm"># - API 路由返回统一 { data, error } 结构</span>
+
+<span class="cm"># 工具限制</span>
+<span class="cm"># - 禁止直接操作数据库，通过 API 层</span>
+<span class="cm"># - 生产环境变更需通过 Code Review</span>
+
+<span class="cm"># 完成定义</span>
+<span class="cm"># - 必须运行 npm test 并通过</span>
+<span class="cm"># - 必须运行 lint 检查</span></div>
+  </div>
+
+  <div class="callout">
+    <p><strong>CLAUDE.md vs Delta 内置持久化：</strong>Claude Code 需要手动编写 CLAUDE.md 并提交到仓库，Delta 的 Agent 状态自动保持，不需要每次重新写说明文档。Delta 更适合不想维护额外文档的团队。</p>
+  </div>
+</section>
+
+<!-- SECTION 05: MCP ECOSYSTEM ─────────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">05</span><span class="label">MCP 生态：Agent 的工具扩展</span></div>
+
+  <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Model Context Protocol（MCP）是连接 Agent 与外部工具的开放标准。Claude Code 支持 1864+ MCP 服务器，Delta 亦通过 MCP 扩展能力。</p>
+
+  <div class="mcp-row">
+    <div class="mcp-card">
+      <h4>内置工具（Delta / Claude Code）</h4>
+      <p>Read / Edit / Execute（终端命令）/ Search / Browser / Web（网页抓取）/ Agent（子 Agent 委托）/ VSCode / Todo</p>
+    </div>
+    <div class="mcp-card">
+      <h4>常见 MCP 集成场景</h4>
+      <p>数据库查询、CI 状态检查、API 文档搜索、Slack 通知、GitHub PR 操作、Figma 设计稿读取</p>
+    </div>
+    <div class="mcp-card">
+      <h4>MCP 服务器示例</h4>
+      <p>filesystem、github、postgres、sqlite、memory（向量记忆）、fetch、puppeteer、Brave Search</p>
+    </div>
+    <div class="mcp-card">
+      <h4>Delta 的 MCP 支持</h4>
+      <p>Delta 原生集成 Browser / Search / FS 工具，同时支持 MCP 协议扩展，可接入任何 MCP 服务器。</p>
+    </div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-top">Claude Code — MCP 服务器添加</div>
+    <div class="code-body"><span class="cm"># 添加 MCP 服务器</span>
+<span class="k">claude mcp</span> add  filesystem   <span class="cm"># 本地文件系统</span>
+<span class="k">claude mcp</span> add  github       <span class="cm"># GitHub API 集成</span>
+<span class="k">claude mcp</span> add  postgres     <span class="cm"># PostgreSQL 数据库</span>
+<span class="k">claude mcp</span> add  memory       <span class="cm"># 向量记忆搜索</span>
+
+<span class="cm"># 查看已安装的 MCP 服务器</span>
+<span class="k">claude mcp</span> list</div>
+  </div>
+</section>
+
+<!-- SECTION 06: PRICING ────────────────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">06</span><span class="label">定价对比</span></div>
+
+  <div class="pricing-grid">
+    <div class="price-col">
+      <h4>GitHub Copilot</h4>
+      <div class="amount">$10</div>
+      <div class="period">每月（Pro）</div>
+      <div class="note">IDE 内嵌补全 + Chat；Agentic Memory 新增（2026）；JetBrains 支持</div>
+    </div>
+    <div class="price-col">
+      <h4>Windsurf</h4>
+      <div class="amount">$15</div>
+      <div class="period">每月（Pro）</div>
+      <div class="note">Riptide 索引；Cascade Agent；$0 免费版有额度限制</div>
+    </div>
+    <div class="price-col featured">
+      <h4>Cursor</h4>
+      <div class="amount">$20</div>
+      <div class="period">每月（Pro）</div>
+      <div class="note">Composer Agent；72% 接受率；最多模型选择；$0 免费版有限</div>
+    </div>
+    <div class="price-col">
+      <h4>Claude Code</h4>
+      <div class="amount">$20</div>
+      <div class="period">每月（Claude Pro）</div>
+      <div class="note">CLI + VS Code + JetBrains；1M token 窗口；MCP 生态</div>
+    </div>
+  </div>
+
+  <div class="alert-box">
+    <p><strong>Delta 定价：</strong>采用 Freemium 模式，具体授权条款需查阅官方文档。企业私有部署需商务洽谈。</p>
+  </div>
+</section>
+
+<!-- SECTION 07: USE CASES ───────────────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">07</span><span class="label">典型使用场景</span></div>
+
+  <div class="grid-3">
+    <div class="card"><div class="cat-name">大型重构任务</div><p>跨多文件、跨多层依赖的修改，Agent 有完整项目上下文，不需要每次手动说明背景。</p></div>
+    <div class="card"><div class="cat-name">新成员 onboarding</div><p>把项目交给 Delta，新成员通过 Agent 问答理解架构和逻辑，Agent 回答带项目真实上下文。</p></div>
+    <div class="card"><div class="cat-name">自动化测试生成</div><p>Agent 理解代码后生成测试用例，在 Checkpoint 人工确认覆盖范围，持续迭代。</p></div>
+    <div class="card"><div class="cat-name">文档自动维护</div><p>代码变更后 Agent 自动更新 README、API 文档和 Changelog，保持文档与实现同步。</p></div>
+    <div class="card"><div class="cat-name">代码审查辅助</div><p>Agent 预审 PR，标注潜在问题、重构建议和安全风险，审查者聚焦业务逻辑判断。</p></div>
+    <div class="card"><div class="cat-name">AI Agent 工具</div><p>作为其他 AI Agent 的工具，提供持久态项目理解和代码执行能力。</p></div>
+  </div>
+</section>
+
+<!-- SECTION 08: WHEN TO USE ───────────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">08</span><span class="label">工具选型决策</span></div>
+
+  <div class="decision-grid">
+    <div class="decision-card">
+      <div class="dc-head"><h4>选 Delta / Claude Code</h4><span class="badge green">持久态记忆</span></div>
+      <p>项目周期长、上下文复杂、多人协作、需要 AI 记住历史决策的场景。不想每次都重新说明项目背景。</p>
+      <div class="scenarios">典型场景：长期维护的产品代码库、多人参与的中大型项目、需要 AI 追踪数周迭代决策</div>
+    </div>
+    <div class="decision-card">
+      <div class="dc-head"><h4>选 Cursor</h4><span class="badge blue">AI-first IDE</span></div>
+      <p>需要最强代码补全（72% 接受率）、想在编辑器内完成大部分工作、喜欢 Composer 的自主编辑能力。</p>
+      <div class="scenarios">典型场景：AI 原生开发者、追求编辑速度、单人快速原型开发</div>
+    </div>
+    <div class="decision-card">
+      <div class="dc-head"><h4>选 Windsurf</h4><span class="badge amber">大代码库 + 性价比</span></div>
+      <p>代码库规模大（上百万行）、预算有限、需要 Riptide 快速上下文检索。$15/月是主流工具最低价。</p>
+      <div class="scenarios">典型场景：大型单体仓库（100K+ 行）、初创团队预算约束、需要企业级索引能力</div>
+    </div>
+    <div class="decision-card">
+      <div class="dc-head"><h4>选 GitHub Copilot</h4><span class="badge amber">GitHub 生态</span></div>
+      <p>重度使用 GitHub Issue → PR 工作流、需要 Issue → PR 自动化、企业合规要求显式审批门控。</p>
+      <div class="scenarios">典型场景：企业团队、GitHub 重度用户、需要合规审计轨迹的场景</div>
+    </div>
+  </div>
+
+  <div class="dark-closing">
+    <h2>✅ 初学者选型建议</h2>
+    <p>如果不确定从哪个工具开始，建议按以下路径尝试：</p>
+    <div class="benefits-grid">
+      <div class="benefit-item">免费门槛最低 → 先试 GitHub Copilot（$10/月）或 Windsurf（$0 起步）</div>
+      <div class="benefit-item">追求最强 Agent 能力 → Cursor Pro（$20/月）Composer 模式</div>
+      <div class="benefit-item">需要终端原生 + 持久记忆 → Claude Code（$20/月）+ CLAUDE.md</div>
+      <div class="benefit-item">跨会话状态自动保持 → Delta Agentic IDE（Freemium）</div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 09: SKILLS SYSTEM ─────────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">09</span><span class="label">Skill 系统：让 Agent 学会新能力</span></div>
+
+  <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Skill 系统让团队把重复的工作流程封装成可复用模板，Agent 在相关任务中自动加载。Delta 和 Claude Code（通过 <code>.claude/skills/</code> 目录）均支持。</p>
+
+  <div class="grid-2">
+    <div class="card"><div class="cat-name">什么是 Skill</div><p>一个 <code>SKILL.md</code> 文件，包含 Agent 指令、脚本、模板和示例。当任务匹配 Skill 触发条件时，Agent 自动加载并遵循其中的工作流。</p></div>
+    <div class="card"><div class="cat-name">Skill 使用场景</div><p>团队规范的代码审查流程、CI/CD 流水线操作、Docker / Kubernetes 部署流程、数据库迁移 SOP、API 文档生成流程。</p></div>
+    <div class="card"><div class="cat-name">Skill vs Snippet</div><p>Snippet 只复制代码片段，Skill 定义完整行为规范——包括前置条件、执行步骤、验证方式和错误处理。Agent 遇到相关任务时主动加载。</p></div>
+    <div class="card"><div class="cat-name">Skill 安全</div><p>自定义 Skill 可执行任意代码，只安装可信来源的 Skill；避免执行来路不明的脚本。建议通过代码审查后再引入团队 Skill。</p></div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-top">Claude Code — 创建自定义 Skill</div>
+    <div class="code-body"><span class="cm"># 1. 启用 Skills 功能（VS Code 设置）</span>
+<span class="k">{</span>
+  <span class="s">"chat.useAgentSkills"</span>: <span class="k">true</span>
+<span class="k">}</span>
+
+<span class="cm"># 2. 安装 skill-creator</span>
+<span class="k">npx skills</span> add https://github.com/anthropics/skills <span class="k">\</span>
+  --skill skill-creator
+
+<span class="cm"># 3. 让 Agent 生成 Skill</span>
+<span class="cm"># 在 Claude Code 中输入：</span>
+<span class="cm"># "Create a skill that will use my project docs at /docs</span>
+<span class="cm">#  and answer questions about the project architecture"</span>
+
+<span class="cm"># 4. 生成的文件结构</span>
+.claude<span class="k">/</span>skills<span class="k">/</span>my-project-assistant<span class="k">/</span>SKILL.md</div>
+  </div>
+</section>
+
+<!-- SECTION 10: LIMITATIONS ──────────────────────────────── -->
+<section>
+  <div class="sec-head"><span class="num">10</span><span class="label">许可证与边界</span></div>
+
+  <div class="grid-2">
+    <div class="card"><div class="cat-name">许可证</div><p>专有 / Freemium 模式；具体授权条款需查阅官方最新文档。</p></div>
+    <div class="card"><div class="cat-name">数据边界</div><p>本地优先不代表数据永不离开——确认企业部署方案的数据流和合规要求。</p></div>
+    <div class="card"><div class="cat-name">Skill 安全</div><p>自定义 Skill 可执行任意代码，来源可信才安装；避免执行来路不明的 Skill 脚本。</p></div>
+    <div class="card"><div class="cat-name">模型选择</div><p>Delta 默认使用自微调代码模型，也支持接入外部模型 API；不同模型能力有差异，验收时需确认。</p></div>
+  </div>
+
+  <div class="alert-box" style="margin-top:14px">
+    <p><strong>工具组合建议：</strong>很多开发者同时使用多个工具——用 Cursor 做精确编辑，用 Claude Code 做自主任务，用 Delta 做跨会话记忆追踪。根据任务类型灵活切换，不要被单一工具绑定。</p>
+  </div>
+</section>
+
+<footer>来源：官方页面 · TechCrunch · GitHub 文档 · LoreAI · AI First Search · 2026 年 3 月</footer>
+</main>
+</body>
+</html>
