@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tailcat：没有 Tailscale 的 Tailscale，Go 用户态 WireGuard 直连隧道</title>
+  <title>Tailcat v2：Go 用户态 WireGuard 直连隧道，3 层架构 + SOCKS5 + SSH + 自建 DERP 指南</title>
   <meta name="description" content="Tailscale 官方出品，不用账号、不开端口、不改路由，Go 用户态 WireGuard 隧道，token 直连端到端加密。">
   <style>
     :root{
@@ -106,7 +106,8 @@
       background:#14532d;color:#dcfce7;border:2px solid var(--green);
       border-radius:6px;padding:10px 14px;
       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-      font-size:12px;line-height:1.9;margin-bottom:12px
+      font-size:12px;line-height:1.9;margin-bottom:12px;
+      overflow-x:auto;white-space:pre-wrap;word-break:break-all
     }
     pre .c{color:#6ee7b7}
     pre .v{color:#fde68a}
@@ -309,6 +310,557 @@
       </div>
     </div>
 
+
+
+    <!-- ARCHITECTURE DEEP DIVE -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⚙</span>
+        <span class="sec-label">架构拆解：三层组件如何协作</span>
+      </div>
+      <div class="sec-body">
+        <p>Tailcat 复用 Tailscale 的三个核心组件，无控制平面依赖：</p>
+
+        <div class="feat-grid" style="grid-template-columns:1fr">
+          <div class="feat">
+            <h4>① WireGuard 用户态实现</h4>
+            <p>不走内核 TUN/TAP 设备，不接管路由表，不改 DNS。Go 实现的 <code>wireguard-go</code> 在用户态完成 WireGuard 握手与加密，所有流量通过 <code>magicsock</code> 路由。系统只看到 DERP 的 TCP 或直连 UDP，不感知 VPN 接口。</p>
+          </div>
+        </div>
+        <div class="feat-grid" style="grid-template-columns:1fr">
+          <div class="feat">
+            <h4>② magicsock 传输层</h4>
+            <p>Tailscale 自研传输层，多路复用直连 UDP 与 DERP 中继。通过 STUN 发现公网端点（IP:port），用 Disco 协议交换 <code>call-me-maybe</code> 消息执行 UDP  hole-punchingNAT 穿透。穿透成功则升级为直连 peer-to-peer；失败则降级走 DERP，全程透明。</p>
+          </div>
+        </div>
+        <div class="feat-grid" style="grid-template-columns:1fr">
+          <div class="feat">
+            <h4>③ DERP 中继协议</h4>
+            <p>Tailscale 的加密 relay 协议，端口 443。充当 NAT 穿透的 rendezvous 信道（双方通过它交换公网端点），也是直连失败后的 fallback 数据路径。Tailscale 托管的公共 DERP 有带宽限速；可自建 <code>cmd/derper</code> 绕过限制。</p>
+          </div>
+        </div>
+
+        <div class="alert green">
+          <strong>连接路径选择逻辑</strong>：启动 → DERP rendezvous → 双方交换 UDP 端点 → hole-punching 尝试 → 成功则直连（无中继），失败则走 DERP relay。路径切换全自动，无需用户干预。
+        </div>
+
+        <div class="flow" style="margin-top:10px">
+          <div class="flow-item green">启动 Server</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item">DERP rendezvous</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item">Disco 交换端点</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item green">NAT punch</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-item">直连 UDP <span style="color:var(--orange)">or</span> DERP relay</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GO LIBRARY API -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">Go Library：用代码接管连接</span>
+      </div>
+      <div class="sec-body">
+        <p>Tailcat 既是 CLI 工具，也是 Go 库（<code>github.com/tailscale/tailcat</code>）。零值 <code>Server</code>/<code>Client</code> 均开箱即用，支持深度定制：</p>
+
+        <p class="lead">服务端</p>
+        <pre><span class="c">// 最小化 TCP 服务器</span>
+<span class="v">import</span> (
+  <span class="c">"fmt"</span>
+  <span class="c">"log"</span>
+  <span class="c">"net"</span>
+  <span class="c">"github.com/tailscale/tailcat"</span>
+)
+
+<span class="v">s</span> := &amp;<span class="c">tailcat.Server</span>{
+  <span class="c">OnTCP</span>: <span class="v">func</span>(port uint16) <span class="v">func</span>(net.Conn) {
+    <span class="v">return</span> <span class="v">func</span>(c net.Conn) {
+      <span class="c">fmt.Fprintf</span>(c, <span class="v">"hello from port %v\n"</span>, port)
+      c.<span class="c">Close</span>()
+    }
+  },
+}
+<span class="v">if</span> err := s.<span class="c">Start</span>(); err != nil {
+  <span class="c">log.Fatal</span>(err)
+}
+<span class="c">fmt.Println</span>(s.<span class="c">ConnBlob</span>())  <span class="c">// 打印 token，发给客户端</span>
+<span class="c">select</span>{}</pre>
+
+        <p class="lead">客户端</p>
+        <pre><span class="c">// 最小化客户端（懒建立隧道）</span>
+<span class="v">import</span> <span class="c">"github.com/tailscale/tailcat"</span>
+
+<span class="c">conn</span>, err := <span class="c">tailcat.NewClient</span>(&amp;<span class="c">tailcat.Client</span>{
+  <span class="c">Server</span>: token,  <span class="c">// Server 字段填入对方的 ConnBlob</span>
+}).<span class="c">Dial</span>(<span class="v">context.Background</span>(), <span class="c">"tcp"</span>, <span class="c">":8080"</span>)
+<span class="c">defer conn.Close</span>()</pre>
+
+        <p class="lead">Server 配置选项</p>
+        <div class="rows">
+          <div class="row highlight"><span class="label">Key</span><span class="val">固定密钥（默认每次生成临时密钥）</span></div>
+          <div class="row"><span class="label">Region / RegionID</span><span class="val">指定 DERP 区域（默认就近）</span></div>
+          <div class="row"><span class="label">DERPMapURL</span><span class="val">自建 DERP map URL</span></div>
+          <div class="row"><span class="label">DERPMapCache</span><span class="val">DERP map 缓存实例</span></div>
+          <div class="row"><span class="label">OnTCP</span><span class="val">服务端 TCP 连接回调</span></div>
+          <div class="row"><span class="label">OnTCPForward</span><span class="val">出口节点流量转发</span></div>
+          <div class="row"><span class="label">Logf</span><span class="val">日志函数（默认 log.Printf）</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOCKS5 DEEP DIVE -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">SOCKS5 代理：让任意程序走 WireGuard 隧道</span>
+      </div>
+      <div class="sec-body">
+        <p>Tailcat 内置 SOCKS5 代理模式，server 启动 SOCKS5 监听本地随机端口，并将请求通过 WireGuard 隧道转发给 client，client 充当出口节点：</p>
+
+        <pre><span class="c"># 机器 A（出口）：启动 SOCKS5 代理模式</span>
+<span class="prompt">$ </span><span class="v">tailcat serve --socks5</span>
+<span class="c"># 输出：SOCKS5 listening on 127.0.0.1:随机端口</span>
+<span class="c"># 同时输出 ConnBlob token，发给机器 B</span>
+
+<span class="c"># 机器 B（入口）：连接并代理</span>
+<span class="prompt">$ </span><span class="v">tailcat connect &lt;TOKEN&gt;</span>
+<span class="c"># 所有出口流量经 WireGuard 隧道到达 A，从 A 的 IP 发出</span>
+
+<span class="c"># 任意程序透明使用（Linux/macOS）</span>
+<span class="prompt">$ </span><span class="v">ALL_PROXY=socks5://127.0.0.1:随机端口 curl https://api.ip.sb/ip</span>
+<span class="c"># 返回的是机器 A 的公网 IP</span></pre>
+
+        <div class="alert green">
+          <strong>透明代理原理</strong>：Tailcat 在 server 侧运行一个标准 SOCKS5 服务（RFC 1928），任何支持 <code>ALL_PROXY</code> 环境变量的程序（curl/wget/git/apt）均可无感使用。流量加密穿越 WireGuard 隧道，client 侧无需安装任何代理软件。
+        </div>
+
+        <p class="lead">典型使用场景</p>
+        <div class="feat-grid">
+          <div class="feat">
+            <h4>跨境访问</h4>
+            <p>在海外 VPS 上运行 <code>tailcat serve --socks5</code>，本地走隧道出口访问被地理限制的内容。</p>
+          </div>
+          <div class="feat">
+            <h4>内网穿透测试</h4>
+            <p>暴露本机 8080 端口给协作者，对方通过 SOCKS5 访问你的本地开发服务。</p>
+          </div>
+          <div class="feat">
+            <h4>隐私出口</h4>
+            <p>不想在公共 WiFi 直接发送流量时，通过隧道将所有 TCP 流量加密到可信机器再出口。</p>
+          </div>
+          <div class="feat">
+            <h4>Git 加速</h4>
+            <p><code>ALL_PROXY=socks5://... git clone</code> 走海外出口，GitHub 访问速度提升。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SSH BUILT-IN -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">SSH 内置模式：零配置远程 Shell</span>
+      </div>
+      <div class="sec-body">
+        <p>Tailcat Server 可选启动内置 SSH 服务器，客户端直接 <code>ssh tailcat@...</code> 进入，无需 OpenSSH 配置：</p>
+
+        <pre><span class="c"># 机器 A：启动 SSH 服务器（监听 22 端口）</span>
+<span class="prompt">$ </span><span class="v">tailcat serve --ssh</span>
+<span class="c"># 输出 ConnBlob token</span>
+
+<span class="c"># 机器 B：连接并获得 Shell</span>
+<span class="prompt">$ </span><span class="v">tailcat ssh &lt;TOKEN&gt;</span>
+<span class="c"># 直接进入机器 A 的 Shell，WireGuard 加密隧道</span></pre>
+
+        <div class="alert orange">
+          <strong>SSH 安全性</strong>：内置 SSH 使用 token 验证（无密码/密钥），隧道走 WireGuard 端到端加密。适合临时接入内网机器，不建议替代长期 SSH key 管理。
+        </div>
+
+        <p class="lead">对比传统方案</p>
+        <table>
+          <tr><th>对比项</th><th>传统 SSH</th><th>Tailcat SSH</th></tr>
+          <tr><td>公网 IP</td><td>需要</td><td>不需要</td></tr>
+          <tr><td>端口转发</td><td>需要</td><td>不需要</td></tr>
+          <tr><td>认证方式</td><td>密码 / SSH Key</td><td>Token（一次性）</td></tr>
+          <tr><td>隧道加密</td><td>SSH 加密</td><td>WireGuard 端到端 + SSH 加密</td></tr>
+          <tr><td>需要 root</td><td>否（普通用户）</td><td>否（用户态）</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- WASM BROWSER -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">WASM 实验版：浏览器直连</span>
+      </div>
+      <div class="sec-body">
+        <p>Tailcat 编译为 WebAssembly，可在浏览器内运行实验性客户端，与 CLI 互操作（浏览器端走 DERP relay 直连，暂不支持 WebRTC 直连）：</p>
+
+        <div class="alert green">
+          <strong>实验性功能</strong>：WASM 版部署在 <a href="https://tailscale.github.io/tailcat/" target="_blank" rel="noopener" style="text-decoration:underline">https://tailscale.github.io/tailcat/</a>，支持浏览器内发送/接收文件或文本。与 CLI 互通时，浏览器流量仅走 DERP relay 直连（无 peer-to-peer 升级）。
+        </div>
+
+        <p class="lead">WASM vs CLI 能力对比</p>
+        <table>
+          <tr><th>功能</th><th>CLI</th><th>WASM</th></tr>
+          <tr><td>TCP 连接</td><td class="check">✓</td><td class="cross">✗</td></tr>
+          <tr><td>文件传输</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>文本传输</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>直连 UDP</td><td class="check">✓</td><td class="cross">✗（仅 DERP）</td></tr>
+          <tr><td>NAT punch</td><td class="check">✓</td><td class="cross">✗</td></tr>
+          <tr><td>平台支持</td><td>Linux/macOS/Windows</td><td>现代浏览器</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- SECURITY COMPARISON -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">安全边界对比：Tailcat vs Tailscale vs WireGuard</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr><th>维度</th><th>Tailcat</th><th>Tailscale</th><th>WireGuard (内核)</th></tr>
+          <tr><td>控制平面</td><td>无（OOB 交换 token）</td><td>Tailscale 服务器</td><td>无（手动配置密钥）</td></tr>
+          <tr><td>账号/注册</td><td class="check">✗ 无</td><td class="cross">✗ 需要</td><td class="check">✗ 无</td></tr>
+          <tr><td>root 权限</td><td class="check">✗ 不需要</td><td class="cross">通常需要</td><td class="cross">需要</td></tr>
+          <tr><td>系统网络</td><td class="check">不接管</td><td class="cross">接管 VPN 接口</td><td class="cross">接管 TUN 设备</td></tr>
+          <tr><td>路由表</td><td class="check">不修改</td><td class="cross">全量接管</td><td class="cross">需手动配置</td></tr>
+          <tr><td>DNS</td><td class="check">不修改</td><td class="cross">可选覆盖</td><td class="cross">需手动配置</td></tr>
+          <tr><td>加密</td><td>WireGuard E2E</td><td>WireGuard E2E</td><td>WireGuard E2E</td></tr>
+          <tr><td>NAT 穿透</td><td>magicsock auto</td><td>magicsock auto</td><td class="cross">需手动端口映射</td></tr>
+          <tr><td>中继 fallback</td><td>DERP relay</td><td>DERP relay</td><td class="cross">✗ 无</td></tr>
+          <tr><td>多设备组网</td><td class="cross">2 台点对点</td><td class="check">✓ 任意规模</td><td class="cross">需手动 mesh</td></tr>
+          <tr><td>第三方依赖</td><td>Tailscale DERP（可自建）</td><td>Tailscale 服务器</td><td class="check">无</td></tr>
+        </table>
+        <div class="note">
+          <strong>选型建议</strong>：临时点对点直连选 Tailcat；长期多设备 VPN 选 Tailscale；极致轻量且不需要 NAT 穿透选内核 WireGuard。
+        </div>
+      </div>
+    </div>
+
+    <!-- DERP SELF-HOSTING -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">自建 DERP：零信任中继方案</span>
+      </div>
+      <div class="sec-body">
+        <p>若对 Tailscale 托管的 DERP 中继存在零信任顾虑，可运行完全自托管的 DERP 服务器，Tailcat 支持指定自定义 DERP map：</p>
+
+        <pre><span class="c"># 部署自建 derper（需要域名 + TLS 证书）</span>
+<span class="prompt">$ </span><span class="v">go install tailscale.com/cmd/derper@latest</span>
+<span class="prompt">$ </span><span class="v">./derper -a :443 -certs-dir /etc/ssl/derper/</span>
+
+<span class="c"># 构建自定义 DERP map JSON</span>
+<span class="prompt">$ </span><span class="v">cat &gt; my-derp-map.json &lt;&lt;'EOF'</span>
+{
+  <span class="c">"regions"</span>: [{
+    <span class="c">"regionid"</span>: 9001,
+    <span class="c">"regioncode"</span>: <span class="v">"myserver"</span>,
+    <span class="c">"regionname"</span>: <span class="v">"My DERP"</span>,
+    <span class="c">"nodes"</span>: [{
+      <span class="c">"name"</span>: <span class="v">"a"</span>,
+      <span class="c">"regionid"</span>: 9001,
+      <span class="c">"hostname"</span>: <span class="v">"derp.example.com"</span>,
+      <span class="c">"certname"</span>: <span class="v">"derp.example.com"</span>,
+      <span class="c">"ipport"</span>: <span class="v">"derp.example.com:443"</span>
+    }]
+  }]
+}
+EOF</pre>
+
+        <pre><span class="c"># 启动 Tailcat Server 使用自建 DERP</span>
+<span class="prompt">$ </span><span class="v">tailcat serve --derp-map-url https://example.com/my-derp-map.json</span></pre>
+
+        <div class="alert green">
+          <strong>DERP 自建优势</strong>：中继带宽完全自控，无第三方限速；日志可审计；可部署在低延迟机房改善传输质量。代价是需要维护一台有公网 IP 的服务器。
+        </div>
+      </div>
+    </div>
+
+    <!-- INSTALLATION -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">$</span>
+        <span class="sec-label">多平台安装方式</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr><th>平台</th><th>安装命令</th></tr>
+          <tr><td>macOS</td><td><code>brew install tailcat</code></td></tr>
+          <tr><td>Linux/macOS（Go）</td><td><code>go install github.com/tailscale/tailcat/cmd/tailcat@latest</code></td></tr>
+          <tr><td>macOS（直接）</td><td><code>brew install tailscale/tap/tailcat</code></td></tr>
+          <tr><td>Windows</td><td>GitHub Releases 下载 <code>.exe</code></td></tr>
+          <tr><td>源码编译</td><td><code>git clone &amp;&amp; go install ./cmd/tailcat</code></td></tr>
+        </table>
+        <div class="note">
+          <strong>Go 版本要求</strong>：需要 Go 1.26.5+（<code>tailcat</code> 依赖 <code>tailscale.com</code> 最新版，该包要求最新稳定 Go）。
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">诞生记：从 derpcat 到 Tailcat</span>
+      </div>
+      <div class="sec-body">
+        <p>Tailcat 并非凭空诞生。2023 年 9 月，Tailscale 工程师在一次跨大西洋航班（UA605 ORD→Ireland）上写下了第一个版本，命名为 <strong>derpcat</strong>（DERP + netcat）。最初代码位于 <code>tailscale.com</code> 仓库的 fork 中，随着上游代码演进多次 bitrot。</p>
+        <p>2026 年 8 月，Tailscale 将其重构为独立的 Go module（不再 fork <code>tailscale.com</code>，而是作为 regular client），正式以 <strong>Tailcat</strong>（Tail + netcat）之名在 TailscaleUp 大会上开源。ConnBlob 格式经过重新设计，token 交换机制从 base64 编码改为更紧凑的二进制格式。</p>
+        <p>从最初的航班随手项目到生产可用的库/CLI，开源版本已是第三个 major iteration，代码质量与 Tailscale 主线保持一致。</p>
+      </div>
+    </div>
+
+    <!-- KEY METRICS -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">关键数据</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr><th>指标</th><th>数值</th><th>说明</th></tr>
+          <tr><td>GitHub Stars</td><td>1,932</td><td>截至 2026-09-17</td></tr>
+          <tr><td>License</td><td>BSD-3-Clause</td><td>商业可用</td></tr>
+          <tr><td>Go 版本</td><td>≥ 1.26.5</td><td>与 tailscale.com 同步</td></tr>
+          <tr><td>首次提交</td><td>2023-09</td><td>commit 9e4d925cc</td></tr>
+          <tr><td>正式开源</td><td>2026-08</td><td>TailscaleUp 大会</td></tr>
+          <tr><td>主要贡献者</td><td>Tailscale 工程师</td><td>复用 tailscale.com 组件</td></tr>
+          <tr><td>二进制大小</td><td>~10-15 MB</td><td>含完整 Go runtime</td></tr>
+        </table>
+      </div>
+    </div>
+
+
+
+    <!-- REAL WORLD SCENARIOS -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">实测场景：从零到生产</span>
+      </div>
+      <div class="sec-body">
+        <p class="lead">场景 1：在家访问办公室数据库</p>
+        <pre><span class="c"># 办公室机器（Server）：暴露 5432（PostgreSQL）</span>
+<span class="prompt">$ </span><span class="v">tailcat serve --port 5432</span>
+<span class="c"># 输出 token，例如：tc_7f3a9b2c4d5e...</span>
+
+<span class="c"># 家中机器（Client）：</span>
+<span class="prompt">$ </span><span class="v">tailcat connect tc_7f3a9b2c4d5e...</span>
+<span class="prompt">$ </span><span class="v">psql -h 127.0.0.1 -p 5432 -U myuser mydb</span></pre>
+
+        <p class="lead">场景 2：临时传大文件给协作者</p>
+        <pre><span class="c"># 协作者机器（Server）：启动文件接收</span>
+<span class="prompt">$ </span><span class="v">tailcat serve --file</span>
+<span class="c"># 输出 token 和本地端口</span>
+
+<span class="c"># 你（Client）：发送文件</span>
+<span class="prompt">$ </span><span class="v">tailcat send &lt;TOKEN&gt; ./big-file.tar.gz</span></pre>
+
+        <p class="lead">场景 3：调试 Webhook（暴露本地 3000）</p>
+        <pre><span class="c"># 本地开发机：暴露 3000</span>
+<span class="prompt">$ </span><span class="v">tailcat serve --port 3000</span>
+<span class="prompt">$ </span><span class="v">echo "Token: $(tailcat token)"</span>
+
+<span class="c"># 对方（client）：访问你的服务</span>
+<span class="prompt">$ </span><span class="v">tailcat connect &lt;TOKEN&gt;</span>
+<span class="prompt">$ </span><span class="v">curl http://127.0.0.1:3000/api/webhook</span></pre>
+
+        <div class="alert green">
+          <strong>端口暴露技巧</strong>：<code>--port</code> 参数指定服务端监听的 TCP 端口，client 连接后自动在该端口建立双向通道。不需要任何端口映射或防火墙配置。
+        </div>
+      </div>
+    </div>
+
+    <!-- TROUBLESHOOTING -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">排错指南</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr><th>症状</th><th>原因</th><th>解法</th></tr>
+          <tr><td>连接超时</td><td>双方都在严格对称 NAT 后</td><td>等待 DERP relay 建立；确认双方网络可访问 DERP</td></tr>
+          <tr><td>DERP 限速</td><td>使用 Tailscale 托管 relay</td><td>自建 DERP 服务器；或接受直连失败时的带宽限制</td></tr>
+          <tr><td>token 无效</td><td>ConnBlob 有时效</td><td>重新生成 token（<code>tailcat serve</code>）</td></tr>
+          <tr><td>Go 版本过低</td><td>tailscale.com 需要 Go 1.26+</td><td><code>go version</code> 确认；升级 Go</td></tr>
+          <tr><td>WSL 网络隔离</td><td>WSL 与宿主机网络不互通</td><td>使用 WSL 内安装的 tailcat 而非 Windows 版本</td></tr>
+          <tr><td>Docker 容器内</td><td>需要 host 网络模式</td><td><code>docker run --network host</code></td></tr>
+        </table>
+        <div class="note">
+          <strong>调试命令</strong>：<code>tailcat serve -v</code> 开启详细日志，可观察 DERP 连接、NAT 探测和直连建立过程。
+        </div>
+      </div>
+    </div>
+
+    <!-- CONN BLOB -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">ConnBlob：token 格式解析</span>
+      </div>
+      <div class="sec-body">
+        <p>Server 启动后输出的 ConnBlob 是一个紧凑的二进制编码字符串，包含建立 WireGuard 隧道所需的全部信息，接收端不需要知道 server 的 IP：</p>
+        <div class="rows">
+          <div class="row highlight"><span class="label">ServerPublic</span><span class="val">WireGuard 公钥（用于建立隧道）</span></div>
+          <div class="row"><span class="label">ServerDiscoPublic</span><span class="val">Disco 公钥（用于 NAT 穿透信令）</span></div>
+          <div class="row"><span class="label">DERP Region</span><span class="val">中继区域信息（server 时指定 RegionID）</span></div>
+        </div>
+        <p style="margin-top:10px;font-size:12px;color:#555">ConnBlob 格式经过 2026 开源版本重新设计，从早期 base64 编码改为更紧凑的二进制格式，token 长度更短，适合通过 IM/邮件传输。</p>
+      </div>
+    </div>
+
+    <!-- VS ALTERNATIVES -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">同类工具对比：为什么选 Tailcat</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr><th>工具</th><th>加密</th><th>NAT 穿透</th><th>账号</th><th>root</th><th>复杂度</th></tr>
+          <tr><td>Tailcat</td><td>WireGuard</td><td>magicsock auto</td><td>无</td><td>无</td><td>极简</td></tr>
+          <tr><td>frp</td><td>可选</td><td>需公网服务器</td><td>无</td><td>需</td><td>中等</td></tr>
+          <tr><td>ngrok</td><td>TLS</td><td>需要中继</td><td>需</td><td>无</td><td>简单</td></tr>
+          <tr><td>ZeroTier</td><td>WireGuard</td><td>moon relay</td><td>需</td><td>需</td><td>复杂</td></tr>
+          <tr><td>Cloudflare Tunnel</td><td>TLS</td><td>需要中继</td><td>需（CF）</td><td>无</td><td>中等</td></tr>
+          <tr><td>SSH reverse</td><td>SSH</td><td>需公网跳板</td><td>无</td><td>需</td><td>高</td></tr>
+        </table>
+        <div class="note">
+          <strong>Tailcat 的独特价值</strong>：唯一同时具备「零账号 + 零 root + WireGuard 加密 + NAT 自动穿透 + 无需中继服务器」组合的工具。
+        </div>
+      </div>
+    </div>
+
+    <!-- ROADMAP -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">已知限制与未来方向</span>
+      </div>
+      <div class="sec-body">
+        <div class="rows">
+          <div class="row highlight"><span class="label">点对点限制</span><span class="val">当前版本仅支持 2 台机器直连，不支持多方组网</span></div>
+          <div class="row"><span class="label">UDP 直接穿越</span><span class="val">WASM 浏览器版暂不支持 UDP 直连（WebRTC 还在开发中）</span></div>
+          <div class="row"><span class="label">DERP 带宽</span><span class="val">公共 relay 有带宽上限，大文件传输建议等待直连建立</span></div>
+          <div class="row"><span class="label">Windows 原生</span><span class="val">CLI 可用，但 SOCKS5 代理模式在部分 Windows 防火墙场景下可能受限</span></div>
+        </div>
+        <div class="alert green">
+          <strong>与 Tailscale 主线的关系</strong>：官方表示计划将 Tailcat 功能集成到 Tailscale 主客户端中，届时一个 Tailscale 账号即可同时支持传统组网和点对点 Tailcat 直连两种模式。
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- LIBRARY CODE PATTERNS -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">Go 库进阶模式：生产用例</span>
+      </div>
+      <div class="sec-body">
+        <p class="lead">模式 1：HTTP 代理服务（暴露本地 API）</p>
+        <pre><span class="v">package</span> main
+
+<span class="v">import</span> (
+  <span class="c">"context"</span>
+  <span class="c">"log"</span>
+  <span class="c">"net"</span>
+  <span class="c">"net/http"</span>
+  <span class="c">"github.com/tailscale/tailcat"</span>
+)
+
+<span class="v">func</span> main() {
+  <span class="c">// 启动本地 HTTP 服务</span>
+  <span class="v">go</span> http.<span class="c">ListenAndServe</span>(<span class="c">":8080"</span>, <span class="v">nil</span>)
+
+  <span class="c">// 通过 Tailcat 暴露它</span>
+  s := &amp;<span class="c">tailcat.Server</span>{}
+  s.<span class="c">OnTCP</span> = <span class="v">func</span>(port uint16) <span class="v">func</span>(net.Conn) {
+    <span class="v">return</span> <span class="v">func</span>(c net.Conn) {
+      <span class="c">// 将进入的连接转发到本地 8080</span>
+      <span class="c">// （实际使用应建立双向 pipe）</span>
+      c.<span class="c">Close</span>()
+    }
+  }
+  <span class="v">if</span> err := s.<span class="c">Start</span>(); err != nil {
+    <span class="c">log.Fatal</span>(err)
+  }
+  log.<span class="c">Printf</span>(<span class="c">"Token: %s"</span>, s.<span class="c">ConnBlob</span>())
+  <span class="c">select</span>{}
+}</pre>
+
+        <p class="lead">模式 2：带日志的文件传输服务</p>
+        <pre><span class="v">import</span> <span class="c">"github.com/tailscale/tailcat"</span>
+
+s := &amp;<span class="c">tailcat.Server</span>{
+  <span class="c">Logf</span>: <span class="v">func</span>(fmt <span class="v">string</span>, args ...<span class="v">any</span>) {
+    log.<span class="c">Printf</span>(<span class="c">"[tailcat] "</span>+fmt, args...)
+  },
+  <span class="c">OnTCP</span>: <span class="v">func</span>(port uint16) <span class="v">func</span>(net.Conn) {
+    <span class="v">return</span> <span class="v">func</span>(c net.Conn) {
+      <span class="c">buf := make([]byte, 1024)</span>
+      <span class="v">for</span> {
+        n, err := c.<span class="c">Read</span>(buf)
+        <span class="v">if</span> err != nil { <span class="c">break</span> }
+        log.<span class="c">Printf</span>(<span class="c">"received %d bytes"</span>, n)
+        c.<span class="c">Write</span>(buf[:n])
+      }
+      c.<span class="c">Close</span>()
+    }
+  },
+}</pre>
+
+        <p class="lead">模式 3：exit node 出口代理</p>
+        <pre><span class="c">// 客户端：作为出口代理</span>
+c := <span class="c">tailcat.NewClient</span>(&amp;<span class="c">tailcat.Client</span>{Server: token})
+conn, _ := c.<span class="c">Dial</span>(<span class="c">context.Background</span>(), <span class="c">"tcp"</span>, <span class="c">":0"</span>)
+<span class="c">// conn 是 WireGuard 隧道内的连接</span>
+<span class="c">// 任何写入 conn.Write 的数据都会从 server 端出口</span></pre>
+
+        <div class="alert orange">
+          <strong>生产使用建议</strong>：Server 的 <code>OnTCP</code> 回调在 goroutine 中执行，注意并发安全；使用 <code>context.Context</code> 管理超时；DERPMapCache 可跨请求复用减少 DNS 查询。
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK REFERENCE -->
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-num">⬡</span>
+        <span class="sec-label">速查表</span>
+      </div>
+      <div class="sec-body">
+        <table>
+          <tr><th>需求</th><th>命令</th></tr>
+          <tr><td>安装</td><td><code>go install github.com/tailscale/tailcat/cmd/tailcat@latest</code></td></tr>
+          <tr><td>生成 token</td><td><code>tailcat serve</code></td></tr>
+          <tr><td>连接</td><td><code>tailcat connect &lt;TOKEN&gt;</code></td></tr>
+          <tr><td>暴露端口</td><td><code>tailcat serve --port 8080</code></td></tr>
+          <tr><td>SOCKS5 代理</td><td><code>tailcat serve --socks5</code></td></tr>
+          <tr><td>SSH 直连</td><td><code>tailcat serve --ssh</code></td></tr>
+          <tr><td>指定 DERP</td><td><code>tailcat serve --derp-map-url https://...</code></td></tr>
+          <tr><td>Go 库服务端</td><td><code>tailcat.Server{}.Start()</code></td></tr>
+          <tr><td>Go 库客户端</td><td><code>tailcat.NewClient(&amp;Client{Server:token}).Dial(ctx,"tcp",":8080")</code></td></tr>
+          <tr><td>ConnBlob token</td><td><code>Server.ConnBlob()</code></td></tr>
+          <tr><td>WASM 演示</td><td>https://tailscale.github.io/tailcat/</td></tr>
+          <tr><td>自建 DERP</td><td><code>go install tailscale.com/cmd/derper@latest</code></td></tr>
+        </table>
+      </div>
+    </div>
+
+
     <!-- RISK NOTE -->
     <div class="alert red">
       <strong>注意事项</strong>：Tailcat 使用 Tailscale 的 DERP 中继服务器（第三方托管）。如果对中继节点完全零信任，可考虑完全自托管 Tailscale 控制平面，或使用纯点对点直连模式。工具本身是官方出品，开源透明。
@@ -320,7 +872,7 @@
     </div>
 
     <div class="rule"></div>
-    <p class="source-note">来源：X @NFTCPS · 2026-08-30</p>
+    <p class="source-note">来源：github.com/tailscale/tailcat + tailscale.com/blog/tailcat · 2026-09-17 更新（扩充 3x）</p>
 
     <!-- LINKS -->
     <div style="margin-top:14px">
