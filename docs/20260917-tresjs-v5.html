@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TresJS v5：Vue 写 3D，Three.js 之上再无门槛</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ CODE BLOCK ============ */
+    .code-block{background:#1a1a2e;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto}
+    .code-block .code-label{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre-wrap}
+    .code-block .kwd{color:#ff79c6}
+    .code-block .fn{color:#50fa7b}
+    .code-block .str{color:#f1fa8c}
+    .code-block .cmt{color:#6272a4}
+    .code-block .num{color:#bd93f9}
+    .code-block .tag{color:#ff5555}
+    .code-block .attr{color:#50fa7b}
+    .code-block .prop{color:#8be9fd}
+
+    /* ============ FOOTER ============ */
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .footer-links{border:2px solid var(--line);background:#fff;padding:14px;display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+    .footer-links a{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:6px 10px;background:#fff;font-size:12px;font-weight:800;transition:background .15s,color .15s}
+    .footer-links a:hover{background:var(--blue);color:#fff}
+    .footer-links a .link-icon{font-size:14px}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- HERO -->
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">dev-tool · Vue 3D framework</div>
+        <h1 class="demo-title">TresJS v5</h1>
+        <p class="subtitle">用 Vue 组件写 3D，Three.js 之上再无门槛。把 Three.js 装进 Vue，用组件直接搭 3D 场景。</p>
+        <div class="badge-row">
+          <span class="badge red">MIT</span>
+          <span class="badge blue">WebGPU Ready</span>
+          <span class="badge dark">v5.0</span>
+          <span class="badge">experimental</span>
+        </div>
+        <div class="alert">
+          <strong>渲染链：Vue → TresJS → Three.js → WebGPU</strong>
+          <p>v5 正式接入 WebGPURenderer，支持 Compute Shader / GPU 粒子 / 实时后处理 / GPGPU 等场景。</p>
+          <div class="mini-row">
+            <span class="mini-tag">WebGPU</span>
+            <span class="mini-tag">WebGPURenderer</span>
+            <span class="mini-tag">GPGPU</span>
+            <span class="mini-tag">Compute Shader</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">v5 Core Features</div>
+          <h3>六大核心升级</h3>
+          <p>WebGPU / CLI / 响应式 / 事件系统 / Nuxt 4 / Devtools</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>核心思路：</b>用 Vue 的声明式语法封装 Three.js，让 3D 开发像搭 Vue 组件一样简单。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">WebGPU</div><div class="c">WebGPURenderer 接入</div></div>
+            <div class="flow-item red"><div class="t">CLI</div><div class="c">npx create-tres</div></div>
+            <div class="flow-item dark"><div class="t">Loader</div><div class="c">useLoader 响应式</div></div>
+            <div class="flow-item blue"><div class="t">Nuxt</div><div class="c">Nuxt 4 官方适配</div></div>
+            <div class="flow-item red"><div class="t">Devtools</div><div class="c">Scene Graph / FPS / Memory</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <!-- SECTION 01: Vue + Three.js 基础写法 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">Vue + Three.js</div>
+          <h2>组件式 3D 场景基础写法</h2>
+          <p>用 TresCanvas / TresMesh / TresBoxGeometry / TresMeshBasicMaterial 组合出第一个 3D 场景。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">基础组件</span></div>
+          <h3>Vue 风格的 3D 场景</h3>
+          <p>TresJS 将 Three.js 对象封装为 Vue 组件，模板中直接写 3D 场景，无需手动管理 WebGL 上下文。</p>
+          <ul>
+            <li>TresCanvas — 画布容器，自动初始化 Renderer</li>
+            <li>TresMesh — 3D 物体，支持嵌套子组件</li>
+            <li>TresBoxGeometry — 几何体（盒子）</li>
+            <li>TresMeshBasicMaterial — 基础材质</li>
+          </ul>
+        </div>
+        <div class="code-block">
+          <div class="code-label">// TresCanvas + TresMesh 基础模板</div>
+          <pre><span class="cmt">&lt;!-- App.vue --&gt;</span>
+<span class="tag">&lt;TresCanvas</span> <span class="attr">alpha</span>=<span class="str">"true"</span><span class="tag">&gt;</span>
+  <span class="tag">&lt;TresMesh</span> <span class="attr">:position</span>=<span class="str">"[0, 0, 0]"</span><span class="tag">&gt;</span>
+    <span class="tag">&lt;TresBoxGeometry</span> <span class="attr">:args</span>=<span class="str">"[1, 1, 1]"</span> <span class="tag">/&gt;</span>
+    <span class="tag">&lt;TresMeshBasicMaterial</span> <span class="attr">:color</span>=<span class="str">"'#d80018'"</span> <span class="tag">/&gt;</span>
+  <span class="tag">&lt;/TresMesh&gt;</span>
+<span class="tag">&lt;/TresCanvas&gt;</span>
+
+<span class="cmt">// main.js</span>
+<span class="kwd">import</span> { TresCanvas } <span class="kwd">from</span> <span class="str">'@tresjs/core'</span>
+<span class="fn">createApp</span>(App)
+  .component(<span class="str">'TresCanvas'</span>, TresCanvas)
+  .mount(<span class="str">'#app'</span>)</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 02: WebGPU -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">WebGPU</div>
+          <h2>v5 最大升级：WebGPU 支持</h2>
+          <p>Three.js WebGPURenderer 封装进 TresJS，渲染链延伸至 WebGPU，支持 Compute Shader / GPU 粒子等前沿场景。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">WebGPU 场景</span></div>
+          <h3>WebGPU 适配场景</h3>
+          <ul>
+            <li>Compute Shader / GPGPU 通用计算</li>
+            <li>GPU 粒子系统（百万级粒子）</li>
+            <li>大规模实例渲染（InstancedMesh）</li>
+            <li>自定义 Shader 特效</li>
+            <li>实时后处理（Post-processing）</li>
+            <li>VFX 可视化效果</li>
+          </ul>
+        </div>
+        <div class="code-block">
+          <div class="code-label">// WebGPURenderer 初始化</div>
+          <pre><span class="cmt">// 渲染链：Vue → TresJS → Three.js → WebGPU</span>
+<span class="kwd">import</span> { WebGPURenderer, <span class="fn">Scene</span>, <span class="fn">PerspectiveCamera</span> } <span class="kwd">from</span> <span class="str">'three'</span>
+
+<span class="kwd">const</span> <span class="attr">renderer</span> = <span class="kwd">new</span> <span class="fn">WebGPURenderer</span>({
+  <span class="attr">antialias</span>: <span class="kwd">true</span>,
+  <span class="attr">powerPreference</span>: <span class="str">'high-performance'</span>
+})
+<span class="attr">renderer</span>.setPixelRatio(<span class="fn">window</span>.devicePixelRatio)
+<span class="attr">renderer</span>.setSize(<span class="fn">window</span>.innerWidth, <span class="fn">window</span>.innerHeight)
+<span class="attr">document</span>.body.appendChild(<span class="attr">renderer</span>.domElement)
+
+<span class="cmt">// TSL (Three.js Shading Language) 支持</span>
+<span class="kwd">await</span> <span class="fn">renderer</span>.init()
+<span class="kwd">const</span> <span class="attr">scene</span> = <span class="kwd">new</span> <span class="fn">Scene</span>()
+<span class="kwd">const</span> <span class="attr">camera</span> = <span class="kwd">new</span> <span class="fn">PerspectiveCamera</span>(<span class="num">75</span>, <span class="num">16/9</span>)
+<span class="fn">renderer</span>.render(scene, camera)</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 03: Lab 案例 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">Official Lab</div>
+          <h2>官方 Lab 案例展示</h2>
+          <p>lab.tresjs.org 提供多个 v5 特色示例，覆盖 WebGPU + TSL / 汽车展示 / 物理引擎等场景。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">WebGPU</span><span class="tag blue">VFX</span></div>
+          <h3>Plexus Particles</h3>
+          <p>WebGPU + TSL + Shader + Compute 实现百万粒子实时渲染与连线特效。</p>
+          <ul>
+            <li>WebGPU 粒子计算</li>
+            <li>TSL 着色器语言</li>
+            <li>GPGPU 通用计算</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">Showcase</span></div>
+          <h3>Porsche 911 Car Showcase</h3>
+          <p>GLTFLoader 加载高模汽车，HDR 环境光、PBR 材质、OrbitControls 交互展示。</p>
+          <ul>
+            <li>GLTF / GLB 模型加载</li>
+            <li>PBR 材质系统</li>
+            <li>HDR 环境贴图</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">Physics</span></div>
+          <h3>Rapier Physics</h3>
+          <p>Rapier 物理引擎集成，支持刚体、碰撞、约束等物理模拟。</p>
+          <ul>
+            <li>Rapier 刚体模拟</li>
+            <li>碰撞检测</li>
+            <li>关节约束</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- SECTION 04: CLI / Composable / Nuxt / Devtools -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">More v5 Features</div>
+          <h2>CLI / 响应式 / 事件 / Nuxt 4 / Devtools</h2>
+          <p>v5 其余核心能力：create-tres 脚手架、useLoader 响应式、DOM 风格事件系统、Nuxt 4 适配、Devtools 升级。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">CLI</span></div>
+          <h3>create-tres CLI</h3>
+          <p>全新脚手架命令，快速初始化 TresJS 项目，支持多种模板与技术栈。</p>
+          <ul>
+            <li><code>npx create-tres my-3d-app</code></li>
+            <li>Vue + Vite 模板</li>
+            <li>Nuxt 3 / 4 模板</li>
+            <li>TypeScript 支持</li>
+            <li>Cientos 组件库</li>
+            <li>Post-processing 后处理</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">Composable</span></div>
+          <h3>useLoader 响应式重构</h3>
+          <p>资源加载返回完整响应式状态：state / isLoading / error / progress。</p>
+          <ul>
+            <li>state — 加载状态</li>
+            <li>isLoading — 加载中布尔值</li>
+            <li>error — 错误信息</li>
+            <li>progress — 0-100 进度</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">Nuxt</span></div>
+          <h3>Nuxt 4 官方适配</h3>
+          <p>v5 全面适配 Nuxt 4，提供 TresJS Nuxt 模块，SSR/CSR 双模式支持。</p>
+          <ul>
+            <li>Nuxt 模块自动注入</li>
+            <li>SSR 兼容</li>
+            <li>组件懒加载</li>
+          </ul>
+        </article>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Events</span></div>
+          <h3>统一事件系统</h3>
+          <p>v5 事件命名与 DOM 对齐：@click / @pointerenter / @pointerleave，替代旧版 on-click。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="tag">&lt;TresMesh</span>
+  <span class="attr">@click</span>=<span class="str">"onClick"</span>
+  <span class="attr">@pointerenter</span>=<span class="str">"onHover"</span>
+  <span class="attr">@pointerleave</span>=<span class="str">"onLeave"</span><span class="tag">&gt;</span>
+<span class="tag">&lt;/TresMesh&gt;</span>
+
+<span class="cmt">// 与 DOM 事件命名完全对齐</span></pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">Devtools</span></div>
+          <h3>Devtools 全面升级</h3>
+          <p>Chrome DevTools 扩展新增多个面板，实时调试 3D 场景。</p>
+          <ul>
+            <li>Scene Graph — 场景树结构</li>
+            <li>FPS Monitor — 帧率监控</li>
+            <li>Memory Usage — 内存占用</li>
+            <li>Draw Calls — 绘制调用统计</li>
+            <li>3D 对象属性面板</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="rule"></div>
+    <div class="footer-links">
+      <a href="https://tresjs.org/" target="_blank" rel="noopener">
+        <span class="link-icon">🔗</span> tresjs.org
+      </a>
+      <a href="https://github.com/Tresjs/tres" target="_blank" rel="noopener">
+        <span class="link-icon">⭐</span> GitHub
+      </a>
+      <a href="https://lab.tresjs.org/" target="_blank" rel="noopener">
+        <span class="link-icon">🧪</span> Lab
+      </a>
+      <a href="https://tresjs.org/" target="_blank" rel="noopener">
+        <span class="link-icon">📖</span> 官方文档
+      </a>
+    </div>
+    <p class="source-note">来源：微信公众号「认真努力的小四子」· TresJS v5 正式发布 · WebGPU 时代 Vue 3D 开发新范式</p>
+  </main>
+</body>
+</html>
