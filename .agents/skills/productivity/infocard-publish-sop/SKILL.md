@@ -58,6 +58,23 @@ Light route 的 static gates 必须绑定当前卡片：`node scripts/verify-tax
 
 Research produces first-party facts, source boundaries, time-sensitive snapshots, claim verdicts, and evidence gaps. It does not write formal card files, create workspaces, build, commit, push, or publish.
 
+### Content language rules for Author (enforced 2026-09-16)
+
+Dev/tool cards (category: dev-tool, creative-tool, productivity): **English-first**. Section titles, h2/h3 headings, overview labels, and prose explanations must be pure English. Chinese is permitted ONLY for:
+1. Naming-reference table source terms (搜索必需 for the Chinese→English lookup value)
+2. A concise hook line ≤ 10 characters in the hero subtitle (or omit entirely)
+
+Forbidden in dev/tool cards:
+- Chinese prose paragraphs in body text
+- Mixed ZH/EN in section titles (e.g. "A抽卡黑盒", "VIDEO AI IS A抽卡黑盒")
+- Chinese transliterations in English contexts (e.g. "剪映" → use "JianYing"; "抽卡黑盒" → use "black-box output")
+- `lang="zh-CN"` or Chinese font declarations (`PingFang SC`, `Microsoft YaHei`) in dev/tool cards
+- Emoji-only section headings without English equivalents
+
+WeChat/public-account cards: Chinese-first (首屏中文, English only for brand names, tech acronyms, protocol names, and necessary native terms).
+
+When editing an existing card to fix language mix: patch the docs/ HTML directly, then `npm run build && npm run verify` before commit. Do NOT re-delegate authoring.
+
 ### Author
 
 Author writes only under `.docs/<run-id>/<slug>/`:

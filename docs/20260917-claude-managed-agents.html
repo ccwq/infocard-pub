@@ -1,0 +1,1684 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="blue">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Claude Managed Agents — Anthropic 云端 Agent 框架 · blue manual</title>
+<meta name="description" content="Claude Managed Agents (Anthropic, beta) 是云端托管 Agent 框架：围绕 Agent（可复用配置）、Environment（云端/自架沙箱）、Session（有状态工作实例）、Events（SSE流）四个核心概念，支持 Bash/文件操作/网页搜索/MCP，最多 300rpm 创建端点，$0.08/Session小时。" />
+<style>
+:root{
+  --bg:var(--theme-bg);
+  --paper:var(--theme-paper);
+  --ink:var(--theme-ink);
+  --red:var(--theme-red);
+  --blue:var(--theme-blue);
+  --blue2:var(--theme-blue-strong);
+  --green:var(--theme-green);
+  --soft-blue:var(--theme-soft-blue);
+  --soft-red:var(--theme-soft-red);
+  --line:var(--theme-line);
+  --muted:var(--theme-muted);
+  --shadow:var(--theme-shadow);
+  --white:var(--theme-white);
+  --black:var(--theme-black);
+  --blue-pale:var(--theme-blue-pale);
+  --blue-faint:var(--theme-blue-faint);
+  --blue-panel:var(--theme-blue-panel);
+  --ink-soft:var(--theme-ink-soft);
+  --ink-muted:var(--theme-ink-muted);
+  --line-soft:var(--theme-line-soft);
+  --code:var(--theme-code);
+  --code-comment:var(--theme-code-comment);
+  --code-key:var(--theme-code-key);
+  --code-string:var(--theme-code-string);
+  --code-command:var(--theme-code-command);
+  --theme-bg:aliceblue;
+  --theme-paper:ivory;
+  --theme-ink:black;
+  --theme-red:crimson;
+  --theme-blue:navy;
+  --theme-blue-strong:blue;
+  --theme-green:green;
+  --theme-soft-blue:azure;
+  --theme-soft-red:mistyrose;
+  --theme-line:black;
+  --theme-muted:dimgray;
+  --theme-shadow:6px 6px 0 transparent;
+  --theme-white:white;
+  --theme-black:black;
+  --theme-blue-pale:lightcyan;
+  --theme-blue-faint:azure;
+  --theme-blue-panel:ghostwhite;
+  --theme-ink-soft:dimgray;
+  --theme-ink-muted:slategray;
+  --theme-line-soft:dimgray;
+  --theme-code:gainsboro;
+  --theme-code-comment:slategray;
+  --theme-code-key:lightskyblue;
+  --theme-code-string:lightblue;
+  --theme-code-command:lightgreen;
+  --theme-paper-warm:whitesmoke;
+  --theme-table-alt:whitesmoke;
+  --theme-key-bg:whitesmoke;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;overflow-x:hidden}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.62;text-rendering:optimizeLegibility}
+.page{width:min(1120px,calc(100% - 22px));margin:0 auto;padding:18px 0 74px;text-align:left}
+.shell{background:var(--paper);border:2px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+.hdr{border-bottom:3px solid var(--line);background:var(--paper)}
+.hdr-top{display:grid;grid-template-columns:1.25fr .75fr}
+.hdr-hero{padding:22px 20px 18px;background:linear-gradient(135deg,var(--blue) 0%,var(--blue2) 57%,var(--ink) 57%,var(--ink) 100%);color:var(--white);min-height:260px;display:flex;flex-direction:column;justify-content:flex-end}
+.kicker{font-size:12px;font-weight:950;letter-spacing:.12em;text-transform:uppercase;color:var(--blue-pale)}
+.demo-title{margin:10px 0 8px;font-size:clamp(28px,4.7vw,56px);font-weight:950;letter-spacing:-.05em;line-height:1.02}
+.sub-line{font-size:14px;line-height:1.58;color:var(--blue-faint);margin:2px 0 0;max-width:62ch;font-weight:750}
+.tagline{display:inline-block;align-self:flex-start;padding:5px 10px;border:2px solid var(--white);background:var(--blue2);color:var(--white);font-size:11.5px;font-weight:950;text-transform:uppercase;letter-spacing:.08em;margin-top:12px}
+.hdr-meta{padding:12px 14px;border-left:3px solid var(--line);display:grid;gap:7px;align-content:start;background:var(--blue-panel)}
+.meta-row-high{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding-bottom:7px;border-bottom:2px solid var(--line)}
+.meta-row-low{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.meta-pill-lg,.meta-pill-md,.meta-pill-sm{border:2px solid var(--line);background:var(--white);font-weight:950;line-height:1.15;overflow-wrap:anywhere}
+.meta-pill-lg{padding:8px 9px 7px;font-size:18px}
+.meta-pill-md{border-left:4px solid var(--blue);padding:7px 8px 6px;font-size:12.8px}
+.meta-pill-sm{border-left:4px solid var(--blue);padding:7px 8px;font-size:12px;color:var(--ink-soft)}
+.sub{display:block;font-size:11.2px;font-weight:850;text-transform:uppercase;letter-spacing:.055em;color:var(--ink-muted);margin-top:3px}
+.pills{display:flex;flex-wrap:wrap;gap:7px;padding:12px;border-bottom:2px solid var(--line);background:var(--white)}
+.pill{padding:5px 10px;border:2px solid var(--line);font-size:11.6px;font-weight:950;background:var(--white)}
+.pill.blue{background:var(--blue);color:var(--white);border-color:var(--blue)}
+.pill.dark{background:var(--ink);color:var(--white)}
+.pill.soft{background:var(--soft-blue);color:var(--blue);border-color:var(--blue)}
+.section{border-bottom:2px solid var(--line);background:var(--paper)}
+.section:last-of-type{border-bottom:none}
+.sec-head{background:var(--ink);color:var(--white);padding:8px 13px;display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:2px solid var(--line)}
+.sec-head .num{color:var(--blue2);font-size:15px;font-weight:950;letter-spacing:.02em}
+.sec-head .label{font-size:11.8px;font-weight:950;text-transform:uppercase;letter-spacing:.08em;text-align:right}
+.sec-body{padding:13px}
+.lead{font-size:15px;line-height:1.68;font-weight:850;margin:0 0 10px}
+.browser-shell{border:2px solid var(--line);background:var(--white);margin-bottom:12px}
+.shell-hdr{background:var(--blue);color:var(--white);padding:7px 12px;font-size:11.6px;font-weight:950;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px}
+.shell-hdr::before{content:'⬛';font-size:14px}
+.shell-body{padding:12px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.browser-lane{border:2px solid var(--line);padding:10px;position:relative}
+.lane-hdr{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:950}
+.lane-icon{width:22px;height:22px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--white);font-size:11px;font-weight:900}
+.lane-icon.red{background:var(--red)}
+.lane-name{font-size:12.8px;font-weight:950}
+.lane-sub{font-size:10.8px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.tab-strip{display:flex;gap:4px;margin-bottom:8px}
+.tab{height:26px;padding:0 10px;border:1.5px solid var(--line);background:var(--white);font-size:11px;font-weight:700;display:flex;align-items:center;border-radius:3px}
+.tab.active{border-color:var(--blue);background:var(--soft-blue);color:var(--blue)}
+.tab.agent{border-color:var(--blue2);background:var(--blue2);color:var(--white)}
+.lane-desc{font-size:12px;line-height:1.56;color:var(--muted)}
+.lane-arrow{text-align:center;font-size:22px;color:var(--blue);font-weight:900;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.space-panel{border:2px solid var(--blue2);background:var(--soft-blue);padding:8px 10px;margin-top:8px}
+.space-panel-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:11.6px;font-weight:950;color:var(--blue)}
+.space-panel-hdr span{background:var(--blue);color:var(--white);padding:1px 6px;font-size:10px;border-radius:2px}
+.space-tabs{display:flex;gap:4px;flex-wrap:wrap}
+.space-tab{border:1.5px solid var(--blue2);background:var(--white);color:var(--blue);padding:2px 8px;font-size:10.5px;font-weight:700}
+.console-wrap{border:2px solid var(--line);background:var(--black);overflow:hidden;margin-bottom:12px;max-width:100%}
+.console-hdr{background:var(--black);color:var(--code-key);padding:7px 12px;font-size:11px;font-weight:950;font-family:var(--mono);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line-soft)}
+.console-dot{width:10px;height:10px;border-radius:50%;background:var(--blue2);display:inline-block}
+.console-body{padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.65;color:var(--code);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+.c-kw{color:var(--code-key)}
+.c-str{color:var(--code-string)}
+.c-cmt{color:var(--code-comment);font-style:italic}
+.c-cmd{color:var(--code-command)}
+.console-footnote{background:var(--black);color:var(--code-comment);padding:5px 12px;font-size:10.5px;font-family:var(--mono);border-top:1px solid var(--line-soft)}
+.cap-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.cap-cell{border:2px solid var(--line);background:var(--white);padding:10px}
+.cap-cell.blue-accent{border-left:5px solid var(--blue)}
+.cap-cell.red-accent{border-left:5px solid var(--red)}
+.cap-cell.green-accent{border-left:5px solid var(--green)}
+.cap-cell h3{font-size:13px;font-weight:950;margin:0 0 5px;color:var(--ink)}
+.cap-cell p{margin:0;font-size:12px;line-height:1.56;color:var(--muted)}
+.cap-badge{display:inline-block;padding:2px 7px;background:var(--blue);color:var(--white);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;border-radius:2px;margin-bottom:5px}
+table.cmp{width:100%;border-collapse:collapse;font-size:12px;margin:0}
+table.cmp th,table.cmp td{padding:6px 10px;border:1.5px solid var(--line);text-align:center}
+table.cmp th{background:var(--ink);color:var(--white);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+table.cmp td:first-child{text-align:left;font-weight:800}
+table.cmp tr:nth-child(even) td{background:var(--theme-table-alt)}
+table.cmp .check,table.cmp .cross{font-weight:900}
+table.cmp .check{color:var(--green)}
+table.cmp .cross{color:var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{border:2px solid var(--line);background:var(--white);padding:10px 11px;min-width:0;min-inline-size:0}
+.card h3{font-size:13.5px;font-weight:950;line-height:1.25;margin:0 0 6px;color:var(--ink)}
+.card p{margin:0;font-size:12.2px;line-height:1.58;color:var(--muted)}
+.card ul{margin:0;padding-left:17px}
+.card.blue-accent{border-left:5px solid var(--blue)}
+.card.red-accent{border-left:5px solid var(--red)}
+.warn{border-left:5px solid var(--red);padding:11px 12px;background:var(--soft-red);font-size:12.8px;line-height:1.66;margin-bottom:10px}
+.warn b{color:var(--red)}
+.note{border:2px solid var(--line);padding:10px 12px;background:var(--soft-red);font-size:12.5px;line-height:1.6;margin-top:8px}
+.note b{color:var(--red)}
+.route-list{border:2px solid var(--line);background:var(--white);overflow:hidden}
+.route-head{background:var(--ink);color:var(--white);padding:7px 12px;font-size:11.6px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}
+.route-row{display:grid;grid-template-columns:156px 1fr 220px;border-bottom:1.5px solid var(--line)}
+.route-row:last-child{border-bottom:none}
+.route-key,.route-val,.route-out{padding:7px 10px;font-size:12px;line-height:1.5}
+.route-key{border-right:1.5px solid var(--line);font-weight:950;background:var(--theme-key-bg)}
+.route-out{border-left:1.5px solid var(--line);font-weight:900;color:var(--blue);background:var(--soft-blue)}
+.footer{border-top:3px solid var(--line);padding:12px 13px;background:var(--black);color:var(--white)}
+.footer-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
+.small{font:850 11.6px/1.65 var(--mono);color:var(--blue-pale);word-break:break-word}
+.src-note{border-top:2px solid var(--line);padding:8px 12px;background:var(--theme-paper-warm);font-size:11.5px;color:var(--muted);line-height:1.55}
+.src-note b{font-weight:950;color:var(--ink)}
+@media(max-width:980px){
+  .grid2,.cap-grid{grid-template-columns:1fr 1fr}
+  .two-col{grid-template-columns:1fr}
+  .route-row{grid-template-columns:1fr}
+  .route-key{border-right:none;border-bottom:1.5px solid var(--line)}
+  .route-out{border-left:none;border-top:1.5px solid var(--line)}
+}
+@media(max-width:720px){
+  body{font-size:13px}
+  .page{width:min(100% - 18px,680px);padding:10px 0 62px}
+  .hdr-top{grid-template-columns:1fr}
+  .hdr-meta{border-left:none;border-top:3px solid var(--line)}
+  .grid2,.cap-grid,.footer-grid{grid-template-columns:1fr}
+  .two-col{grid-template-columns:1fr}
+  .browser-shell{overflow-x:auto}
+  .console-body{font-size:.68rem}
+}
+.h2-sec{font-size:13.5px;font-weight:950;margin:0 0 10px;color:var(--ink);padding-bottom:7px;border-bottom:1.5px solid var(--line)}
+.h3-sub{font-size:12.8px;font-weight:950;margin:10px 0 6px;color:var(--blue)}
+.section-body-wrap{padding:13px}
+pre.code-block{background:#1a1a2e;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto;max-width:100%;margin-bottom:12px;font-size:12px;line-height:1.6}
+pre.code-block code{font-family:var(--mono);white-space:pre-wrap;word-break:break-word}
+
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="shell">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-top">
+      <div class="hdr-hero">
+        <div class="kicker">Claude · Anthropic · Agent Framework</div>
+        <h1 class="demo-title">Claude Managed Agents</h1>
+        <p class="sub-line">Anthropic 云端托管 Agent 框架<br>有状态 · 长时运行 · 免基础设施</p>
+        <span class="tagline">Beta · API · MIT</span>
+      </div>
+      <div class="hdr-meta">
+        <div class="meta-row-high">
+          <div class="meta-pill-lg" style="color:var(--blue)">Beta</div>
+          <div class="meta-pill-lg" style="color:var(--green)">$0.08/hr</div>
+        </div>
+        <div class="meta-row-low">
+          <div class="meta-pill-sm">SSE 流</div>
+          <div class="meta-pill-sm">Agent v1</div>
+          <div class="meta-pill-sm">有状态</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PILLS -->
+  <div class="pills">
+    <span class="pill blue">Agent</span>
+    <span class="pill soft">Environment</span>
+    <span class="pill">Session</span>
+    <span class="pill soft">SSE Events</span>
+    <span class="pill">MCP</span>
+    <span class="pill soft">Skills</span>
+    <span class="pill">Multi-Agent</span>
+    <span class="pill blue">beta header</span>
+  </div>
+
+  <!-- BODY CONTENT -->
+  <div class="section">
+    <div class="sec-body">
+      <div class="section-body-wrap">
+        <h2 class="h2-sec">SEC 01 — 背景：为什么需要 Managed Agents</h2>
+
+<h3 class="h3-sub">传统 Messages API 的局限</h3>
+
+<table class="cmp"><thead><tr><th>维度</th><th>Messages API</th><th>影响</th></tr></thead><tbody><tr><td>请求模式</td><td>单次 HTTP 请求，无状态</td><td>无法跨越多轮交互保留上下文</td></tr><tr><td>Agent 循环</td><td>需开发者自行实现</td><td>轮次控制、工具执行、错误处理全由你写</td></tr><tr><td>状态持久化</td><td>不保存文件系统/对话历史</td><td>每次请求都是全新上下文</td></tr><tr><td>基础设施</td><td>完全由你负责</td><td>沙箱、网络隔离、工具执行层均需自建</td></tr></tbody></table>
+
+<h3 class="h3-sub">Managed Agents 解决的核心问题</h3>
+
+- <strong>有状态</strong>：对话历史、文件系统状态在 Session 期间全程保留，Agent 可跨多轮访问之前的输出
+- <strong>长时运行</strong>：任务可持续数分钟至数小时，Agent 自主决策并执行多步骤工作流
+- <strong>免基础设施</strong>：无需自建 Agent 循环、沙箱或工具执行层，Anthropic 提供完整托管框架
+
+<h3 class="h3-sub">适用场景</h3>
+
+<table class="cmp"><thead><tr><th>场景</th><th>说明</th></tr></thead><tbody><tr><td>复杂多步骤任务</td><td>代码生成 + 单元测试 + PR 创建的完整流水线</td></tr><tr><td>非同步工作</td><td>人类审批环节介入的 Agent 工作流</td></tr><tr><td>排程执行</td><td>按 cron 周期自动运行的定时任务</td></tr><tr><td>云端隔离沙箱</td><td>需安全执行环境（不信任目标网站代码）</td></tr></tbody></table>
+
+<h3 class="h3-sub">与自建 Agent 的 TCO 对比</h3>
+
+<table class="cmp"><thead><tr><th>维度</th><th>Messages API 自建</th><th>Managed Agents</th></tr></thead><tbody><tr><td>基础设施</td><td>自建沙箱容器</td><td>Anthropic 托管（零运维）</td></tr><tr><td>开发时间</td><td>2–4 周（Agent 循环+工具层）</td><td>1–2 天（API 调用）</td></tr><tr><td>运维成本</td><td>容器管理、网络、防火墙</td><td>零</td></tr><tr><td>扩展性</td><td>需自行处理并发</td><td>平台自动弹性</td></tr><tr><td>有状态支持</td><td>需自行实现</td><td>开箱即用</td></tr></tbody></table>
+
+
+
+<h2 class="h2-sec">SEC 02 — 核心概念：四个构件</h2>
+
+Claude Managed Agents 围绕四个核心概念构建：
+
+<h3 class="h3-sub">Agent（代理）</h3>
+
+可复用、带版本控制的配置单元。一次定义，可在多个 Session 中通过 ID 引用。
+
+<pre class="code-block"><code>{
+  "id": "agent_01HqR2k7vXbZ9mNpL3wYcT8f",
+  "name": "Coding Assistant",
+  "type": "agent",
+  "version": 1,
+  "model": { "id": "claude-opus-5", "effort": { "type": "high" } },
+  "system": "You are a helpful coding agent.",
+  "tools": [{ "type": "agent_toolset_20260401" }],
+  "created_at": "2026-04-03T18:24:10.412Z"
+}
+</code></pre>
+
+<h3 class="h3-sub">Environment（环境）</h3>
+
+定义 Agent 运行所在的沙盒配置。云端沙盒（Anthropic 托管）或自架沙盒（满足合规/数据驻留）。
+
+- 多个 Session 可共享同一个 Environment，但每个 Session 获得独立 Linux 容器
+- Environment 没有版本控制，频繁更新需自行记录变更历史
+
+<h3 class="h3-sub">Session（会话）</h3>
+
+运行中的 Agent 实例，带持久化文件系统 + 对话历史。Agent 自主执行工具，结果通过 SSE 实时推送。
+
+<h3 class="h3-sub">Event（事件）</h3>
+
+Client 与 Agent 之间交换的消息，通过 Server-Sent Events（SSE）流式传输。
+
+<h3 class="h3-sub">概念关系图</h3>
+
+<pre class="code-block"><code>Client App
+    │
+    ├─► POST /v1/sessions  (创建 Session)
+    │       │
+    │       ▼
+    │   Session  ────────────────────►  Agent  ──►  Environment
+    │   (运行实例)                     (配置)         (沙盒配置)
+    │
+    └─► SSE events.stream()           Agent 执行
+            │                         Tool 调用
+            ▼                         实时推送事件
+        agent.message / agent.tool_use / session.status_idle
+</code></pre>
+
+
+
+<h2 class="h2-sec">SEC 03 — Agent 创建与配置详解</h2>
+
+<h3 class="h3-sub">核心字段</h3>
+
+<table class="cmp"><thead><tr><th>字段</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>name</code></td><td>✅</td><td>人类可读名称，字符串</td></tr><tr><td><code>model</code></td><td>✅</td><td>Claude 模型 ID 或对象形式（支持 speed/effort）</td></tr><tr><td><code>system</code></td><td>—</td><td>System prompt，定义 Agent 行为角色</td></tr><tr><td><code>tools</code></td><td>—</td><td>工具集配置（agent_toolset/MCP/自定义）</td></tr><tr><td><code>mcp_servers</code></td><td>—</td><td>MCP 服务器声明列表</td></tr><tr><td><code>skills</code></td><td>—</td><td>Agent 可引用的 Skills 列表</td></tr><tr><td><code>description</code></td><td>—</td><td>人类可读描述</td></tr><tr><td><code>metadata</code></td><td>—</td><td>自定义键值对</td></tr></tbody></table>
+
+<h3 class="h3-sub">model 字段详解</h3>
+
+<strong>字符串形式（固定速度）：</strong>
+
+<pre class="code-block"><code>"model": "claude-opus-5"
+</code></pre>
+
+<strong>对象形式（精细控制）：</strong>
+
+<pre class="code-block"><code>"model": {
+  "id": "claude-opus-5",
+  "speed": "standard",
+  "effort": { "type": "high" }
+}
+</code></pre>
+
+支持的 model ID：<code>claude-opus-5</code>、<code>claude-opus-4-8</code>、<code>claude-opus-4-7</code>、<code>claude-sonnet-5</code>、<code>claude-sonnet-4-7</code> 等。
+
+<h3 class="h3-sub">effort 级别对工具调用行为的影响</h3>
+
+<table class="cmp"><thead><tr><th>级别</th><th>行为特征</th></tr></thead><tbody><tr><td><code>low</code></td><td>最少工具调用，快速响应</td></tr><tr><td><code>medium</code></td><td>平衡模式（默认）</td></tr><tr><td><code>high</code></td><td>更多迭代、测试、验证</td></tr><tr><td><code>xhigh</code></td><td>极度谨慎，大量自检</td></tr><tr><td><code>max</code></td><td>最强制性检查</td></tr><tr><td><code>{ "type": "high", "budget_tokens": 5000 }</code></td><td>指定工具调用的 Token 上限</td></tr></tbody></table>
+
+<strong>注意</strong>：<code>speed</code> 和 <code>effort</code> 只能在 Agent 级别设置，无法在 Session 级别覆盖。
+
+<h3 class="h3-sub">tools 类型</h3>
+
+<table class="cmp"><thead><tr><th>类型</th><th>type 值</th><th>说明</th></tr></thead><tbody><tr><td>预建工具集</td><td><code>agent_toolset_20260401</code></td><td>内置工具：bash/read/write/edit/glob/grep/web_search/web_fetch</td></tr><tr><td>MCP 工具</td><td>通过 <code>mcp_servers</code> 配置</td><td>连接外部 MCP 服务器获取工具</td></tr><tr><td>自定义工具</td><td><code>custom</code></td><td>用户定义工具名 + JSON Schema，由你的应用执行后返回结果</td></tr></tbody></table>
+
+<strong>工具输出截断阈值</strong>：当工具输出超过 <strong>100,000 字符</strong>（约 25,000 token）时，自动写入沙箱文件，Agent 收到截断预览 + 文件路径。
+
+<h3 class="h3-sub">version 机制：乐观并发控制</h3>
+
+<pre class="code-block"><code># 更新 Agent（带 version 实现乐观锁）
+curl -X PUT https://api.anthropic.com/v1/agents/$AGENT_ID \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "content-type: application/json" \
+  -d '{
+    "version": 1,
+    "system": "Updated system prompt"
+  }'
+# 成功返回 200；version 不匹配返回 409 Conflict
+</code></pre>
+
+<h3 class="h3-sub">完整 curl 示例：创建 Agent</h3>
+
+<pre class="code-block"><code>agent=$(curl -sS --fail-with-body https://api.anthropic.com/v1/agents \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "content-type: application/json" \
+  -d @- &lt;&lt;'EOF' | jq -r '.id'
+{
+  "name": "Coding Assistant",
+  "model": "claude-opus-5",
+  "system": "You are a helpful coding agent. Write clean, well-documented code.",
+  "tools": [{"type": "agent_toolset_20260401"}]
+}
+EOF
+)
+echo "Agent ID: $agent"
+</code></pre>
+
+
+
+<h2 class="h2-sec">SEC 04 — Environment 配置详解</h2>
+
+<h3 class="h3-sub">云端沙箱 vs 自架沙箱</h3>
+
+<table class="cmp"><thead><tr><th>维度</th><th>云端沙箱（type: cloud）</th><th>自架沙箱（self-hosted）</th></tr></thead><tbody><tr><td>管理方</td><td>Anthropic</td><td>你自己（Docker/K8s）</td></tr><tr><td>预装包</td><td>Python/Node.js/Bash/网络</td><td>自定义镜像</td></tr><tr><td>数据驻留</td><td>Anthropic 数据中心</td><td>你的基础设施</td></tr><tr><td>适用场景</td><td>通用快速开始</td><td>合规/数据主权/定制环境</td></tr></tbody></table>
+
+<h3 class="h3-sub">packages 预装字段</h3>
+
+支持的包管理器：<code>apt</code>、<code>cargo</code>、<code>gem</code>、<code>go</code>、<code>npm</code>、<code>pip</code>。
+
+<pre class="code-block"><code>environment=$(curl -fsS https://api.anthropic.com/v1/environments \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "content-type: application/json" \
+  --data @- &lt;&lt;'EOF' | jq -r '.id'
+{
+  "name": "data-analysis",
+  "config": {
+    "type": "cloud",
+    "packages": {
+      "pip": ["pandas==2.2.0", "numpy", "scikit-learn"],
+      "npm": ["express@4.18.0"]
+    },
+    "networking": {"type": "unrestricted"}
+  }
+}
+EOF
+)
+echo "Environment ID: $environment"
+</code></pre>
+
+<h3 class="h3-sub">networking 网络配置</h3>
+
+<table class="cmp"><thead><tr><th>模式</th><th>描述</th></tr></thead><tbody><tr><td><code>unrestricted</code></td><td>完全出站网络访问（默认）</td></tr><tr><td><code>limited</code></td><td>限制到 <code>allowed_hosts</code>，需设 <code>allow_package_managers</code> 和 <code>allow_mcp_servers</code></td></tr></tbody></table>
+
+<pre class="code-block"><code>{
+  "networking": {
+    "type": "limited",
+    "allowed_hosts": ["api.github.com", "pypi.org"],
+    "allow_package_managers": true,
+    "allow_mcp_servers": true
+  }
+}
+</code></pre>
+
+<h3 class="h3-sub">生命周期</h3>
+
+<pre class="code-block"><code>创建 Environment（POST /v1/environments）
+  → 关联 Session（每个 Session 获得独立沙箱容器）
+  → 运行中（Agent 在沙箱内执行工具）
+  → 终止/归档（手动删除或过期自动清理）
+</code></pre>
+
+<strong>关键约束</strong>：
+
+- 环境没有版本控制，频繁更新需自行记录变更历史
+- 归档后现有 Session 继续运行，新 Session 无法引用
+- 删除前必须先归档，且无活跃 Session 引用
+
+
+
+<h2 class="h2-sec">SEC 05 — Session 生命周期</h2>
+
+<h3 class="h3-sub">创建 Session</h3>
+
+<strong>最小请求：</strong>
+
+<pre class="code-block"><code>session=$(curl -fsSL https://api.anthropic.com/v1/sessions \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "content-type: application/json" \
+  -d @- &lt;&lt;'EOF' | jq '{id: .id, status: .status}'
+{
+  "agent": "$AGENT_ID",
+  "environment_id": "$ENVIRONMENT_ID",
+  "title": "Quickstart session"
+}
+EOF
+)
+SESSION_ID=$(jq -r '.id' &lt;&lt;&lt; "$session")
+echo "Session ID: $SESSION_ID"
+</code></pre>
+
+<h3 class="h3-sub">Session 状态机</h3>
+
+<table class="cmp"><thead><tr><th>状态</th><th>说明</th></tr></thead><tbody><tr><td><code>initializing</code></td><td>Session 创建，Agent 加载配置中</td></tr><tr><td><code>running</code></td><td>Agent 正在处理任务（<strong>计费时段</strong>）</td></tr><tr><td><code>idle</code></td><td>Agent 等待输入，<code>stop_reason</code> 说明原因</td></tr><tr><td><code>rescheduling</code></td><td>瞬态错误，平台自动重试（不收费）</td></tr><tr><td><code>terminated</code></td><td>终态，Session 结束</td></tr></tbody></table>
+
+<strong>计费说明</strong>：只有 <code>running</code> 状态计费。<code>idle</code> / <code>rescheduling</code> / <code>terminated</code> 不计 Session 运行时长。
+
+<h3 class="h3-sub">有状态特性</h3>
+
+- <strong>文件系统持久化</strong>：<code>write</code> 工具创建的文件在 Session 生命周期内保留
+- <strong>对话历史保留</strong>：每次 <code>events.send</code> 后追加到历史，Agent 感知上下文
+- <strong>工具调用上下文</strong>：Agent 可读取前序 <code>write</code> 的文件作为下一步的输入
+
+<h3 class="h3-sub">Session 限制（按用量层级）</h3>
+
+<table class="cmp"><thead><tr><th>操作</th><th>限制</th></tr></thead><tbody><tr><td>创建端点（agents/sessions/environments）</td><td>300 请求/分钟</td></tr><tr><td>读取端点（retrieve/list/stream）</td><td>1,200 请求/分钟</td></tr><tr><td>并发 Session 数</td><td>按账户计划（Start/Build/Scale tier）</td></tr><tr><td>Session 最大运行时长</td><td>按计划（可联系销售定制）</td></tr></tbody></table>
+
+<h3 class="h3-sub">Session 清理</h3>
+
+- <strong>手动删除</strong>：<code>DELETE /v1/sessions/{id}</code>，事件流立即终止
+- <strong>过期自动清理</strong>：按账户级别的数据保留策略
+
+
+<h2 class="h2-sec">SEC 06 — Events 与 SSE 流</h2>
+
+Claude Managed Agents 通过 <strong>Server-Sent Events (SSE)</strong> 实时推送会话事件。客户端先调用 <code>events.stream</code> 打开流，再调用 <code>events.send</code> 发送用户消息，Agent 的每一次思考、工具调用、回复块都会以事件形式推送到客户端。
+
+<h3 class="h3-sub">事件类型完整列表</h3>
+
+#### 用户事件（User Events）
+
+<table class="cmp"><thead><tr><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>user.message</code></td><td>用户消息，包含 text / image / document 内容块</td></tr><tr><td><code>user.interrupt</code></td><td>中断 Agent 执行</td></tr><tr><td><code>user.custom_tool_result</code></td><td>响应 Agent 发起的自定义工具调用</td></tr><tr><td><code>user.tool_confirmation</code></td><td>审批或拒绝 Agent / MCP 工具调用（配合 permission_policy）</td></tr><tr><td><code>user.define_outcome</code></td><td>定义 Agent 追求的目标</td></tr><tr><td><code>user.tool_result</code></td><td>仅限 self_hosted 环境，由集成方提供 agent_toolset 结果</td></tr></tbody></table>
+
+#### Agent 事件（Agent Events）
+
+<table class="cmp"><thead><tr><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>agent.message</code></td><td>Agent 响应内容块（text / image / tool_use / tool_result）</td></tr><tr><td><code>agent.thinking</code></td><td>Agent 正在进行 extended thinking 的进度信号，不含思考内容</td></tr><tr><td><code>agent.tool_use</code></td><td>Agent 调用预建工具（bash、文件操作等），携带 evaluated_permission</td></tr><tr><td><code>agent.tool_result</code></td><td>预建工具执行结果</td></tr><tr><td><code>agent.mcp_tool_use</code></td><td>Agent 调用 MCP 服务器工具，携带 evaluated_permission</td></tr><tr><td><code>agent.mcp_tool_result</code></td><td>MCP 工具执行结果</td></tr><tr><td><code>agent.custom_tool_use</code></td><td>Agent 调用自定义工具，需客户端通过 <code>user.custom_tool_result</code> 响应</td></tr><tr><td><code>agent.thread_context_compacted</code></td><td>对话历史被压缩以适应上下文窗口</td></tr><tr><td><code>agent.thread_message_received</code></td><td>多 Agent 场景：子 Agent 向协调器发回报告或提问</td></tr><tr><td><code>agent.thread_message_sent</code></td><td>多 Agent 场景：协调器向子 Agent 发送任务或追问</td></tr></tbody></table>
+
+#### 会话事件（Session Events）
+
+<table class="cmp"><thead><tr><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>session.status_running</code></td><td>Agent 正在处理任务</td></tr><tr><td><code>session.status_idle</code></td><td>Agent 完成当前任务并等待输入，包含 stop_reason</td></tr><tr><td><code>session.status_rescheduled</code></td><td>发生瞬态错误，Session 自动重试</td></tr><tr><td><code>session.status_terminated</code></td><td>Session 结束（不可恢复错误或被归档）</td></tr><tr><td><code>session.deleted</code></td><td>Session 被删除，事件流终止</td></tr><tr><td><code>session.updated</code></td><td>Session 更新请求变更了字段，下一回合生效</td></tr><tr><td><code>session.error</code></td><td>处理时发生错误，包含 typed error 对象和 retry_status</td></tr><tr><td><code>session.usage</code></td><td>Session 累计用量快照（token 计数和成本追踪）</td></tr><tr><td><code>session.thread_created</code></td><td>多 Agent 场景：创建了新线程</td></tr><tr><td><code>session.thread_status_running</code></td><td>线程开始执行（主线程和子线程均会触发）</td></tr><tr><td><code>session.thread_status_idle</code></td><td>线程完成回合并等待输入，含 stop_reason</td></tr><tr><td><code>session.thread_status_rescheduled</code></td><td>线程遇瞬态错误自动重试</td></tr><tr><td><code>session.thread_status_terminated</code></td><td>线程被归档或遇到终态错误</td></tr></tbody></table>
+
+#### Span 事件（Span Events）
+
+<table class="cmp"><thead><tr><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>span.model_request_start</code></td><td>模型推理调用开始</td></tr><tr><td><code>span.model_request_end</code></td><td>模型推理完成，包含 model_usage（token 计数）</td></tr><tr><td><code>span.outcome_evaluation_start</code></td><td>结果评估开始</td></tr><tr><td><code>span.outcome_evaluation_ongoing</code></td><td>结果评估进行中的心跳</td></tr><tr><td><code>span.outcome_evaluation_end</code></td><td>评估周期完成；<code>needs_revision</code> 继续下一轮，其余为终态</td></tr></tbody></table>
+
+#### 系统事件（System Events）
+
+<table class="cmp"><thead><tr><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>system.message</code></td><td>在当前及后续回合追加特权级系统上下文（需 Claude Fable 5.1 / Mythos 5.1 / Opus 5 / Opus 4.8 等模型支持）</td></tr></tbody></table>
+
+<h3 class="h3-sub">SSE 事件格式</h3>
+
+每个 SSE 事件以 <code>event: <type></code> 行开头，后跟 <code>data: <JSON></code>：
+
+<pre class="code-block"><code>event: agent.message
+data: {"type":"agent.message","content":[{"type":"text","text":"Hello!"}]}
+
+event: agent.tool_use
+data: {"type":"agent.tool_use","name":"bash","input":{"command":"ls -la"}}
+
+event: session.status_idle
+data: {"type":"session.status_idle","stop_reason":{"type":"end_turn"}}
+</code></pre>
+
+<h3 class="h3-sub">Python SDK 处理 SSE（完整可运行示例）</h3>
+
+<pre class="code-block"><code>from anthropic import Anthropic
+
+client = Anthropic()
+
+session_id = "session_xxx"  # 替换为实际 session ID
+
+with client.beta.sessions.events.stream(session_id) as stream:
+    # 打开流后立即发送用户消息
+    client.beta.sessions.events.send(
+        session_id,
+        events=[
+            {
+                "type": "user.message",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "List the files in the current directory",
+                    }
+                ],
+            }
+        ],
+    )
+
+    # 处理流式事件
+    for event in stream:
+        match event.type:
+            case "agent.message":
+                for block in event.content:
+                    if hasattr(block, "text"):
+                        print(block.text, end="")
+            case "agent.tool_use":
+                print(f"\n[Using tool: {event.name}]")
+            case "agent.tool_result":
+                print(f"\n[Tool result: {event.content[:80]}...]")
+            case "session.status_idle":
+                print("\n\nAgent finished.")
+                break
+            case "session.error":
+                print(f"\n\nError: {event.error}")
+                break
+</code></pre>
+
+<h3 class="h3-sub">Node.js SDK 处理 SSE（完整可运行示例）</h3>
+
+<pre class="code-block"><code>import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+const sessionId = "session_xxx"; // 替换为实际 session ID
+
+async function main() {
+  const stream = await client.beta.sessions.events.stream(sessionId);
+
+  // 打开流后发送用户消息
+  await client.beta.sessions.events.send(sessionId, {
+    events: [
+      {
+        type: "user.message",
+        content: [
+          {
+            type: "text",
+            text: "List the files in the current directory",
+          },
+        ],
+      },
+    ],
+  });
+
+  // 处理流式事件
+  for await (const event of stream) {
+    if (event.type === "agent.message") {
+      for (const block of event.content) {
+        if (block.type === "text") {
+          process.stdout.write(block.text);
+        }
+      }
+    } else if (event.type === "agent.tool_use") {
+      console.log(<code>\n[Using tool: ${event.name}]</code>);
+    } else if (event.type === "agent.tool_result") {
+      console.log(<code>\n[Tool result received]</code>);
+    } else if (event.type === "session.status_idle") {
+      console.log("\n\nAgent finished.");
+      break;
+    } else if (event.type === "session.error") {
+      console.error(<code>\n\nError:</code>, event.error);
+      break;
+    }
+  }
+}
+
+main().catch(console.error);
+</code></pre>
+
+<h3 class="h3-sub">stream=true vs stream=false 行为差异</h3>
+
+<table class="cmp"><thead><tr><th>行为</th><th>stream=true（默认）</th><th>stream=false</th></tr></thead><tbody><tr><td>响应方式</td><td>SSE 流式推送事件</td><td>非流式，返回完整响应对象</td></tr><tr><td>实时性</td><td>实时接收 tool_use / tool_result 事件</td><td>等待 Agent 完全完成后一次性返回</td></tr><tr><td>适用场景</td><td>需要实时展示 Agent 思考过程或工具调用</td><td>只需最终结果，简化客户端逻辑</td></tr><tr><td>SDK API</td><td><code>client.beta.sessions.events.stream()</code></td><td><code>client.beta.messages.create()</code> 或 <code>client.beta.sessions.events.send(..., stream=False)</code></td></tr><tr><td>错误处理</td><td><code>session.error</code> 事件在流中出现</td><td>异常在 HTTP 响应中返回</td></tr></tbody></table>
+
+<h3 class="h3-sub">错误处理：网络中断重连策略与超时</h3>
+
+<strong><code>session.error</code> 事件结构：</strong>
+
+<pre class="code-block"><code>{
+  "type": "session.error",
+  "error": {
+    "type": "mcp_connection_failed_error",
+    "mcp_server_name": "github",
+    "retry_status": "can_retry"
+  }
+}
+</code></pre>
+
+<table class="cmp"><thead><tr><th>Error type</th><th>Meaning</th><th>retry_status</th></tr></thead><tbody><tr><td><code>mcp_connection_failed_error</code></td><td>MCP 服务器网络不可达（超时或 HTTP 失败）</td><td><code>can_retry</code></td></tr><tr><td><code>mcp_authentication_failed_error</code></td><td>MCP 服务器拒绝了 vault 凭证</td><td><code>cannot_retry</code>（需换凭证）</td></tr><tr><td><code>session.status_rescheduled</code></td><td>瞬态错误，平台自动重试</td><td>自动处理</td></tr></tbody></table>
+
+<strong>重连策略建议：</strong>
+
+1. <strong>监听 <code>session.error</code> 事件</strong>：捕获错误类型，决定是换凭证还是继续等待
+2. <strong><code>mcp_connection_failed_error</code> 自动重试</strong>：连接在 <code>session.status_idle</code> → <code>session.status_running</code> 转换时自动重试，客户端无需主动重连
+3. <strong>SSE 流断开</strong>：使用指数退避重新连接 <code>events.stream</code>，从上次已处理的 event 位置继续消费（Session 事件历史可通过 <code>events.list</code> 补齐）
+4. <strong>超时处理</strong>：建议 SSE 连接设置 5–10 分钟读超时；Agent 长时间无响应可能意味着工具阻塞，检查 <code>agent.tool_use</code> / <code>agent.tool_result</code> 事件流是否正常
+
+
+
+<h2 class="h2-sec">SEC 07 — 预建工具集（Agent Toolset）详解</h2>
+
+<code>agent_toolset_20260401</code> 是 Claude Managed Agents 提供的一套预构建工具集，启用 bash、文件系统操作、网页搜索等核心能力。
+
+<h3 class="h3-sub">工具列表</h3>
+
+<table class="cmp"><thead><tr><th>工具名</th><th>功能</th><th>主要参数</th></tr></thead><tbody><tr><td><code>bash</code></td><td>在沙箱中执行 shell 命令</td><td><code>command</code>（必填）、<code>timeout</code>（可选，秒）、<code>cwd</code>（可选，工作目录）</td></tr><tr><td><code>read</code></td><td>读取文件内容</td><td><code>file_path</code>（必填）、<code>limit</code>（可选，行数限制）</td></tr><tr><td><code>write</code></td><td>写入或覆盖文件</td><td><code>file_path</code>（必填）、<code>content</code>（必填）</td></tr><tr><td><code>edit</code></td><td>对文件进行定向编辑（find-and-replace）</td><td><code>file_path</code>、<code>old_string</code>、<code>new_string</code></td></tr><tr><td><code>glob</code></td><td>按 glob 模式搜索文件</td><td><code>pattern</code>（必填）</td></tr><tr><td><code>grep</code></td><td>在文件中搜索内容</td><td><code>pattern</code>（必填）、<code>file_path</code>（必填）</td></tr><tr><td><code>web_search</code></td><td>执行网页搜索</td><td><code>query</code>（必填）、<code>recency_days</code>（可选）</td></tr><tr><td><code>web_fetch</code></td><td>抓取并解析网页内容</td><td><code>url</code>（必填）、<code>char_limit</code>（可选）</td></tr></tbody></table>
+
+<h3 class="h3-sub">permission_policy：权限策略</h3>
+
+每个工具可独立配置权限策略，控制是否需要人工审批：
+
+<table class="cmp"><thead><tr><th>Policy 类型</th><th>行为</th></tr></thead><tbody><tr><td><code>always_allow</code></td><td>工具调用自动批准，无需人工确认</td></tr><tr><td><code>always_ask</code></td><td>每次工具调用前需发送 <code>user.tool_confirmation</code> 审批</td></tr><tr><td><code>auto</code></td><td>服务端智能判断：低风险调用自动放行，高风险调用要求确认，无法判断时降级为 ask</td></tr></tbody></table>
+
+<strong>配置示例：全局 always_ask，bash 单独 always_allow：</strong>
+
+<pre class="code-block"><code>{
+  "type": "agent_toolset_20260401",
+  "default_config": {
+    "enabled": true,
+    "permission_policy": { "type": "always_ask" }
+  },
+  "configs": [
+    {
+      "name": "bash",
+      "enabled": true,
+      "permission_policy": { "type": "always_allow" }
+    },
+    {
+      "name": "web_search",
+      "enabled": true,
+      "permission_policy": { "type": "always_ask" }
+    }
+  ]
+}
+</code></pre>
+
+<h3 class="h3-sub">工具配置字段详解</h3>
+
+<table class="cmp"><thead><tr><th>字段</th><th>位置</th><th>描述</th></tr></thead><tbody><tr><td><code>type</code></td><td>顶层</td><td>固定值 <code>"agent_toolset_20260401"</code></td></tr><tr><td><code>default_config.enabled</code></td><td>全局</td><td>是否默认启用所有工具，默认 <code>true</code></td></tr><tr><td><code>default_config.permission_policy</code></td><td>全局</td><td>默认权限策略</td></tr><tr><td><code>configs[].name</code></td><td>工具级</td><td>工具标识符（bash / read / write / edit / glob / grep / web_search / web_fetch）</td></tr><tr><td><code>configs[].enabled</code></td><td>工具级</td><td>是否启用该工具</td></tr><tr><td><code>configs[].permission_policy</code></td><td>工具级</td><td>该工具的权限策略，覆盖默认值</td></tr></tbody></table>
+
+<h3 class="h3-sub">工具超时限制与重试策略</h3>
+
+<table class="cmp"><thead><tr><th>工具</th><th>默认超时</th><th>可配置</th><th>重试</th></tr></thead><tbody><tr><td><code>bash</code></td><td>60 秒</td><td>通过 <code>timeout</code> 参数指定，最大值由环境配置决定</td><td>瞬态错误（exit_code != 0 且非致命）可重试 1 次</td></tr><tr><td><code>read</code></td><td>30 秒</td><td>否</td><td>失败后不可重试，Agent 会尝试其他方式</td></tr><tr><td><code>write</code></td><td>30 秒</td><td>否</td><td>失败后不可重试</td></tr><tr><td><code>edit</code></td><td>30 秒</td><td>否</td><td>失败后不可重试</td></tr><tr><td><code>glob</code></td><td>15 秒</td><td>否</td><td>失败后不可重试</td></tr><tr><td><code>grep</code></td><td>15 秒</td><td>否</td><td>失败后不可重试</td></tr><tr><td><code>web_search</code></td><td>30 秒</td><td>否</td><td>网络错误可重试 1 次</td></tr><tr><td><code>web_fetch</code></td><td>30 秒</td><td>否</td><td>网络错误可重试 1 次</td></tr></tbody></table>
+
+<strong>bash 工具超时配置示例：</strong>
+
+Agent 在 system prompt 中可通过指令控制 bash 默认超时，或在调用时由服务端注入超时参数。自定义超时需在 agent 配置或 session 级别设置环境约束。
+
+<h3 class="h3-sub">提示缓存优化</h3>
+
+<code>agent_toolset_20260401</code> 下的所有工具（尤其是 <code>read</code>、<code>glob</code>、<code>grep</code>）会自动利用 prompt caching 优化成本。当 Agent 读取大文件或重复读取相同文件时，平台会将已缓存的内容以 <code>cache_control</code> 标记计入，降低重复 token 费用。建议将 Agent 需要反复访问的文件放在固定路径，减少缓存未命中。
+
+
+
+<h2 class="h2-sec">SEC 08 — MCP 服务器集成</h2>
+
+<h3 class="h3-sub">MCP（Model Context Protocol）概念</h3>
+
+MCP 是 Anthropic 推出的标准化协议，用于将第三方工具和数据源接入 Agent。与 agent_toolset 的预建工具不同，MCP 允许 Agent 通过标准化的 <code>mcp_toolset</code> 接入任意实现了 MCP 协议的服务端点（如 GitHub API、Linear、Notion、Slack 等）。
+
+<strong>MCP 配置分为两个步骤：</strong>
+
+1. <strong>Agent 创建时</strong>：声明 Agent 连接哪些 MCP 服务器（名称 + URL，无认证信息）
+2. <strong>Session 创建时</strong>：通过 <code>vault_ids</code> 传入预注册的凭证，平台自动为每个 MCP 服务器注入对应凭据
+
+<h3 class="h3-sub">在 Agent 级别配置 mcp_servers</h3>
+
+<pre class="code-block"><code>{
+  "name": "GitHub Assistant",
+  "model": "claude-opus-4-8",
+  "mcp_servers": [
+    {
+      "type": "url",
+      "name": "github",
+      "url": "https://api.githubcopilot.com/mcp/"
+    }
+  ],
+  "tools": [
+    { "type": "agent_toolset_20260401" },
+    {
+      "type": "mcp_toolset",
+      "mcp_server_name": "github",
+      "default_config": {
+        "enabled": true,
+        "permission_policy": { "type": "always_ask" }
+      }
+    }
+  ]
+}
+</code></pre>
+
+<h3 class="h3-sub">在 Session 级别覆盖 MCP 配置</h3>
+
+Session 创建时可通过 <code>agent</code> 字段的对象形式覆盖 Agent 级别的 <code>mcp_servers</code> 和 <code>tools</code> 配置：
+
+<pre class="code-block"><code>{
+  "agent": {
+    "type": "agent",
+    "id": "agent_01HqRxxx",
+    "mcp_servers": [
+      { "type": "url", "name": "github", "url": "https://api.githubcopilot.com/mcp/" },
+      { "type": "url", "name": "slack", "url": "https://slack-mcp.example.com/" }
+    ]
+  },
+  "environment_id": "env_01ABCxxx",
+  "vault_ids": ["vault_xxx"]
+}
+</code></pre>
+
+<h3 class="h3-sub">MCP 服务器配置字段</h3>
+
+<table class="cmp"><thead><tr><th>字段</th><th>必填</th><th>描述</th></tr></thead><tbody><tr><td><code>type</code></td><td>是</td><td>固定值 <code>"url"</code>（远程 MCP 服务器）或通过 MCP tunnels 连接私有服务器</td></tr><tr><td><code>name</code></td><td>是</td><td>唯一名称（1–255 字符），用于在 <code>tools</code> 数组和事件流中引用</td></tr><tr><td><code>url</code></td><td>是</td><td>MCP 服务器 HTTP 端点（最多 2048 字符）</td></tr></tbody></table>
+
+<strong>约束：</strong>
+
+- 每个 Agent 最多声明 20 个 MCP 服务器
+- 每个 <code>mcp_servers</code> 条目必须在 <code>tools</code> 数组中有对应的 <code>mcp_toolset</code> 引用
+- 每个 <code>mcp_toolset</code> 必须引用一个已声明的 MCP 服务器
+- API 会拒绝无引用声明或悬挂工具集
+
+<h3 class="h3-sub">完整 curl 示例：创建带 MCP 的 Agent</h3>
+
+<pre class="code-block"><code>AGENT_ID=$(
+  curl -sS --fail-with-body https://api.anthropic.com/v1/agents \
+    -H "x-api-key: $ANTHROPIC_API_KEY" \
+    -H "anthropic-version: 2023-06-01" \
+    -H "anthropic-beta: managed-agents-2026-04-01" \
+    -H "content-type: application/json" \
+    -d @- &lt;&lt;'EOF' | jq -r '.id'
+{
+  "name": "GitHub Assistant",
+  "model": "claude-opus-4-8",
+  "mcp_servers": [
+    {
+      "type": "url",
+      "name": "github",
+      "url": "https://api.githubcopilot.com/mcp/"
+    }
+  ],
+  "tools": [
+    { "type": "agent_toolset_20260401" },
+    {
+      "type": "mcp_toolset",
+      "mcp_server_name": "github",
+      "default_config": {
+        "enabled": true,
+        "permission_policy": { "type": "always_ask" }
+      }
+    }
+  ]
+}
+EOF
+)
+
+echo "Created agent: $AGENT_ID"
+</code></pre>
+
+<h3 class="h3-sub">精细化 MCP 工具选择</h3>
+
+默认 MCP toolset 启用服务器暴露的所有工具。可通过 <code>configs</code> 选择性启用或禁用：
+
+<strong>只启用部分工具（其余默认禁用）：</strong>
+
+<pre class="code-block"><code>{
+  "type": "mcp_toolset",
+  "mcp_server_name": "github",
+  "default_config": { "enabled": false },
+  "configs": [
+    { "name": "get_issue", "enabled": true },
+    { "name": "list_issues", "enabled": true },
+    { "name": "add_issue_comment", "enabled": true }
+  ]
+}
+</code></pre>
+
+<strong>禁用部分工具（其余默认启用）：</strong>
+
+<pre class="code-block"><code>{
+  "type": "mcp_toolset",
+  "mcp_server_name": "github",
+  "configs": [
+    { "name": "delete_repository", "enabled": false }
+  ]
+}
+</code></pre>
+
+<h3 class="h3-sub">MCP 大输出自动分流</h3>
+
+当 MCP 工具输出超过 100,000 tokens 时，内容自动写入沙箱文件，Agent 收到截断预览和文件路径，可通过 <code>read</code> 工具读取完整内容。
+
+<h3 class="h3-sub">MCP 连接失败处理</h3>
+
+Session 创建不验证 MCP 连通性。若服务器不可达或凭证被拒，Session 仍会启动并发送 <code>session.error</code> 事件：
+
+<table class="cmp"><thead><tr><th>Error type</th><th>含义</th><th>处理方式</th></tr></thead><tbody><tr><td><code>mcp_connection_failed_error</code></td><td>网络错误或超时</td><td>等待下次 idle→running 自动重试，或检查服务器 URL</td></tr><tr><td><code>mcp_authentication_failed_error</code></td><td>凭证被拒</td><td>需更新 vault 凭证，确保 <code>mcp_server_url</code> 与 <code>mcp_servers[].url</code> 完全匹配（协议+主机+端口+路径归一化后一致）</td></tr></tbody></table>
+
+
+
+<h2 class="h2-sec">SEC 09 — Skills 技能系统</h2>
+
+<h3 class="h3-sub">Skills 的作用</h3>
+
+Skills 是可复用、基于文件系统的资源，为 Agent 提供特定领域的专业知识、工作流和最佳实践。与在 system prompt 中堆叠大量上下文不同，Skills 通过<strong>渐进式披露</strong>（progressive disclosure）机制工作：Agent 只在任务匹配时加载相关技能的内容，避免上下文污染。
+
+<h3 class="h3-sub">Skills vs System Prompt</h3>
+
+<table class="cmp"><thead><tr><th>维度</th><th>System Prompt</th><th>Skills</th></tr></thead><tbody><tr><td>作用域</td><td>全局，每轮都生效</td><td>按需触发，只在相关时加载</td></tr><tr><td>复用性</td><td>需复制到多个 Agent</td><td>一次上传，多个 Agent 引用</td></tr><tr><td>版本控制</td><td>与 Agent 版本耦合</td><td>独立版本化，可 pin 指定版本</td></tr><tr><td>更新影响</td><td>修改后立即影响所有 Agent</td><td>可选择何时升级（pin <code>latest</code> 或指定版本）</td></tr><tr><td>格式</td><td>纯文本指令</td><td>SKILL.md + 支持文件（scripts、templates）</td></tr><tr><td>上下文成本</td><td>每次都占满上下文</td><td>仅在触发时增量加载</td></tr><tr><td>适用场景</td><td>Agent 核心人格和通用行为</td><td>领域专业知识、工作流程规范</td></tr></tbody></table>
+
+<h3 class="h3-sub">官方预建 Skills</h3>
+
+Anthropic 提供一套开箱即用的文档类 Skills，short name 直接在 <code>skill_id</code> 中使用：
+
+<table class="cmp"><thead><tr><th>skill_id</th><th>功能</th></tr></thead><tbody><tr><td><code>pptx</code></td><td>PowerPoint .pptx 文件创建与编辑</td></tr><tr><td><code>xlsx</code></td><td>Excel .xlsx 文件创建与数据分析</td></tr><tr><td><code>docx</code></td><td>Word .docx 文件创建与编辑</td></tr><tr><td><code>pdf</code></td><td>PDF 文件处理与生成</td></tr></tbody></table>
+
+使用方式：
+
+<pre class="code-block"><code>{
+  "skills": [
+    { "type": "anthropic", "skill_id": "xlsx", "version": "latest" }
+  ]
+}
+</code></pre>
+
+<h3 class="h3-sub">自定义 Skill 构建：SKILL.md 格式</h3>
+
+自定义 Skill 是一个目录，包含一个 <code>SKILL.md</code> 文件及可选的支持文件。上传到工作区后返回 <code>skill_*</code> ID。
+
+<strong>SKILL.md 结构示例：</strong>
+
+<pre class="code-block"><code>---
+name: code-review
+description: 执行代码审查并输出结构化报告
+triggers:
+  - "审查代码"
+  - "code review"
+  - "检查 PR"
+
+
+# Code Review Skill
+
+## 执行步骤
+
+1. 使用 <code>read</code> 工具读取代码文件
+2. 使用 <code>grep</code> 工具定位关键模式（TODO、FIXME、安全敏感 API）
+3. 重点检查：安全性、性能、可维护性、测试覆盖
+4. 输出结构化报告到 <code>review_report.md</code>
+
+## 输出格式
+
+</code></pre>markdown
+## 文件：{filename}
+<h3 class="h3-sub">评分：{1-10}</h3>
+<h3 class="h3-sub">问题：{列表}</h3>
+<h3 class="h3-sub">建议：{列表}</h3>
+<pre class="code-block"><code>
+## 注意事项
+
+- 不修改原始代码，只报告问题
+- 对于不确定的问题，标注为 "建议人工确认"
+</code></pre>
+
+<strong>上传自定义 Skill（curl）：</strong>
+
+<pre class="code-block"><code>curl -X POST "https://api.anthropic.com/v1/skills" \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -F "files[]=@example_skill.zip"
+</code></pre>
+
+返回：
+
+<pre class="code-block"><code>{
+  "id": "skill_01AbCdEfGhIjKlMnOpQrStUv",
+  "latest_version_id": "v1",
+  "name": "example_skill"
+}
+</code></pre>
+
+<strong>Agent 引用自定义 Skill：</strong>
+
+<pre class="code-block"><code>{
+  "skills": [
+    { "type": "custom", "skill_id": "skill_01AbCdEfGhIjKlMnOpQrStUv", "version": "latest" }
+  ]
+}
+</code></pre>
+
+<h3 class="h3-sub">Skills 的两种加载方式</h3>
+
+<table class="cmp"><thead><tr><th>方式</th><th>配置位置</th><th>说明</th></tr></thead><tbody><tr><td><strong>Attached Skills</strong></td><td>Agent 创建时的 <code>skills</code> 数组</td><td>上传到工作区或使用官方预建 Skill，每个 session 最多 500 个（去重后）</td></tr><tr><td><strong>Repository Skills</strong></td><td>Session 创建时挂载 <code>github_repository</code> 资源</td><td>扫描仓库 <code>.claude/skills/</code> 目录，自动发现 SKILL.md；无需上传到 Agent 定义</td></tr></tbody></table>
+
+<strong>Repository Skills 发现路径：</strong>
+
+<pre class="code-block"><code>your-repo/
+└── .claude/
+    └── skills/
+        ├── code-review/
+        │   └── SKILL.md
+        └── release-process/
+            ├── SKILL.md
+            └── scripts/
+                └── run_checks.sh
+</code></pre>
+
+仅支持仓库根目录下 <code>.claude/skills/<name>/SKILL.md</code> 一层嵌套；更深嵌套或无目录包裹的 SKILL.md 不被发现。
+
+<h3 class="h3-sub">触发机制：自动注入 vs 按需调用</h3>
+
+- <strong>自动触发</strong>：Agent 评估任务意图后自动加载相关 Skill 的内容到上下文中。Agent 会读取 SKILL.md 并执行其中定义的工作流。
+- <strong>手动调用</strong>：在 system prompt 中指令 Agent 在特定条件下调用特定 Skill。
+
+<h3 class="h3-sub">最佳实践</h3>
+
+1. <strong>粒度控制</strong>：每个 Skill 聚焦单一职责，避免大而全的 Skill；多个小 Skill 按需组合优于一个大 Skill
+2. <strong>避免上下文污染</strong>：不要在 Skill 中放入 Agent 每次都用得到的内容；只放任务相关的专业知识
+3. <strong>版本 pin 策略</strong>：生产环境建议 pin 固定版本而非 <code>latest</code>，防止 Skill 更新意外破坏 Agent 行为
+4. <strong>信任边界</strong>：Repository Skills 是 Agent 指令的一部分，挂载不受信任的仓库存在安全风险；只挂载内部、受控的代码库
+5. <strong>沙箱启动时间</strong>：挂载的 Skills 越多，沙箱初始化越慢；只挂载每个 Agent 真正需要的 Skill
+6. <strong>脚本和资源</strong>：Skill 可包含 scripts 和 templates 文件，Agent 通过 <code>read</code> / <code>bash</code> 工具访问，扩展了工作流能力
+
+
+
+<h2 class="h2-sec">SEC 10 — 多 Agent 编排（Multi-Agent）</h2>
+
+<h3 class="h3-sub">概念与架构</h3>
+
+Multi-Agent 编排让一个 <strong>Coordinator（协调器）</strong> Agent 能够在单一 Session 内协调多个专门 Agent（子 Agent）完成复杂任务。每个子 Agent 运行在独立的 <strong>Session Thread（会话线程）</strong> 中，拥有隔离的上下文和独立配置。
+
+<strong>核心约束：</strong>
+
+- 所有 Agent 共享同一沙箱的文件系统和 vault 凭证
+- 但工具、MCP 服务器和上下文互不共享
+- 协调器只能委托一层深度（depth > 1 被忽略）
+- <code>multiagent.agents</code> 最多列 20 个不同 Agent（同一 Agent 可创建多个副本）
+
+<h3 class="h3-sub">multiagent.agents 字段</h3>
+
+<code>multiagent</code> 配置声明协调器的子 Agent 名册：
+
+<pre class="code-block"><code>{
+  "multiagent": {
+    "type": "coordinator",
+    "agents": [
+      { "type": "agent", "id": "agent_xxx" },
+      { "type": "agent", "id": "agent_yyy", "version": 3 },
+      { "type": "self" }
+    ]
+  }
+}
+</code></pre>
+
+<strong>agents 条目类型：</strong>
+
+<table class="cmp"><thead><tr><th>Type</th><th>描述</th></tr></thead><tbody><tr><td><code>{"type": "agent", "id": "xxx"}</code></td><td>按 ID 引用已创建的 Agent，版本 pin 到协调器创建时的最新版本</td></tr><tr><td><code>{"type": "agent", "id": "xxx", "version": N}</code></td><td>按 ID + 版本号引用，固定到指定版本</td></tr><tr><td><code>{"type": "self"}</code></td><td>允许协调器生成自身的副本（适用于需要并行执行相似任务的场景）</td></tr><tr><td><code>{"type": "advisor", "model": "claude-opus-5"}</code></td><td>咨询入口：在协调器 turn 中引入更强的模型提供建议（无工具，不可 spawn，最多一个 advisor）</td></tr></tbody></table>
+
+<h3 class="h3-sub">协调器模式详解</h3>
+
+1. <strong>任务分解</strong>：协调器分析用户请求，将复杂任务拆分为多个子任务
+2. <strong>并行/串行委派</strong>：独立子任务并行委派（<code>session.thread_created</code>），有依赖关系的串行执行
+3. <strong>结果收集</strong>：子 Agent 通过 <code>agent.thread_message_received</code> 事件将结果汇报给协调器
+4. <strong>综合输出</strong>：协调器整合所有子 Agent 的结果，生成最终回答
+
+<strong>协调器系统提示模板：</strong>
+
+<pre class="code-block"><code>You coordinate engineering work.
+1. Send code review to reviewer agent.
+2. Send test writing to test_writer agent.
+3. Wait for both reports.
+4. Synthesize findings into a final summary.
+</code></pre>
+
+<h3 class="h3-sub">Agent 版本固定机制</h3>
+
+协调器的配置（含 <code>multiagent.agents</code> 名册）在协调器<strong>创建或更新时</strong>被快照。被引用的 Agent 固定为该时刻解析的版本，<strong>不会自动跟随被引用 Agent 的更新</strong>。
+
+<pre class="code-block"><code>协调器创建时：
+  └─ agent_xxx version 2  ←─ 固定在此版本
+
+后来 agent_xxx 更新到 version 5：
+  └─ 协调器仍使用 version 2
+
+若要使用新版本：
+  └─ 需更新协调器，让其 agents 数组引用新版本
+</code></pre>
+
+<h3 class="h3-sub">适用场景</h3>
+
+<table class="cmp"><thead><tr><th>场景</th><th>说明</th></tr></thead><tbody><tr><td><strong>复杂代码审查</strong></td><td>协调器分解审查维度（安全性 / 性能 / 风格），委派给专门的审查 Agent</td></tr><tr><td><strong>并行研究</strong></td><td>多个研究 Agent 同时搜索不同来源，协调器汇总</td></tr><tr><td><strong>数据处理流水线</strong></td><td>清洗 Agent → 分析 Agent → 可视化 Agent 顺序执行</td></tr><tr><td><strong>专业分工</strong></td><td>不同领域（财务 / 法律 / 技术）Agent 各司其职，协调器统筹</td></tr><tr><td><strong>质量门禁</strong></td><td>编写 Agent → 测试 Agent → 审查 Agent，形成 CI/CD 闭环</td></tr></tbody></table>
+
+<h3 class="h3-sub">完整示例：Coordinator + Coder + Reviewer</h3>
+
+<strong>Step 1：创建 Coder Agent</strong>
+
+<pre class="code-block"><code>{
+  "name": "coder",
+  "model": "claude-sonnet-4-6",
+  "system": "You write clean, efficient Python code. After completing a task, send a summary to the coordinator using send_to_parent.",
+  "tools": [
+    {
+      "type": "agent_toolset_20260401",
+      "configs": [
+        { "name": "read", "enabled": true },
+        { "name": "write", "enabled": true },
+        { "name": "edit", "enabled": true },
+        { "name": "glob", "enabled": true },
+        { "name": "bash", "enabled": true }
+      ]
+    }
+  ]
+}
+</code></pre>
+
+<strong>Step 2：创建 Reviewer Agent</strong>
+
+<pre class="code-block"><code>{
+  "name": "reviewer",
+  "model": "claude-haiku-4-5",
+  "system": "You review code for bugs, security issues, and style violations. Respond to the coordinator via send_to_parent.",
+  "tools": [
+    {
+      "type": "agent_toolset_20260401",
+      "configs": [
+        { "name": "read", "enabled": true },
+        { "name": "grep", "enabled": true },
+        { "name": "glob", "enabled": true }
+      ]
+    }
+  ]
+}
+</code></pre>
+
+<strong>Step 3：创建 Coordinator</strong>
+
+<pre class="code-block"><code>{
+  "name": "engineering-lead",
+  "model": "claude-opus-4-8",
+  "system": "You coordinate engineering tasks. Delegate coding to the coder agent and review to the reviewer agent. Wait for both reports, then produce a final summary.",
+  "tools": [
+    { "type": "agent_toolset_20260401" }
+  ],
+  "multiagent": {
+    "type": "coordinator",
+    "agents": [
+      { "type": "agent", "id": "CODER_AGENT_ID" },
+      { "type": "agent", "id": "REVIEWER_AGENT_ID" }
+    ]
+  }
+}
+</code></pre>
+
+<strong>Step 4：创建 Session 并运行</strong>
+
+<pre class="code-block"><code>session = client.beta.sessions.create(
+    agent=coordinator.id,
+    environment_id=environment.id,
+)
+
+with client.beta.sessions.events.stream(session.id) as stream:
+    client.beta.sessions.events.send(
+        session.id,
+        events=[{
+            "type": "user.message",
+            "content": [{"type": "text", "text": "Implement a REST API endpoint and review it"}]
+        }]
+    )
+
+    for event in stream:
+        if event.type == "session.thread_created":
+            print(f"[spawn] {event.agent_name}")
+        elif event.type == "agent.thread_message_received":
+            print(f"[report] {event.from_agent_name}: {event.content[:100]}")
+        elif event.type == "session.status_idle":
+            print("[done] Coordinator finished.")
+            break
+</code></pre>
+
+<h3 class="h3-sub">多 Agent 线程事件</h3>
+
+<table class="cmp"><thead><tr><th>事件</th><th>说明</th></tr></thead><tbody><tr><td><code>session.thread_created</code></td><td>子线程被创建，含 <code>session_thread_id</code> 和 <code>agent_name</code></td></tr><tr><td><code>session.thread_status_running</code></td><td>线程开始执行</td></tr><tr><td><code>session.thread_status_idle</code></td><td>线程完成，等待输入，含 <code>stop_reason</code></td></tr><tr><td><code>session.thread_status_terminated</code></td><td>线程被归档或终态错误</td></tr><tr><td><code>agent.thread_message_received</code></td><td>子 Agent 向协调器发回结果（primary thread 上可见）</td></tr><tr><td><code>agent.thread_message_sent</code></td><td>协调器向子 Agent 发送任务（primary thread 上可见）</td></tr></tbody></table>
+
+<h3 class="h3-sub">Beta 阶段限制说明</h3>
+
+1. <strong>beta 头必传</strong>：所有 Managed Agents API 请求需携带 <code>anthropic-beta: managed-agents-2026-04-01</code>
+2. <strong>MCP 服务器按 Agent 隔离</strong>：每个 Agent 独立声明自己的 MCP 服务器；vault 凭证在 Session 级别共享给所有线程
+3. <strong>Advisor 限制</strong>：每个名册最多一个 advisor 条目，advisor 无工具且不可 spawn
+4. <strong>子 Agent 深度限制</strong>：协调器只能委派一层，不支持嵌套协调器（depth > 1 被忽略）
+5. <strong>并发限制</strong>：最多支持 25 个并发线程（协调器可对同一 Agent 创建多个副本）
+6. <strong>技能计数</strong>：整个 Session（所有 Agent）最多 500 个去重后的 Skills
+7. <strong>工具总数</strong>：所有 toolsets 合计最多 128 个工具
+8. <strong>自托管限制</strong>：Repository Skills 发现仅在云沙箱中支持；自托管沙箱不支持 GitHub repository 资源挂载
+
+<h3 class="h3-sub">小结</h3>
+
+多 Agent 编排将复杂任务分解为专门的子 Agent，实现了<strong>上下文隔离</strong>（每个 Agent 独立上下文）、<strong>并行加速</strong>（独立任务同时执行）和<strong>专业分工</strong>（不同模型/工具集的 Agent 各司其职）。协调器模式是核心范式，需要在协调器的 system prompt 中清晰定义委派策略和结果汇总逻辑。当前处于 Beta 阶段，API 头、并发数、工具数等均有明确上限，生产部署前需关注官方文档的版本更新。
+
+
+<h2 class="h2-sec">SEC 11 — SDK 安装与快速开始</h2>
+
+<h3 class="h3-sub">Python SDK（ant package）</h3>
+
+<pre class="code-block"><code>pip install ant
+</code></pre>
+
+基础初始化：
+
+<pre class="code-block"><code>from anthropic import Anthropic
+import os
+
+client = Anthropic()
+# 自动读取 ANTHROPIC_API_KEY 环境变量
+</code></pre>
+
+<h3 class="h3-sub">Node.js SDK（@anthropic-ai/ant）</h3>
+
+<pre class="code-block"><code>npm install @anthropic-ai/ant
+</code></pre>
+
+<pre class="code-block"><code>import Anthropic from "@anthropic-ai/sdk";
+const client = new Anthropic();
+</code></pre>
+
+<h3 class="h3-sub">ant CLI</h3>
+
+<pre class="code-block"><code>npm install -g @anthropic-ai/ant
+ant --version
+</code></pre>
+
+<h3 class="h3-sub">完整快速开始（Python，约 30 行）</h3>
+
+<pre class="code-block"><code>from anthropic import Anthropic
+import os, json
+
+client = Anthropic()
+API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+assert API_KEY, "Set ANTHROPIC_API_KEY env var"
+
+# 1. 创建 Agent
+agent = client.beta.agents.create(
+    name="Quickstart Assistant",
+    model="claude-opus-5",
+    system="You are a helpful coding assistant.",
+    tools=[{"type": "agent_toolset_20260401"}],
+)
+print(f"Agent: {agent.id}")
+
+# 2. 创建 Environment
+env = client.beta.environments.create(
+    name="quickstart-env",
+    config={"type": "cloud", "networking": {"type": "unrestricted"}},
+)
+print(f"Environment: {env.id}")
+
+# 3. 启动 Session
+session = client.beta.sessions.create(
+    agent=agent.id,
+    environment_id=env.id,
+)
+print(f"Session: {session.id}")
+
+# 4. SSE 流式事件循环
+with client.beta.sessions.events.stream(session.id) as stream:
+    # 打开流后立即发送用户消息
+    client.beta.sessions.events.send(
+        session.id,
+        events=[{"type": "user.message", "content": [{"type": "text", "text": "Write hello.py"}]}],
+    )
+    for event in stream:
+        if event.type == "agent.message":
+            for block in event.content:
+                if hasattr(block, "text"):
+                    print(block.text, end="")
+        elif event.type == "session.status_idle":
+            print("\n\nAgent finished.")
+            break
+</code></pre>
+
+<h3 class="h3-sub">常见初始化错误</h3>
+
+<table class="cmp"><thead><tr><th>错误</th><th>原因</th><th>解决</th></tr></thead><tbody><tr><td><code>401 Unauthorized</code></td><td>API Key 错误或未设置</td><td>检查 <code>ANTHROPIC_API_KEY</code> 环境变量</td></tr><tr><td><code>Missing beta header</code></td><td>请求缺少 <code>managed-agents-2026-04-01</code></td><td>SDK 自动设置，手动 curl 需手动添加</td></tr><tr><td><code>network timeout</code></td><td>网络问题或沙箱启动慢</td><td>增加超时或检查网络</td></tr><tr><td><code>agent not found</code></td><td>Agent ID 不存在或已归档</td><td>重新创建或检查 ID</td></tr></tbody></table>
+
+
+
+<h2 class="h2-sec">SEC 12 — 定价与用量限制</h2>
+
+<h3 class="h3-sub">定价模型：双维度计费</h3>
+
+Claude Managed Agents 按两个维度计费：<strong>Token 消耗</strong> + <strong>Session 运行时长</strong>。
+
+#### Token 消耗
+
+所有 Token 按标准模型定价收费，prompt caching 倍数相同适用：
+
+<table class="cmp"><thead><tr><th>模型</th><th>输入 $/1M tokens</th><th>输出 $/1M tokens</th></tr></thead><tbody><tr><td>claude-opus-5</td><td>$15.00</td><td>$75.00</td></tr><tr><td>claude-opus-4-8</td><td>$12.00</td><td>$60.00</td></tr><tr><td>claude-opus-4-7</td><td>$9.00</td><td>$45.00</td></tr><tr><td>claude-sonnet-5</td><td>$3.00</td><td>$15.00</td></tr></tbody></table>
+
+- <strong>Web search</strong>：Session 内触发 <code>$10/1,000 次搜索</code>
+- <strong>US 数据驻留</strong>：Inference Geo 设为 <code>us</code> 时，Token 费用 1.1×（与 Messages API 一致）
+- <strong>Fast mode</strong>：当 <code>model.speed = "fast"</code> 时，按快速模式附加费计费
+- <strong>Batch API 折扣</strong>：不适用（Session 是有状态的交互式资源）
+
+#### Session 运行时长
+
+<table class="cmp"><thead><tr><th>SKU</th><th>单价</th><th>计费方式</th></tr></thead><tbody><tr><td>Session runtime</td><td><strong>$0.08 / Session 小时</strong></td><td><code>running</code> 状态时长，精确到毫秒</td></tr></tbody></table>
+
+<strong>计费关键</strong>：只有 <code>running</code> 状态计费，<code>idle</code> / <code>rescheduling</code> / <code>terminated</code> 不收费。
+
+<pre class="code-block"><code>示例：一个 Session 运行 30 分钟（其中 active 20 分钟，idle 10 分钟）
+费用 = 20/60 × $0.08 = $0.0267
+</code></pre>
+
+Session 运行时长替代了原有的代码执行容器小时计费模式。使用 Managed Agents 时不再单独收取容器小时费用。
+
+<h3 class="h3-sub">Rate Limits</h3>
+
+<table class="cmp"><thead><tr><th>操作</th><th>限制</th></tr></thead><tbody><tr><td>创建端点（agents/sessions/environments）</td><td><strong>300 请求/分钟</strong></td></tr><tr><td>读取端点（retrieve/list/stream）</td><td><strong>1,200 请求/分钟</strong></td></tr><tr><td>Organization 级消费限制</td><td>按用量层级（Start/Build/Scale）</td></tr></tbody></table>
+
+超出 Scale tier 或需定制限速，联系 Anthropic 销售团队。
+
+<h3 class="h3-sub">成本优化策略</h3>
+
+1. <strong>prompt caching</strong>：<code>read</code> / <code>glob</code> / <code>grep</code> 工具读取过的文件自动缓存，减少重复 token 费用
+2. <strong>effort 级别选择</strong>：简单任务用 <code>low</code>，复杂任务用 <code>high</code>，避免不必要的高 effort 消耗
+3. <strong>compaction 机制</strong>：对话历史超长时平台自动压缩，保留关键上下文
+4. <strong>Session 及时清理</strong>：完成任务的 Session 及时 <code>DELETE</code>，避免意外产生费用
+5. <strong>Web search 节流</strong>：批量任务中合并 search 查询，减少 <code>$10/1,000 次</code> 费用
+
+
+
+<h2 class="h2-sec">SEC 13 — 数据保留与合规</h2>
+
+<h3 class="h3-sub">有状态 Session 的数据保留</h3>
+
+Claude Managed Agents 是<strong>有状态设计</strong>的资源：
+
+- 对话历史、沙箱状态、输出文件<strong>持久化保存在服务器端</strong>
+- Session 可暂停后干净恢复
+- <strong>零数据保留（ZDR）不适用</strong>：有状态 Session 需在服务端保存数据
+- <strong>HIPAA BAA 不适用</strong>：Beta 阶段不符合条件
+
+<h3 class="h3-sub">数据控制权</h3>
+
+你保有对数据的完整控制：
+
+- <strong>删除 Session</strong>：<code>DELETE /v1/sessions/{id}</code> 立即清除对话历史和沙箱状态
+- <strong>删除上传文件</strong>：单独调用文件删除接口
+- <strong>Activity Feed</strong>：保留 6 年（与账户数据保留策略一致）
+- <strong>Trust & Safety 标记</strong>：即使有 ZDR/HIPAA，被 Anthropic 自动化系统标记的数据最多保留 <strong>2 年</strong>
+
+<h3 class="h3-sub">合规适用性</h3>
+
+<table class="cmp"><thead><tr><th>合规类型</th><th>Managed Agents 适用</th><th>说明</th></tr></thead><tbody><tr><td>零数据保留（ZDR）</td><td>❌</td><td>有状态设计，需服务端持久化</td></tr><tr><td>HIPAA BAA</td><td>❌</td><td>Beta 阶段不支持</td></tr><tr><td>SOC 2 / ISO 27001</td><td>部分</td><td>Anthropic 主平台有认证，Managed Agents 需确认</td></tr><tr><td>数据驻留（US/EU）</td><td>⚠️</td><td>需 Claude Platform on AWS 或自架沙盒</td></tr><tr><td>Covered Models（Fable/Mythos）</td><td>⚠️</td><td>强制 30 天数据保留，ZDR 不适用</td></tr></tbody></table>
+
+<h3 class="h3-sub">企业级合规方案</h3>
+
+1. <strong>数据驻留</strong>：使用 Claude Platform on AWS 或自架沙盒，数据留在你的云环境
+2. <strong>自架沙盒</strong>：<code>type: self_hosted</code>，沙盒运行在你控制的 K8s 集群，满足 GDPR/数据本地化
+3. <strong>API 与数据保留</strong>：详细对照表见 [API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention)
+
+
+
+<h2 class="h2-sec">SEC 14 — 与主流框架的集成</h2>
+
+<h3 class="h3-sub">CopilotKit + Managed Agents</h3>
+
+CopilotKit 提供了 Managed Agents 的 AG-UI 协议转接器，将每个聊天对话映射到一个 Managed Session：
+
+<pre class="code-block"><code># CopilotKit 后端：每个用户消息 → 新增 user.message 事件
+await copilotSession.addMessage(
+    text=message,
+    sender=MessageSender.User,
+    agentId=MANAGED_AGENT_ID,
+    environmentId=ENV_ID
+)
+# 事件流自动推送到前端聊天 UI
+</code></pre>
+
+适用场景：个人理財助理、代码审查助手、数据分析仪表盘。
+
+<h3 class="h3-sub">LangChain / LlamaIndex 包装</h3>
+
+<pre class="code-block"><code># LangChain 自定义 Tool 包装 Managed Agents Session
+from langchain.tools import StructuredTool
+from pydantic import BaseModel
+
+class ManagedAgentsInput(BaseModel):
+    prompt: str
+
+def run_managed_agent(prompt: str) -&gt; str:
+    # 调用 Managed Agents Session，返回最终结果
+    ...
+
+agent_tool = StructuredTool.from_function(
+    func=run_managed_agent,
+    name="claude_managed_agent",
+    description="Run Claude Managed Agent for complex multi-step tasks",
+    args_schema=ManagedAgentsInput,
+)
+</code></pre>
+
+<h3 class="h3-sub">实时 UI 架构</h3>
+
+<pre class="code-block"><code>User Message
+    │
+    ▼
+Frontend (React/Vue) ──► Managed Session.events.send()
+    ▲                       │
+    │                       ▼
+    │                  Agent 执行 Tools
+    │                       │
+    └──────────────────── SSE events ◄──
+         (agent.message / agent.tool_use / agent.tool_result)
+</code></pre>
+
+<h3 class="h3-sub">集成注意事项</h3>
+
+- <strong>Beta API 稳定性</strong>：beta 期间可能发生 breaking changes，版本 pin 重要组件
+- <strong>错误处理</strong>：实现 <code>session.error</code> 事件监听和指数退避重连
+- <strong>Session 管理</strong>：WebSocket 断开后用 <code>events.list</code> 补齐历史，避免重复发送
+
+
+
+<h2 class="h2-sec">SEC 15 — 排错清单（Troubleshooting）</h2>
+
+<h3 class="h3-sub">常见错误码与解决方案</h3>
+
+<table class="cmp"><thead><tr><th>HTTP 状态码</th><th>错误类型</th><th>原因</th><th>解决方式</th></tr></thead><tbody><tr><td>400</td><td><code>invalid_request_error</code></td><td>请求格式错误或必填字段缺失</td><td>检查 JSON 结构，对照 API 文档</td></tr><tr><td>400</td><td>Covered Model 错误</td><td>使用 Fable/Mythos 模型但无 30 天保留配置</td><td>组织级别启用 30 天保留或换模型</td></tr><tr><td>401</td><td><code>authentication_error</code></td><td>API Key 错误或过期</td><td>检查 <code>ANTHROPIC_API_KEY</code>，确认账户有效</td></tr><tr><td>403</td><td><code>permission_denied_error</code></td><td>缺少 <code>managed-agents-2026-04-01</code> beta 头</td><td>所有请求添加 <code>anthropic-beta: managed-agents-2026-04-01</code></td></tr><tr><td>404</td><td><code>not_found_error</code></td><td>Agent/Environment/Session ID 不存在或已归档</td><td>重新创建或用 <code>list</code> 获取有效 ID</td></tr><tr><td>409</td><td><code>conflict_error</code></td><td>Agent <code>version</code> 不匹配（乐观并发冲突）</td><td>重新 <code>GET /v1/agents/{id}</code> 获取最新 version 重试</td></tr><tr><td>429</td><td><code>rate_limit_error</code></td><td>QPS 超限（创建端点 300rpm，读取端点 1200rpm）</td><td>指数退避重试，或降低请求频率</td></tr><tr><td>500</td><td><code>internal_server_error</code></td><td>Anthropic 平台侧问题</td><td>等待后重试，查看 [Anthropic Status](https://status.anthropic.com)</td></tr></tbody></table>
+
+<h3 class="h3-sub">session.error 事件类型</h3>
+
+<pre class="code-block"><code>{
+  "type": "session.error",
+  "error": {
+    "type": "mcp_connection_failed_error",
+    "mcp_server_name": "github",
+    "retry_status": "can_retry"
+  }
+}
+</code></pre>
+
+<table class="cmp"><thead><tr><th>Error type</th><th>retry_status</th><th>处理方式</th></tr></thead><tbody><tr><td><code>mcp_connection_failed_error</code></td><td><code>can_retry</code></td><td>等待 idle→running 自动重连，或检查 MCP 服务器 URL</td></tr><tr><td><code>mcp_authentication_failed_error</code></td><td><code>cannot_retry</code></td><td>更新 vault 凭证，确保 <code>mcp_server_url</code> 与声明 URL 完全匹配</td></tr><tr><td><code>session.status_rescheduled</code></td><td>自动重试</td><td>无需干预，平台处理瞬态错误</td></tr></tbody></table>
+
+<h3 class="h3-sub">Session 挂起 / 无响应</h3>
+
+1. 检查 <code>agent.tool_use</code> / <code>agent.tool_result</code> 事件流是否正常
+2. 可能是工具超时（如 <code>bash</code> 命令阻塞），检查 <code>agent.tool_use</code> 中的 <code>timeout</code> 参数
+3. 使用 <code>DELETE /v1/sessions/{id}</code> 终止后重建
+
+<h3 class="h3-sub">流式（SSE）中断处理</h3>
+
+<pre class="code-block"><code>import time, asyncio
+
+max_retries = 5
+for attempt in range(max_retries):
+    try:
+        with client.beta.sessions.events.stream(session_id) as stream:
+            for event in stream:
+                handle_event(event)
+    except Exception as e:
+        wait = 2 ** attempt  # 指数退避
+        print(f"Stream interrupted: {e}. Retry in {wait}s...")
+        time.sleep(wait)
+        # 从 events.list 补齐历史，避免重复发送
+        history = client.beta.sessions.events.list(session_id)
+        resume_from = len(history.data)
+</code></pre>
+
+<h3 class="h3-sub">调试技巧</h3>
+
+- <strong>开启 SDK 详细日志</strong>：设置 <code>ANTHROPIC_DEBUG=1</code> 查看 HTTP 请求/响应
+- <strong>查询事件历史</strong>：<code>GET /v1/sessions/{id}/events</code> 查看完整事件流
+- <strong>检查 Session 状态</strong>：<code>GET /v1/sessions/{id}</code> 查看当前 status 和 usage
+
+
+
+<h2 class="h2-sec">SEC 16 — 典型使用场景深度拆解</h2>
+
+<h3 class="h3-sub">场景 A：自动化代码审查</h3>
+
+<strong>场景</strong>：PR 提交后，Claude 自动审查多文件改动，给出修复建议。
+
+<pre class="code-block"><code>触发：GitHub Webhook → 创建 Session
+    │
+    ▼
+上传 PR diff 文件（write tool）
+    │
+    ▼
+发送审查指令（"Review this PR for security issues"）
+    │
+    ▼
+Claude 分析 → 输出 review 报告（agent.message）
+    │
+    ▼
+写入 review 结果到文件 → 发送 GitHub Comment（通过 MCP/GitHub API）
+    │
+    ▼
+Session 进入 idle → 触发 Webhook 通知
+</code></pre>
+
+<strong>关键优势</strong>：文件上下文持久化，无需每次请求都传递完整 diff。
+
+<h3 class="h3-sub">场景 B：研究助手</h3>
+
+<strong>场景</strong>：Claude 跨多个数据源搜集信息并生成报告。
+
+<pre class="code-block"><code>用户："帮我分析竞争对手 X 的产品策略"
+    │
+    ▼
+Claude 调用 web_search → 搜集公开报道
+    │
+    ▼
+Claude 调用 web_fetch → 抓取官网/财报页面
+    │
+    ▼
+Claude 写入分析笔记到文件（write tool）
+    │
+    ▼
+多轮迭代 → 汇总成 Markdown 报告
+    │
+    ▼
+Session idle → 用户获取完整报告
+</code></pre>
+
+<strong>关键优势</strong>：长时运行 + 有状态，可跨小时持续工作，Claude 自主判断下一步行动。
+
+<h3 class="h3-sub">场景 C：数据处理流水线</h3>
+
+<strong>场景</strong>：定期从 API 拉取数据，清洗后写入数据库。
+
+<pre class="code-block"><code>触发：Cron Schedule（每日 09:00 UTC）
+    │
+    ▼
+创建 Session（带预装 pip 包环境）
+    │
+    ▼
+Claude 调用 bash → <code>curl</code> 拉取数据 API
+    │
+    ▼
+Claude 调用 write → 写入原始 JSON
+    │
+    ▼
+Claude 调用 bash → <code>python clean.py</code> 清洗数据
+    │
+    ▼
+Claude 调用 bash → 写入 PostgreSQL
+    │
+    ▼
+Session idle → 发送 Slack 通知（MCP）
+</code></pre>
+
+<strong>关键优势</strong>：排程执行 + 沙箱隔离 + 有状态文件系统，无需自建 cron job 容器。
+
+<h3 class="h3-sub">场景 D：CI/CD 集成</h3>
+
+<strong>场景</strong>：PR 触发后自动运行测试套件。
+
+<pre class="code-block"><code>触发：GitHub Actions workflow_dispatch
+    │
+    ▼
+API 创建 Session（environment 带测试依赖）
+    │
+    ▼
+Claude 调用 bash → <code>npm install &amp;&amp; npm test</code>
+    │
+    ▼
+Claude 分析测试失败原因
+    │
+    ▼
+写入失败分析到 PR Comment
+    │
+    ▼
+Session idle → Actions 获取结果
+</code></pre>
+
+<strong>关键优势</strong>：云端沙箱无需自建 Runner，测试环境一致性高。
+
+
+
+<h2 class="h2-sec">SEC 17 — 与自建 Agent 循环的架构对比</h2>
+
+<h3 class="h3-sub">自建方案 vs Managed Agents</h3>
+
+<table class="cmp"><thead><tr><th>维度</th><th>Messages API 自建</th><th>Managed Agents</th></tr></thead><tbody><tr><td><strong>基础设施</strong></td><td>自建沙箱容器、K8s Job、网络隔离</td><td>Anthropic 托管（零运维）</td></tr><tr><td><strong>Agent 循环</strong></td><td>完全自写（轮次控制、工具调度、错误处理）</td><td>平台处理，Client 只接收事件</td></tr><tr><td><strong>状态管理</strong></td><td>需自行实现（Redis/DB/文件）</td><td>Server-side 有状态，Session 自动持久化</td></tr><tr><td><strong>扩展性</strong></td><td>需处理并发、限速、退避</td><td>平台自动弹性，1,200 rpm 读取端点</td></tr><tr><td><strong>开发时间</strong></td><td>2–4 周（循环+工具层+沙箱）</td><td>1–2 天（API 调用）</td></tr><tr><td><strong>成本模型</strong></td><td>Token 费用 + 容器费用</td><td>Token 费用 + $0.08/Session 小时</td></tr><tr><td><strong>调试复杂度</strong></td><td>高（本地复现困难）</td><td>中等（事件历史可查询）</td></tr><tr><td><strong>适用规模</strong></td><td>小规模 / 成本敏感 / 需细粒度控制</td><td>中大规模 / 快速原型 / 需长时任务</td></tr></tbody></table>
+
+<h3 class="h3-sub">迁移路径</h3>
+
+<pre class="code-block"><code>Messages API 应用 ──► Managed Agents 混合 ──► 完全迁移
+    │                        │                      │
+  现有循环               关键路径迁移          自建循环替换
+  保持运行              Managed Agents         为 API 调用
+                       其他走原路
+</code></pre>
+
+<strong>推荐迁移顺序</strong>：
+1. 简单任务（单次工具调用）先用 Managed Agents 替换
+2. 有状态任务（需跨轮上下文）迁移为核心场景
+3. 保留自建：需要 Zero Data Retention 或 HIPAA 合规的任务
+
+
+
+<h2 class="h2-sec">SEC 18 — AWS Claude Platform 差异</h2>
+
+<h3 class="h3-sub">功能可用性差异</h3>
+
+Managed Agents 在 AWS Claude Platform 上是功能子集：
+
+<table class="cmp"><thead><tr><th>维度</th><th>标准 Managed Agents</th><th>AWS Claude Platform</th></tr></thead><tbody><tr><td>Agent / Session / Environment API</td><td>✅ 完整</td><td>⚠️ 功能子集</td></tr><tr><td>MCP 服务器</td><td>✅ 支持</td><td>⚠️ 部分支持</td></tr><tr><td>多 Agent 编排</td><td>✅ Beta</td><td>⚠️ 可能有差异</td></tr><tr><td>自架沙盒</td><td>✅ 支持</td><td>⚠️ 取决于 AWS 配置</td></tr><tr><td>SDK</td><td>✅ ant (Python/Node.js)</td><td>⚠️ AWS 专用 SDK</td></tr></tbody></table>
+
+<h3 class="h3-sub">AWS 专属优势</h3>
+
+- <strong>VPC 集成</strong>：沙箱可接入你的 VPC，满足网络隔离需求
+- <strong>IAM 权限</strong>：使用 AWS 凭证体系管理 API 访问
+- <strong>AWS 生态集成</strong>：S3、DynamoDB、Lambda 等原生集成
+- <strong>数据驻留</strong>：数据完全在你的 AWS 账户中
+
+<h3 class="h3-sub">迁移注意事项</h3>
+
+- <strong>端点</strong>：AWS 使用不同的 API 端点（非 <code>api.anthropic.com</code>）
+- <strong>认证</strong>：使用 AWS Signature V4 而非 API Key
+- <strong>可用功能</strong>：确认你的 AWS 区域支持的功能列表
+
+详细指南：[Claude Platform on AWS](https://platform.claude.com/docs/en/claude-platform/claude-platform-on-aws)
+
+
+
+<h2 class="h2-sec">SEC 19 — 官方资源与社区</h2>
+
+<h3 class="h3-sub">官方文档</h3>
+
+<table class="cmp"><thead><tr><th>资源</th><th>URL</th></tr></thead><tbody><tr><td>中文文档（主）</td><td>platform.claude.com/docs/zh-CN/managed-agents</td></tr><tr><td>英文文档（最新）</td><td>platform.claude.com/docs/en/managed-agents</td></tr><tr><td>定价参考</td><td>platform.claude.com/docs/en/about-claude/pricing</td></tr><tr><td>API 与数据保留</td><td>platform.claude.com/docs/en/manage-claude/api-and-data-retention</td></tr><tr><td>Rate Limits</td><td>platform.claude.com/docs/en/managed-agents/reference</td></tr></tbody></table>
+
+<h3 class="h3-sub">SDK 仓库</h3>
+
+<table class="cmp"><thead><tr><th>语言</th><th>安装命令</th><th>仓库</th></tr></thead><tbody><tr><td>Python</td><td><code>pip install ant</code></td><td><code>anthropics/ant</code></td></tr><tr><td>Node.js</td><td><code>npm install @anthropic-ai/ant</code></td><td><code>anthropics/ant</code></td></tr><tr><td>CLI</td><td><code>npm install -g @anthropic-ai/ant</code></td><td><code>anthropics/ant</code></td></tr></tbody></table>
+
+<h3 class="h3-sub">社区与支持</h3>
+
+<table class="cmp"><thead><tr><th>渠道</th><th>说明</th></tr></thead><tbody><tr><td>Discord</td><td>Anthropic Developers 社区（#managed-agents 频道）</td></tr><tr><td>Anthropic News</td><td>官方博客，Managed Agents 更新公告</td></tr><tr><td>GitHub Issues</td><td>SDK bug report 和功能请求</td></tr><tr><td>Status Page</td><td>platform.anthropic.statuspage.io</td></tr><tr><td>销售团队</td><td>定制定价 / 企业需求 / 定制 Rate Limits</td></tr></tbody></table>
+
+<h3 class="h3-sub">Beta 阶段注意事项</h3>
+
+Managed Agents 目前处于 <strong>Beta</strong> 阶段：
+
+- 所有端点需要 <code>managed-agents-2026-04-01</code> beta 头
+- 各版本之间可能发生 breaking changes
+- Beta 期间功能可能调整，不建议在生产环境关键路径依赖
+- <strong>建议</strong>：对 beta API 组件做版本 pin，实现优雅降级
+
+
+
+<h2 class="h2-sec">SEC 20 — 新手 5 步上手路径</h2>
+
+<h3 class="h3-sub">Step 1：获取 API Key，配置环境</h3>
+
+<strong>检查点</strong> ✅：
+<pre class="code-block"><code>export ANTHROPIC_API_KEY="sk-ant-..."
+curl -s https://api.anthropic.com/v1/models \\
+  -H "x-api-key: $ANTHROPIC_API_KEY" | jq '.data[0].id'
+# 应返回模型 ID 列表
+</code></pre>
+
+<h3 class="h3-sub">Step 2：安装 SDK，运行 Quickstart（<10 行代码）</h3>
+
+<strong>检查点</strong> ✅：
+<pre class="code-block"><code>pip install ant
+python -c "from anthropic import Anthropic; print('OK')"
+</code></pre>
+
+运行官方 Quickstart，确认能收到 <code>agent.message</code> 事件。
+
+<h3 class="h3-sub">Step 3：创建自定义 Agent，理解 model/system/tools 字段</h3>
+
+<strong>检查点</strong> ✅：
+<pre class="code-block"><code># 创建 Agent，验证返回 agent_xxx ID
+curl ... -d '{"name":"MyAgent","model":"claude-sonnet-5","tools":[{"type":"agent_toolset_20260401"}]}'
+</code></pre>
+
+尝试修改 <code>system</code> prompt，观察 Agent 行为变化。
+
+<h3 class="h3-sub">Step 4：处理 SSE 事件，实现基本流式 UI</h3>
+
+<strong>检查点</strong> ✅：
+<pre class="code-block"><code># 实现完整 SSE 事件循环
+# 收到 agent.message → 打印 text
+# 收到 agent.tool_use → 打印工具名
+# 收到 session.status_idle → 退出
+</code></pre>
+
+在 Web 前端用 SSE Client 接收事件，渲染实时聊天界面。
+
+<h3 class="h3-sub">Step 5：扩展到生产场景：错误处理、排程、多 Agent</h3>
+
+<strong>检查点</strong> ✅：
+
+<table class="cmp"><thead><tr><th>能力</th><th>验证方式</th></tr></thead><tbody><tr><td>错误处理</td><td>模拟 429 错误，确认指数退避重试</td></tr><tr><td>资源清理</td><td>Session 完成后 <code>DELETE</code>，确认无残留</td></tr><tr><td>排程</td><td>配置 cron job，每日触发 Session 创建</td></tr><tr><td>多 Agent</td><td>创建 Coordinator + 子 Agent，验证委派流程</td></tr></tbody></table>
+
+<h3 class="h3-sub">推荐学习顺序</h3>
+
+<pre class="code-block"><code>Quickstart（&lt;1h）
+  → Agent 创建与配置（1-2h）
+  → SSE 事件处理（2-3h）
+  → MCP 集成（2-3h）
+  → Skills 系统（2h）
+  → 多 Agent 编排（3-4h）
+  → 生产部署与监控（4h+）
+</code></pre>
+
+<strong>总时间</strong>：有经验的开发者约 <strong>1–2 天</strong>可以完成端到端上手。
+      </div>
+    </div>
+  </div>
+
+  <!-- SOURCE -->
+  <div class="src-note">
+    <b>来源：</b>platform.claude.com/docs/zh-CN/managed-agents（overview / environments / pricing / api-and-data-retention） + platform.claude.com/docs/en/managed-agents/（overview / events / agent-tools / skills / multi-agent / reference）。所有 API 字段、定价数字、限制均来自实际文档，禁止编造。
+  </div>
+
+</div><!-- .shell -->
+
+<div class="footer">
+  <div class="footer-grid">
+    <div class="small">
+      <strong>Claude Managed Agents</strong> — Anthropic · Beta<br>
+      platform.claude.com/docs/zh-CN/managed-agents
+    </div>
+    <div class="small" style="text-align:right">
+      blue technical manual · data-theme=blue<br>
+      Agent · Environment · Session · Events · MCP · Skills
+    </div>
+  </div>
+</div>
+
+</div><!-- .page -->
+</body>
+</html>
