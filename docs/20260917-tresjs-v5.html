@@ -388,7 +388,888 @@
       </div>
     </section>
 
-    <!-- FOOTER -->
+    
+
+    <!-- SECTION 05: Composable 系统重构 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">Composable System</div>
+          <h2>v5 Composable 全面重构：从工具函数到真正的 Vue Composable</h2>
+          <p>useLoader / useLoop / useTres / useGLTF / useGraph — 每一个都经过重构，带来完整的响应式状态、TypeScript 类型安全和自动资源清理。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">useLoader</span><span class="tag dark">v5 核心</span></div>
+          <h3>从 Promise 到响应式状态</h3>
+          <p>v4 返回 Promise，v5 返回完整响应式对象。loader 不再是异步工具函数，而是真正的 Vue Composable。</p>
+          <ul>
+            <li><code>state</code> — 加载完成的资源（Ref）</li>
+            <li><code>isLoading</code> — 加载中布尔值（Ref）</li>
+            <li><code>error</code> — 错误信息（Ref&lt;Error|null&gt;）</li>
+            <li><code>progress</code> — 进度对象 {loaded, total, percentage}</li>
+            <li><code>load(path)</code> — 手动触发加载任意路径</li>
+            <li><code>execute(delay)</code> — 延迟重新加载</li>
+          </ul>
+        </div>
+        <div class="code-block">
+          <div class="code-label">// useLoader v5 响应式模式</div>
+          <pre><span class="cmt">// ❌ v4 — 返回 Promise</span>
+<span class="kwd">const</span> gltf = <span class="kwd">await</span> <span class="fn">useLoader</span>(GLTFLoader, <span class="str">'/model.glb'</span>)
+
+<span class="cmt">// ✅ v5 — 响应式状态对象</span>
+<span class="kwd">const</span> { state: gltf, isLoading, error, progress } =
+  <span class="fn">useLoader</span>(GLTFLoader, <span class="str">'/model.glb'</span>)
+
+<span class="cmt">// 监听加载状态</span>
+<span class="fn">watch</span>(isLoading, (loading) => {
+  <span class="kwd">if</span> (loading) console.<span class="fn">log</span>(<span class="str">'加载中…'</span>)
+})
+
+<span class="cmt">// 监听进度</span>
+<span class="fn">watch</span>(progress, (p) => {
+  console.<span class="fn">log</span>(<span class="str">`进度: </span><span class="prop">${p.percentage}</span><span class="str">%`</span>)
+})
+
+<span class="cmt">// 模板中直接使用</span>
+<span class="tag">&lt;primitive</span> <span class="attr">v-if</span>=<span class="str">"gltf"</span> <span class="attr">:object</span>=<span class="str">"gltf.scene"</span> <span class="tag">/&gt;</span></pre>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">useLoop</span></div>
+          <h3>渲染循环 useLoop</h3>
+          <p>替代旧版 useRenderLoop。新 API 提供 onBeforeRender / onRender / onAfterRender 三个钩子，精确控制渲染阶段。</p>
+          <ul>
+            <li><code>onBeforeRender</code> — 物理更新、输入处理</li>
+            <li><code>onRender</code> — 默认渲染逻辑</li>
+            <li><code>onAfterRender</code> — 后处理、截图</li>
+            <li>参数：delta（帧间隔）/ elapsed（总耗时）/ deltaRatio</li>
+          </ul>
+        </div>
+        <div class="code-block">
+          <div class="code-label">// useLoop 渲染循环</div>
+          <pre><span class="kwd">import</span> { <span class="fn">useLoop</span> } <span class="kwd">from</span> <span class="str">'@tresjs/core'</span>
+
+<span class="kwd">const</span> { onBeforeRender, onRender, onAfterRender } = <span class="fn">useLoop</span>()
+
+<span class="cmt">// 每帧之前：更新物理/输入</span>
+<span class="fn">onBeforeRender</span>(({ delta, elapsed }) => {
+  meshRef.value.rotation.y += delta
+  updatePhysics(delta)
+})
+
+<span class="cmt">// 每帧之后：后处理</span>
+<span class="fn">onAfterRender</span>(() => {
+  captureFrame()
+})</pre>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">useTres</span></div>
+          <h3>useTres 场景上下文</h3>
+          <p>替代旧版 useTresContext。提供对场景、相机、渲染器的直接访问。</p>
+          <ul>
+            <li><code>camera</code> — 当前相机</li>
+            <li><code>scene</code> — Three.js 场景</li>
+            <li><code>renderer</code> — WebGLRenderer / WebGPURenderer</li>
+            <li><code>controls</code> — 轨道控制器</li>
+            <li><code>clock</code> — 全局时钟</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag red">useGraph</span></div>
+          <h3>useGraph 场景图查询</h3>
+          <p>替代旧版 useSeek。从加载的 GLTF 模型中结构化查询节点和材质。</p>
+          <ul>
+            <li><code>nodes</code> — 按名称索引的所有节点</li>
+            <li><code>materials</code> — 按名称索引的所有材质</li>
+            <li>替代 <code>useSeek</code>：直接访问节点，无需遍历</li>
+            <li>自动类型推导（配合 TypeScript 泛型）</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 06: Breaking Changes -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">06</div>
+        <div class="section-meta">
+          <div class="label k">Breaking Changes</div>
+          <h2>v4 → v5 完整迁移对照表</h2>
+          <p>v5 包含多个破坏性变更。逐项对照，迁移不走弯路。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">ESM-only</span></div>
+          <h3>ESM-only 构建</h3>
+          <p>v5 移除了所有 UMD 构建。仅支持 ES Module。Node.js 需 14+。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// package.json 需添加</span>
+{
+  <span class="str">"type"</span>: <span class="str">"module"</span>
+}
+
+<span class="cmt">// ❌ v4 CommonJS — 已移除</span>
+<span class="kwd">const</span> { TresCanvas } = <span class="fn">require</span>(<span class="str">'@tresjs/core'</span>)
+
+<span class="cmt">// ✅ v5 ESM</span>
+<span class="kwd">import</span> { TresCanvas } <span class="kwd">from</span> <span class="str">'@tresjs/core'</span></pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag red">Events</span></div>
+          <h3>事件系统重写</h3>
+          <p>基于 @pmndrs/pointer-events，遵循 DOM 原生命名，仅首触元素触发。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// ❌ v4 短横线命名</span>
+<span class="tag">&lt;TresMesh @pointer-down</span>=<span class="str">"handle"</span><span class="tag">&gt;</span>
+<span class="tag">&lt;TresMesh @click</span>=<span class="str">"handle"</span> <span class="attr">@pointer-up</span>=<span class="str">"handle"</span><span class="tag">&gt;</span>
+
+<span class="cmt">// ✅ v5 DOM 原生命名</span>
+<span class="tag">&lt;TresMesh @pointerdown</span>=<span class="str">"handle"</span><span class="tag">&gt;</span>
+<span class="tag">&lt;TresMesh @click</span>=<span class="str">"handle"</span> <span class="attr">@pointerup</span>=<span class="str">"handle"</span><span class="tag">&gt;</span>
+
+<span class="cmt">// 重叠元素：改用父级处理</span>
+<span class="tag">&lt;TresGroup @click</span>=<span class="str">"handleGroup"</span><span class="tag">&gt;</span>
+  <span class="tag">&lt;TresMesh&gt;</span>…<span class="tag">&lt;/TresMesh&gt;</span>
+<span class="tag">&lt;/TresGroup&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">废弃移除</span></div>
+          <h3>已移除的 Composable</h3>
+          <p>以下 Composable 在 v5 中已移除或迁移：</p>
+          <ul>
+            <li><code>useTresReady</code> → <code>@ready</code> 事件</li>
+            <li><code>useSeek</code> → <code>useGraph</code></li>
+            <li><code>useTresEventManager</code> → 新事件系统</li>
+            <li><code>useRaycaster</code> → 原生 Three.js Raycaster</li>
+            <li><code>useRenderLoop</code> → <code>useLoop</code></li>
+            <li><code>useLogger</code> → 移除（调试简化）</li>
+            <li><code>useCamera</code> → <code>useTres().camera</code></li>
+            <li><code>useTexture</code> → <code>@tresjs/cientos</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">useRenderLoop</span></div>
+          <h3>useLoop 替代 useRenderLoop</h3>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// ❌ v4 useRenderLoop</span>
+<span class="kwd">const</span> { onLoop } = <span class="fn">useRenderLoop</span>()
+<span class="fn">onLoop</span>(({ delta, elapsed }) => {
+  mesh.rotation.y += delta
+})
+
+<span class="cmt">// ✅ v5 useLoop</span>
+<span class="kwd">const</span> { onBeforeRender } = <span class="fn">useLoop</span>()
+<span class="fn">onBeforeRender</span>(({ delta, elapsed }) => {
+  mesh.rotation.y += delta
+})</pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">Camera API</span></div>
+          <h3>Camera 上下文变更</h3>
+          <p>camera 从实例改为状态对象，支持多相机管理。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// ❌ v4</span>
+<span class="kwd">const</span> { camera } = <span class="fn">useTresContext</span>()
+
+<span class="cmt">// ✅ v5 — 简单迁移</span>
+<span class="kwd">const</span> { camera } = <span class="fn">useTres</span>()
+
+<span class="cmt">// 高级用法：多相机管理</span>
+<span class="kwd">const</span> activeCam = camera.value.current</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">useGLTF 变更</span></div>
+          <h3>Cientos useGLTF 同步更新</h3>
+          <p>useGLTF / useFBX 等 Cientos Composable 也改为响应式模式。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> { <span class="fn">useGLTF</span> } <span class="kwd">from</span> <span class="str">'@tresjs/cientos'</span>
+
+<span class="kwd">const</span> { state, nodes, materials, isLoading, progress } =
+  <span class="fn">useGLTF</span>(<span class="str">'/model.glb'</span>, { draco: <span class="kwd">true</span> })
+
+<span class="tag">&lt;primitive</span> <span class="attr">v-if</span>=<span class="str">"state"</span> <span class="attr">:object</span>=<span class="str">"state.scene"</span> <span class="tag">/&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 07: Ecosystem -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">07</div>
+        <div class="section-meta">
+          <div class="label">Ecosystem</div>
+          <h2>生态体系：cientos / post-processing / rapier / nuxt</h2>
+          <p>TresJS 核心之外还有完整的周边生态：组件库、物理引擎、后处理、Nuxt 模块。每一项都已在 v5 下适配完毕。</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">cientos</span></div>
+          <h3>@tresjs/cientos</h3>
+          <p>官方组件库，提供常用 3D 组件、控制器和 Composable。</p>
+          <ul>
+            <li>OrbitControls — 轨道控制器</li>
+            <li>useGLTF / useFBX — 模型加载</li>
+            <li>useTexture — 纹理加载</li>
+            <li>useAnimations — 动画混合器</li>
+            <li>Levioso — 浮动动画组件</li>
+            <li>Stars / Fog / 天空盒</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">post-processing</span></div>
+          <h3>@tresjs/post-processing</h3>
+          <p>后处理管线，支持 Bloom / Vignette / SSR / Depth 等效果。</p>
+          <ul>
+            <li>Bloom — HDR 发光效果</li>
+            <li>Vignette — 暗角效果</li>
+            <li>EffectComposer — 效果组合器</li>
+            <li>支持 pmndrs 生态效果</li>
+            <li>基于 Three.js EffectComposer</li>
+            <li>Vue 组件式封装</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">physics</span></div>
+          <h3>@tresjs/rapier</h3>
+          <p>Rapier WASM 物理引擎，声明式刚体与碰撞体。</p>
+          <ul>
+            <li>Physics provider — 物理世界容器</li>
+            <li>RigidBody — 刚体（动态/固定）</li>
+            <li>collider — 碰撞体形状</li>
+            <li>碰撞事件与接触力事件</li>
+            <li>collisionGroups 过滤</li>
+            <li>useRapierContext — 深入物理世界</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">nuxt</span></div>
+          <h3>@tresjs/nuxt</h3>
+          <p>官方 Nuxt 模块，自动注入 TresJS 到 Nuxt 生态。</p>
+          <ul>
+            <li>nuxt.config.ts 一行配置</li>
+            <li>组件/Composable 自动导入</li>
+            <li>TresCanvas 客户端渲染</li>
+            <li>Nuxt Devtools 集成</li>
+            <li>TresJS Devtools 扩展</li>
+            <li>SSR 兼容（需 client 指令）</li>
+          </ul>
+        </article>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="code-block">
+          <div class="code-label">// Nuxt 安装 TresJS</div>
+          <pre><span class="cmt">// nuxt.config.ts</span>
+<span class="kwd">export default</span> <span class="fn">defineNuxtConfig</span>({
+  <span class="attr">modules</span>: [<span class="str">'@tresjs/nuxt'</span>],
+  <span class="attr">tres</span>: {
+    <span class="attr">devtools</span>: <span class="kwd">true</span>
+  }
+})
+
+<span class="cmt">// 安装依赖</span>
+<span class="fn">pnpm</span> add @tresjs/nuxt @tresjs/cientos @tresjs/post-processing</pre>
+        </div>
+        <div class="code-block">
+          <div class="code-label">// Rapier Physics 声明式刚体</div>
+          <pre><span class="tag">&lt;TresCanvas&gt;</span>
+  <span class="tag">&lt;Suspense&gt;</span>
+    <span class="tag">&lt;Physics&gt;</span>
+      <span class="tag">&lt;RigidBody</span> <span class="attr">:restitution</span>=<span class="str">"0.5"</span><span class="tag">&gt;</span>
+        <span class="tag">&lt;TresMesh</span> <span class="attr">:position</span>=<span class="str">"[0, 8, 0]"</span><span class="tag">&gt;</span>
+          <span class="tag">&lt;TresBoxGeometry</span> <span class="tag">/&gt;</span>
+          <span class="tag">&lt;TresMeshNormalMaterial</span> <span class="tag">/&gt;</span>
+        <span class="tag">&lt;/TresMesh&gt;</span>
+      <span class="tag">&lt;/RigidBody&gt;</span>
+
+      <span class="tag">&lt;RigidBody</span> <span class="attr">type</span>=<span class="str">"fixed"</span><span class="tag">&gt;</span>
+        <span class="tag">&lt;TresMesh</span> <span class="attr">:rotation</span>=<span class="str">"[-Math.PI/2, 0, 0]"</span><span class="tag">&gt;</span>
+          <span class="tag">&lt;TresPlaneGeometry</span> <span class="attr">:args</span>=<span class="str">"[10, 10]"</span> <span class="tag">/&gt;</span>
+          <span class="tag">&lt;TresMeshBasicMaterial</span> <span class="attr">:color</span>=<span class="str">"'#f4f4f4'"</span> <span class="tag">/&gt;</span>
+        <span class="tag">&lt;/TresMesh&gt;</span>
+      <span class="tag">&lt;/RigidBody&gt;</span>
+    <span class="tag">&lt;/Physics&gt;</span>
+  <span class="tag">&lt;/Suspense&gt;</span>
+<span class="tag">&lt;/TresCanvas&gt;</span></pre>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 08: 安装与快速上手 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">08</div>
+        <div class="section-meta">
+          <div class="label b">Getting Started</div>
+          <h2>安装与快速上手：从零到第一个 3D 场景</h2>
+          <p>手把手安装 TresJS，写出第一个 3D 场景。Node.js ≥20，支持 pnpm / npm / yarn。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">Scaffold</span></div>
+          <h3>方式一：create-tres CLI（推荐）</h3>
+          <p>交互式向导，自动配置 Vue + Vite / Nuxt，带 TypeScript / ESLint / 生态包。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt"># 推荐方式：npx 直接运行</span>
+<span class="fn">npx</span> create-tres my-tres-app
+
+<span class="cmt"># 向导选项示例</span>
+<span class="str">? Select a template</span> › Vue + Vite
+<span class="str">? Select ecosystem packages</span> › Cientos, Post-processing
+<span class="str">? Enable TypeScript?</span> › Yes
+<span class="str">? Enable ESLint?</span> › Yes
+
+<span class="cmt"># 进入目录</span>
+<span class="fn">cd</span> my-tres-app && pnpm dev</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Manual</span></div>
+          <h3>方式二：手动安装</h3>
+          <p>在已有 Vue 项目中手动安装 TresJS 核心包。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt"># 安装 TresJS 核心</span>
+<span class="fn">pnpm</span> add @tresjs/core
+
+<span class="cmt"># 安装生态包（可选）</span>
+<span class="fn">pnpm</span> add @tresjs/cientos
+<span class="fn">pnpm</span> add @tresjs/post-processing
+<span class="fn">pnpm</span> add @tresjs/nuxt
+
+<span class="cmt"># 注册 TresCanvas 组件（main.js）</span>
+<span class="kwd">import</span> { TresCanvas } <span class="kwd">from</span> <span class="str">'@tresjs/core'</span>
+<span class="fn">createApp</span>(App)
+  .component(<span class="str">'TresCanvas'</span>, TresCanvas)
+  .mount(<span class="str">'#app'</span>)</pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">Nuxt</span></div>
+          <h3>Nuxt 项目安装</h3>
+          <p>使用官方 @tresjs/nuxt 模块，一行配置启用完整 TresJS 生态。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt"># 安装模块</span>
+<span class="fn">pnpm</span> add @tresjs/nuxt
+
+<span class="cmt"># nuxt.config.ts</span>
+<span class="kwd">export default</span> <span class="fn">defineNuxtConfig</span>({
+  <span class="attr">modules</span>: [<span class="str">'@tresjs/nuxt'</span>],
+  <span class="attr">tres</span>: { <span class="attr">devtools</span>: <span class="kwd">true</span> },
+  <span class="attr">devtools</span>: { <span class="attr">enabled</span>: <span class="kwd">true</span> }
+})
+
+<span class="cmt"># TresCanvas 自动导入，无需手动注册</span></pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">First Scene</span></div>
+          <h3>第一个 3D 场景</h3>
+          <p>安装完成后，用 Vue 单文件组件写出第一个 3D 场景。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="tag">&lt;template&gt;</span>
+  <span class="tag">&lt;TresCanvas</span>
+    <span class="attr">antialias</span>=<span class="str">"true"</span>
+    <span class="attr">:clear-color</span>=<span class="str">"'#1a1a2e'"</span>
+    <span class="tag">&gt;</span>
+    <span class="cmt">&lt;!-- 相机 --&gt;</span>
+    <span class="tag">&lt;TresPerspectiveCamera</span>
+      <span class="attr">:position</span>=<span class="str">"[3, 3, 3]"</span>
+      <span class="tag">/&gt;</span>
+    <span class="cmt">&lt;!-- 3D 物体 --&gt;</span>
+    <span class="tag">&lt;TresMesh</span> <span class="attr">:position</span>=<span class="str">"[0, 0, 0]"</span><span class="tag">&gt;</span>
+      <span class="tag">&lt;TresBoxGeometry</span> <span class="attr">:args</span>=<span class="str">"[1, 1, 1]"</span> <span class="tag">/&gt;</span>
+      <span class="tag">&lt;TresMeshNormalMaterial</span> <span class="tag">/&gt;</span>
+    <span class="tag">&lt;/TresMesh&gt;</span>
+    <span class="cmt">&lt;!-- 灯光 --&gt;</span>
+    <span class="tag">&lt;TresAmbientLight</span> <span class="attr">:intensity</span>=<span class="str">"1"</span> <span class="tag">/&gt;</span>
+    <span class="tag">&lt;TresDirectionalLight</span>
+      <span class="attr">:position</span>=<span class="str">"[5, 5, 5]"</span>
+      <span class="attr">:cast-shadow</span>=<span class="str">"true"</span>
+    <span class="tag">/&gt;</span>
+  <span class="tag">&lt;/TresCanvas&gt;</span>
+<span class="tag">&lt;/template&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 09: Tres CLI 脚手架 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">09</div>
+        <div class="section-meta">
+          <div class="label k">Tres CLI</div>
+          <h2>tres CLI：从 GLTF 模型到类型化 Vue 组件</h2>
+          <p>@tresjs/cli 将 GLTF/GLB 模型自动转换为带类型和插槽的 Vue 组件，节点更新不再丢失覆盖。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">tres gltf</span></div>
+          <h3>自动生成 Vue 组件</h3>
+          <p>给定一个 .glb/.gltf 文件，生成带类型声明和插槽的 Vue 组件。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt"># 安装 CLI</span>
+<span class="fn">pnpm</span> add -D @tresjs/cli
+
+<span class="cmt"># 生成组件（无需安装额外依赖）</span>
+<span class="fn">tres</span> gltf public/models/robot.glb
+<span class="cmt"># 输出：src/models/Robot.gen.vue</span>
+<span class="cmt"># 插槽：Head, Body, Base</span>
+
+<span class="cmt"># 查看帮助</span>
+<span class="fn">tres</span> gltf --help</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Slots</span></div>
+          <h3>插槽覆盖机制</h3>
+          <p>生成的组件为每个命名节点提供插槽，覆盖后再次生成不丢失。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// Robot.gen.vue 自动生成</span>
+<span class="tag">&lt;template&gt;</span>
+  <span class="tag">&lt;TresGroup</span> <span class="attr">:object</span>=<span class="str">"state.scene"</span><span class="tag">&gt;</span>
+    <span class="tag">&lt;slot</span> <span class="attr">name</span>=<span class="str">"Head"</span> <span class="tag">/&gt;</span>
+    <span class="tag">&lt;slot</span> <span class="attr">name</span>=<span class="str">"Body"</span> <span class="tag">/&gt;</span>
+    <span class="tag">&lt;slot</span> <span class="attr">name</span>=<span class="str">"Base"</span> <span class="tag">/&gt;</span>
+  <span class="tag">&lt;/TresGroup&gt;</span>
+<span class="tag">&lt;/template&gt;</span>
+
+<span class="cmt">// 使用时覆盖插槽</span>
+<span class="tag">&lt;Robot</span><span class="tag">&gt;</span>
+  <span class="tag">&lt;template #Head&gt;</span>
+    <span class="tag">&lt;TresMesh&gt;</span>
+      <span class="tag">&lt;TresBoxGeometry</span> <span class="attr">:args</span>=<span class="str">"[0.5, 0.5, 0.5]"</span> <span class="tag">/&gt;</span>
+      <span class="tag">&lt;TresMeshStandardMaterial</span> <span class="attr">color</span>=<span class="str">"red"</span> <span class="tag">/&gt;</span>
+    <span class="tag">&lt;/TresMesh&gt;</span>
+  <span class="tag">&lt;/template&gt;</span>
+<span class="tag">&lt;/Robot&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">TypeScript</span></div>
+          <h3>TypeScript 类型安全</h3>
+          <p>配合 TypeScript 泛型，节点和材质访问完全类型化。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> type { Mesh, MeshStandardMaterial } <span class="kwd">from</span> <span class="str">'three'</span>
+<span class="kwd">import</span> { <span class="fn">useGLTF</span> } <span class="kwd">from</span> <span class="str">'@tresjs/cientos'</span>
+
+<span class="kwd">interface</span> <span class="fn">ModelNodes</span> {
+  Head: Mesh
+  Body: Mesh
+}
+<span class="kwd">interface</span> <span class="fn">ModelMaterials</span> {
+  Metal: MeshStandardMaterial
+}
+
+<span class="kwd">const</span> { nodes, materials } =
+  <span class="fn">useGLTF</span>&lt;ModelNodes, ModelMaterials&gt;(<span class="str">'/model.glb'</span>)
+
+<span class="cmt">// 完全类型化：不是 any</span>
+nodes.value.Head.material = materials.value.Metal</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">管道模式</span></div>
+          <h3>CLI 管道模式</h3>
+          <p>stdout 只输出 payload，stderr 输出进度，CI/CD 友好。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt"># 输出 JSON 到文件</span>
+<span class="fn">tres</span> gltf robot.glb --json > robot.json
+
+<span class="cmt"># 复制组件代码到剪贴板</span>
+<span class="fn">tres</span> gltf robot.glb --console | pbcopy
+
+<span class="cmt"># 无 TTY 时自动关闭动画 spinner</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 10: 动画与后处理 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">10</div>
+        <div class="section-meta">
+          <div class="label">Animation & Post-processing</div>
+          <h2>动画系统与后处理：从 GLTF 动画剪辑到 Bloom 发光效果</h2>
+          <p>useAnimations 驱动 GLTF 动画，@tresjs/post-processing 提供 Bloom / Vignette 等后处理。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">useAnimations</span></div>
+          <h3>GLTF 动画剪辑</h3>
+          <p>从 GLTF 模型提取动画剪辑，控制播放/暂停/切换。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> { <span class="fn">useGLTF</span>, <span class="fn">useAnimations</span> } <span class="kwd">from</span> <span class="str">'@tresjs/cientos'</span>
+
+<span class="kwd">const</span> { state } = <span class="fn">useGLTF</span>(<span class="str">'/robot.glb'</span>)
+<span class="kwd">const</span> animations = <span class="fn">computed</span>(
+  () => state.value?.animations ?? []
+)
+<span class="kwd">const</span> model = <span class="fn">computed</span>(() => state.value?.scene)
+
+<span class="kwd">const</span> { actions } = <span class="fn">useAnimations</span>(animations, model)
+
+<span class="cmt">// 播放动画</span>
+<span class="fn">watch</span>(actions, (acts) => {
+  <span class="kwd">const</span> idle = acts[<span class="str">'Idle'</span>]
+  idle?.play()
+})
+
+<span class="cmt">// 切换动画</span>
+<span class="kwd">const</span> walk = acts[<span class="str">'Walk'</span>]
+walk.play()
+actions[<span class="str">'Idle'</span>].fadeOut(walk, 0.5)</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag red">Bloom</span></div>
+          <h3>Bloom 发光后处理</h3>
+          <p>HDR 亮度区域发光效果，常用于霓虹/火焰/科幻场景。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> {
+  <span class="fn">EffectComposerPmndrs</span>,
+  <span class="fn">BloomPmndrs</span>,
+  <span class="fn">VignettePmndrs</span>
+} <span class="kwd">from</span> <span class="str">'@tresjs/post-processing'</span>
+
+<span class="tag">&lt;TresMesh&gt;</span>
+  <span class="tag">&lt;TresIcosahedronGeometry</span> <span class="attr">:args</span>=<span class="str">"[1, 1]"</span> <span class="tag">/&gt;</span>
+  <span class="tag">&lt;TresMeshStandardMaterial</span>
+    <span class="attr">color</span>=<span class="str">"#ff6600"</span>
+    <span class="attr">:emissive</span>=<span class="str">"'#ff6600'"</span>
+    <span class="attr">:emissive-intensity</span>=<span class="str">"2"</span>
+  <span class="tag">/&gt;</span>
+<span class="tag">&lt;/TresMesh&gt;</span>
+
+<span class="tag">&lt;Suspense&gt;</span>
+  <span class="tag">&lt;EffectComposerPmndrs&gt;</span>
+    <span class="tag">&lt;BloomPmndrs</span>
+      <span class="attr">:intensity</span>=<span class="str">"3"</span>
+      <span class="attr">:luminance-threshold</span>=<span class="str">"0.2"</span>
+      <span class="attr">mipmap-blur</span>
+    <span class="tag">/&gt;</span>
+    <span class="tag">&lt;VignettePmndrs</span> <span class="attr">:darkness</span>=<span class="str">"0.4"</span> <span class="tag">/&gt;</span>
+  <span class="tag">&lt;/EffectComposerPmndrs&gt;</span>
+<span class="tag">&lt;/Suspense&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">手动控制</span></div>
+          <h3>useAnimations 手动更新模式</h3>
+          <p>关闭自动更新，手动在 useLoop 中控制混合器更新。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> { <span class="fn">useLoop</span> } <span class="kwd">from</span> <span class="str">'@tresjs/core'</span>
+
+<span class="kwd">const</span> { mixer } = <span class="fn">useAnimations</span>(animations, model, {
+  <span class="attr">manualUpdate</span>: <span class="kwd">true</span>
+})
+
+<span class="kwd">const</span> { onBeforeRender } = <span class="fn">useLoop</span>()
+<span class="fn">onBeforeRender</span>(({ delta }) => {
+  mixer.value.update(delta)
+})</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">OrbitControls</span></div>
+          <h3>Levioso 浮动动画</h3>
+          <p>Cientos 提供的浮动动画组件，无需编写动画逻辑。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> { <span class="fn">Levioso</span>, <span class="fn">OrbitControls</span> } <span class="kwd">from</span> <span class="str">'@tresjs/cientos'</span>
+
+<span class="tag">&lt;TresCanvas&gt;</span>
+  <span class="tag">&lt;OrbitControls</span> <span class="tag">/&gt;</span>
+  <span class="tag">&lt;Levioso</span>
+    <span class="attr">:speed</span>=<span class="str">"2"</span>
+    <span class="attr">:rotation-intensity</span>=<span class="str">"2"</span>
+    <span class="attr">:float-intensity</span>=<span class="str">"1"</span>
+  <span class="tag">&gt;</span>
+    <span class="tag">&lt;TresMesh&gt;</span>
+      <span class="tag">&lt;TresIcosahedronGeometry</span> <span class="attr">:args</span>=<span class="str">"[1, 1]"</span> <span class="tag">/&gt;</span>
+      <span class="tag">&lt;TresMeshNormalMaterial</span> <span class="attr">flat-shading</span> <span class="tag">/&gt;</span>
+    <span class="tag">&lt;/TresMesh&gt;</span>
+  <span class="tag">&lt;/Levioso&gt;</span>
+<span class="tag">&lt;/TresCanvas&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 11: Devtools 调试与资源清理 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">11</div>
+        <div class="section-meta">
+          <div class="label b">Devtools & Debug</div>
+          <h2>Devtools 调试与资源清理</h2>
+          <p>v5 内置场景图检查器 / FPS 监控 / 内存分析，配合 Vue DevTools 使用。资源清理防止内存泄漏。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">Devtools</span></div>
+          <h3>TresJS Devtools 功能清单</h3>
+          <p>Chrome DevTools 扩展面板，实时查看和调试 3D 场景。</p>
+          <ul>
+            <li><strong>Scene Graph</strong> — 完整场景树结构，节点层级可视化</li>
+            <li><strong>FPS Monitor</strong> — 实时帧率监控，发现性能瓶颈</li>
+            <li><strong>Memory Usage</strong> — 内存占用分析，防止泄漏</li>
+            <li><strong>Draw Calls</strong> — 绘制调用次数，优化批次</li>
+            <li><strong>Properties Panel</strong> — 选中 3D 对象的属性实时编辑</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Nuxt Devtools</span></div>
+          <h3>Nuxt Devtools 集成</h3>
+          <p>Nuxt 4 项目中，TresJS Devtools 作为 Nuxt Devtools 插件运行。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// nuxt.config.ts</span>
+<span class="kwd">export default</span> <span class="fn">defineNuxtConfig</span>({
+  <span class="attr">modules</span>: [<span class="str">'@tresjs/nuxt'</span>, <span class="str">'@nuxt/devtools'</span>],
+  <span class="attr">tres</span>: { <span class="attr">devtools</span>: <span class="kwd">true</span> },
+  <span class="attr">devtools</span>: { <span class="attr">enabled</span>: <span class="kwd">true</span> }
+})
+
+<span class="cmt"># 启动 devtools</span>
+<span class="fn">pnpm</span> dev
+
+<span class="cmt"># 在 Nuxt Devtools 面板中找到 TresJS Tab</span></pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">@ready</span></div>
+          <h3>场景就绪事件</h3>
+          <p>替代旧版 useTresReady，用 @ready 事件监听 TresCanvas 准备完毕。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// ❌ v4 — useTresReady 已移除</span>
+<span class="kwd">const</span> { isReady } = <span class="fn">useTresReady</span>()
+
+<span class="cmt">// ✅ v5 — @ready 事件</span>
+<span class="tag">&lt;TresCanvas</span> <span class="attr">@ready</span>=<span class="str">"onCanvasReady"</span><span class="tag">&gt;</span>
+
+<span class="kwd">function</span> <span class="fn">onCanvasReady</span>(ctx) {
+  console.<span class="fn">log</span>(<span class="str">'Canvas ready:'</span>, ctx)
+  console.<span class="fn">log</span>(<span class="str">'Renderer:'</span>, ctx.renderer)
+  console.<span class="fn">log</span>(<span class="str">'Camera:'</span>, ctx.camera)
+}</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Auto Cleanup</span></div>
+          <h3>自动资源清理</h3>
+          <p>v5 Composable 在组件卸载时自动调用 dispose()，防止 Three.js 内存泄漏。</p>
+          <ul>
+            <li>useLoader 加载的资源自动 dispose</li>
+            <li>useGLTF 模型卸载时自动清理</li>
+            <li>纹理/几何体自动释放 GPU 显存</li>
+            <li>动画混合器自动停止并清理</li>
+            <li>渲染器在 TresCanvas 卸载时 dispose</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 12: 资源清理与 WebGPU -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">12</div>
+        <div class="section-meta">
+          <div class="label k">WebGPU & Performance</div>
+          <h2>WebGPU 渲染链与性能优化</h2>
+          <p>WebGPU 的 TSL 着色器语言、固定时间步物理、以及 bundle size 优化策略。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">TSL</span></div>
+          <h3>Three.js Shading Language (TSL)</h3>
+          <p>WebGPU 下 Three.js 使用 TSL 而非 GLSL，语法更接近 JavaScript，类型安全。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// TSL — WebGPU 着色器（替代 GLSL）</span>
+<span class="kwd">import</span> { <span class="fn">color</span>, <span class="fn">vec3</span>, <span class="fn">normalView</span> } <span class="kwd">from</span> <span class="str">'three/webgpu'</span>
+<span class="kwd">import</span> { <span class="fn">nodeProxy</span> } <span class="kwd">from</span> <span class="str">'three/examples/jsm'</span>
+
+<span class="cmt">// 创建 TSL 函数</span>
+<span class="kwd">const</span> myMaterial = <span class="fn">nodeProxy</span>(<span class="fn">MeshStandardMaterial</span>, {
+  <span class="attr">color</span>: <span class="fn">color</span>(<span class="str">'#d80018'</span>),
+  <span class="attr">roughness</span>: <span class="num">0.5</span>
+})
+
+<span class="cmt">// GPGPU — GPU 通用计算</span>
+<span class="cmt">// 用于粒子系统、噪声生成等</span></pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">slim</span></div>
+          <h3>createTresApp slim：Tree-shaking 优化</h3>
+          <p>v5 新增 slim 入口，不自动 extend 全量 THREE 命名空间，按需注册。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// @tresjs/core/slim — 不 extend 全量 THREE</span>
+<span class="kwd">import</span> { <span class="fn">createTresApp</span> } <span class="kwd">from</span> <span class="str">'@tresjs/core/slim'</span>
+<span class="kwd">import</span> { Mesh, BoxGeometry, MeshStandardMaterial } <span class="kwd">from</span> <span class="str">'three'</span>
+
+<span class="kwd">const</span> app = <span class="fn">createTresApp</span>(canvas, {
+  <span class="attr">windowSize</span>: <span class="kwd">true</span>
+})
+app.<span class="fn">extend</span>({ Mesh, BoxGeometry, MeshStandardMaterial })
+app.<span class="fn">render</span>(MyScene)
+
+<span class="cmt">// bundle 大幅减小：仅打包使用的 Three.js 类</span></pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">Rapier 固定步长</span></div>
+          <h3>Rapier 物理时间步长</h3>
+          <p>Rapier 使用固定时间步（1/60s）模拟，与渲染帧率解耦，防止长间隙导致物理爆炸。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// 物理逻辑放入 onBeforeStep，非渲染循环</span>
+<span class="kwd">import</span> { <span class="fn">useRapier</span> } <span class="kwd">from</span> <span class="str">'@tresjs/rapier'</span>
+
+<span class="kwd">const</span> { world, rapier, timeStep, onBeforeStep } = <span class="fn">useRapier</span>()
+
+<span class="fn">onBeforeStep</span>(() => {
+  <span class="cmt">// 每物理子步运行一次，不是每渲染帧</span>
+  <span class="cmt">// 施加力、检测碰撞等</span>
+  applyPlayerForce()
+})</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">DRACO</span></div>
+          <h3>DRACO 压缩与模型优化</h3>
+          <p>使用 DRACO 压缩 GLTF 模型，配合 useGLTF 的 draco 选项自动解码。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">const</span> { state, nodes, materials } = <span class="fn">useGLTF</span>(
+  <span class="str">'/models/compressed.glb'</span>,
+  { <span class="attr">draco</span>: <span class="kwd">true</span> }
+)
+
+<span class="cmt">// useLoader 配置 DRACO 解码器</span>
+<span class="kwd">import</span> { <span class="fn">DRACOLoader</span> } <span class="kwd">from</span> <span class="str">'three/examples/jsm'</span>
+<span class="kwd">const</span> { state, isLoading } = <span class="fn">useLoader</span>(GLTFLoader, <span class="str">'/robot.glb'</span>, {
+  <span class="attr">extensions</span>: (loader) => {
+    <span class="kwd">const</span> dracoLoader = <span class="kwd">new</span> <span class="fn">DRACOLoader</span>()
+    loader.<span class="fn">setDRACOLoader</span>(dracoLoader)
+  }
+})</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 13: 完整资源对照与链接 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">13</div>
+        <div class="section-meta">
+          <div class="label">Resources</div>
+          <h2>完整资源对照：v5 核心包 / Composable / 迁移清单</h2>
+          <p>所有核心 API、废弃对照、安装命令与官方资源链接。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">废弃对照表</span></div>
+          <h3>v4 → v5 Composable 废弃对照</h3>
+          <ul>
+            <li><code>useTresReady</code> → <code>@ready</code> 事件 on TresCanvas</li>
+            <li><code>useSeek</code> → <code>useGraph(scene)</code></li>
+            <li><code>useTresEventManager</code> → 新事件系统（移除）</li>
+            <li><code>useRaycaster</code> → 原生 Three.js Raycaster</li>
+            <li><code>useRenderLoop</code> → <code>useLoop()</code></li>
+            <li><code>useLogger</code> → 移除（调试简化）</li>
+            <li><code>useCamera</code> → <code>useTres().camera</code></li>
+            <li><code>useTexture</code> → <code>@tresjs/cientos</code></li>
+            <li><code>useTresContext</code> → <code>useTres()</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">npm 命令</span></div>
+          <h3>升级与安装命令</h3>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt"># 升级到 v5</span>
+<span class="fn">pnpm</span> add @tresjs/tres@latest
+<span class="fn">pnpm</span> add @tresjs/cientos@latest
+
+<span class="cmt"># Rapier 物理引擎（alpha）</span>
+<span class="fn">pnpm</span> add @tresjs/rapier@latest
+
+<span class="cmt"># CLI 脚手架</span>
+<span class="fn">pnpm</span> add -D @tresjs/cli
+
+<span class="cmt"># Nuxt 模块</span>
+<span class="fn">pnpm</span> add @tresjs/nuxt</pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">@tresjs/core</span></div>
+          <h3>核心 Composable API 速查</h3>
+          <ul>
+            <li><code>useLoader(Loader, url, opts)</code> — 通用资源加载（v5 新响应式 API）</li>
+            <li><code>useLoop()</code> — 渲染循环（onBeforeRender / onRender / onAfterRender）</li>
+            <li><code>useTres()</code> — 场景上下文（camera / scene / renderer / controls / clock）</li>
+            <li><code>useTresContext()</code> — 完整上下文（模块作者用）</li>
+            <li><code>useGraph(scene)</code> — 场景图查询（nodes / materials）</li>
+            <li><code>useCamera()</code> → 已移除，改用 <code>useTres().camera</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">官方资源</span></div>
+          <h3>官方文档与社区</h3>
+          <ul>
+            <li><strong>官网</strong> — <a href="https://tresjs.org/" target="_blank">tresjs.org</a></li>
+            <li><strong>官方博客</strong> — <a href="https://tresjs.org/blog/tresjs-v5" target="_blank">v5 发布公告</a></li>
+            <li><strong>升级指南</strong> — <a href="https://docs.tresjs.org/getting-started/upgrade-guide" target="_blank">docs.tresjs.org</a></li>
+            <li><strong>GitHub</strong> — <a href="https://github.com/Tresjs/tres" target="_blank">Tresjs/tres</a></li>
+            <li><strong>Lab 示例</strong> — <a href="https://lab.tresjs.org/" target="_blank">lab.tresjs.org</a></li>
+            <li><strong>Cientos</strong> — <a href="https://cientos.tresjs.org/" target="_blank">cientos.tresjs.org</a></li>
+            <li><strong>Nuxt 模块</strong> — <a href="https://nuxt.com/modules/tresjs" target="_blank">nuxt.com/modules/tresjs</a></li>
+            <li><strong>Rapier 物理</strong> — <a href="https://rapier.tresjs.org/" target="_blank">rapier.tresjs.org</a></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+<!-- FOOTER -->
     <div class="rule"></div>
     <div class="footer-links">
       <a href="https://tresjs.org/" target="_blank" rel="noopener">
@@ -408,3 +1289,501 @@
   </main>
 </body>
 </html>
+
+
+    <!-- SECTION 14: TresCanvas 完整 API 参考 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">14</div>
+        <div class="section-meta">
+          <div class="label b">API Reference</div>
+          <h2>TresCanvas 完整属性参考</h2>
+          <p>所有 TresCanvas 可用属性：WebGL 上下文初始化参数（必须在创建时设置）和可动态修改的渲染参数。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">上下文初始化</span></div>
+          <h3>必须在创建时设置的参数</h3>
+          <p>WebGL 上下文一旦创建无法更改，修改需重建整个渲染器，因此这些属性须使用静态值。</p>
+          <ul>
+            <li><code>alpha</code> — Canvas 透明背景（布尔）</li>
+            <li><code>antialias</code> — 抗锯齿（布尔）</li>
+            <li><code>powerPreference</code> — 性能偏好：'high-performance' | 'low-power' | 'default'</li>
+            <li><code>preserveDrawingBuffer</code> — 保留绘制缓冲区（截图用）</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">动态参数</span></div>
+          <h3>可动态修改的渲染参数</h3>
+          <p>以下参数可以在运行时通过响应式 ref 动态修改。</p>
+          <ul>
+            <li><code>clearColor</code> — 背景清除色（Color 实例或字符串）</li>
+            <li><code>shadows</code> — 阴影投射（布尔）</li>
+            <li><code>windowSize</code> — 跟随窗口大小（布尔）</li>
+            <li><code>toneMapping</code> — 色调映射（ACESFilmicToneMapping 等）</li>
+            <li><code>toneMappingExposure</code> — 曝光值（数值）</li>
+            <li><code>outputColorSpace</code> — 输出色彩空间</li>
+            <li><code>shadowMapType</code> — 阴影贴图类型</li>
+            <li><code>renderMode</code> — 渲染模式（默认/手动）</li>
+            <li><code>dpr</code> — 设备像素比（数值）</li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="code-block">
+          <div class="code-label">// 静态初始化参数（仅在创建时生效）</div>
+          <pre><span class="tag">&lt;TresCanvas</span>
+  <span class="attr">:alpha</span>=<span class="str">"true"</span>
+  <span class="attr">:antialias</span>=<span class="str">"true"</span>
+  <span class="attr">power-preference</span>=<span class="str">"high-performance"</span>
+  <span class="attr">:preserve-drawing-buffer</span>=<span class="str">"true"</span>
+<span class="tag">&gt;</span>
+  <span class="cmt">&lt;!-- 场景内容 --&gt;</span>
+<span class="tag">&lt;/TresCanvas&gt;</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-label">// 动态参数（响应式修改）</div>
+          <pre><span class="kwd">import</span> { <span class="fn">ACESFilmicToneMapping</span> } <span class="kwd">from</span> <span class="str">'three'</span>
+
+<span class="kwd">const</span> shadowsOn = <span class="fn">ref</span>(<span class="kwd">true</span>)
+<span class="kwd">const</span> toneMapping = <span class="fn">ref</span>(<span class="fn">ACESFilmicToneMapping</span>)
+<span class="kwd">const</span> exposure = <span class="fn">ref</span>(<span class="num">1.0</span>)
+
+<span class="tag">&lt;TresCanvas</span>
+  <span class="attr">:shadows</span>=<span class="str">"shadowsOn"</span>
+  <span class="attr">:tone-mapping</span>=<span class="str">"toneMapping"</span>
+  <span class="attr">:tone-mapping-exposure</span>=<span class="str">"exposure"</span>
+  <span class="attr">:clear-color</span>=<span class="str">"'#1a1a2e'"</span>
+<span class="tag">&gt;</span>
+  <span class="tag">&lt;TresMesh</span> <span class="attr">:cast-shadow</span>=<span class="str">"shadowsOn"</span><span class="tag">&gt;</span>…<span class="tag">&lt;/TresMesh&gt;</span>
+<span class="tag">&lt;/TresCanvas&gt;</span>
+
+<span class="cmt">// 运行时修改（自动响应）</span>
+<span class="fn">watch</span>(toneMapping, (v) => console.<span class="fn">log</span>(<span class="str">'tone changed to'</span>, v))</pre>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">@loop</span></div>
+          <h3>TresCanvas 事件</h3>
+          <p>所有 TresCanvas 可绑定事件：</p>
+          <ul>
+            <li><code>@ready</code> — Canvas 就绪，参数为上下文对象</li>
+            <li><code>@render</code> — 每帧渲染时触发</li>
+            <li><code>@before-loop</code> — 渲染循环开始前</li>
+            <li><code>@loop</code> — 渲染循环每帧触发</li>
+            <li><code>@after-loop</code> — 渲染循环结束后</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">渲染模式</span></div>
+          <h3>渲染模式与手动渲染</h3>
+          <p>v5 支持手动渲染模式，适合需要精确控制渲染时机的场景。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="tag">&lt;TresCanvas</span> <span class="attr">:render-mode</span>=<span class="str">"'manual'"</span><span class="tag">&gt;</span>
+  <span class="cmt">&lt;!-- 手动控制渲染循环 --&gt;</span>
+<span class="tag">&lt;/TresCanvas&gt;</span>
+
+<span class="kwd">import</span> { <span class="fn">useTres</span> } <span class="kwd">from</span> <span class="str">'@tresjs/core'</span>
+<span class="kwd">const</span> { renderer } = <span class="fn">useTres</span>()
+
+<span class="cmt">// 手动渲染</span>
+<span class="fn">requestAnimationFrame</span>(() => {
+  renderer.value.render(scene, camera)
+})</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 15: TresJS vs 竞品 / 使用场景选型 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">15</div>
+        <div class="section-meta">
+          <div class="label k">Comparison</div>
+          <h2>TresJS vs 竞品：什么时候选 TresJS？</h2>
+          <p>Vue 开发者 + Three.js → TresJS。React 开发者 → react-three-fiber。需要 CAD / 游戏引擎 → Babylon.js / Three.js 原生。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">react-three-fiber</span></div>
+          <h3>react-three-fiber（r3f）对比</h3>
+          <p>r3f 是 React 生态最成熟的 Three.js 封装，TresJS 对齐其 API 风格但面向 Vue。</p>
+          <table style="width:100%;font-size:12px;border-collapse:collapse">
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px"><strong>特性</strong></td><td style="padding:5px 8px">r3f</td><td style="padding:5px 8px">TresJS</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">框架</td><td style="padding:5px 8px">React</td><td style="padding:5px 8px">Vue 3</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">上手难度</td><td style="padding:5px 8px">中等（需熟悉 React）</td><td style="padding:5px 8px">低（Vue 开发者友好）</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">生态规模</td><td style="padding:5px 8px">极大（drei 等）</td><td style="padding:5px 8px">成长中（Cientos 等）</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">WebGPU</td><td style="padding:5px 8px">via Three.js</td><td style="padding:5px 8px">via Three.js（v5 实验支持）</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">物理引擎</td><td style="padding:5px 8px">@react-three/rapier</td><td style="padding:5px 8px">@tresjs/rapier</td></tr>
+          </table>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Babylon.js</span></div>
+          <h3>Babylon.js 对比</h3>
+          <p>Babylon.js 是完整游戏引擎，功能更全但体积更大，学习曲线陡。</p>
+          <table style="width:100%;font-size:12px;border-collapse:collapse">
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px"><strong>特性</strong></td><td style="padding:5px 8px">Babylon.js</td><td style="padding:5px 8px">TresJS</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">框架</td><td style="padding:5px 8px">原生/框架无关</td><td style="padding:5px 8px">Vue 3</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">Bundle 大小</td><td style="padding:5px 8px">较大（~1MB+）</td><td style="padding:5px 8px">小（~100KB core）</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">组件化</td><td style="padding:5px 8px">有限</td><td style="padding:5px 8px">完全组件化</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">Vue 集成</td><td style="padding:5px 8px">需额外适配</td><td style="padding:5px 8px">原生 Vue 集成</td></tr>
+            <tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 8px">适用场景</td><td style="padding:5px 8px">游戏/CAD/大场景</td><td style="padding:5px 8px">数据可视化/Web 应用</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">TresJS 适用场景</span></div>
+          <h3>TresJS 最适合的场景</h3>
+          <ul>
+            <li>Vue 3 项目中嵌入 3D 可视化（产品展示、数据仪表盘）</li>
+            <li>快速原型：用 Vue 组件思维搭 3D 场景</li>
+            <li>数据可视化：与 Vue 响应式系统天然结合</li>
+            <li>Nuxt SSR/CSR 项目中的 3D 页面</li>
+            <li>AR/VR 展示（Three.js VR API 继承）</li>
+            <li>需要 Nuxt Devtools 集成调试的场景</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">进阶路径</span></div>
+          <h3>TresJS → 原生 Three.js</h3>
+          <p>TresJS 只是 Vue 封装，底层仍是 Three.js。掌握 Three.js 概念后可直接调用 Three.js API。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// 通过 useTres 访问 Three.js 原生对象</span>
+<span class="kwd">import</span> { <span class="fn">useTres</span> } <span class="kwd">from</span> <span class="str">'@tresjs/core'</span>
+
+<span class="kwd">const</span> { renderer, camera, scene } = <span class="fn">useTres</span>()
+
+<span class="cmt">// Three.js 原生 API 直接调用</span>
+<span class="kwd">import</span> { <span class="fn">Raycaster</span>, <span class="fn">Vector2</span> } <span class="kwd">from</span> <span class="str">'three'</span>
+
+<span class="kwd">const</span> raycaster = <span class="kwd">new</span> <span class="fn">Raycaster</span>()
+<span class="kwd">const</span> mouse = <span class="kwd">new</span> <span class="fn">Vector2</span>()
+
+<span class="cmt">// 任何 Three.js 类/方法都可以直接使用</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 16: 实操食谱：FPS 相机 / 碰撞检测 / VR -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">16</div>
+        <div class="section-meta">
+          <div class="label">Recipes</div>
+          <h2>实操食谱：FPS 相机 / 碰撞检测 / VR / 性能监控</h2>
+          <p>4 个真实场景的完整代码示例，拿来即用。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">FPS 相机</span></div>
+          <h3>第一人称视角相机控制</h3>
+          <p>WASD 键盘移动 + 鼠标拖拽视角，Three.js PointerLockControls 封装。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> { <span class="fn">PointerLockControls</span>,
+         <span class="fn">KeyboardControls</span> } <span class="kwd">from</span> <span class="str">'three/examples/jsm'</span>
+
+<span class="kwd">const</span> { camera } = <span class="fn">useTres</span>()
+<span class="kwd">const</span> { onBeforeRender } = <span class="fn">useLoop</span>()
+
+<span class="cmt">// 键盘映射</span>
+<span class="kwd">const</span> keyboard = <span class="kwd">new</span> <span class="fn">KeyboardControls</span>()
+keyboard.<span class="fn">addEventListener</span>(<span class="str">'keydown'</span>, (e) => {
+  <span class="kwd">if</span> (e.code === <span class="str">'KeyW'</span>) camera.value.position.z -= <span class="num">0.1</span>
+  <span class="kwd">if</span> (e.code === <span class="str">'KeyS'</span>) camera.value.position.z += <span class="num">0.1</span>
+  <span class="kwd">if</span> (e.code === <span class="str">'KeyA'</span>) camera.value.position.x -= <span class="num">0.1</span>
+  <span class="kwd">if</span> (e.code === <span class="str">'KeyD'</span>) camera.value.position.x += <span class="num">0.1</span>
+})</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Raycasting</span></div>
+          <h3>射线检测：鼠标拣选 3D 物体</h3>
+          <p>用 Three.js Raycaster 检测鼠标指向的 3D 对象（点击选中等交互）。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> { <span class="fn">Raycaster</span>, <span class="fn">Vector2</span> } <span class="kwd">from</span> <span class="str">'three'</span>
+
+<span class="kwd">const</span> { camera, scene } = <span class="fn">useTres</span>()
+<span class="kwd">const</span> mouse = <span class="kwd">new</span> <span class="fn">Vector2</span>()
+<span class="kwd">const</span> raycaster = <span class="kwd">new</span> <span class="fn">Raycaster</span>()
+
+<span class="kwd">function</span> <span class="fn">onMouseMove</span>(event) {
+  mouse.x = (event.clientX / window.innerWidth) * <span class="num">2</span> - <span class="num">1</span>
+  mouse.y = -(event.clientY / window.innerHeight) * <span class="num">2</span> + <span class="num">1</span>
+  raycaster.setFromCamera(mouse, camera.value)
+  <span class="kwd">const</span> intersects = raycaster.intersectObjects(
+    scene.value.children, <span class="kwd">true</span>
+  )
+  <span class="kwd">if</span> (intersects.length > <span class="num">0</span>) {
+    console.<span class="fn">log</span>(<span class="str">'Hit:'</span>, intersects[<span class="num">0</span>].object.name)
+  }
+}
+window.<span class="fn">addEventListener</span>(<span class="str">'mousemove'</span>, onMouseMove)</pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">VR</span></div>
+          <h3>WebXR VR 模式</h3>
+          <p>接入 WebXR API，在 Quest 等 VR 头显中运行场景。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> { <span class="fn">VRButton</span> } <span class="kwd">from</span> <span class="str">'three/examples/jsm'</span>
+
+<span class="cmt">// 创建 VR 按钮</span>
+<span class="kwd">const</span> vrButton = <span class="fn">VRButton</span>.createButton(
+  renderer.value
+)
+document.body.<span class="fn">appendChild</span>(vrButton)
+renderer.value.xr.enabled = <span class="kwd">true</span>
+
+<span class="tag">&lt;TresCanvas</span> <span class="attr">:shadows</span>=<span class="str">"false"</span><span class="tag">&gt;</span>
+  <span class="cmt">&lt;!-- VR 中不需要阴影（影响性能）--&gt;</span>
+  <span class="tag">&lt;TresAmbientLight</span> <span class="attr">:intensity</span>=<span class="str">"2"</span> <span class="tag">/&gt;</span>
+  <span class="cmt">&lt;!-- 内容 --&gt;</span>
+<span class="tag">&lt;/TresCanvas&gt;</span></pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">性能监控</span></div>
+          <h3>FPS / Draw Calls 监控</h3>
+          <p>Three.js Stats.js 叠加 FPS 和内存监控，直观判断性能瓶颈。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="kwd">import</span> { <span class="fn">Stats</span> } <span class="kwd">from</span> <span class="str">'three/examples/jsm/libs/stats.module'</span>
+
+<span class="kwd">const</span> stats = <span class="kwd">new</span> <span class="fn">Stats</span>()
+stats.<span class="fn">showPanel</span>(<span class="num">0</span>) <span class="cmt">// 0= FPS, 1= ms, 2= MB</span>
+document.body.<span class="fn">appendChild</span>(stats.dom)
+
+<span class="kwd">const</span> { onBeforeRender } = <span class="fn">useLoop</span>()
+<span class="fn">onBeforeRender</span>(() => {
+  stats.begin()
+  <span class="cmt">// 渲染逻辑</span>
+  stats.end()
+})
+
+<span class="cmt">// 优化目标：</span>
+<span class="cmt">// FPS ≥ 60（桌面）</span>
+<span class="cmt">// Draw Calls &lt; 100（理想）</span>
+<span class="cmt">// 三角形数 &lt; 100K（移动端）</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 17: 排错清单与常见错误 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">17</div>
+        <div class="section-meta">
+          <div class="label k">Troubleshooting</div>
+          <h2>排错清单：v5 高频报错与解决方案</h2>
+          <p>基于 GitHub Issues 和官方 Discord 整理的常见错误诊断路径。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">Error 1</span></div>
+          <h3>"Component is not instantiated"</h3>
+          <p><strong>原因</strong>：v5 强制使用 <code>extend()</code> 注册组件，不支持全局自动注册。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// ❌ 错误：组件未注册</span>
+<span class="cmt">// Uncaught Error: Component not instantiated.</span>
+
+<span class="cmt">// ✅ 正确：先 extend</span>
+<span class="kwd">import</span> { <span class="fn">Mesh</span>, <span class="fn">BoxGeometry</span>, <span class="fn">MeshNormalMaterial</span> } <span class="kwd">from</span> <span class="str">'three'</span>
+<span class="kwd">const</span> app = <span class="fn">createTresApp</span>()
+app.<span class="fn">extend</span>({ Mesh, BoxGeometry, MeshNormalMaterial })</pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Error 2</span></div>
+          <h3>"Cannot read property '...' of undefined"</h3>
+          <p><strong>原因</strong>：在 <code>Suspense</code> 异步加载完成前就访问了 <code>useGLTF</code> 返回值。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// ❌ 错误：直接访问异步加载结果</span>
+<span class="kwd">const</span> { scene } = <span class="fn">useGLTF</span>(<span class="str">'/model.glb'</span>)
+console.<span class="fn">log</span>(scene.value) <span class="cmt">// 可能为 undefined</span>
+
+<span class="cmt">// ✅ 正确：用 computed 或 watch 等待</span>
+<span class="kwd">const</span> { scene } = <span class="fn">useGLTF</span>(<span class="str">'/model.glb'</span>)
+<span class="kwd">const</span> modelReady = <span class="fn">computed</span>(() => !!scene.value)
+
+<span class="cmt">// 在模板中用 v-if</span>
+<span class="tag">&lt;Suspense&gt;</span>
+  <span class="tag">&lt;Robot v-if</span>=<span class="str">"modelReady"</span> <span class="attr">:model</span>=<span class="str">"scene"</span> <span class="tag">/&gt;</span>
+  <span class="tag">&lt;template #fallback&gt;</span>
+    <span class="tag">&lt;div&gt;</span>Loading 3D model...<span class="tag">&lt;/div&gt;</span>
+  <span class="tag">&lt;/template&gt;</span>
+<span class="tag">&lt;/Suspense&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">Error 3</span></div>
+          <h3>性能下降 / FPS 低于 30</h3>
+          <p><strong>诊断路径</strong>：先定位瓶颈来源，再针对性优化。</p>
+          <ul>
+            <li>① 开启 Stats.js，确认瓶颈类型（GPU/CPU）</li>
+            <li>② 检查 Draw Calls 数量：目标 &lt;100</li>
+            <li>③ 几何体是否重复创建？（放在组件外）</li>
+            <li>④ 纹理分辨率是否过大？（&gt;2K 需压缩）</li>
+            <li>⑤ 阴影是否过于复杂？（改用 contactShadows）</li>
+            <li>⑥ 移动端是否开启了抗锯齿？（关闭 antialias）</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Error 4</span></div>
+          <h3>useLoader 加载无响应</h3>
+          <p><strong>原因</strong>：URL 路径错误或跨域 CORS 阻止资源加载。</p>
+          <ul>
+            <li>① 检查 public/ 目录放置：Vite 静态资源必须放在 <code>public/</code></li>
+            <li>② GLTF 模型引用其他资源（纹理）时注意相对路径</li>
+            <li>③ DRACO 压缩模型需要 DRACOLoader</li>
+            <li>④ CORS：本地开发用 <code>pnpm dev</code>（Vite 自带服务器）</li>
+            <li>⑤ 确认 URL 前缀：本地 <code>/model.glb</code> 对应 <code>public/model.glb</code></li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">Error 5</span></div>
+          <h3>物理模拟不稳定 / 物体穿模</h3>
+          <p><strong>原因</strong>：Rapier 固定步长与渲染帧率不同步。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// ✅ 正确：物理放入 onBeforeStep</span>
+<span class="kwd">const</span> { onBeforeStep } = <span class="fn">useRapier</span>()
+
+<span class="fn">onBeforeStep</span>(() => {
+  <span class="cmt">// 固定 1/60s 步长更新</span>
+  <span class="cmt">// 在这里施加力、检测碰撞</span>
+  playerBody.value.applyImpulse({
+    <span class="attr">x</span>: <span class="num">0</span>, <span class="attr">y</span>: <span class="num">0</span>, <span class="attr">z</span>: -<span class="num">0.5</span>
+  }, <span class="kwd">true</span>)
+})
+
+<span class="cmt">// ❌ 错误：在 onBeforeRender 中更新物理</span></pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Error 6</span></div>
+          <h3>SSR 场景渲染错误 / window undefined</h3>
+          <p><strong>原因</strong>：Three.js 依赖 WebGL/Navigator 等浏览器 API。</p>
+          <div class="code-block" style="margin-top:8px">
+            <pre><span class="cmt">// ✅ 正确：Nuxt 中使用 &lt;ClientOnly&gt;</span>
+<span class="tag">&lt;template&gt;</span>
+  <span class="tag">&lt;ClientOnly&gt;</span>
+    <span class="tag">&lt;TresScene /&gt;</span>
+    <span class="tag">&lt;template #fallback&gt;</span>
+      <span class="tag">&lt;div&gt;</span>Loading 3D...<span class="tag">&lt;/div&gt;</span>
+    <span class="tag">&lt;/template&gt;</span>
+  <span class="tag">&lt;/ClientOnly&gt;</span>
+<span class="tag">&lt;/template&gt;</span>
+
+<span class="cmt">// 或在 setup 中守卫</span>
+<span class="kwd">if</span> (process.client) {
+  <span class="kwd">const</span> { scene } = <span class="fn">useTres</span>()
+}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 18: TresJS v5 新手学习路径 -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">18</div>
+        <div class="section-meta">
+          <div class="label b">Learning Path</div>
+          <h2>新手学习路径：从零到独立项目（推荐路线）</h2>
+          <p>按照实际项目经验设计的 7 步学习路径，每步配套实践目标。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tagrow"><span class="tag red">Step 1-2</span></div>
+          <h3>Step 1：搭建环境 + 第一个盒子（Day 1）</h3>
+          <p>目标：理解 TresCanvas 作为 Vue 组件的用法。</p>
+          <ul>
+            <li>用 create-tres 创建项目（或手动安装 @tresjs/core）</li>
+            <li>在 TresCanvas 中放置 TresMesh + TresBoxGeometry + TresMeshNormalMaterial</li>
+            <li>理解 Three.js 的"组件即对象"思维：Vue template → Three.js 场景树</li>
+          </ul>
+          <h3 style="margin-top:12px">Step 2：相机 + 灯光 + 交互（Day 1-2）</h3>
+          <p>目标：学会配置相机视角和基础灯光。</p>
+          <ul>
+            <li>添加 TresPerspectiveCamera，设置 position 和 lookAt</li>
+            <li>添加 TresAmbientLight + TresDirectionalLight</li>
+            <li>使用 OrbitControls（cientos）实现鼠标旋转/缩放</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Step 3-4</span></div>
+          <h3>Step 3：动画循环（Day 2-3）</h3>
+          <p>目标：学会用 useLoop 控制渲染帧。</p>
+          <ul>
+            <li>用 useLoop().onBeforeRender 实现物体旋转</li>
+            <li>理解渲染循环的 delta 参数（两帧间隔时间）</li>
+            <li>用 onBeforeRender/onRender/onAfterRender 选择更新时机</li>
+          </ul>
+          <h3 style="margin-top:12px">Step 4：加载外部模型（Day 3-4）</h3>
+          <p>目标：掌握 useGLTF 加载 GLTF/GLB 模型。</p>
+          <ul>
+            <li>找一个免费 GLTF 模型（Sketchfab / TresJS Lab）</li>
+            <li>用 useGLTF 加载，配合 Suspense 处理异步</li>
+            <li>尝试用cientos 的 OrbitControls 旋转查看模型</li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">Step 5-6</span></div>
+          <h3>Step 5：材质 + 纹理（Day 4-5）</h3>
+          <p>目标：掌握 Three.js 材质系统的基本用法。</p>
+          <ul>
+            <li>TresMeshStandardMaterial：金属度/粗糙度/PBR</li>
+            <li>贴图加载：useLoader(TextureLoader, url)</li>
+            <li>环境贴图（.env）：增强金属质感</li>
+          </ul>
+          <h3 style="margin-top:12px">Step 6：Vue 响应式集成（Day 5-6）</h3>
+          <p>目标：体会 TresJS 与 Vue 响应式系统的深度结合。</p>
+          <ul>
+            <li>用 ref 控制物体位置：:position="[x, y, z]"</li>
+            <li>用 watch 控制材质颜色切换</li>
+            <li>用 computed 派生 3D 变换（旋转矩阵等）</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">Step 7</span></div>
+          <h3>Step 7：独立项目实战（Day 6-14）</h3>
+          <p>目标：从零到完整项目，串联所有知识点。</p>
+          <ul>
+            <li>选一个真实场景：产品 360° 展示 / 数据可视化 / 3D 图表</li>
+            <li>设计 Vue 组件树，合理拆分 3D 场景</li>
+            <li>接入cientos：OrbitControls / ContactShadows / 动画</li>
+            <li>性能调优：Stats.js 监控，优化 Draw Calls</li>
+            <li>发布：Vercel / Netlify 部署，验证移动端渲染</li>
+          </ul>
+          <div class="tagrow" style="margin-top:10px">
+            <span class="tag dark">推荐项目</span>
+            <span class="tag dark">学习资料</span>
+          </div>
+          <ul style="margin-top:6px">
+            <li><a href="https://lab.tresjs.org/" target="_blank">lab.tresjs.org</a> — 官方交互式示例</li>
+            <li><a href="https://cientos.tresjs.org/" target="_blank">cientos.tresjs.org</a> — 组件库文档</li>
+            <li><a href="https://github.com/Tresjs/tres" target="_blank">GitHub Examples</a></li>
+          </ul>
+        </div>
+      </div>
+    </section>
