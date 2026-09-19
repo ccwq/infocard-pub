@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="darkblue">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+  <title>WeVisDoc — Tencent's End-to-End Document Parser</title>
+  <style>
+    :root{
+      --bg:#0c1020;--bg-2:#11162a;--panel:#171c2b;--panel-2:#0f1424;
+      --ink:#eef4ff;--muted:#a8b7df;--line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;--blue:#4a78ff;--green:#2db36a;--yellow:#f4c84c;--purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);--grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:40px 0 64px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+
+    /* ── Hero bar ── */
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));
+      box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+
+    /* ── Hero ── */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;
+      border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);
+      backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(36px,6.5vw,80px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(14px,1.8vw,19px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(12px,1.4vw,15px);line-height:1.65;color:#c5d2f7}
+
+    /* ── Stats strip ── */
+    .stats-strip{display:flex;gap:16px;margin:0 0 14px;flex-wrap:wrap}
+    .stat{background:linear-gradient(135deg,rgba(88,195,255,.14),rgba(132,89,255,.10));
+      border:1.5px solid rgba(255,255,255,.13);border-radius:999px;padding:6px 14px;
+      display:flex;align-items:center;gap:6px;font:800 13px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#eef4ff}
+    .stat .n{color:var(--cyan);font-weight:900}
+
+    /* ── Shell (3-col) ── */
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;
+      background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.10);
+      border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);
+      border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;
+      box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);
+      display:flex;justify-content:space-between;align-items:center;gap:10px;
+      background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;
+      text-transform:uppercase;color:#fff}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+      color:#dfe8ff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8;font-size:13px;line-height:1.6}
+
+    /* ── Model cards ── */
+    .model-card{border:1.5px solid rgba(255,255,255,.09);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+      border-radius:14px;padding:11px 12px;display:grid;gap:4px}
+    .model-name{font-size:15px;font-weight:900;color:#fff}
+    .model-base{font-size:11.5px;color:#9fb0de}
+    .model-base span{color:#7eb8f5}
+
+    /* ── Benchmark table ── */
+    .bench-table{width:100%;border-collapse:collapse;font-size:12.5px}
+    .bench-table th{text-align:left;padding:5px 8px;color:#9fb0de;font:800 10px/1 ui-monospace;
+      letter-spacing:.1em;text-transform:uppercase;border-bottom:1.5px solid rgba(255,255,255,.1)}
+    .bench-table td{padding:6px 8px 5px;border-bottom:1px solid rgba(255,255,255,.06)}
+    .bench-table tr:last-child td{border-bottom:none}
+    .bench-table .score{font-weight:900;color:var(--cyan);font-size:14px;letter-spacing:-.02em}
+    .bench-table .tag{font-size:10px;padding:2px 7px;border-radius:999px;background:rgba(45,179,106,.15);
+      border:1px solid rgba(45,179,106,.35);color:#7fe1a2;letter-spacing:.06em}
+
+    /* ── Source block ── */
+    .source-block{border:1.5px solid rgba(255,255,255,.09);background:linear-gradient(180deg,#1a2030,#151a28);
+      border-radius:14px;padding:12px 13px;display:grid;gap:8px}
+    .src-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .src-author{font-size:13px;font-weight:900;color:#fff}
+    .src-handle{font-size:11px;color:#9fb0de}
+    .src-link{font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#7eb8f5;
+      overflow-wrap:anywhere;word-break:break-all}
+    .quote-text{font-size:12px;line-height:1.6;color:#c5d2f7;border-left:3px solid var(--blue);
+      padding-left:10px;margin:0;font-style:italic}
+
+    /* ── X image ── */
+    .x-img-wrap{margin:14px 0;display:grid;gap:10px}
+    .x-img{border-radius:16px;border:1.5px solid rgba(255,255,255,.12);overflow:hidden;
+      box-shadow:var(--shadow);display:block;width:100%;max-width:520px}
+    .x-img img{width:100%;height:auto;display:block}
+    .x-caption{font:800 10.5px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#7a8fc5;text-align:center;letter-spacing:.05em}
+
+    /* ── Pill row ── */
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);
+      border-radius:999px;color:#fff;font-size:12px;font-weight:850;
+      letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+
+    /* ── Footer ── */
+    .footer{margin-top:24px;padding:16px 0 0;border-top:1.5px solid rgba(255,255,255,.07);
+      display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .footer-note{font:800 10.5px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#5a6a9a;
+      letter-spacing:.06em}
+    .footer-note span{color:#7a8fc5}
+
+    /* ── Mobile ── */
+    @media (max-width:640px){
+      .hero{grid-template-columns:1fr}
+      .shell{grid-template-columns:1fr}
+      .title{font-size:clamp(32px,10vw,52px)}
+      .page{padding:28px 0 48px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero-bar"></div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <span class="kicker">Open Source &nbsp;·&nbsp; Document AI &nbsp;·&nbsp; Qwen3-VL</span>
+        <div class="source">
+          <div>@shao__meng</div>
+          <div style="font-size:10px;color:#7a8fc5;margin-top:2px">2026-09-18 &nbsp;·&nbsp; X (Twitter)</div>
+        </div>
+      </div>
+      <h1 class="title">WeVisDoc</h1>
+      <p class="subtitle">Tencent's End-to-End Document Parser</p>
+      <p class="subcn">端到端文档解析：输入页面图像，直接输出结构化 Markdown。文本、LaTeX 公式、HTML 表格、阅读顺序统一在单一输出序列，无流水线中间交接。</p>
+      <div class="pill-row">
+        <span class="pill cyan">Apache-2.0</span>
+        <span class="pill green">Chinese + English</span>
+        <span class="pill yellow">Qwen3-VL Fine-tuned</span>
+        <span class="pill purple">Hugging Face</span>
+      </div>
+    </div>
+    <div class="hero-copy" style="padding-top:0">
+      <div style="display:grid;gap:8px">
+        <div style="border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(88,195,255,.18),rgba(132,89,255,.14));
+          border-radius:18px;padding:14px 16px">
+          <div style="font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#9fb0de;margin-bottom:8px">OmniDocBench</div>
+          <div style="font-size:48px;font-weight:950;letter-spacing:-.05em;line-height:1;color:#fff">95.38<span style="font-size:20px;color:#9fb0de"> / 100</span></div>
+          <div style="font-size:11px;color:#7fe1a2;margin-top:4px">#1 among end-to-end parsers</div>
+        </div>
+        <div style="border:1.5px solid rgba(255,255,255,.11);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+          border-radius:16px;padding:12px 14px;display:grid;gap:6px">
+          <div style="font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#9fb0de">PureDocBench</div>
+          <div style="font-size:32px;font-weight:900;letter-spacing:-.04em;color:#e8edf8">75.54</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-strip">
+    <div class="stat"><span class="n">110</span> likes</div>
+    <div class="stat"><span class="n">17</span> reposts</div>
+    <div class="stat"><span class="n">1</span> reply</div>
+  </div>
+
+  <!-- 3-col shell -->
+  <div class="shell">
+    <!-- Left: Models -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Model Variants</h3>
+        <span class="badge" style="background:rgba(45,179,106,.12);border-color:rgba(45,179,106,.28);color:#7fe1a2">2B / 4B</span>
+      </div>
+      <div class="panel-body">
+        <div class="model-card">
+          <div class="model-name">WeVisDoc-4B</div>
+          <div class="model-base">Base: <span>Qwen3-VL-4B-Instruct</span></div>
+        </div>
+        <div class="model-card">
+          <div class="model-name">WeVisDoc-2B</div>
+          <div class="model-base">Base: <span>Qwen3-VL-2B-Instruct</span></div>
+        </div>
+        <div style="border-top:1.5px solid rgba(255,255,255,.07);padding-top:10px;margin-top:2px">
+          <div style="font-size:11.5px;color:#9fb0de;line-height:1.6">
+            Both fine-tuned by Tencent WeChat Vision Team on document understanding tasks. Available on Hugging Face.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Core capability -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Core Capability</h3>
+        <span class="badge" style="background:rgba(88,195,255,.12);border-color:rgba(88,195,255,.28);color:#7fe1a2">End-to-End</span>
+      </div>
+      <div class="panel-body">
+        <div style="display:grid;gap:8px">
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Text extraction → structured Markdown</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>LaTeX formula recognition</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>HTML table output</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Reading-order sequencing in single pass</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>No multi-stage pipeline handoffs</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Benchmarks -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Benchmarks</h3>
+        <span class="badge">Top Ranked</span>
+      </div>
+      <div class="panel-body">
+        <table class="bench-table">
+          <thead>
+            <tr><th>Benchmark</th><th>Score</th><th>Rank</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>OmniDocBench</td>
+              <td class="score">95.38</td>
+              <td><span class="tag">#1 E2E</span></td>
+            </tr>
+            <tr>
+              <td>PureDocBench</td>
+              <td class="score">75.54</td>
+              <td><span class="tag">#1 E2E</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="font-size:11px;color:#7a8fc5;line-height:1.5;border-top:1.5px solid rgba(255,255,255,.07);padding-top:8px;margin-top:2px">
+          Source: @HuggingPapers quoting OmniDocBench leaderboard results
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- X image -->
+  <div class="x-img-wrap">
+    <div class="x-img">
+      <img src="../assets/20260919-wevisdoc/x-post.jpg" alt="WeVisDoc demo output screenshot" loading="lazy" onerror="this.style.display='none'"/>
+    </div>
+    <div class="x-caption">@shao__meng · X (Twitter) · 2026-09-18</div>
+  </div>
+
+  <!-- Source attribution -->
+  <div class="shell" style="grid-template-columns:1fr 1fr;margin-top:0">
+    <div class="panel">
+      <div class="panel-head"><h3>Primary Source</h3></div>
+      <div class="panel-body">
+        <div class="source-block">
+          <div class="src-row">
+            <div>
+              <div class="src-author">meng shao</div>
+              <div class="src-handle">@shao__meng</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:10.5px;color:#7a8fc5">2026-09-18</div>
+              <div style="font-size:10.5px;color:#7eb8f5;margin-top:2px">10:14 CST</div>
+            </div>
+          </div>
+          <div class="src-link">twitter.com/shao__meng/status/2100770481330897257</div>
+          <div style="display:grid;gap:4px;margin-top:4px">
+            <div style="font-size:11.5px;color:#c5d2f7;line-height:1.55">
+              腾讯微信视觉团队开源了端到端文档解析器「WeVisDoc」—— 输入一张页面图像，直接输出结构化 Markdown。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Benchmark Source</h3></div>
+      <div class="panel-body">
+        <div class="source-block">
+          <div class="src-row">
+            <div>
+              <div class="src-author">DailyPapers</div>
+              <div class="src-handle">@HuggingPapers</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:10.5px;color:#7a8fc5">2026-09-17</div>
+              <div style="font-size:10.5px;color:#7eb8f5;margin-top:2px">23:35 UTC</div>
+            </div>
+          </div>
+          <div class="src-link">twitter.com/HuggingPapers/status/2100609544946643118</div>
+          <p class="quote-text">"Tencent just released WeVisDoc on Hugging Face. An end-to-end document parser that turns page images into structured Markdown, with LaTeX formulas and HTML tables. It tops OmniDocBench (95.38) and PureDocBench (75.54) among end-to-end parsers."</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-note">
+      Infocard · Source: <span>X (Twitter)</span> · @shao__meng · 2026-09-18 · Hermes Agent
+    </div>
+    <div class="pill-row" style="margin-top:0">
+      <span class="pill" style="font-size:10.5px;min-height:24px;padding:4px 8px">WeVisDoc</span>
+      <span class="pill" style="font-size:10.5px;min-height:24px;padding:4px 8px">Qwen3-VL</span>
+      <span class="pill" style="font-size:10.5px;min-height:24px;padding:4px 8px">文档解析</span>
+      <span class="pill" style="font-size:10.5px;min-height:24px;padding:4px 8px">Tencent</span>
+      <span class="pill" style="font-size:10.5px;min-height:24px;padding:4px 8px">开源</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
