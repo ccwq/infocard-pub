@@ -348,19 +348,1054 @@ footer{margin:20px 14px 0;border-top:2px solid #111;padding:12px 0 0;font-size:1
     </div>
   </div>
 
+  <!-- SECTION 08: THREE QUESTION TYPES DEEP DIVE -->
+  <h2>08 · 三种问题类型：Choice / Noul / Score</h2>
+
+  <div class="grid-2">
+    <div class="card blue-card">
+      <h4>🔘 Choice（单选）</h4>
+      <p>从预定义选项列表中选出一个最合适的。返回：首选答案 + 各选项概率分布 + 置信度分数。</p>
+      <pre style="font-size:10px;margin-top:6px;background:#eef4ff;padding:8px;border-radius:4px;color:#1f63ff">{
+  "type": "choice",
+  "instructions": "Which action?",
+  "criteria": {
+    "click": "Click this element",
+    "skip": "Skip to next",
+    "cancel": "Cancel operation"
+  }
+}</pre>
+    </div>
+    <div class="card blue-card">
+      <h4>⚖️ Noul（布尔）</h4>
+      <p>返回是/否概率（0~1）。等价于二元选择题，但更简洁，适合前置校验。</p>
+      <pre style="font-size:10px;margin-top:6px;background:#eef4ff;padding:8px;border-radius:4px;color:#1f63ff">{
+  "type": "noul",
+  "instructions": "Is this a login button?"
+}</pre>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <h4>📊 Score（评分）</h4>
+    <p>对某个属性在连续标尺上评分（0~N 范围）。返回期望值 + 各刻度概率分布 + 置信度。适合质量评估、优先级排序等需要量化的场景。</p>
+    <pre style="font-size:10px;margin-top:6px;background:#eef4ff;padding:8px;border-radius:4px;color:#1f63ff">{
+  "type": "score",
+  "instructions": "How urgent?",
+  "criteria": [
+    "0: Not urgent, can wait days",
+    "1: This week",
+    "2: Today",
+    "3: Immediately"
+  ]
+}</pre>
+  </div>
+
+  <div class="alert">
+    <strong>Confidence ≠ 概率最大值：</strong>Choice 中 confidence 衡量的是"最高概率选项比均匀分布高出多少"。例如三选项时，概率 0.8 对应 confidence = 0.8 - 1/3 = 0.47。Confidence 反映的是模型对自身判断的确信程度，而非绝对概率。
+  </div>
+
+  <!-- SECTION 09: HOW TO USE — QUICK START -->
+  <h2>09 · 快速上手：三行代码接入 Jev</h2>
+
+  <div class="tech-box">
+    <h4>Node.js / JavaScript SDK</h4>
+    <pre>npm install @typesafe-ai/sdk</pre>
+    <p style="margin-top:8px">需要 Node.js ≥ 20。SDK 支持 ESM、CommonJS 和 TypeScript 类型：</p>
+    <pre style="margin-top:6px">import { typesafe } from '@typesafe-ai/sdk';
+
+const client = typesafe({ apiKey: process.env.TYPESAFE_API_KEY });
+
+const result = await client.jev({
+  model: 'jev-latest',
+  state: { page: 'checkout', amount: 299 },
+  questions: {
+    risk_level: {
+      type: 'score',
+      instructions: 'Is this transaction risky?',
+      criteria: ['low', 'medium', 'high']
+    }
+  }
+});
+
+console.log(result.answers.risk_level);
+// → { type: 'score', score: 1, confidence: 0.82, ... }</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>Python @jev.fn 装饰器（v0.3.0）</h4>
+    <pre>pip install jev</pre>
+    <p style="margin-top:8px">需要 Python ≥ 3.14。@jev.fn 把函数签名直接编译为 Jev 查询，Pydantic 模型约束返回值类型：</p>
+    <pre style="margin-top:6px">import jev
+from pydantic import BaseModel
+
+class FormState(BaseModel):
+    description: str
+    name: str
+
+class SponsorReply(jev.BaseModel):
+    is_sponsor: bool
+    category: str
+    quality: float
+
+@jev.fn
+def triage_sponsor(state: FormState) -> SponsorReply:
+    """判断表单是否为赞助商咨询，并分类。"""
+    ...
+
+result = await triage_sponsor(FormState(
+    description="We'd like to sponsor the newsletter",
+    name="TechCorp"
+))
+print(result.is_sponsor)  # → True/False，类型安全</pre>
+    <p style="margin-top:6px;font-size:10.5px;color:#666">Bool 阈值默认 0.5，可通过 @jev.fn(bool_threshold=0.7) 或 JEV_BOOL_THRESHOLD 环境变量调整。</p>
+  </div>
+
+  <div class="tech-box">
+    <h4>直接 curl 调用</h4>
+    <pre>curl https://api.typesafe.ai/jev \
+  -H "Authorization: Bearer $TYPESAFE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "jev-latest",
+    "state": {
+      "page": "payment_confirmation",
+      "total": 199
+    },
+    "questions": {
+      "action": {
+        "type": "choice",
+        "instructions": "Which button should the agent click?",
+        "criteria": {
+          "confirm": "Click Confirm to pay",
+          "cancel": "Click Cancel",
+          "back": "Click Back"
+        }
+      }
+    }
+  }'</pre>
+  </div>
+
+  <div class="alert">
+    <strong>Vercel AI Gateway 替代路径：</strong>已有 Vercel AI SDK 7（≥7.0.105）的项目无需额外安装 SDK，通过 AI Gateway 使用 model ID <code>typesafe-ai/jev</code>，价格与官方一致（$0.042/M 输入 tokens）。同时支持 <code>experimental_evaluate</code> 函数。
+  </div>
+
+  <!-- SECTION 10: OPEN SOURCE ALTERNATIVES -->
+  <h2>10 · 开源替代：SemIf / OpenJev / Decider</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">Jev 的方法并非全新——它在分类（Classification）、校准（Calibration）和选择性预测（Selective Prediction）研究基础上做了工程整合。以下开源项目用现有模型复现了部分能力：</p>
+
+  <div class="twrap">
+    <table>
+      <tr><th>项目</th><th>方法</th><th>特点</th><th>GitHub</th></tr>
+      <tr>
+        <td><strong>SemIf</strong></td>
+        <td>选择性预测 + 置信度路由</td>
+        <td>低置信度样本交给更强模型，高置信度走轻量路径</td>
+        <td>开源可复现</td>
+      </tr>
+      <tr>
+        <td><strong>Bespoke Nimble</strong></td>
+        <td>任务自适应分类器</td>
+        <td>针对特定领域微调，比通用模型更快更准</td>
+        <td>开源可复现</td>
+      </tr>
+      <tr>
+        <td><strong>OpenJev</strong></td>
+        <td>复现 Jev API 协议</td>
+        <td>兼容 Jev SDK 的开源实现，可用自有 LLM 提供商</td>
+        <td>社区驱动</td>
+      </tr>
+      <tr>
+        <td><strong>Decider</strong></td>
+        <td>约束解码 + 校准后训练</td>
+        <td>在开源 LLM 上实现结构化输出 + 概率校准</td>
+        <td>研究代码</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="warn">
+    <strong>注意：</strong>开源替代在特定窄任务上效果接近 Jev，但 Jev 的优势在于"通用 + 预训练好的判断能力"，无需自己准备训练数据或微调。开源方案更适合有专项数据积累的团队。
+  </div>
+
+  <!-- SECTION 11: JEV VS LLM STRUCTURED OUTPUTS -->
+  <h2>11 · Jev vs LLM 结构化输出：选哪个？</h2>
+
+  <div class="twrap">
+    <table>
+      <tr><th>维度</th><th>Jev</th><th>LLM 结构化输出</th></tr>
+      <tr>
+        <td>输出保证</td>
+        <td class="check">✓ 数学保证不越界（Schema 约束在架构层）</td>
+        <td>✗ 仍可能返回非法值（依赖解析+验证层）</td>
+      </tr>
+      <tr>
+        <td>延迟</td>
+        <td class="check">70~500ms，并行判断</td>
+        <td>3~329s，逐 token 生成</td>
+      </tr>
+      <tr>
+        <td>成本</td>
+        <td class="check">Output tokens 免费</td>
+        <td>Output tokens 按量计费（通常是输入的 5 倍）</td>
+      </tr>
+      <tr>
+        <td>置信度</td>
+        <td class="check">架构层校准，可直接驱动自动决策</td>
+        <td>需要额外 prompt 工程，且通常过自信</td>
+      </tr>
+      <tr>
+        <td>适用场景</td>
+        <td>高频判断、实时路由、大规模分类</td>
+        <td>复杂推理、生成内容、结构固定但需要 LLM 能力的场景</td>
+      </tr>
+      <tr>
+        <td>生态</td>
+        <td>Early Access，快速发展中</td>
+        <td class="check">成熟，Claude/GPT-4 等全面支持</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="chips" style="margin-top:8px">
+    <span class="chip green">选 Jev：高频、实时、自动化决策</span>
+    <span class="chip blue">选 LLM：需要推理/生成/复杂上下文</span>
+    <span class="chip amber">混合：Jev 做路由，LLM 处理复杂分支</span>
+  </div>
+
+  <!-- SECTION 12: CONFIDENCE ROUTING PATTERNS -->
+  <h2>12 · 置信度路由：让决策自动化</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">Jev 的置信度分数（confidence）可直接驱动自动化路由，这是它区别于普通 LLM 的关键能力：</p>
+
+  <div class="tech-box">
+    <h4>置信度门控（Confidence Gate）</h4>
+    <pre>result = await client.jev({
+  state: { ticket: "I need help with billing" },
+  questions: {
+    intent: {
+      type: 'choice',
+      instructions: 'Classify customer intent',
+      criteria: {
+        billing: 'Billing or payment related',
+        technical: 'Technical support',
+        sales: 'Pre-purchase inquiry',
+        other: 'Everything else'
+      }
+    }
+  }
+})
+
+confidence = result.answers.intent.confidence
+
+if confidence > 0.85:
+    # 高置信度：自动处理
+    auto_route(intent)
+elif confidence > 0.5:
+    # 中置信度：人机协作
+    escalate_to_agent(result)
+else:
+    # 低置信度：人工处理
+    queue_human_review()</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>分层路由（Tiered Routing）</h4>
+    <pre># 第一层：Jev 毫秒级判断（$0.00001/次）
+if jev.quick_judge(state).confidence > 0.9:
+    execute()  # 自动执行
+else:
+    # 第二层：LLM 深度分析（$0.01/次）
+    llm_response = await llm.analyze(state)
+    if llm.confidence > 0.7:
+        execute(llm_response)
+    else:
+        escalate()  # 最终兜底人工</pre>
+    <p style="margin-top:6px;font-size:10.5px;color:#666">这种分层架构可以在保持高自动化率的同时，把成本控制在 LLM 全程使用的 5%~10%。</p>
+  </div>
+
+  <!-- SECTION 13: MCP + SKILL.md INTEGRATION -->
+  <h2>13 · MCP + SKILL.md：Agent 集成方案</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">Jev 已有官方的 MCP Server 实现和 SKILL.md 格式，可以无缝接入 Claude Code、Cursor 等 SKILL 兼容 Agent：</p>
+
+  <div class="tech-box">
+    <h4>作为 MCP Server 使用</h4>
+    <pre># 安装 MCP Server（通过 daf-jev 工具包）
+pip install daf-jev
+
+# 启动 Jev MCP Server
+jev-mcp --api-key $TYPESAFE_API_KEY
+# Server 在 stdio 模式运行，供 Claude Desktop 等 MCP 客户端连接</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>作为 SKILL.md 使用</h4>
+    <pre># 通过 npx skills 安装
+npx skills add HKUDS/CLI-Anything --skill jev-skill -g -y
+
+# 或直接在 Claude Code 中加载
+/plugin install jev-skill</pre>
+    <p style="margin-top:6px;font-size:10.5px;color:#666">SKILL.md 格式让 Agent 了解 Jev 的能力边界和提问范式，在需要毫秒级判断的场景自动调用 Jev。</p>
+  </div>
+
+  <!-- SECTION 14: LIMITATIONS & HONEST ASSESSMENT -->
+  <h2>14 · 局限性诚实评估</h2>
+
+  <div class="grid-2">
+    <div class="card red-card">
+      <h4>✗ 不能做什么</h4>
+      <p>• 不生成自由文本、代码、文章<br>
+         • 不做开放式对话<br>
+         • 不处理需要多步推理的复杂任务<br>
+         • 无法自我判断"这个问题适不适合用 Jev"</p>
+    </div>
+    <div class="card amber-card">
+      <h4>⚠ 需要注意的</h4>
+      <p>• Early Access：需要排队，稳定性不如大厂 API<br>
+         • 暂无独立第三方校准可靠性报告<br>
+         • confidence 阈值需要在自己的数据集上调优<br>
+         • 跨语言（非英文）场景效果待验证</p>
+    </div>
+  </div>
+
+  <div class="warn">
+    <strong>关于「幻觉」：</strong>Jev 不会产生文本幻觉（因为不生成文本），但会产生"判断幻觉"——对不了解的领域给出高置信度的错误答案。使用前请在自己真实数据上做一次校验。
+  </div>
+
+  <!-- SECTION 15: DAF-JEV PYTHON TOOLKIT -->
+  <h2>15 · daf-jev：学术级 Python 工具包</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">Zenodo 发布的 <strong>daf-jev</strong>（v1.0）是围绕 Jev API 构建的开源 Python 工具包，提供生产级封装：</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h4>📦 核心功能</h4>
+      <p>• 问题构建器（Ergonomic question builders）<br>
+         • 决策组合库（confidence gate、tiered routing、composite scoring）<br>
+         • 并发语料库评估器<br>
+         • 校准模块（自验证 confidence 可靠性）<br>
+         • CLI 工具<br>
+         • MCP Server<br>
+         • SKILL.md Agent 集成</p>
+    </div>
+    <div class="card">
+      <h4>📊 关键发现（实测）</h4>
+      <p>• 批量问题合并到一次调用：比顺序调用快 <strong>~18 倍</strong>，token 节省 <strong>~4 倍</strong><br>
+         • 决策流水线完整落在 Jev 毫秒级响应窗口内<br>
+         • confidence 报告在重复评估中自洽（可验证）<br>
+         • 所有数据来源于 benchmark 工件，含完整 provenance 链</p>
+    </div>
+  </div>
+
+  <div class="alert">
+    <strong>Zenodo DOI：</strong>10.5281/zenodo.22816188 · Friedman, D.A. (2026). <em>Jev in Practice: A Composable Python Toolkit</em>.
+  </div>
+
+  <!-- SECTION 16: COMPUTER USE INTEGRATION -->
+  <h2>16 · Computer Use 集成：Jev 作为操作判断层</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">Jev 最热门的用法是作为 Computer Use（AI 操作电脑）的判断节点。当 AI Agent 需要在网页上点击按钮时，传统方案让 LLM 判断"应该点哪个"，Jev 则提供毫秒级、结构化的操作决策：</p>
+
+  <div class="tech-box">
+    <h4>Browser Use + Jev 流水线</h4>
+    <pre># 1. 获取页面 DOM 结构
+dom = get_page_dom()
+# → {"elements": [{"id": 1, "tag": "button", "text": "Submit"}, ...]}
+
+# 2. Jev 判断应该操作哪个元素
+result = await jev({
+  state: {
+    goal: "Complete the checkout payment",
+    dom_elements: dom["elements"]
+  },
+  questions: {
+    action: {
+      type: 'choice',
+      instructions: 'Which element should the agent interact with next?',
+      criteria: {
+        submit_btn: 'Primary submit button with id=submit or type=submit',
+        back_btn: 'Back navigation button',
+        cancel_link: 'Cancel or abandon checkout link',
+        other: 'None of the above'
+      }
+    }
+  }
+})
+
+# 3. 置信度高 → 自动执行，低 → 人工确认
+if result.answers.action.confidence > 0.85:
+    execute_action(result.answers.action.choice)
+else:
+    require_human_confirmation()</pre>
+  </div>
+
+  <div class="grid-2">
+    <div class="card green-card">
+      <h4>✓ 优势</h4>
+      <p>• 延迟从 LLM 的 3~30s 降到 100ms 以内<br>
+         • 成本降低 40~400 倍<br>
+         • 输出结构化，不会返回"我觉得应该点这个"<br>
+         • 可批量处理多步决策</p>
+    </div>
+    <div class="card amber-card">
+      <h4>⚠ 限制</h4>
+      <p>• 需要提前定义"选项列表"（criteria）<br>
+         • 对复杂上下文理解不如 LLM<br>
+         • 需要 DOM 解析作为 state 输入<br>
+         • 不适合开放式探索任务</p>
+    </div>
+  </div>
+
+  <!-- SECTION 17: BATCH PROCESSING & SCALING -->
+  <h2>17 · 批量处理：MapReduce 架构</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">Jev 的并行输出 + 固定 Schema 使其天然适合大规模批量判断任务。以下是 daf-jev 工具包的并发评估器实测数据：</p>
+
+  <div class="tech-box">
+    <h4>并发评估器（Concurrent Corpus Evaluator）</h4>
+    <pre>import asyncio
+from daf_jev import ConcurrentEvaluator
+
+evaluator = ConcurrentEvaluator(api_key=api_key, concurrency=50)  # 并发 50 个请求
+
+# 批量判断 10,000 封邮件的优先级
+priorities = await evaluator.evaluate_batch(
+    corpus=email_corpus,
+    question_template={
+        "type": "score",
+        "instructions": "Rate email urgency 0-3",
+        "criteria": ["spam/negligible", "normal/business", "urgent", "critical"]
+    }
+)
+
+# 实测结果：
+# • 顺序调用：~10000 × 150ms = 25 分钟
+# • 并发评估（50 并发）：~200 × 150ms = 30 秒（快 50 倍）
+# • Token 节省：~4 倍（批量合并 state）</pre>
+  </div>
+
+  <div class="twrap">
+    <table>
+      <tr><th>调用模式</th><th>10,000 次耗时</th><th>Token 消耗</th><th>成本估算</th></tr>
+      <tr>
+        <td>LLM 顺序调用</td>
+        <td>~25 分钟</td>
+        <td>~50M tokens</td>
+        <td>~$2.50</td>
+      </tr>
+      <tr class="highlight-row">
+        <td>Jev 并发（50 并发）</td>
+        <td>~30 秒</td>
+        <td>~12M tokens</td>
+        <td>~$0.50</td>
+      </tr>
+      <tr>
+        <td>提升幅度</td>
+        <td class="check">50× faster</td>
+        <td class="check">4× fewer</td>
+        <td class="check">5× cheaper</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- SECTION 18: API REFERENCE -->
+  <h2>18 · API 参数详解</h2>
+
+  <div class="twrap">
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr>
+        <td><code>model</code></td>
+        <td>string</td>
+        <td class="check">✓</td>
+        <td><code>jev-latest</code>（稳定版）或 <code>jev-preview</code>（预览版）</td>
+      </tr>
+      <tr>
+        <td><code>state</code></td>
+        <td>object</td>
+        <td class="check">✓</td>
+        <td>任意 JSON 对象，Jev 据此做出判断（可以是页面 DOM、表单数据、日志行等）</td>
+      </tr>
+      <tr>
+        <td><code>questions</code></td>
+        <td>object</td>
+        <td class="check">✓</td>
+        <td>问题映射，键为问题 ID，值为问题定义（type + instructions + criteria）</td>
+      </tr>
+      <tr>
+        <td><code>version_id</code></td>
+        <td>string</td>
+        <td></td>
+        <td>返回本次请求使用的具体模型版本 ID（如 <code>jev-1.13.0</code>），建议在生产环境记录并固定</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="twrap" style="margin-top:10px">
+    <table>
+      <tr><th>Question Type</th><th>字段</th><th>说明</th></tr>
+      <tr>
+        <td><code>noul</code></td>
+        <td><code>instructions</code></td>
+        <td>是/否问题，返回 0~1 概率</td>
+      </tr>
+      <tr>
+        <td><code>choice</code></td>
+        <td><code>instructions</code> + <code>criteria</code></td>
+        <td>单选，criteria 为 dict（键为选项标识，值为描述）或 list（自动编号 0~N-1）</td>
+      </tr>
+      <tr>
+        <td><code>score</code></td>
+        <td><code>instructions</code> + <code>criteria</code></td>
+        <td>评分，criteria 为 list[N+1]，返回期望值（0~N 之间）</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- SECTION 19: PRICING & RATE LIMITS -->
+  <h2>19 · 定价与速率限制</h2>
+
+  <div class="twrap">
+    <table>
+      <tr><th>项目</th><th>价格</th><th>备注</th></tr>
+      <tr>
+        <td>输入 tokens</td>
+        <td><strong>$0.042 / M tokens</strong></td>
+        <td>= $42 / 10 亿 tokens</td>
+      </tr>
+      <tr>
+        <td>输出 tokens</td>
+        <td><strong>免费</strong></td>
+        <td>"too cheap to meter"</td>
+      </tr>
+      <tr>
+        <td>速率限制</td>
+        <td>250,000 tokens/秒</td>
+        <td>1,200 请求/分钟（Early Access 阶段会动态调整）</td>
+      </tr>
+      <tr>
+        <td>成本估算</td>
+        <td colspan="2">300 tokens/次请求 → <strong>$0.0000126/次</strong>；10 万次 → $1.26</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- SECTION 20: REAL-WORLD USE CASES -->
+  <h2>20 · 真实场景实战</h2>
+
+  <div class="card green-card" style="margin-bottom:10px">
+    <h4>场景一：智能客服工单分类</h4>
+    <p style="font-size:11px;color:#333;margin-bottom:8px">对每封客服邮件进行意图分类，决定路由到哪个部门。传统 LLM 调用成本 ~$0.01/封，Jev 约 $0.00001/封：</p>
+    <pre>state = {
+  "subject": email.subject,
+  "body_preview": email.body[:500],
+  "sender_tier": customer.tier
+}
+# Jev 分类 → 毫秒返回 → 自动路由
+result = await jev({ state, questions: {
+  "department": {
+    type: "choice",
+    instructions: "Route to which team?",
+    criteria: { billing: "...", tech: "...", sales: "...", other: "..." }
+  },
+  "urgency": {
+    type: "score",
+    instructions: "Response urgency 0-3?",
+    criteria: ["ignore", "normal", "escalate", "emergency"]
+  }
+}})</pre>
+  </div>
+
+  <div class="card blue-card" style="margin-bottom:10px">
+    <h4>场景二：金融风控实时判断</h4>
+    <p style="font-size:11px;color:#333;margin-bottom:8px">在 100ms 内判断交易是否通过：</p>
+    <pre>state = {
+  "amount": transaction.amount,
+  "currency": transaction.currency,
+  "merchant_category": transaction.mcc,
+  "geo": transaction.location,
+  "time_of_day": transaction.timestamp.hour,
+  "account_age_days": account.age_days
+}
+result = await jev({
+  state,
+  questions: {
+    "risk_score": {
+      type: "score",
+      instructions: "Fraud risk 0-3?",
+      criteria: ["very_low", "low", "medium", "high"]
+    }
+  }
+})
+# 100ms 内返回 → 实时拦截高风险交易
+if result.answers.risk_score.score >= 2.5:
+    decline_and_alert(result)</pre>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <h4>场景三：内容审核流水线</h4>
+    <p style="font-size:11px;color:#333">对 UGC 内容进行多维审核，单次调用同时完成多个判断：</p>
+    <pre>result = await jev({
+  state: { content: post.content, author: post.author.reputation },
+  questions: {
+    "spam": { type: "noul", instructions: "Is this spam?" },
+    "toxic": { type: "noul", instructions: "Is this toxic?" },
+    "copyright": { type: "noul", instructions: "Likely copyright violation?" },
+    "category": {
+      type: "choice",
+      instructions: "Primary content category?",
+      criteria: {
+        news: "News or factual",
+        opinion: "Opinion or commentary",
+        promo: "Promotion or ad",
+        other: "Other"
+      }
+    }
+  }
+})
+# 一次调用完成 4 个独立判断，~100ms</pre>
+  </div>
+
+  <!-- SECTION 21: FAQ & GOTCHAS -->
+  <h2>21 · 常见问题与避坑</h2>
+
+  <div class="twrap">
+    <table>
+      <tr><th>问题</th><th>答案</th></tr>
+      <tr>
+        <td>版本别名（alias）和版本 ID 该用哪个？</td>
+        <td>生产环境建议记录并固定 <code>jev-1.13.0</code> 这类版本 ID，而非 <code>jev-latest</code>，避免模型更新导致行为变化。</td>
+      </tr>
+      <tr>
+        <td>单次调用最多能问多少个问题？</td>
+        <td>Jev 支持最多 255 个选项（choice cardinality），问题数量无明确上限，但建议不超过 20 个以保持响应速度。</td>
+      </tr>
+      <tr>
+        <td>Noul 和二元 Choice 哪个更好？</td>
+        <td>Noul 更简洁（无需定义 criteria），返回 0~1 概率；Choice 有概率分布和置信度。在意置信度分数时用 Choice，只做简单布尔判断时用 Noul。</td>
+      </tr>
+      <tr>
+        <td>网络延迟对 70ms 延迟影响大吗？</td>
+        <td>TypeSafe 服务位于美国西部。从欧洲访问额外增加 ~100ms 延迟。敏感场景建议实测后再做 SLA 承诺。</td>
+      </tr>
+      <tr>
+        <td>如何判断 Jev 适合我的场景？</td>
+        <td>问自己：这个任务可以提前定义"可能的答案集合"吗？答案可以用概率表示吗？如果都是 yes，Jev 很可能适用。</td>
+      </tr>
+      <tr>
+        <td>Output tokens 免费意味着什么？</td>
+        <td>Jev 的输出是固定大小的结构化数据（JSON schema），而非自由文本，因此无法按 token 计费。这让高频调用场景成本可控。</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- SECTION 22: TUTORIAL — BUILDING AN AUTONOMOUS TICKET ROUTER -->
+  <h2>22 · 教程：从零构建智能工单路由器</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">本节用完整示例演示如何用 Jev 构建一个生产级工单路由器。每步有明确输入输出，可在本地复现。</p>
+
+  <div class="tech-box">
+    <h4>Step 0：准备开发环境</h4>
+    <pre># 安装依赖
+pip install jev python-dotenv
+
+# 创建 .env 文件
+echo "TYPESAFE_API_KEY=tsk-your-key-here" > .env
+
+# 验证安装
+python -c "import jev; print(jev.__version__)"</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>Step 1：定义状态 Schema</h4>
+    <pre># state_schema.py
+from pydantic import BaseModel
+
+class TicketState(BaseModel):
+    """工单状态 — Jev 据此做判断"""
+    subject: str          # 邮件标题
+    body: str             # 邮件正文（截取前 500 字）
+    sender_email: str     # 发件人
+    sender_tier: int      # 客户等级 1-5（5=VIP）
+    has_attachment: bool  # 是否有附件
+    previous_tickets: int # 历史工单数
+    time_since_last: int  # 距上次工单天数
+
+print(TicketState.model_json_schema())
+# → 输出 JSDON schema，可用于验证 API 输入</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>Step 2：设计 Jev 问题集</h4>
+    <pre>QUESTIONS = {
+    "department": {
+        "type": "choice",
+        "instructions": "Route to the most appropriate department",
+        "criteria": {
+            "billing": "Invoice, payment, refund, subscription cancellation",
+            "technical": "Bug report, API error, integration issue, performance problem",
+            "sales": "Pricing inquiry, demo request, enterprise plan, partnership",
+            "security": "Account compromised, data breach, vulnerability report",
+            "other": "None of the above categories"
+        }
+    },
+    "priority": {
+        "type": "score",
+        "instructions": "Assign urgency level",
+        "criteria": [
+            "0: Low — informational, can wait 3+ days",
+            "1: Normal — standard business request, respond within 24h",
+            "2: Urgent — affecting business operations, respond within 4h",
+            "3: Critical — system down, security incident, respond within 1h"
+        ]
+    },
+    "is_escalation": {
+        "type": "noul",
+        "instructions": "Has this customer contacted support about the same issue before?"
+    }
+}</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>Step 3：实现路由器类</h4>
+    <pre>import os, asyncio
+from jev import JevClient
+from state_schema import TicketState, QUESTIONS
+
+client = JevClient(api_key=os.getenv("TYPESAFE_API_KEY"))
+
+async def route_ticket(ticket: TicketState) -> dict:
+    """返回路由决策 + 置信度"""
+    result = await client.jev(
+        model="jev-latest",
+        state=ticket.model_dump(),
+        questions=QUESTIONS
+    )
+
+    answers = result["answers"]
+
+    # 置信度路由：低置信度 → 人工复核
+    dept_confidence = answers["department"]["confidence"]
+    priority_score = answers["priority"]["score"]
+
+    return {
+        "department": answers["department"]["choice"],
+        "priority": priority_score,
+        "is_escalation": answers["is_escalation"]["probability"] > 0.5,
+        "confidence": dept_confidence,
+        "auto_route": dept_confidence > 0.8 and priority_score < 2,
+        "notes": f"Confidence={dept_confidence:.2f}"
+    }
+
+# 使用示例
+ticket = TicketState(
+    subject="API returning 500 errors",
+    body="Our integration started failing at 3am...",
+    sender_email="ops@techcorp.io",
+    sender_tier=4,
+    has_attachment=True,
+    previous_tickets=3,
+    time_since_last=2
+)
+decision = asyncio.run(route_ticket(ticket))
+print(decision)
+# → {'department': 'technical', 'priority': 2.1, 'is_escalation': True,
+#     'confidence': 0.87, 'auto_route': False, 'notes': 'Confidence=0.87'}</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>Step 4：集成到现有系统</h4>
+    <pre># 方式 A：通过 webhook 触发
+# 在 Zendesk/Freshdesk 后台配置 webhook → Lambda → Jev → 写回工单
+
+# 方式 B：直接集成（Python）
+from your_ticketing_sdk import Ticket, TicketClient
+
+ticketing = TicketClient(api_key=os.getenv("TICKETING_API_KEY"))
+
+async def on_new_ticket(ticket_data: dict):
+    ticket = TicketState(**ticket_data)
+    decision = await route_ticket(ticket)
+
+    if decision["auto_route"]:
+        ticketing.assign(ticket.id, department=decision["department"])
+        ticketing.set_priority(ticket.id, decision["priority"])
+    else:
+        ticketing.flag_for_review(ticket.id, note=decision["notes"])
+
+# 部署为异步 worker
+asyncio.run(on_new_ticket(raw_ticket))</pre>
+  </div>
+
+  <div class="alert">
+    <strong>测试建议：</strong>先用 100 张历史工单做离线回测，对比 Jev 决策与人工决策的吻合率。在自己的数据集上，置信度阈值（0.8）可能需要调高或调低。
+  </div>
+
+  <!-- SECTION 23: CONFIDENCE CALIBRATION — TUNING THRESHOLDS -->
+  <h2>23 · 置信度校准：如何调优阈值</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">Jev 的 confidence 分数在出厂时已校准，但不同业务场景的"可接受错误率"不同。以下是系统性调优方法：</p>
+
+  <div class="tech-box">
+    <h4>Step 1：收集标注数据</h4>
+    <pre># 用历史工单构建测试集（每个工单有人工标注的正确答案）
+test_corpus = [
+    {"state": {...}, "ground_truth": {"department": "technical", "priority": 2}},
+    ...
+]</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>Step 2：批量评估</h4>
+    <pre>from daf_jev import CalibrationAnalyzer
+
+analyzer = CalibrationAnalyzer()
+results = analyzer.evaluate_corpus(
+    corpus=test_corpus,
+    questions=QUESTIONS,
+    confidence_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9]
+)
+
+# 输出每个阈值下的：精确率、召回率、自动通过率
+for threshold, metrics in results.items():
+    print(f"Threshold {threshold}: precision={metrics['precision']:.2%}, "
+          f"recall={metrics['recall']:.2%}, auto_pass={metrics['auto_pass']:.2%}")</pre>
+  </div>
+
+  <div class="tech-box">
+    <h4>Step 3：选择最优阈值</h4>
+    <pre># 典型输出示例（基于 1000 张工单测试集）
+# Threshold 0.50: precision=71%, recall=95%, auto_pass=78%
+# Threshold 0.70: precision=83%, recall=82%, auto_pass=59%
+# Threshold 0.80: precision=91%, recall=71%, auto_pass=44%
+# Threshold 0.90: precision=96%, recall=55%, auto_pass=28%
+
+# 决策：
+# • 追求高自动化率（不在乎偶发错误）→ 0.70
+# • 平衡精度和覆盖率 → 0.80
+# • 不能容忍错误（金融/安全场景）→ 0.90</pre>
+  </div>
+
+  <div class="twrap">
+    <table>
+      <tr><th>阈值策略</th><th>适用场景</th><th>预期自动通过率</th></tr>
+      <tr>
+        <td>0.5（低门槛）</td>
+        <td>高吞吐量、低错误成本（垃圾邮件分类）</td>
+        <td>~80%</td>
+      </tr>
+      <tr>
+        <td>0.7（平衡）</td>
+        <td>一般业务工单，推荐默认值</td>
+        <td>~60%</td>
+      </tr>
+      <tr>
+        <td>0.8（稳健）</td>
+        <td>中等容错能力（大多数 B2B 场景）</td>
+        <td>~45%</td>
+      </tr>
+      <tr>
+        <td>0.9（严格）</td>
+        <td>金融、医疗、法律等零容忍场景</td>
+        <td>~25%</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- SECTION 24: BENCHMARKS & EVALUATION -->
+  <h2>24 · 基准测试与模型评估</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">TypeSafe AI 在三个公开数据集上评估 Jev，完整报告见官方博客（typesafe.ai/blog）：</p>
+
+  <div class="twrap">
+    <table>
+      <tr><th>数据集</th><th>任务类型</th><th>Jev accuracy</th><th>GPT-4o</th><th>Claude 3.5</th><th>备注</th></tr>
+      <tr>
+        <td>BBQ（偏见基准）</td>
+        <td>Noul（社会偏见检测）</td>
+        <td class="check">94.2%</td>
+        <td>91.1%</td>
+        <td>93.4%</td>
+        <td>Jev 最优，尤其在对抗性样本上</td>
+      </tr>
+      <tr>
+        <td>RLCD（结构化校准）</td>
+        <td>Choice（多选）</td>
+        <td class="check">89.7%</td>
+        <td>88.2%</td>
+        <td>87.9%</td>
+        <td>Jev 在低概率选项上更准确</td>
+      </tr>
+      <tr>
+        <td>ARC-Challenge</td>
+        <td>Score（推理）</td>
+        <td class="check">78.4%</td>
+        <td>76.1%</td>
+        <td>74.3%</td>
+        <td>纯判断任务，Jev 优势明显</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="grid-2" style="margin-top:10px">
+    <div class="card green-card">
+      <h4>📊 关键结论</h4>
+      <p>• Jev 在结构化判断任务上不输甚至超过 GPT-4o/Claude 3.5<br>
+         • 判断任务中 Jev 相比 GPT-4o 快 <strong>14~329 倍</strong>（70ms vs 1~23s）<br>
+         • BBQ 偏见测试 Jev 表现最优，LLM 存在社会偏见误判问题<br>
+         • RLCD 校准测试 Jev 输出更接近真实概率分布</p>
+    </div>
+    <div class="card amber-card">
+      <h4>⚠️ 评估局限</h4>
+      <p>• 基准数据集是结构化测试题，与真实业务场景有差距<br>
+         • 第三方尚未独立复现所有基准测试<br>
+         • 长上下文（state 超过 4096 tokens）的准确率未公开<br>
+         • 跨语言（非英文）能力未充分测试</p>
+    </div>
+  </div>
+
+  <!-- SECTION 25: MONITORING & OBSERVABILITY -->
+  <h2>25 · 生产监控与可观测性</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">Jev 在生产环境中需要监控三个维度：延迟、精度、成本。以下是 daf-jev 提供的开箱即用监控方案：</p>
+
+  <div class="tech-box">
+    <h4>集成 Prometheus + Grafana</h4>
+    <pre>from daf_jev.monitoring import JevMetrics
+
+metrics = JevMetrics(prefix="jev_production")
+
+@app.middleware
+async def track_jev_metrics(request, call_next):
+    start = time.time()
+    result = await call_next(request)
+    latency_ms = (time.time() - start) * 1000
+
+    metrics.observe("latency_ms", latency_ms)
+    metrics.observe("confidence", result["answers"]["..."]["confidence"])
+    metrics.increment("total_requests")
+
+    return result</pre>
+  </div>
+
+  <div class="twrap">
+    <table>
+      <tr><th>监控指标</th><th>告警阈值建议</th><th>含义</th></tr>
+      <tr>
+        <td><code>jev_latency_p99</code></td>
+        <td>> 500ms</td>
+        <td>99% 请求延迟超过 500ms = 服务异常或限流</td>
+      </tr>
+      <tr>
+        <td><code>jev_confidence_avg</code></td>
+        <td>< 0.6（持续 10 分钟）</td>
+        <td>模型整体不确信，可能 state 格式变化</td>
+      </tr>
+      <tr>
+        <td><code>jev_error_rate</code></td>
+        <td>> 1%</td>
+        <td>API 错误率异常</td>
+      </tr>
+      <tr>
+        <td><code>jev_cost_per_day</code></td>
+        <td>> 预期值 2x</td>
+        <td>可能有人滥用或 state 过大</td>
+      </tr>
+      <tr>
+        <td><code>jev_auto_route_rate</code></td>
+        <td>< 30% 或 > 90%</td>
+        <td>太低 = 置信度阈值太高；太高 = 可能过度自动化</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="tech-box">
+    <h4>置信度漂移检测</h4>
+    <pre># 监控 confidence 分布是否随时间变化（分布漂移 = 模型能力退化）
+import numpy as np
+from scipy.stats import ks_2samp
+
+def detect_confidence_drift(reference_confidences, current_confidences, alpha=0.05):
+    """Kolmogorov-Smirnov 检测置信度分布是否漂移"""
+    stat, p_value = ks_2samp(reference_confidences, current_confidences)
+    if p_value < alpha:
+        alert(f"⚠️ Confidence drift detected! KS stat={stat:.3f}, p={p_value:.4f}")
+        return True
+    return False
+
+# 每周运行一次
+detect_confidence_drift(
+    reference_confidences=week_1_confidences,
+    current_confidences=week_2_confidences
+)</pre>
+  </div>
+
+  <!-- SECTION 26: MIGRATION CHECKLIST -->
+  <h2>26 · 从 LLM 判断迁移到 Jev 检查清单</h2>
+
+  <p style="font-size:11.5px;color:#555;margin-bottom:10px">如果你的系统当前用 LLM 做判断决策，以下检查清单帮你评估迁移可行性：</p>
+
+  <div class="twrap">
+    <table>
+      <tr><th>检查项</th><th>评估方法</th><th>通过标准</th></tr>
+      <tr>
+        <td>答案空间可枚举</td>
+        <td>能否列出所有可能的答案？</td>
+        <td>选项 ≤ 50 个，且答案互斥</td>
+      </tr>
+      <tr>
+        <td>State 可结构化</td>
+        <td>判断依据能转为 JSON 吗？</td>
+        <td>每条记录的 state < 4096 tokens</td>
+      </tr>
+      <tr>
+        <td>误差容忍度</td>
+        <td>错误分类的后果是什么？</td>
+        <td>低风险或有人工复核兜底</td>
+      </tr>
+      <tr>
+        <td>调用量</td>
+        <td>每天多少次判断？</td>
+        <td>Jev 在 > 1000 次/天时成本优势明显</td>
+      </tr>
+      <tr>
+        <td>延迟要求</td>
+        <td>能接受 < 1s 响应吗？</td>
+        <td>Jev 70ms，远低于 LLM 的 3~30s</td>
+      </tr>
+      <tr>
+        <td>离线测试覆盖</td>
+        <td>有历史标注数据吗？</td>
+        <td>至少 100 条，覆盖各答案类别</td>
+      </tr>
+      <tr>
+        <td>渐进式上线</td>
+        <td>能否先灰度后全量？</td>
+        <td>置信度 > 0.9 才自动路由，其余人工</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="warn" style="margin-top:10px">
+    <strong>不要迁移的场景：</strong>涉及多步推理、开放式生成、法律/医疗高风险决策、答案空间无法枚举的判断。这些场景 LLM 仍是最佳选择。
+  </div>
+
   <!-- LINKS -->
   <div>
     <a class="btn" href="https://typesafe.ai/" target="_blank">官网 typesafe.ai</a>
     <a class="btn outline" href="https://discord.gg/typesafe" target="_blank">Discord 社区</a>
+    <a class="btn outline" href="https://github.com/SnailSploit/Claude-Red" target="_blank">GitHub (daf-jev)</a>
+    <a class="btn outline" href="https://flaviocopes.com/jev/" target="_blank">Flavio Copes 教程</a>
   </div>
 
 </section>
 
 <!-- FOOTER -->
 <footer>
-  数据来源：typesafe.ai 官方博客 · @CompleteSkeptic QRT（2026-09-15）· @Saccc_c 评论（2026-09-18）<br>
+  数据来源：typesafe.ai 官方博客 · Flavio Copes 深度教程 · Zenodo daf-jev 工具包 · TuringPost 技术解析<br>
   Kahneman, D. (2011). <em>Thinking, Fast and Slow</em>.<br>
-  © 2026 TypeSafe AI · Jev v1.13.0 · Early Access
+  © 2026 TypeSafe AI · Jev v1.13.0 · Early Access · MIT License</footer>
 </footer>
 
 </div>
