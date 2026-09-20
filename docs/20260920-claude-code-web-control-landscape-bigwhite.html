@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="bigwhite">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Code Web 控制方案全景：Remote Control、PTY 与 Agent SDK</title>
+  <meta name="description" content="从官方 Remote Control、PTY/WebSocket Web Terminal、Agent SDK Web UI 到 Windows 适配，梳理 Claude Code 远程控制的技术路线，并比较七个第三方项目与两条真实链路。">
+  <style>
+    :root{
+      --bg:#f7f8fa;--paper:#fff;--ink:#0b0d12;--muted:#66717f;--faint:#9aa5b2;
+      --line:#e2e7ee;--line2:#cdd5df;--blue:#001a72;--blue2:#4b73bd;--blue3:#9db3dd;
+      --soft:#f6f8fb;--soft-blue:#eef4ff;--black:#05070a;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+    body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:13px;line-height:1.64}
+    img{max-width:100%;display:block}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace}
+    .page{width:min(1180px,calc(100% - 24px));margin:0 auto;padding:18px 0 72px}
+    .sheet{background:var(--paper);border:1px solid var(--line);box-shadow:0 18px 54px rgba(20,35,60,.08);padding:18px}
+    .topline{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:800}
+    .brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+    .brand:before{content:"";display:inline-block;width:22px;height:6px;background:var(--blue)}
+    .hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:18px;align-items:stretch;margin-bottom:18px}
+    .hero-copy{display:grid;align-content:space-between;gap:24px;min-height:360px}
+    .kicker{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+    h1{font-size:clamp(34px,5.6vw,64px);line-height:1.08;letter-spacing:-.045em;margin:0;color:var(--ink);font-weight:900}
+    .lead{max-width:66ch;color:var(--muted);font-size:15.5px;line-height:1.72;margin:16px 0 0}
+    .hero-pills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .hero-pill{padding:13px 14px;border-right:1px solid var(--line)}
+    .hero-pill:last-child{border-right:0}
+    .mini-bar{width:34px;height:5px;background:var(--blue);margin-bottom:12px}
+    .hero-pill b{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}
+    .hero-pill span{font-size:12.5px;color:var(--muted);line-height:1.45}
+    .blue-block{background:var(--blue);color:#fff;min-height:360px;padding:22px;display:grid;align-content:space-between;position:relative;overflow:hidden}
+    .blue-block:after{content:"";position:absolute;inset:auto -16px -16px auto;width:120px;height:120px;border:1px solid rgba(255,255,255,.18);transform:rotate(15deg)}
+    .blue-block .label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:850;color:rgba(255,255,255,.75);position:relative;z-index:1}
+    .blue-block .big{font-size:clamp(76px,12vw,150px);line-height:.82;letter-spacing:-.085em;font-weight:900;position:relative;z-index:1}
+    .blue-block .caption{max-width:32ch;font-size:14.5px;color:rgba(255,255,255,.82);line-height:1.55;position:relative;z-index:1}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .panel{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;min-width:0}
+    .panel.gray{background:var(--soft)}
+    .panel.black{background:var(--black);color:#fff;border-color:var(--black)}
+    .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px}
+    .panel.black .head{border-color:rgba(255,255,255,.18)}
+    .label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:900;line-height:1.25}
+    .page-no{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:800;white-space:nowrap}
+    .panel h2{font-size:clamp(19px,2.4vw,28px);line-height:1.12;letter-spacing:-.04em;margin:0;font-weight:900}
+    .panel p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.7}
+    .panel.black p{color:rgba(255,255,255,.72)}
+    .metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .metric{background:#fff;border:1px solid var(--line);padding:13px;min-height:112px;display:grid;align-content:space-between}
+    .metric strong{font-size:38px;line-height:.92;letter-spacing:-.06em;color:var(--ink)}
+    .metric span{font-size:10.5px;color:var(--muted);font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+    .bar{height:8px;background:var(--line);margin-top:13px;overflow:hidden}
+    .bar i{display:block;height:100%;background:var(--blue)}
+    .rank{display:grid;gap:10px}
+    .rank-row{display:grid;grid-template-columns:minmax(120px,148px) minmax(0,1fr) 44px;gap:10px;align-items:center;font-size:12px}
+    .rank-row .name{color:#323842;font-weight:700;line-height:1.25;overflow-wrap:anywhere}
+    .track{height:10px;background:var(--soft);position:relative}
+    .fill{height:100%;background:var(--blue)}
+    .score{text-align:right;color:var(--ink);font-weight:850}
+    .feature{background:var(--soft);padding:14px;border:1px solid var(--line);display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:start}
+    .feature+.feature{margin-top:10px}
+    .feature.dark{background:var(--black);color:#fff;border-color:var(--black)}
+    .feature .num{font-size:30px;line-height:1;letter-spacing:-.04em;font-weight:900;color:var(--blue)}
+    .feature.dark .num{color:#fff}
+    .feature b{display:block;margin-bottom:4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+    .feature p{margin:0}
+    .feature.dark p{color:rgba(255,255,255,.72)}
+    .list{display:grid;gap:10px}
+    .list-item{display:grid;grid-template-columns:56px 1fr 34px;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}
+    .list-item:last-child{border-bottom:0;padding-bottom:0}
+    .list-item strong{font-size:24px;line-height:1;letter-spacing:-.055em;color:var(--blue)}
+    .list-item b{display:block;font-size:14px;line-height:1.25;overflow-wrap:anywhere}
+    .list-item span{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.5}
+    .icon{width:30px;height:30px;border:1px solid var(--line2);display:grid;place-items:center;color:var(--blue);font-weight:900;font-size:13px}
+    .wide{display:grid;grid-template-columns:1.15fr .85fr;gap:14px;margin-top:14px}
+    .chart-card,.note-panel{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;min-width:0}
+    .note-panel{background:var(--soft-blue);border:1px solid #d7e6ff;align-content:space-between;gap:18px}
+    .note-panel .big{font-size:52px;line-height:.92;font-weight:900;letter-spacing:-.07em;color:var(--blue)}
+    .tbl-wrap{overflow-x:auto;border:1px solid var(--line)}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px}
+    th{background:var(--soft);padding:9px 11px;text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);font-weight:900;border-bottom:1px solid var(--line)}
+    td{padding:10px 11px;border-bottom:1px solid var(--line);vertical-align:top;color:#323842;line-height:1.55}
+    tr:last-child td{border-bottom:0}
+    td.mode{font-weight:800;color:var(--ink);white-space:nowrap}
+    tr.hl{background:var(--soft-blue)}
+    tr.hl td.mode{color:var(--blue)}
+    pre{margin:0;background:var(--soft);border:1px solid var(--line);padding:12px;font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:#26303c}
+    pre .c{color:var(--blue2)}
+    .meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .meta-box{background:#fff;border:1px solid var(--line);padding:13px;display:grid;gap:8px;min-height:92px}
+    .meta-box b{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
+    .meta-box span{font-size:12.5px;line-height:1.55;color:var(--muted);overflow-wrap:anywhere}
+    .source-list{display:grid;gap:8px}
+    .source-list a{color:var(--blue);text-decoration:underline;text-decoration-color:rgba(0,26,114,.22);overflow-wrap:anywhere}
+    .source-list a:hover{text-decoration-color:currentColor}
+    .tag-note{font-size:11px;color:var(--faint);letter-spacing:.04em}
+    .footer{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:800}
+    @media(max-width:980px){.hero,.wide{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}.hero-copy{min-height:auto}.blue-block{min-height:260px}.meta-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:720px){
+      .page{width:min(100%,calc(100% - 14px));padding:10px 0 60px}.sheet{padding:12px}
+      .topline,.footer{align-items:flex-start;flex-direction:column}
+      .grid3,.metric-grid,.hero-pills,.meta-grid{grid-template-columns:1fr}
+      .hero-pill{border-right:0;border-bottom:1px solid var(--line)}.hero-pill:last-child{border-bottom:0}
+      h1{font-size:34px;line-height:1.16}.lead{font-size:14px}
+      .blue-block .big{font-size:80px}.blue-block{min-height:230px}
+      .panel{padding:14px}
+      .rank-row{grid-template-columns:86px minmax(0,1fr) 38px}
+      .feature{grid-template-columns:1fr}
+      .list-item{grid-template-columns:44px 1fr 28px}
+      .chart-card,.note-panel{padding:14px}
+      table{min-width:560px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="sheet">
+      <div class="topline">
+        <div class="brand">Claude Code · Web 控制调研</div>
+        <div>2026.09.20 · 资料核验截至当日</div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div>
+            <div class="kicker">技术调研 · CONTROL SURFACE</div>
+            <h1>Claude Code Web 控制方案全景</h1>
+            <p class="lead">让 Web 页面接上 Claude Code，不是“把终端塞进网页”这一件事，而是三条不同的路线：<strong>官方 Remote Control</strong> 接管已有会话，<strong>PTY/WebSocket</strong> 复用终端进程，<strong>Agent SDK Web UI</strong> 重建控制面。先确定“谁拥有会话”，再选 Web UI。</p>
+          </div>
+          <div class="hero-pills">
+            <div class="hero-pill"><div class="mini-bar"></div><b>SESSION 层</b><span>Remote Control / Agent SDK：控制 Claude 会话与消息。</span></div>
+            <div class="hero-pill"><div class="mini-bar"></div><b>TTY 层</b><span>PTY + WebSocket：控制终端进程的画面与按键。</span></div>
+            <div class="hero-pill"><div class="mini-bar"></div><b>平台现实</b><span>没有成熟方案可无条件 attach 任意已打开的 Windows Terminal。</span></div>
+          </div>
+        </div>
+        <aside class="blue-block">
+          <div class="label">ROUTES</div>
+          <div class="big">3</div>
+          <div class="caption">三条路线控制对象不同：官方会话层、终端进程层、SDK 重建层。本卡比较维度，非外部 benchmark。</div>
+        </aside>
+      </section>
+
+      <section class="grid3">
+        <article class="panel">
+          <div class="head"><div class="label">DATA · 全景四个数字</div><div class="page-no">PAGE 01</div></div>
+          <h2>一眼看清这条赛道</h2>
+          <div class="metric-grid">
+            <div class="metric"><div><strong>1</strong><span>官方方案</span></div><div class="bar"><i style="width:33%"></i></div></div>
+            <div class="metric"><div><strong>7</strong><span>重点第三方</span></div><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="metric"><div><strong>2</strong><span>控制层级</span></div><div class="bar"><i style="width:66%"></i></div></div>
+            <div class="metric"><div><strong>3</strong><span>Windows 路线</span></div><div class="bar"><i style="width:100%"></i></div></div>
+          </div>
+          <p class="tag-note">官方 1 = Remote Control；层级 2 = 会话层 / TTY 层；Windows 路线 = 原生 ConPTY、psmux、WSL2。</p>
+        </article>
+
+        <article class="panel">
+          <div class="head"><div class="label">ROUTES · 路线辨析</div><div class="page-no">PAGE 02</div></div>
+          <h2>三条路线控制的东西不同</h2>
+          <div class="feature"><div class="num">A</div><div><b>Remote Control</b><p>接管<b>已有 Claude 会话</b>：浏览器与本地终端共享同一 session、权限提示与任务状态；本机不开放入站端口。</p></div></div>
+          <div class="feature"><div class="num">B</div><div><b>PTY / WebSocket</b><p>接管<b>终端进程</b>：xterm.js 只负责渲染，node-pty / ConPTY / tmux 才是执行边界；等价于把 stdin 交给浏览器。</p></div></div>
+          <div class="feature"><div class="num">C</div><div><b>Agent SDK Web UI</b><p>用 <code>@anthropic-ai/claude-agent-sdk</code> 的 <code>query()</code> 重建控制面：结构化事件流、权限与计划审批，<b>不显示原始终端</b>。</p></div></div>
+        </article>
+
+        <article class="panel gray">
+          <div class="head"><div class="label">OFFICIAL · 官方入口</div><div class="page-no">PAGE 03</div></div>
+          <h2>Remote Control：默认首选</h2>
+          <pre><span class="c"># 服务器模式：托管多个会话</span>
+claude remote-control
+
+<span class="c"># 已有交互式会话内</span>
+/remote-control</pre>
+          <p>工作方式：本机 Claude Code 只发起<b>出站 HTTPS</b>，经 Anthropic API 转发；浏览器在 claude.ai/code 打开同一会话。本地文件、MCP、工具、项目配置保持可用。</p>
+          <p>边界：需 claude.ai 登录，不支持纯 API Key；Bedrock / Vertex / Foundry 与自定义 <code>ANTHROPIC_BASE_URL</code> 场景不可用；部分终端专属命令（如 /plugin、/resume）仍需本地 CLI；本地进程退出后会话离线。</p>
+        </article>
+      </section>
+
+      <section class="grid3">
+        <article class="panel">
+          <div class="head"><div class="label">ARCH · 官方链路</div><div class="page-no">PAGE 04</div></div>
+          <h2>会话层：官方托管转发</h2>
+          <pre><span class="c"># 浏览器看到的是结构化会话，</span>
+<span class="c"># 不是终端画面</span>
+claude.ai/code  ─┐
+Claude 手机 App ─┤  Anthropic API (TLS)
+                 ▼
+        本机 Claude Code 进程
+                 ▼
+     本地文件 / MCP / 工具 / 配置</pre>
+          <p>本机<b>不开放入站端口</b>；transcript 在 Remote Control 期间同步到 Anthropic 服务端以支持多设备与断线恢复，保留策略遵循其数据条款。协议细节（握手、token 语义、多端写入策略）未完整公开，不应自行假设。</p>
+        </article>
+
+        <article class="panel">
+          <div class="head"><div class="label">ARCH · 自建链路</div><div class="page-no">PAGE 05</div></div>
+          <h2>TTY 层：PTY Broker 是执行边界</h2>
+          <pre><span class="c"># 浏览器永远只连 Broker，</span>
+<span class="c"># 不直连 PTY 或 tmux socket</span>
+xterm.js ── WebSocket ── Auth Broker
+                          ├─ node-pty / ConPTY
+                          ├─ tmux / psmux
+                          └─ claude / claude --resume</pre>
+          <p>xterm.js 官方定位是<b>终端渲染组件</b>，不是 shell。谁持有 PTY，谁就拥有命令执行权。Broker 必须承担：认证、Origin 校验、会话注册表、单 writer、断线重连与输出缓冲。</p>
+        </article>
+
+        <article class="panel black">
+          <div class="head"><div class="label">RISK · 安全底线</div><div class="page-no">PAGE 06</div></div>
+          <h2>WebSocket 可写 ≈ 远程终端输入</h2>
+          <p>PTY Web UI 一旦被未授权访问，等价于远程命令执行入口。基线：</p>
+          <p>· 默认只监听 127.0.0.1，远程用 Tailscale / WireGuard / SSH 隧道；<br>
+          · WebSocket 校验精确 Origin + CSRF / 一次性配对 token；<br>
+          · 每个 session 默认单 writer，其余连接只读 observer；<br>
+          · 限制连接数、消息大小与 PTY 数量，记录审计日志；<br>
+          · 凭证、环境变量、.env 永不进浏览器。</p>
+        </article>
+      </section>
+
+      <section class="panel" style="margin-bottom:14px">
+        <div class="head"><div class="label">RANKING · 主观选型顺序</div><div class="page-no">PAGE 07</div></div>
+        <h2>七个项目：按“适配已有 TUI / PTY”的阅读顺序</h2>
+        <div class="rank">
+          <div class="rank-row"><div class="name">vultuk/claude-code-web</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="score">A</div></div>
+          <div class="rank-row"><div class="name">tlive</div><div class="track"><div class="fill" style="width:92%"></div></div><div class="score">A</div></div>
+          <div class="rank-row"><div class="name">Claude Code Studio</div><div class="track"><div class="fill" style="width:84%;background:var(--blue2)"></div></div><div class="score">B</div></div>
+          <div class="rank-row"><div class="name">OmniTerm</div><div class="track"><div class="fill" style="width:78%;background:var(--blue2)"></div></div><div class="score">B</div></div>
+          <div class="rank-row"><div class="name">purplemux</div><div class="track"><div class="fill" style="width:72%;background:var(--blue3)"></div></div><div class="score">B</div></div>
+          <div class="rank-row"><div class="name">Agent of Empires</div><div class="track"><div class="fill" style="width:66%;background:var(--blue3)"></div></div><div class="score">C</div></div>
+          <div class="rank-row"><div class="name">TUAN webterminal</div><div class="track"><div class="fill" style="width:58%;background:var(--blue3)"></div></div><div class="score">C</div></div>
+        </div>
+        <p class="tag-note">A=优先评估，B=场景匹配后评估，C=特定路线适用。口径：PTY/TUI 适配度、Windows 友好度、维护成熟度、部署成本；为本卡编辑判断，核验截至 2026-09-20，非统一测试排名。fafawlf/claude-code-web 属路线 C（Agent SDK），不参与本排序。</p>
+      </section>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>项目</th><th>机制</th><th>Windows</th><th>关键限制</th></tr></thead>
+          <tbody>
+            <tr class="hl"><td class="mode">vultuk/claude-code-web</td><td>node-pty + WebSocket + xterm.js，多会话持久化</td><td>依赖本地 CLI / PTY，需实测</td><td>自己启动并托管 PTY；npm 版本 2025-10，约 97 stars；必须配置认证</td></tr>
+            <tr><td class="mode">tlive</td><td>hooks 旁路监听现有会话；或 wrapped 模式持有 PTY</td><td>ConPTY 路线，验证较少</td><td>v2 不再托管会话，持久化需自配 tmux；默认 bind 0.0.0.0 需收紧</td></tr>
+            <tr><td class="mode">Claude Code Studio</td><td>tmux control mode 管理 agent PTY，功能面大</td><td>官方列支持</td><td>复杂度高；管理的是自家 tmux 会话，非任意外部 TTY</td></tr>
+            <tr><td class="mode">OmniTerm</td><td>ACP 协议 + tmux/psmux + portable-pty，多 Agent 控制台</td><td>psmux 方案</td><td>面向自家管理的会话；Chat 模式走结构化协议而非终端镜像</td></tr>
+            <tr><td class="mode">purplemux</td><td>xterm.js → node-pty → 专用 tmux；JSONL 结构化时间线</td><td>不支持（macOS/Linux）</td><td>仅 macOS/Linux；已有会话经 tmux/resume 管理</td></tr>
+            <tr><td class="mode">Agent of Empires</td><td>每 agent 一个 tmux session；Rust TUI + Web dashboard</td><td>仅 WSL2</td><td>tmux 管理器定位，非浏览器 PTY 代理；约 3.3k stars</td></tr>
+            <tr><td class="mode">TUAN webterminal</td><td>Express + Socket.IO + node-pty，含 /resume</td><td>PowerShell/WinPTY 偏好</td><td>无完善认证、硬编码路径；仅可信 LAN 实验，禁公网</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section class="grid3" style="margin-top:14px">
+        <article class="panel">
+          <div class="head"><div class="label">SDK · 路线 C 备注</div><div class="page-no">PAGE 08</div></div>
+          <h2>fafawlf/claude-code-web 不是 PTY</h2>
+          <p>与 vultuk 同名不同物：它基于 <code>@anthropic-ai/claude-agent-sdk</code> 的 <code>query()</code>，用 Fastify WebSocket 驱动 SDK 管理的会话，提供 cwd / resume / permissionMode / 事件重放。控制的是 Agent 能力面，<b>不 attach 现有终端、不显示 TUI 画面</b>。默认 loopback + token，单用户定位。</p>
+        </article>
+
+        <article class="panel">
+          <div class="head"><div class="label">WINDOWS · 适配要点</div><div class="page-no">PAGE 09</div></div>
+          <h2>三条路线按宿主分</h2>
+          <div class="list">
+            <div class="list-item"><strong>01</strong><div><b>原生 ConPTY</b><span>tlive / webterminal 类；注意 Ctrl-C、进程树终止、UTF-8 编码与 PowerShell 输出转义。</span></div><div class="icon">W</div></div>
+            <div class="list-item"><strong>02</strong><div><b>psmux（tmux 替代）</b><span>OmniTerm 路线；保留 tmux 语义的会话持久化与 attach 模型。</span></div><div class="icon">P</div></div>
+            <div class="list-item"><strong>03</strong><div><b>WSL2</b><span>purplemux / Agent of Empires / CodeHelm 路线；PTY、tmux、信号最成熟，代价是路径与端口桥接。</span></div><div class="icon">L</div></div>
+          </div>
+        </article>
+
+        <article class="panel gray">
+          <div class="head"><div class="label">DECISION · 选型路径</div><div class="page-no">PAGE 10</div></div>
+          <h2>按需求对号入座</h2>
+          <div class="list">
+            <div class="list-item"><strong>Q1</strong><div><b>只想远程继续本机会话</b><span>官方 Remote Control，一行命令，安全由官方链路承担。</span></div><div class="icon">→</div></div>
+            <div class="list-item"><strong>Q2</strong><div><b>必须看到完整 TUI</b><span>vultuk/claude-code-web 或 tlive；同时接受自建安全的责任。</span></div><div class="icon">→</div></div>
+            <div class="list-item"><strong>Q3</strong><div><b>接管任意已开的 Windows Terminal</b><span>没有成熟通用方案；现实模型是托管 PTY + claude --resume。</span></div><div class="icon">→</div></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="chart-card">
+          <div class="head"><div class="label">REALITY · 接管能力矩阵</div><div class="page-no">PAGE 11</div></div>
+          <h2>“接管已有 TUI”要拆开看</h2>
+          <div class="tbl-wrap">
+            <table style="min-width:520px">
+              <thead><tr><th>方案</th><th>接管对象</th><th>是否显示原始终端</th><th>能否接任意已开窗口</th></tr></thead>
+              <tbody>
+                <tr><td class="mode">Remote Control</td><td>Claude 会话层</td><td>否，结构化 UI</td><td>按官方会话语义，非任意终端</td></tr>
+                <tr><td class="mode">PTY 项目</td><td>终端进程层</td><td>是</td><td>通常仅限自家托管的 PTY/tmux</td></tr>
+                <tr><td class="mode">Agent SDK UI</td><td>Agent 生命周期</td><td>否</td><td>否，新建/恢复 SDK 会话</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+        <aside class="note-panel">
+          <div><div class="label">BOTTOM LINE</div><div class="big">托管<br>优先</div></div>
+          <p>没有方案能无条件抓取任意已打开的终端窗口。可靠的模型始终是：Broker 托管 ConPTY / psmux / tmux 会话，已有对话用 <code>claude --resume &lt;session-id&gt;</code> 恢复，而不是直接抓取窗口。</p>
+        </aside>
+      </section>
+
+      <section class="panel" style="margin-top:14px">
+        <div class="head"><div class="label">SOURCES · 来源</div><div class="page-no">PAGE 12</div></div>
+        <h2>官方文档、项目仓库与安全参考</h2>
+        <div class="meta-grid">
+          <div class="meta-box"><b>官方文档</b><span class="source-list">
+            <a href="https://code.claude.com/docs/en/remote-control">code.claude.com/docs/en/remote-control</a>
+            <a href="https://code.claude.com/docs/en/claude-code-on-the-web">code.claude.com/docs/en/claude-code-on-the-web</a>
+            <a href="https://code.claude.com/docs/en/desktop">code.claude.com/docs/en/desktop</a>
+          </span></div>
+          <div class="meta-box"><b>项目仓库</b><span class="source-list">
+            <a href="https://github.com/vultuk/claude-code-web">github.com/vultuk/claude-code-web</a>
+            <a href="https://github.com/y49/tlive">github.com/y49/tlive</a>
+            <a href="https://github.com/Lexus2016/claude-code-studio">github.com/Lexus2016/claude-code-studio</a>
+            <a href="https://github.com/GDWhisper/OmniTerm">github.com/GDWhisper/OmniTerm</a>
+            <a href="https://github.com/subicura/purplemux">github.com/subicura/purplemux</a>
+            <a href="https://github.com/agent-of-empires/agent-of-empires">github.com/agent-of-empires/agent-of-empires</a>
+            <a href="https://github.com/TUAN130294/webterminal">github.com/TUAN130294/webterminal</a>
+            <a href="https://github.com/fafawlf/claude-code-web">github.com/fafawlf/claude-code-web</a>
+          </span></div>
+          <div class="meta-box"><b>安全与组件参考</b><span class="source-list">
+            <a href="https://github.com/xtermjs/xterm.js">github.com/xtermjs/xterm.js</a>
+            <a href="https://github.com/tsl0922/ttyd">github.com/tsl0922/ttyd</a>
+            <a href="https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html">OWASP WebSocket Security Cheat Sheet</a>
+            <a href="https://datatracker.ietf.org/doc/html/rfc6455">RFC 6455 WebSocket</a>
+          </span></div>
+        </div>
+        <p class="tag-note">项目活跃度（stars / 最近推送 / npm 下载）为 2026-09-20 调研快照，会随时间漂移；Remote Control 内部协议、token 语义与多端写入策略未公开，本卡不作推断。</p>
+      </section>
+
+      <footer class="footer">
+        <div>SOURCE · CODE.CLAUDE.COM / GITHUB REPOS / OWASP</div>
+        <div>STYLE · infocard-bigwhite-style · 2026-09-20</div>
+      </footer>
+    </div>
+  </main>
+</body>
+</html>
