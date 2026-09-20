@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CLI-Anything — 让所有软件变成 Agent 可操作的 CLI</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+      --grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+
+    /* ── Hero bar ── */
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+
+    /* ── Hero section ── */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{
+      display:inline-flex;align-items:center;gap:8px;width:fit-content;
+      padding:5px 10px;border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;
+      font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;text-transform:uppercase;border-radius:999px;
+    }
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(36px,6vw,72px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,17px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);
+      border-radius:999px;color:#fff;font-size:12px;font-weight:850;
+      letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+
+    /* ── Hero visual panel ── */
+    .hero-visual{
+      min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);
+      border-radius:22px;box-shadow:var(--shadow);padding:14px;
+      display:grid;gap:12px;align-content:start;
+    }
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{
+      width:66px;height:66px;border-radius:22px;
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+        linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+      box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em;
+    }
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{
+      min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;
+      display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2);
+    }
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{
+      width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+      background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.1);color:#fff;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .visual-strip{
+      height:12px;border-radius:999px;
+      background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);
+      box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16);
+    }
+
+    /* ── Pipeline section ── */
+    .pipeline-section{margin-bottom:14px}
+    .section-label{
+      font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      text-transform:uppercase;letter-spacing:.14em;color:#9fb0de;margin:0 0 10px;
+      display:flex;align-items:center;gap:8px;
+    }
+    .section-label::before{
+      content:"";display:block;width:3px;height:14px;border-radius:999px;
+      background:linear-gradient(180deg,var(--cyan),var(--purple));
+    }
+    .pipeline-flow{
+      display:flex;align-items:center;gap:0;
+      background:#11162a;border:1.5px solid rgba(255,255,255,.1);
+      border-radius:18px;padding:14px 16px;overflow-x:auto;
+      box-shadow:var(--shadow);
+    }
+    .pipe-step{
+      display:flex;flex-direction:column;align-items:center;gap:6px;
+      flex:1;min-width:80px;max-width:120px;
+    }
+    .pipe-icon{
+      width:48px;height:48px;border-radius:50%;
+      display:grid;place-items:center;
+      font-size:22px;font-weight:950;
+      border:2px solid rgba(255,255,255,.15);
+      background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));
+      box-shadow:0 4px 12px rgba(0,0,0,.2);
+    }
+    .pipe-label{
+      font-size:11px;font-weight:900;text-align:center;
+      color:#e8edf8;letter-spacing:.04em;line-height:1.3;
+    }
+    .pipe-num{
+      font-size:9.5px;font-weight:900;letter-spacing:.06em;
+      color:#9fb0de;text-transform:uppercase;
+    }
+    .pipe-arrow{
+      color:#4a5a8a;font-size:20px;flex-shrink:0;
+      margin:0 2px;align-self:center;
+    }
+
+    /* ── Three-column shell ── */
+    .shell{
+      display:grid;grid-template-columns:1fr 1.28fr .92fr;
+      gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);
+      border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px;
+    }
+    .panel{
+      min-width:0;background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);
+      border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;
+      box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column;
+    }
+    .panel-head{
+      padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);
+      display:flex;justify-content:space-between;align-items:center;gap:10px;
+      background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+    }
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .panel-head .badge{
+      display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#dfe8ff;
+      font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;
+    }
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+
+    /* ── CLI-Hub commands ── */
+    .cmd-list{display:grid;gap:8px}
+    .cmd-item{
+      display:flex;justify-content:space-between;gap:8px;align-items:center;
+      border:1px solid rgba(255,255,255,.08);background:#0f1424;
+      padding:8px 10px;border-radius:10px;font-size:12px;color:#d8e2ff;
+    }
+    .cmd-item .cmd{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#7ad9ff;font-size:11.5px;
+    }
+    .cmd-item .desc{color:#9fb0de;font-size:11px}
+
+    /* ── Examples ── */
+    .example-list{display:grid;gap:8px}
+    .example-item{
+      display:flex;align-items:flex-start;gap:10px;
+      border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2131,#171c2b);
+      padding:9px 10px;border-radius:12px;
+    }
+    .example-badge{
+      padding:3px 8px;border-radius:999px;font-size:10.5px;font-weight:900;
+      text-transform:uppercase;letter-spacing:.08em;flex-shrink:0;margin-top:1px;
+    }
+    .badge-cli{border:1px solid rgba(88,195,255,.35);background:rgba(88,195,255,.1);color:#7ad9ff}
+    .badge-native{border:1px solid rgba(45,179,106,.35);background:rgba(45,179,106,.1);color:#7fe1a2}
+    .example-item .name{font-size:13px;font-weight:900;color:#fff}
+    .example-item .note{font-size:11.5px;color:#9fb0de;line-height:1.45}
+
+    /* ── Agent integration ── */
+    .agent-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .agent-card{
+      border:1px solid rgba(255,255,255,.08);background:#0f1424;
+      padding:9px 10px;border-radius:10px;display:grid;gap:4px;
+    }
+    .agent-card .name{font-size:12px;font-weight:900;color:#fff}
+    .agent-card .role{font-size:11px;color:#9fb0de;line-height:1.4}
+
+    /* ── Skill note ── */
+    .skill-note{
+      border:1.5px solid rgba(244,200,76,.3);background:rgba(244,200,76,.08);
+      border-radius:14px;padding:11px 12px;display:grid;gap:6px;
+    }
+    .skill-note .label{
+      font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#f4c84c;
+    }
+    .skill-note p{margin:0;font-size:12.5px;line-height:1.6;color:#edf2ff}
+
+    /* ── Feature row ── */
+    .feature-row{
+      display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px;
+    }
+    .feature{
+      background:#171c2b;border:1.5px solid rgba(255,255,255,.08);
+      border-radius:16px;padding:11px 9px;color:#e8edf8;
+      text-align:center;display:grid;gap:7px;min-width:0;
+    }
+    .feature-icon{
+      width:28px;height:28px;margin:0 auto;border-radius:50%;
+      background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;
+      font-size:14px;color:#fff;
+    }
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+
+    /* ── Footer ── */
+    .footer{
+      background:#0b1020;border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;padding:12px 14px;
+      display:flex;justify-content:space-between;gap:10px;align-items:center;
+      color:#dfe8ff;font-size:12px;flex-wrap:wrap;
+    }
+    .footer a{color:var(--cyan)}
+    .footer .meta{color:#9fb0de}
+
+    @media (max-width:1080px){
+      .hero,.shell{grid-template-columns:1fr}
+      .feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(30px,13vw,54px)}
+      .shell{padding:10px;gap:10px}
+      .feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .pipeline-flow{padding:12px 10px;gap:0}
+      .pipe-step{min-width:60px;max-width:80px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Hero bar ── -->
+  <div class="hero-bar"></div>
+
+  <!-- ── Hero section ── -->
+  <div class="hero">
+
+    <!-- Left: copy -->
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">HKUDS · 7相流水线 · CLI-Hub</div>
+        <div class="source">@XAMTO_AI · 2026-09-19</div>
+      </div>
+      <h1 class="title">CLI-Anything<br>— 让所有软件<br>变成 Agent<br>可操作的 CLI</h1>
+      <p class="subcn">港大 HKUDS 开源项目。用 7 相流水线给任意软件生成 Agent 可用的 CLI 接口，配套 CLI-Hub 注册表一句命令安装管理。Blender、GIMP、LibreOffice 已有现成封装，接 Claude Code 直接改场景出图，不必盯着界面点。</p>
+      <div class="pill-row">
+        <span class="pill cyan">9 ❤️</span>
+        <span class="pill green">7 Phase Pipeline</span>
+        <span class="pill purple">Agent-Native</span>
+        <span class="pill">Claude Code</span>
+        <span class="pill">Cursor</span>
+        <span class="pill">开源</span>
+      </div>
+    </div>
+
+    <!-- Right: visual panel -->
+    <div class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">CA</div>
+        <div class="visual-meta">
+          <div class="big">HKUDS</div>
+          <div class="small">香港大学数据科学实验室</div>
+        </div>
+      </div>
+      <div class="visual-strip"></div>
+      <div class="mini-grid">
+        <div class="mini-card">
+          <div class="mini-icon cyan">
+            <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+          </div>
+          <div class="label">流水线</div>
+          <div class="value">7 相</div>
+          <div class="desc">Analyze → Publish 全自动</div>
+        </div>
+        <div class="mini-card">
+          <div class="mini-icon green">
+            <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+          </div>
+          <div class="label">Hub 注册表</div>
+          <div class="value">即装即用</div>
+          <div class="desc">pip install 后 cli-hub</div>
+        </div>
+        <div class="mini-card">
+          <div class="mini-icon yellow">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+          </div>
+          <div class="label">Agent 集成</div>
+          <div class="value">多端支持</div>
+          <div class="desc">Claude Code / Cursor / Pi</div>
+        </div>
+        <div class="mini-card">
+          <div class="mini-icon purple">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          </div>
+          <div class="label">SKILL.md</div>
+          <div class="value">自动生成</div>
+          <div class="desc">Agent 直接消费</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /hero -->
+
+  <!-- ── Pipeline diagram ── -->
+  <div class="pipeline-section">
+    <div class="section-label">7 相流水线</div>
+    <div class="pipeline-flow">
+      <div class="pipe-step">
+        <div class="pipe-icon" style="background:linear-gradient(135deg,rgba(88,195,255,.3),rgba(88,195,255,.08));border-color:rgba(88,195,255,.4)">🔍</div>
+        <div class="pipe-num">Phase 1</div>
+        <div class="pipe-label">Analyze</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon" style="background:linear-gradient(135deg,rgba(132,89,255,.3),rgba(132,89,255,.08));border-color:rgba(132,89,255,.4)">✏️</div>
+        <div class="pipe-num">Phase 2</div>
+        <div class="pipe-label">Design</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon" style="background:linear-gradient(135deg,rgba(74,120,255,.3),rgba(74,120,255,.08));border-color:rgba(74,120,255,.4)">⚙️</div>
+        <div class="pipe-num">Phase 3</div>
+        <div class="pipe-label">Implement</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon" style="background:linear-gradient(135deg,rgba(244,200,76,.3),rgba(244,200,76,.08));border-color:rgba(244,200,76,.4)">🧪</div>
+        <div class="pipe-num">Phase 4</div>
+        <div class="pipe-label">Plan Tests</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon" style="background:linear-gradient(135deg,rgba(244,200,76,.3),rgba(244,200,76,.08));border-color:rgba(244,200,76,.4)">✅</div>
+        <div class="pipe-num">Phase 5</div>
+        <div class="pipe-label">Write Tests</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon" style="background:linear-gradient(135deg,rgba(45,179,106,.3),rgba(45,179,106,.08));border-color:rgba(45,179,106,.4)">📄</div>
+        <div class="pipe-num">Phase 6</div>
+        <div class="pipe-label">Document</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon" style="background:linear-gradient(135deg,rgba(45,179,106,.4),rgba(45,179,106,.12));border-color:rgba(45,179,106,.5)">🚀</div>
+        <div class="pipe-num">Phase 7</div>
+        <div class="pipe-label">Publish</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Three-column shell: CLI-Hub | Examples | Agent ── -->
+  <div class="shell">
+
+    <!-- Col 1: CLI-Hub commands -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>CLI-Hub 命令</h3>
+        <span class="badge">pip 安装</span>
+      </div>
+      <div class="panel-body">
+        <div class="cmd-list">
+          <div class="cmd-item">
+            <span class="cmd">pip install cli-anything-hub</span>
+            <span class="desc">安装 Hub</span>
+          </div>
+          <div class="cmd-item">
+            <span class="cmd">cli-hub list</span>
+            <span class="desc">浏览全部</span>
+          </div>
+          <div class="cmd-item">
+            <span class="cmd">cli-hub install &lt;name&gt;</span>
+            <span class="desc">安装 CLI</span>
+          </div>
+          <div class="cmd-item">
+            <span class="cmd">cli-hub search &lt;keyword&gt;</span>
+            <span class="desc">搜索包</span>
+          </div>
+          <div class="cmd-item">
+            <span class="cmd">cli-hub info &lt;name&gt;</span>
+            <span class="desc">查看详情</span>
+          </div>
+          <div class="cmd-item">
+            <span class="cmd">cli-hub update</span>
+            <span class="desc">更新 Hub</span>
+          </div>
+          <div class="cmd-item">
+            <span class="cmd">cli-hub uninstall &lt;name&gt;</span>
+            <span class="desc">卸载 CLI</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Col 2: Examples + Skill note -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>已有现成 CLI</h3>
+        <span class="badge">Hub 可装</span>
+      </div>
+      <div class="panel-body">
+        <div class="example-list">
+          <div class="example-item">
+            <span class="example-badge badge-native">Native</span>
+            <div>
+              <div class="name">Blender</div>
+              <div class="note">已有现成 CLI，接 Claude Code 可改场景、出图，不必盯着界面点</div>
+            </div>
+          </div>
+          <div class="example-item">
+            <span class="example-badge badge-native">Native</span>
+            <div>
+              <div class="name">GIMP</div>
+              <div class="note">GNU 图像处理软件，已有社区封装</div>
+            </div>
+          </div>
+          <div class="example-item">
+            <span class="example-badge badge-native">Native</span>
+            <div>
+              <div class="name">LibreOffice</div>
+              <div class="note">办公套件，命令行接口已封装</div>
+            </div>
+          </div>
+          <div class="example-item">
+            <span class="example-badge badge-cli">CLI</span>
+            <div>
+              <div class="name">社区贡献</div>
+              <div class="note">Hub 持续收录新包</div>
+            </div>
+          </div>
+        </div>
+        <div class="skill-note">
+          <div class="label">⚡ SKILL.md 自动生成</div>
+          <p>每个生成的 CLI 自动输出 SKILL.md，Claude Code / Cursor 等 Agent 直接消费，无需手动配置提示词。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Col 3: Agent integration -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Agent 集成</h3>
+        <span class="badge">即插即用</span>
+      </div>
+      <div class="panel-body">
+        <div class="agent-grid">
+          <div class="agent-card">
+            <div class="name">Claude Code</div>
+            <div class="role">接 Blender 改场景出图</div>
+          </div>
+          <div class="agent-card">
+            <div class="name">Cursor</div>
+            <div class="role">代码库 Agent 集成</div>
+          </div>
+          <div class="agent-card">
+            <div class="name">Pi</div>
+            <div class="role">个人 AI 助手</div>
+          </div>
+          <div class="agent-card">
+            <div class="name">OpenClaw</div>
+            <div class="role">多 Agent 编排</div>
+          </div>
+          <div class="agent-card">
+            <div class="name">Codex</div>
+            <div class="role">OpenAI 开发者工具</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;border:1.5px solid rgba(255,255,255,.08);background:#0f1424;border-radius:12px;padding:10px 11px;display:grid;gap:6px">
+          <div style="font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de">使用限制</div>
+          <p style="margin:0;font-size:11.5px;line-height:1.6;color:#c9d4f7">没有现成封装的软件，需提供源代码路径按流程生成。不是任意安装包都能一句话打通，软件本身仍需装在机器上。</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /shell -->
+
+  <!-- ── Feature row ── -->
+  <div class="feature-row">
+    <div class="feature">
+      <div class="feature-icon">🔍</div>
+      <span>源码扫描<br>GUI→API 映射</span>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">✏️</div>
+      <span>命令设计<br>状态模型</span>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⚙️</div>
+      <span>Click CLI<br>REPL + JSON</span>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🧪</div>
+      <span>单元+E2E<br>测试计划</span>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📦</div>
+      <span>setup.py<br>安装 PATH</span>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔄</div>
+      <span>撤销/重做<br>内置支持</span>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <div class="footer">
+    <div>
+      <a href="https://github.com/HKUDS/CLI-Anything" target="_blank">GitHub: HKUDS/CLI-Anything</a>
+      &nbsp;·&nbsp;
+      <a href="https://clianything.cc/" target="_blank">CLI-Hub</a>
+    </div>
+    <div class="meta">来源：@XAMTO_AI · 2026-09-19 · 9 ❤️ · 港大 HKUDS</div>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>
