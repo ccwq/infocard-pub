@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Claude Code Web 控制方案全景：Remote Control、PTY 与 Agent SDK</title>
-  <meta name="description" content="从官方 Remote Control、PTY/WebSocket Web Terminal、Agent SDK Web UI 到 Windows 适配，梳理 Claude Code 远程控制的技术路线，并比较七个第三方项目与两条真实链路。">
+  <meta name="description" content="先给结论再给证据：官方 Remote Control、PTY/WebSocket、Agent SDK 三条路线辨析，10 个方案（含 8 个开源项目与 ttyd）的安装、启动、验证命令与边界，以及 Windows 宿主适配与 WebSocket 安全基线。">
   <style>
     :root{
       --bg:#f7f8fa;--paper:#fff;--ink:#0b0d12;--muted:#66717f;--faint:#9aa5b2;
@@ -39,16 +39,33 @@
     .blue-block .big{font-size:clamp(76px,12vw,150px);line-height:.82;letter-spacing:-.085em;font-weight:900;position:relative;z-index:1}
     .blue-block .caption{max-width:32ch;font-size:14.5px;color:rgba(255,255,255,.82);line-height:1.55;position:relative;z-index:1}
     .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
     .panel{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;min-width:0}
     .panel.gray{background:var(--soft)}
     .panel.black{background:var(--black);color:#fff;border-color:var(--black)}
+    .panel.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
     .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px}
     .panel.black .head{border-color:rgba(255,255,255,.18)}
+    .panel.blue .head{border-color:rgba(255,255,255,.22)}
     .label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:900;line-height:1.25}
+    .panel.black .label{color:#9db3dd}
+    .panel.blue .label{color:rgba(255,255,255,.78)}
     .page-no{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:800;white-space:nowrap}
+    .panel.black .page-no{color:rgba(255,255,255,.4)}
+    .panel.blue .page-no{color:rgba(255,255,255,.4)}
     .panel h2{font-size:clamp(19px,2.4vw,28px);line-height:1.12;letter-spacing:-.04em;margin:0;font-weight:900}
     .panel p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.7}
     .panel.black p{color:rgba(255,255,255,.72)}
+    .panel.blue p{color:rgba(255,255,255,.82)}
+    .chapter{border-top:2px solid var(--ink);margin-top:26px;padding-top:14px}
+    .chapter-no{display:grid;place-items:center;width:52px;height:52px;background:var(--blue);color:#fff;font-size:22px;font-weight:900;flex:0 0 auto}
+    .chapter-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:6px}
+    .chapter-head .label{margin-top:2px}
+    .chapter-head h2{font-size:clamp(21px,2.6vw,30px);line-height:1.1;letter-spacing:-.04em;margin:2px 0 0;font-weight:900}
+    .chapter-intro{color:var(--muted);font-size:13.5px;line-height:1.7;max-width:80ch;margin:10px 0 14px}
+    .sec{font-size:15.5px;font-weight:850;letter-spacing:-.01em;margin:22px 0 10px;color:var(--ink)}
+    .sec .no{color:var(--blue2);font-weight:900;margin-right:8px}
+    .divider{height:1px;background:var(--line);margin:22px 0}
     .metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .metric{background:#fff;border:1px solid var(--line);padding:13px;min-height:112px;display:grid;align-content:space-between}
     .metric strong{font-size:38px;line-height:.92;letter-spacing:-.06em;color:var(--ink)}
@@ -63,12 +80,9 @@
     .score{text-align:right;color:var(--ink);font-weight:850}
     .feature{background:var(--soft);padding:14px;border:1px solid var(--line);display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:start}
     .feature+.feature{margin-top:10px}
-    .feature.dark{background:var(--black);color:#fff;border-color:var(--black)}
     .feature .num{font-size:30px;line-height:1;letter-spacing:-.04em;font-weight:900;color:var(--blue)}
-    .feature.dark .num{color:#fff}
     .feature b{display:block;margin-bottom:4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
     .feature p{margin:0}
-    .feature.dark p{color:rgba(255,255,255,.72)}
     .list{display:grid;gap:10px}
     .list-item{display:grid;grid-template-columns:56px 1fr 34px;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}
     .list-item:last-child{border-bottom:0;padding-bottom:0}
@@ -80,6 +94,29 @@
     .chart-card,.note-panel{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;min-width:0}
     .note-panel{background:var(--soft-blue);border:1px solid #d7e6ff;align-content:space-between;gap:18px}
     .note-panel .big{font-size:52px;line-height:.92;font-weight:900;letter-spacing:-.07em;color:var(--blue)}
+    /* 阅读分流提示 */
+    .gate{background:var(--soft-blue);border:1px solid #d7e6ff;border-left:5px solid var(--blue);padding:16px 18px;margin:16px 0 0;display:grid;gap:10px}
+    .gate .gate-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);font-weight:900}
+    .gate p{margin:0;color:#33415a;font-size:13.5px;line-height:1.7;max-width:86ch}
+    .gate ol{margin:0;padding-left:20px;color:#33415a;font-size:13px;line-height:1.8}
+    .gate ol a{color:var(--blue);font-weight:700}
+    /* 方案小节 */
+    .plan{border:1px solid var(--line);background:var(--paper);padding:16px;display:grid;gap:12px;min-width:0;margin-bottom:14px}
+    .plan-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+    .plan-head .no{font-size:24px;font-weight:900;letter-spacing:-.04em;color:var(--blue)}
+    .plan-head h3{font-size:17px;font-weight:900;letter-spacing:-.015em;margin:0;overflow-wrap:anywhere}
+    .plan-head .pos{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:800}
+    .plan-cols{display:grid;grid-template-columns:1.05fr .95fr;gap:14px;min-width:0}
+    .plan-col{display:grid;gap:10px;min-width:0;align-content:start}
+    .kv{display:grid;gap:6px}
+    .kv-row{display:grid;grid-template-columns:74px 1fr;gap:10px;font-size:12.5px;line-height:1.6}
+    .kv-row b{color:var(--blue);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:900;padding-top:2px}
+    .kv-row span{color:#3a4552;overflow-wrap:anywhere}
+    pre{margin:0;background:var(--soft);border:1px solid var(--line);padding:12px;font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:#26303c}
+    pre .c{color:var(--blue2)}
+    pre .hl-cmd{font-weight:700;color:var(--blue)}
+    .tag-note{font-size:11px;color:var(--faint);letter-spacing:.04em;line-height:1.6}
+    .nv{display:inline-block;background:var(--soft);border:1px solid var(--line2);color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.08em;padding:1px 6px;margin-left:6px;vertical-align:2px}
     .tbl-wrap{overflow-x:auto;border:1px solid var(--line)}
     table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px}
     th{background:var(--soft);padding:9px 11px;text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);font-weight:900;border-bottom:1px solid var(--line)}
@@ -88,8 +125,6 @@
     td.mode{font-weight:800;color:var(--ink);white-space:nowrap}
     tr.hl{background:var(--soft-blue)}
     tr.hl td.mode{color:var(--blue)}
-    pre{margin:0;background:var(--soft);border:1px solid var(--line);padding:12px;font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:#26303c}
-    pre .c{color:var(--blue2)}
     .meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
     .meta-box{background:#fff;border:1px solid var(--line);padding:13px;display:grid;gap:8px;min-height:92px}
     .meta-box b{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
@@ -97,21 +132,22 @@
     .source-list{display:grid;gap:8px}
     .source-list a{color:var(--blue);text-decoration:underline;text-decoration-color:rgba(0,26,114,.22);overflow-wrap:anywhere}
     .source-list a:hover{text-decoration-color:currentColor}
-    .tag-note{font-size:11px;color:var(--faint);letter-spacing:.04em}
     .footer{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:800}
-    @media(max-width:980px){.hero,.wide{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}.hero-copy{min-height:auto}.blue-block{min-height:260px}.meta-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:980px){.hero,.wide,.plan-cols{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}.hero-copy{min-height:auto}.blue-block{min-height:260px}.meta-grid{grid-template-columns:1fr 1fr}}
     @media(max-width:720px){
       .page{width:min(100%,calc(100% - 14px));padding:10px 0 60px}.sheet{padding:12px}
       .topline,.footer{align-items:flex-start;flex-direction:column}
-      .grid3,.metric-grid,.hero-pills,.meta-grid{grid-template-columns:1fr}
+      .grid3,.grid2,.metric-grid,.hero-pills,.meta-grid{grid-template-columns:1fr}
       .hero-pill{border-right:0;border-bottom:1px solid var(--line)}.hero-pill:last-child{border-bottom:0}
       h1{font-size:34px;line-height:1.16}.lead{font-size:14px}
       .blue-block .big{font-size:80px}.blue-block{min-height:230px}
-      .panel{padding:14px}
+      .panel,.plan,.gate,.chart-card,.note-panel{padding:14px}
+      .chapter-no{width:42px;height:42px;font-size:18px}
+      .chapter-head{gap:10px}
       .rank-row{grid-template-columns:86px minmax(0,1fr) 38px}
       .feature{grid-template-columns:1fr}
       .list-item{grid-template-columns:44px 1fr 28px}
-      .chart-card,.note-panel{padding:14px}
+      .kv-row{grid-template-columns:1fr;gap:2px}
       table{min-width:560px}
     }
   </style>
@@ -120,16 +156,17 @@
   <main class="page">
     <div class="sheet">
       <div class="topline">
-        <div class="brand">Claude Code · Web 控制调研</div>
-        <div>2026.09.20 · 资料核验截至当日</div>
+        <div class="brand">Claude Code · Web 控制调研 v2</div>
+        <div>2026.09.20 · 资料核验截至当日 · README 命令已核对</div>
       </div>
 
+      <!-- ============ 速览区 ============ -->
       <section class="hero">
         <div class="hero-copy">
           <div>
-            <div class="kicker">技术调研 · CONTROL SURFACE</div>
+            <div class="kicker">技术调研 · CONTROL SURFACE · 渐进式阅读</div>
             <h1>Claude Code Web 控制方案全景</h1>
-            <p class="lead">让 Web 页面接上 Claude Code，不是“把终端塞进网页”这一件事，而是三条不同的路线：<strong>官方 Remote Control</strong> 接管已有会话，<strong>PTY/WebSocket</strong> 复用终端进程，<strong>Agent SDK Web UI</strong> 重建控制面。先确定“谁拥有会话”，再选 Web UI。</p>
+            <p class="lead"><strong>先选“谁拥有会话”，再选 Web UI</strong>——官方 Remote Control 接管已有会话且不开放端口，是默认首选；PTY/WebSocket 把终端执行权交给浏览器，能力最大但安全自负；Agent SDK 重建控制面，适合做成产品。</p>
           </div>
           <div class="hero-pills">
             <div class="hero-pill"><div class="mini-bar"></div><b>SESSION 层</b><span>Remote Control / Agent SDK：控制 Claude 会话与消息。</span></div>
@@ -144,45 +181,88 @@
         </aside>
       </section>
 
-      <section class="grid3">
-        <article class="panel">
-          <div class="head"><div class="label">DATA · 全景四个数字</div><div class="page-no">PAGE 01</div></div>
-          <h2>一眼看清这条赛道</h2>
-          <div class="metric-grid">
-            <div class="metric"><div><strong>1</strong><span>官方方案</span></div><div class="bar"><i style="width:33%"></i></div></div>
-            <div class="metric"><div><strong>7</strong><span>重点第三方</span></div><div class="bar"><i style="width:100%"></i></div></div>
-            <div class="metric"><div><strong>2</strong><span>控制层级</span></div><div class="bar"><i style="width:66%"></i></div></div>
-            <div class="metric"><div><strong>3</strong><span>Windows 路线</span></div><div class="bar"><i style="width:100%"></i></div></div>
-          </div>
-          <p class="tag-note">官方 1 = Remote Control；层级 2 = 会话层 / TTY 层；Windows 路线 = 原生 ConPTY、psmux、WSL2。</p>
-        </article>
-
-        <article class="panel">
-          <div class="head"><div class="label">ROUTES · 路线辨析</div><div class="page-no">PAGE 02</div></div>
-          <h2>三条路线控制的东西不同</h2>
-          <div class="feature"><div class="num">A</div><div><b>Remote Control</b><p>接管<b>已有 Claude 会话</b>：浏览器与本地终端共享同一 session、权限提示与任务状态；本机不开放入站端口。</p></div></div>
-          <div class="feature"><div class="num">B</div><div><b>PTY / WebSocket</b><p>接管<b>终端进程</b>：xterm.js 只负责渲染，node-pty / ConPTY / tmux 才是执行边界；等价于把 stdin 交给浏览器。</p></div></div>
-          <div class="feature"><div class="num">C</div><div><b>Agent SDK Web UI</b><p>用 <code>@anthropic-ai/claude-agent-sdk</code> 的 <code>query()</code> 重建控制面：结构化事件流、权限与计划审批，<b>不显示原始终端</b>。</p></div></div>
-        </article>
-
-        <article class="panel gray">
-          <div class="head"><div class="label">OFFICIAL · 官方入口</div><div class="page-no">PAGE 03</div></div>
-          <h2>Remote Control：默认首选</h2>
-          <pre><span class="c"># 服务器模式：托管多个会话</span>
-claude remote-control
-
-<span class="c"># 已有交互式会话内</span>
-/remote-control</pre>
-          <p>工作方式：本机 Claude Code 只发起<b>出站 HTTPS</b>，经 Anthropic API 转发；浏览器在 claude.ai/code 打开同一会话。本地文件、MCP、工具、项目配置保持可用。</p>
-          <p>边界：需 claude.ai 登录，不支持纯 API Key；Bedrock / Vertex / Foundry 与自定义 <code>ANTHROPIC_BASE_URL</code> 场景不可用；部分终端专属命令（如 /plugin、/resume）仍需本地 CLI；本地进程退出后会话离线。</p>
-        </article>
+      <!-- 核心要点 -->
+      <section class="panel" style="margin-bottom:14px">
+        <div class="head"><div class="label">TL;DR · 核心要点</div><div class="page-no">SCOPE 01</div></div>
+        <h2>四条要点，各自独立成立</h2>
+        <div class="feature"><div class="num">1</div><div><b>三条路线控制的东西不同</b><p>Remote Control 接管<b>已有 Claude 会话</b>（消息层）；PTY/WebSocket 接管<b>终端进程</b>（TTY 层）；Agent SDK Web UI <b>重建控制面</b>（生命周期层）。混称“同一个 Web UI”会导致选型错误。</p></div></div>
+        <div class="feature"><div class="num">2</div><div><b>官方 Remote Control 是默认首选</b><p>一行命令、出站 HTTPS、不开放入站端口；代价是需要 claude.ai 订阅登录，且看不到原始终端画面。能用它就不要自建。</p></div></div>
+        <div class="feature"><div class="num">3</div><div><b>PTY 路线的执行边界在后端</b><p>xterm.js 只是渲染组件；谁持有 node-pty / ConPTY / tmux，谁就拥有命令执行权。选型看四维：PTY/TUI 适配度、Windows 友好度、维护成熟度、部署成本。</p></div></div>
+        <div class="feature"><div class="num">4</div><div><b>Windows 先选宿主再选工具</b><p>原生 ConPTY、psmux、WSL2 三条宿主路线成熟度差异极大；多数 tmux 系项目在原生 Windows 不可用或仅 WSL2。</p></div></div>
       </section>
 
-      <section class="grid3">
-        <article class="panel">
-          <div class="head"><div class="label">ARCH · 官方链路</div><div class="page-no">PAGE 04</div></div>
-          <h2>会话层：官方托管转发</h2>
-          <pre><span class="c"># 浏览器看到的是结构化会话，</span>
+      <!-- 速览结论 -->
+      <section class="panel" style="margin-bottom:14px">
+        <div class="head"><div class="label">SNAPSHOT · 速览结论</div><div class="page-no">SCOPE 02</div></div>
+        <h2>按需求对号入座：第一命令</h2>
+        <div class="tbl-wrap">
+          <table style="min-width:640px">
+            <thead><tr><th>你的需求</th><th>选什么</th><th>第一命令</th><th>代价</th></tr></thead>
+            <tbody>
+              <tr class="hl"><td class="mode">远程继续本机 Claude 会话</td><td>官方 Remote Control</td><td><code>claude remote-control</code></td><td>需订阅登录；无终端画面</td></tr>
+              <tr><td class="mode">浏览器里看完整 TUI</td><td>vultuk/claude-code-web</td><td><code>npx claude-code-web</code></td><td>自建认证与安全</td></tr>
+              <tr><td class="mode">手机审批 + 旁路监控现有会话</td><td>tlive（hooks 模式）</td><td><code>npm i -g tlive &amp;&amp; tlive setup</code></td><td>默认 bind 0.0.0.0 需收紧</td></tr>
+              <tr><td class="mode">多 Agent 统一控制台</td><td>OmniTerm</td><td><code>cargo install omniterm</code></td><td>面向自家管理的会话</td></tr>
+              <tr><td class="mode">接管任意已开 Windows Terminal</td><td>— 无成熟方案</td><td>托管 PTY + <code>claude --resume</code></td><td>接受间接恢复模型</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tag-note">本表只给“读完 60 秒即可行动”的最短路径；每条路线的完整上手步骤、前置依赖与验证方式在第 1–3 章逐项展开。</p>
+      </section>
+
+      <!-- 阅读分流提示 -->
+      <aside class="gate">
+        <div class="gate-label">READING GATE · 阅读分流</div>
+        <p><b>到这里你已经可以行动</b>：三条路线的边界、四条核心要点、五类需求的“第一命令”都已给出，直接选表执行即可。</p>
+        <p><b>继续阅读你将获得</b>：每个方案从安装到验证的完整命令（README 原文核对）、两条链路的架构图与执行边界、Windows 三宿主适配细节、WebSocket 安全基线清单，以及排序口径与证据局限。</p>
+        <ol>
+          <li><a href="#ch1">第 1 章 · 三条路线辨析与官方上手</a>（Remote Control / PTY / Agent SDK）</li>
+          <li><a href="#ch2">第 2 章 · 七个 PTY 系项目逐个上手</a>（安装→启动→验证）</li>
+          <li><a href="#ch3">第 3 章 · Agent SDK 路线与同名辨析</a>（fafawlf ≠ vultuk）</li>
+          <li><a href="#ch4">第 4 章 · Windows 宿主适配</a></li>
+          <li><a href="#ch5">第 5 章 · 安全边界</a></li>
+          <li><a href="#ch6">第 6 章 · 排序口径与证据局限</a></li>
+        </ol>
+      </aside>
+
+      <!-- ============ 第 1 章 ============ -->
+      <section class="chapter" id="ch1">
+        <div class="chapter-head">
+          <div class="chapter-no">01</div>
+          <div><div class="label">DEPTH · 深度正文</div><h2>三条路线辨析与官方上手</h2></div>
+        </div>
+        <p class="chapter-intro">对应要点 1 与要点 2。评价标准只有一条：<b>控制对象</b>。会话层方案改不了你的终端，TTY 层方案不懂 Claude 的会话语义，SDK 层方案根本不连现有终端。每条路线给出机制、能力边界与从零到可用的完整步骤。</p>
+
+        <div class="sec"><span class="no">1.1</span>路线 A：官方 Remote Control（会话层）</div>
+        <div class="plan">
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 三种启动方式</span>
+<span class="hl-cmd">claude remote-control</span>        <span class="c"># 服务器模式：托管最多 32 个会话</span>
+<span class="hl-cmd">claude --remote-control</span>      <span class="c"># 交互式会话 + 远程可用（可加会话名）</span>
+<span class="c"># 或在已有会话内：</span>
+<span class="hl-cmd">/remote-control</span>              <span class="c"># 携带当前对话历史接入</span>
+
+<span class="c"># 常用 flags（服务器模式，置于 remote-control 之后）</span>
+claude remote-control \
+  --name "My Project" \       <span class="c"># 会话列表显示名</span>
+  --spawn worktree \          <span class="c"># same-dir | worktree | session</span>
+  --capacity 8 \              <span class="c"># 并发上限，默认 32</span>
+  --permission-mode acceptEdits</pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>前置</b><span>Pro/Max/Team/Enterprise 订阅，<code>claude</code> 已 /login；不支持纯 API Key；Bedrock / Vertex / Foundry / 自定义 <code>ANTHROPIC_BASE_URL</code> 不可用；<code>DISABLE_TELEMETRY</code> 等变量会阻断 feature-flag 检查；从项目目录启动（workspace trust）。</span></div>
+                <div class="kv-row"><b>首次上手</b><span>项目目录运行 <code>claude remote-control</code> → 首次确认 <code>Enable Remote Control? y</code> → 终端显示会话 URL，按空格出二维码 → 手机/浏览器打开 claude.ai/code 即接管。</span></div>
+                <div class="kv-row"><b>关键配置</b><span><code>--spawn</code> 决定会话隔离方式（worktree 需 git 仓库）；运行时按 <code>w</code> 切换 same-dir/worktree；<code>--sandbox</code> 开文件/网络隔离（默认关）。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>终端出现 <code>/rc active</code> 指示器（链接到 claude.ai 会话）；浏览器端能看到本地 subagent 与 workflow 的实时状态。</span></div>
+                <div class="kv-row"><b>排障</b><span>报“requires a claude.ai subscription”→ 检查 ANTHROPIC_API_KEY/AUTH_TOKEN 是否覆盖了登录态；报 403 超三分钟 → VPN/代理变更后用 /remote-control 重连；本地进程退出 → 会话离线，长任务放 tmux/screen 里跑。</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 浏览器看到的是结构化会话，</span>
 <span class="c"># 不是终端画面</span>
 claude.ai/code  ─┐
 Claude 手机 App ─┤  Anthropic API (TLS)
@@ -190,119 +270,448 @@ Claude 手机 App ─┤  Anthropic API (TLS)
         本机 Claude Code 进程
                  ▼
      本地文件 / MCP / 工具 / 配置</pre>
-          <p>本机<b>不开放入站端口</b>；transcript 在 Remote Control 期间同步到 Anthropic 服务端以支持多设备与断线恢复，保留策略遵循其数据条款。协议细节（握手、token 语义、多端写入策略）未完整公开，不应自行假设。</p>
-        </article>
+            </div>
+            <div class="plan-col">
+              <p>本机<b>不开放入站端口</b>：进程只发起出站 HTTPS，注册到 Anthropic API 后轮询取工作。transcript 在 Remote Control 期间同步到服务端以支持多设备与断线恢复，保留策略遵循其数据条款。协议细节（握手、token 语义、多端写入策略）未公开，不应自行假设。部分命令仍为本地专属：/plugin、/resume 需在终端执行；/model、/effort 等 Web 端仅接受参数形式。</p>
+            </div>
+          </div>
+        </div>
 
-        <article class="panel">
-          <div class="head"><div class="label">ARCH · 自建链路</div><div class="page-no">PAGE 05</div></div>
-          <h2>TTY 层：PTY Broker 是执行边界</h2>
-          <pre><span class="c"># 浏览器永远只连 Broker，</span>
+        <div class="sec"><span class="no">1.2</span>路线 B：PTY / WebSocket（TTY 层）</div>
+        <div class="plan">
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 浏览器永远只连 Broker，</span>
 <span class="c"># 不直连 PTY 或 tmux socket</span>
 xterm.js ── WebSocket ── Auth Broker
                           ├─ node-pty / ConPTY
                           ├─ tmux / psmux
                           └─ claude / claude --resume</pre>
-          <p>xterm.js 官方定位是<b>终端渲染组件</b>，不是 shell。谁持有 PTY，谁就拥有命令执行权。Broker 必须承担：认证、Origin 校验、会话注册表、单 writer、断线重连与输出缓冲。</p>
-        </article>
+            </div>
+            <div class="plan-col">
+              <p>xterm.js 官方定位是<b>终端渲染组件</b>，不是 shell；执行权在持有 PTY 的后端进程。自建 Broker 至少要承担：认证、Origin 校验、会话注册表、单 writer 串行输入、断线重连与输出缓冲。下面用 ttyd 演示最小链路——它是这条路线的“参考实现”，也是理解所有 PTY 系项目的透镜。</p>
+            </div>
+          </div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># ttyd：把任意命令变成网页终端</span>
+<span class="c"># macOS: brew install ttyd</span>
+<span class="c"># Linux: apt install ttyd</span>
+<span class="c"># Win:   winget install tsl0922.ttyd</span>
 
-        <article class="panel black">
-          <div class="head"><div class="label">RISK · 安全底线</div><div class="page-no">PAGE 06</div></div>
-          <h2>WebSocket 可写 ≈ 远程终端输入</h2>
-          <p>PTY Web UI 一旦被未授权访问，等价于远程命令执行入口。基线：</p>
-          <p>· 默认只监听 127.0.0.1，远程用 Tailscale / WireGuard / SSH 隧道；<br>
-          · WebSocket 校验精确 Origin + CSRF / 一次性配对 token；<br>
-          · 每个 session 默认单 writer，其余连接只读 observer；<br>
-          · 限制连接数、消息大小与 PTY 数量，记录审计日志；<br>
-          · 凭证、环境变量、.env 永不进浏览器。</p>
-        </article>
-      </section>
+<span class="hl-cmd">ttyd -W bash</span>   <span class="c"># -W 才允许写入！默认只读</span>
+<span class="c"># → http://localhost:7681</span>
 
-      <section class="panel" style="margin-bottom:14px">
-        <div class="head"><div class="label">RANKING · 主观选型顺序</div><div class="page-no">PAGE 07</div></div>
-        <h2>七个项目：按“适配已有 TUI / PTY”的阅读顺序</h2>
-        <div class="rank">
-          <div class="rank-row"><div class="name">vultuk/claude-code-web</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="score">A</div></div>
-          <div class="rank-row"><div class="name">tlive</div><div class="track"><div class="fill" style="width:92%"></div></div><div class="score">A</div></div>
-          <div class="rank-row"><div class="name">Claude Code Studio</div><div class="track"><div class="fill" style="width:84%;background:var(--blue2)"></div></div><div class="score">B</div></div>
-          <div class="rank-row"><div class="name">OmniTerm</div><div class="track"><div class="fill" style="width:78%;background:var(--blue2)"></div></div><div class="score">B</div></div>
-          <div class="rank-row"><div class="name">purplemux</div><div class="track"><div class="fill" style="width:72%;background:var(--blue3)"></div></div><div class="score">B</div></div>
-          <div class="rank-row"><div class="name">Agent of Empires</div><div class="track"><div class="fill" style="width:66%;background:var(--blue3)"></div></div><div class="score">C</div></div>
-          <div class="rank-row"><div class="name">TUAN webterminal</div><div class="track"><div class="fill" style="width:58%;background:var(--blue3)"></div></div><div class="score">C</div></div>
+<span class="c"># 生产级收紧：认证 + origin + 限客户端</span>
+ttyd -W -c user:pass -O -m 1 \
+  -i 127.0.0.1 claude</pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>前置</b><span>任一平台；Windows 用 releases 预编译二进制或 winget/scoop。</span></div>
+                <div class="kv-row"><b>关键选项</b><span><code>-p</code> 端口（默认 7681）、<code>-c</code> Basic 认证、<code>-W</code> 开写入（默认只读）、<code>-O</code> 校验 Origin、<code>-m</code> 最大客户端、<code>-o</code> 单客户端、<code>-i</code> 绑定网卡或 UNIX socket。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>浏览器打开 7681 端口看到 bash 提示符；用 <code>-w</code> 指定工作目录后在其中跑 <code>claude</code> 即得最小 Web TUI。</span></div>
+                <div class="kv-row"><b>边界</b><span>ttyd 不管 Claude 会话语义——没有 JSONL 解析、没有权限卡片，纯粹是“终端上网页”。它是理解 purplemux / Studio 等项目加了什么的关键基线。</span></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <p class="tag-note">A=优先评估，B=场景匹配后评估，C=特定路线适用。口径：PTY/TUI 适配度、Windows 友好度、维护成熟度、部署成本；为本卡编辑判断，核验截至 2026-09-20，非统一测试排名。fafawlf/claude-code-web 属路线 C（Agent SDK），不参与本排序。</p>
+
+        <div class="sec"><span class="no">1.3</span>路线 C：Agent SDK Web UI（生命周期层）</div>
+        <div class="plan">
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 官方 quickstart（TypeScript）</span>
+npm init -y &amp;&amp; npm pkg set type=module
+npm install @anthropic-ai/claude-agent-sdk
+npm install --save-dev tsx
+
+<span class="c"># agent.ts —— 最小可用 agent</span>
+import { query } from
+  "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "Review utils.py for bugs.",
+  options: {
+    allowedTools: ["Read","Edit","Glob"],
+    permissionMode: "acceptEdits"
+  }
+})) {
+  if (message.type === "result")
+    console.log(`Done: ${message.subtype}`);
+}</pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>前置</b><span>Node 20+（或 Python + uv/pip）；API key 认证——官方明确不允许第三方产品走 claude.ai 登录或订阅额度。</span></div>
+                <div class="kv-row"><b>辨析</b><span>Agent SDK ≠ Client SDK（后者是你自己写工具循环的裸 API）；≠ Managed Agents（Anthropic 托管沙箱的独立 REST 产品）；≠ CLI（终端交互面）。SDK 把 Claude Code 的工具、循环、上下文管理做成库。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>tsx agent.ts 输出流式 assistant 消息与最终 result.subtype；Web UI 化即把该循环接到 Fastify/Express WebSocket 上（第 3 章的 fafawlf 是完整范例）。</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr><th>项目</th><th>机制</th><th>Windows</th><th>关键限制</th></tr></thead>
-          <tbody>
-            <tr class="hl"><td class="mode">vultuk/claude-code-web</td><td>node-pty + WebSocket + xterm.js，多会话持久化</td><td>依赖本地 CLI / PTY，需实测</td><td>自己启动并托管 PTY；npm 版本 2025-10，约 97 stars；必须配置认证</td></tr>
-            <tr><td class="mode">tlive</td><td>hooks 旁路监听现有会话；或 wrapped 模式持有 PTY</td><td>ConPTY 路线，验证较少</td><td>v2 不再托管会话，持久化需自配 tmux；默认 bind 0.0.0.0 需收紧</td></tr>
-            <tr><td class="mode">Claude Code Studio</td><td>tmux control mode 管理 agent PTY，功能面大</td><td>官方列支持</td><td>复杂度高；管理的是自家 tmux 会话，非任意外部 TTY</td></tr>
-            <tr><td class="mode">OmniTerm</td><td>ACP 协议 + tmux/psmux + portable-pty，多 Agent 控制台</td><td>psmux 方案</td><td>面向自家管理的会话；Chat 模式走结构化协议而非终端镜像</td></tr>
-            <tr><td class="mode">purplemux</td><td>xterm.js → node-pty → 专用 tmux；JSONL 结构化时间线</td><td>不支持（macOS/Linux）</td><td>仅 macOS/Linux；已有会话经 tmux/resume 管理</td></tr>
-            <tr><td class="mode">Agent of Empires</td><td>每 agent 一个 tmux session；Rust TUI + Web dashboard</td><td>仅 WSL2</td><td>tmux 管理器定位，非浏览器 PTY 代理；约 3.3k stars</td></tr>
-            <tr><td class="mode">TUAN webterminal</td><td>Express + Socket.IO + node-pty，含 /resume</td><td>PowerShell/WinPTY 偏好</td><td>无完善认证、硬编码路径；仅可信 LAN 实验，禁公网</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <!-- ============ 第 2 章 ============ -->
+      <section class="chapter" id="ch2">
+        <div class="chapter-head">
+          <div class="chapter-no">02</div>
+          <div><div class="label">DEPTH · 项目逐个上手</div><h2>七个 PTY 系项目：安装 → 启动 → 验证</h2></div>
+        </div>
+        <p class="chapter-intro">对应要点 3。顺序即第 6 章的推荐阅读顺序（主观口径）。每个项目统一五件事：定位一句话、安装命令、启动命令、首次上手、关键配置与验证。命令取自各仓库 README 原文（2026-09-20 核对）；无法核验的字段显式标注。</p>
 
-      <section class="grid3" style="margin-top:14px">
-        <article class="panel">
-          <div class="head"><div class="label">SDK · 路线 C 备注</div><div class="page-no">PAGE 08</div></div>
-          <h2>fafawlf/claude-code-web 不是 PTY</h2>
-          <p>与 vultuk 同名不同物：它基于 <code>@anthropic-ai/claude-agent-sdk</code> 的 <code>query()</code>，用 Fastify WebSocket 驱动 SDK 管理的会话，提供 cwd / resume / permissionMode / 事件重放。控制的是 Agent 能力面，<b>不 attach 现有终端、不显示 TUI 画面</b>。默认 loopback + token，单用户定位。</p>
-        </article>
+        <div class="plan">
+          <div class="plan-head"><span class="no">2.1</span><h3>vultuk/claude-code-web</h3><span class="pos">PTY 直桥 · 排序 A</span></div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 前置：Node ≥16；claude 已在 PATH 并登录</span>
+<span class="hl-cmd">npx claude-code-web</span>
+<span class="c"># → 启动即打印随机 token：</span>
+<span class="c">#   "Generated random authentication token: Xr9..."</span>
+<span class="c"># → http://localhost:32352/?token=Xr9...</span>
 
-        <article class="panel">
-          <div class="head"><div class="label">WINDOWS · 适配要点</div><div class="page-no">PAGE 09</div></div>
-          <h2>三条路线按宿主分</h2>
-          <div class="list">
-            <div class="list-item"><strong>01</strong><div><b>原生 ConPTY</b><span>tlive / webterminal 类；注意 Ctrl-C、进程树终止、UTF-8 编码与 PowerShell 输出转义。</span></div><div class="icon">W</div></div>
-            <div class="list-item"><strong>02</strong><div><b>psmux（tmux 替代）</b><span>OmniTerm 路线；保留 tmux 语义的会话持久化与 attach 模型。</span></div><div class="icon">P</div></div>
-            <div class="list-item"><strong>03</strong><div><b>WSL2</b><span>purplemux / Agent of Empires / CodeHelm 路线；PTY、tmux、信号最成熟，代价是路径与端口桥接。</span></div><div class="icon">L</div></div>
+<span class="c"># 全局安装</span>
+npm install -g claude-code-web
+
+<span class="c"># 常用变体</span>
+npx claude-code-web --port 8080 \
+  --auth my-token --no-open
+npx claude-code-web --https \
+  --cert cert.pem --key key.pem
+npx claude-code-web --disable-auth  <span class="c"># 仅本机临时调试</span>
+npx claude-code-web --plan max5     <span class="c"># pro|max5|max20</span></pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>机制</b><span>node-pty 生成并托管真实 claude 进程，WebSocket 双向转发，xterm.js 渲染；会话持久化、断线保留最近 1000 行输出缓冲，多浏览器可 join 同一会话。</span></div>
+                <div class="kv-row"><b>首次上手</b><span>启动 → 复制 token 打开页面 → Sessions 下拉 New Session 命名并选工作目录 → 在网页终端里得到一个完整 TUI。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>浏览器输入发送到 TUI 有回显；关浏览器重开 join 同一 session，历史输出仍在。</span></div>
+                <div class="kv-row"><b>边界</b><span>v2.0 起默认强制认证；管的是自己 spawn 的 PTY，不是任意已开终端。约 97 stars / npm 3.4.0（2025-10），活跃度一般，需自行评估。</span></div>
+              </div>
+            </div>
           </div>
-        </article>
+        </div>
 
-        <article class="panel gray">
-          <div class="head"><div class="label">DECISION · 选型路径</div><div class="page-no">PAGE 10</div></div>
-          <h2>按需求对号入座</h2>
-          <div class="list">
-            <div class="list-item"><strong>Q1</strong><div><b>只想远程继续本机会话</b><span>官方 Remote Control，一行命令，安全由官方链路承担。</span></div><div class="icon">→</div></div>
-            <div class="list-item"><strong>Q2</strong><div><b>必须看到完整 TUI</b><span>vultuk/claude-code-web 或 tlive；同时接受自建安全的责任。</span></div><div class="icon">→</div></div>
-            <div class="list-item"><strong>Q3</strong><div><b>接管任意已开的 Windows Terminal</b><span>没有成熟通用方案；现实模型是托管 PTY + claude --resume。</span></div><div class="icon">→</div></div>
+        <div class="plan">
+          <div class="plan-head"><span class="no">2.2</span><h3>tlive</h3><span class="pos">hooks 旁路 + PTY 包装 · 排序 A</span></div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="hl-cmd">npm install -g tlive</span>
+<span class="hl-cmd">tlive setup</span>   <span class="c"># 向导：经 claude plugin CLI 注册插件</span>
+              <span class="c"># （hooks + skill + /tlive:* 命令），</span>
+              <span class="c"># IM 凭据可跳过</span>
+<span class="hl-cmd">tlive start</span>   <span class="c"># daemon 启动，打印 web URL + 二维码</span>
+tlive run claude   <span class="c"># 可选：包装模式 → 真·web 终端</span>
+
+tlive mode full   <span class="c"># 开远程审批（默认 notify 只通知）</span>
+tlive status      <span class="c"># 查看生效模式</span>
+tlive mode off    <span class="c"># 总开关（kill switch）</span></pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>机制</b><span>hooks/companion 模式骑在 Claude Code 官方 hook 机制上：默认 notify 只推送状态，<b>永不阻塞工具调用</b>；full 模式持有工具调用，让你在手机 Allow/Deny（与本地对话框并行，先答先赢）。wrapped 模式额外持有 PTY，提供 xterm web 终端与 IM 注入。</span></div>
+                <div class="kv-row"><b>关键配置</b><span><code>~/.tlive/config.json</code>：<code>web.bind</code> 默认 <b>0.0.0.0</b>（局域网手机可达，token 是唯一门），建议改 <code>127.0.0.1</code>；web token 在 <code>~/.tlive/web-token</code>（0600）；卡片永不携带 dashboard 链接（防 token 入 IM 服务器）。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>普通 <code>claude</code> 会话运行时 dashboard 出现会话卡片（hooks 模式已生效）；wrapped 会话环境变量有 <code>TLIVE_SESSION=&lt;id&gt;</code>。</span></div>
+                <div class="kv-row"><b>边界</b><span>v2 全新重写不兼容 v1 配置，直接 <code>tlive setup</code> 重来；Windows 设计支持（named pipes + ConPTY）但官方自述“less battle-tested”。</span></div>
+              </div>
+            </div>
           </div>
-        </article>
+        </div>
+
+        <div class="plan">
+          <div class="plan-head"><span class="no">2.3</span><h3>Claude Code Studio</h3><span class="pos">tmux control mode 全功能台 · 排序 B</span></div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 前置：Node 22.13+（免原生编译）；claude 已登录</span>
+<span class="c"># Web 版最快启动：</span>
+<span class="hl-cmd">npx github:Lexus2016/claude-code-studio</span>
+<span class="c"># → http://localhost:3000，设密码，开始用</span>
+
+<span class="c"># Docker</span>
+git clone https://github.com/Lexus2016/claude-code-studio
+cd claude-code-studio &amp;&amp; cp .env.example .env
+docker compose up -d --build
+
+<span class="c"># 桌面版（mac/win/linux 安装包，或 brew cask）</span>
+<span class="c"># File → Import data 可从 web 版迁移 chats.db</span></pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>机制</b><span>terminal-bridge.js 用 tmux control mode：tmux 拥有 agent PTY，Node 经 control-mode 管道转发输出/输入/resize；独立 ccstudio socket。</span></div>
+                <div class="kv-row"><b>关键配置</b><span>默认仅监听 localhost；开远程需 <code>HOST=0.0.0.0</code>（控制台持续告警）；首密码必须从 localhost 设置，远程设置需控制台打印的一次性 setup code。<code>PORT/WORKDIR/MAX_TASK_WORKERS/CLAUDE_IDLE_TIMEOUT_MS</code> 等环境变量可调。</span></div>
+                <div class="kv-row"><b>注意</b><span>UI 驱动 <code>claude --dangerously-skip-permissions</code> 且 Bash 以 $HOME 为根——端口暴露≈shell 暴露，只应放在容器或受信内网。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>http://localhost:3000 登录后建项目、发任务，Kanban 与终端面板均活动；约 136 stars（2026-09-13 推送），功能面大、复杂度高。</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan">
+          <div class="plan-head"><span class="no">2.4</span><h3>OmniTerm</h3><span class="pos">多 Agent ACP 控制台 · 排序 B</span></div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 三选一</span>
+<span class="hl-cmd">cargo install omniterm</span>
+npm install -g @gdwhisper/omniterm   <span class="c"># Node ≥18</span>
+docker run -d -p 9077:9077 \
+  -v omniterm-data:/app/data ghcr.io/GDWhisper/omniterm
+
+<span class="hl-cmd">omniterm</span>   <span class="c"># → http://localhost:9077</span>
+omniterm update   <span class="c"># 升级</span></pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>前置</b><span>tmux（Windows 用 <a href="https://github.com/psmux/psmux" style="color:var(--blue)">psmux</a> 替代）；Rust 单二进制内嵌前端与 SQLite。</span></div>
+                <div class="kv-row"><b>首次上手</b><span>浏览器设初始密码 → 添加项目目录 → 建 session：选 agent（Claude/Codex/Gemini/OpenCode/Qwen/Kiro 预设）进 Chat 模式，或留空当纯终端。</span></div>
+                <div class="kv-row"><b>机制</b><span>Chat 模式走 ACP 协议（回复是结构化文本 + 工具卡片 + 可折叠思考）；终端桥是 portable-pty + WebSocket + tmux control mode。权限请求触发 tab 闪烁 + 声音 + 侧栏 badge，可当场批准/拒绝、中途换模型或思考级别。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>一键释放会话后日志仍在，随时 resume；idle 会话自动回收。</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan">
+          <div class="plan-head"><span class="no">2.5</span><h3>purplemux</h3><span class="pos">tmux 持久多会话 · 排序 B</span></div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 前置：Node 20+、tmux；仅 macOS / Linux</span>
+<span class="hl-cmd">npx purplemux@latest</span>
+<span class="c"># → http://localhost:8022，Done.</span>
+
+<span class="c"># 全局安装</span>
+npm install -g purplemux &amp;&amp; purplemux
+
+<span class="c"># CLI 建标签页</span>
+purplemux tab create -w WS -t codex-cli -n "fix auth"
+purplemux tab create -w WS -t agent-sessions
+
+<span class="c"># Claude 标签页需先装好并登录 claude：</span>
+curl -fsSL https://claude.ai/install.sh | bash</pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>机制</b><span>每个会话跑在 tmux 里：关浏览器、断 SSH 都不打断，重开还原全部标签/面板/目录。JSONL 解析提供时间线视图、权限提示卡片、5 小时/7 天用量倒计时。</span></div>
+                <div class="kv-row"><b>关键配置</b><span>首次访问设密码（scrypt 哈希存 <code>~/.purplemux/config.json</code>）；重置密码即删该文件重启。对外暴露务必走 HTTPS：Tailscale Serve 或自备反代（需转发 WS upgrade 头）。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>手机 PWA 加到主屏，Web Push 收“任务完成/需输入”通知；一键 resume 旧 Claude 会话。</span></div>
+                <div class="kv-row"><b>边界</b><span>官方明说与 Remote Control 的分工：官方做单会话远程控制，purplemux 做多会话管理 + 推送 + 持久化。Windows 明确不支持。</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan">
+          <div class="plan-head"><span class="no">2.6</span><h3>Agent of Empires</h3><span class="pos">tmux 会话管理器 · 排序 C</span></div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 前置：tmux 必须；Linux / macOS（Win 仅 WSL2）</span>
+curl -fsSL https://raw.githubusercontent.com/agent-of-empires/agent-of-empires/main/scripts/install.sh | bash
+<span class="c"># 或 brew install aoe</span>
+
+<span class="hl-cmd">aoe</span>                    <span class="c"># TUI（按 ? 看快捷键）</span>
+<span class="hl-cmd">aoe add --cmd claude</span>   <span class="c"># 建 Claude 会话</span>
+<span class="hl-cmd">aoe serve</span>              <span class="c"># 起 web dashboard</span></pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>机制</b><span>每个 agent 一个独立 tmux session：关 TUI、断 SSH、终端崩溃都不丢；重开 aoe 原样恢复。TUI/web/CLI/HTTP API 四个面。知道的关键快捷键：<code>Ctrl+b d</code> 脱离回 TUI。</span></div>
+                <div class="kv-row"><b>加分项</b><span>agent 状态检测（running/waiting/idle/error）、git worktree 管理、Docker/Podman/Apple Containers 沙箱、diff viewer、手机结构化视图。约 3.3k stars。</span></div>
+                <div class="kv-row"><b>边界</b><span>官方 FAQ：Windows 仅 WSL2（依赖 tmux 与 POSIX 进程处理）；它加在“你已有的 tmux 工作流”之上——仍可直接 tmux attach 任何 aoe 会话。</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan">
+          <div class="plan-head"><span class="no">2.7</span><h3>TUAN webterminal</h3><span class="pos">Windows 轻量 PTY · 排序 C</span></div>
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 前置：Windows + 管理员权限；Node ≥18；Git（Git Bash）</span>
+git clone https://github.com/TUAN130294/webterminal.git
+cd webterminal &amp;&amp; npm install
+<span class="c"># 一键安装并启动（PM2）：</span>
+<span class="c">#   以管理员运行 MANAGER.bat → 按 1</span>
+<span class="c"># 常驻：按 7 装 Windows Service（开机自启）</span>
+
+<span class="c"># 改端口：ecosystem.config.js → env.PORT</span>
+<span class="c"># 改用户路径：server.js 第 53 行 ACTUAL_USER_HOME</span></pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>首次上手</b><span>访问 <code>http://localhost:9000</code> → 左栏 Claude Sessions → 点 + New Terminal 或点会话 resume → 选目录 → 选 AI Profile（Claude/Agy/GLM/Codex/纯 Bash）→ 确认。</span></div>
+                <div class="kv-row"><b>机制</b><span>Express + Socket.IO + node-pty；手机同 WiFi 访问 <code>http://&lt;IP&gt;:9000</code>（ipconfig 查 IP）。</span></div>
+                <div class="kv-row"><b>边界</b><span>README 自述“无需登录，打开即用”且含硬编码用户路径——仅可信 LAN 实验，<b>禁止公网</b>；约 16 stars，可当 node-pty Windows 参考实现读源码。</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
+      <!-- ============ 第 3 章 ============ -->
+      <section class="chapter" id="ch3">
+        <div class="chapter-head">
+          <div class="chapter-no">03</div>
+          <div><div class="label">DEPTH · 同名辨析</div><h2>fafawlf/claude-code-web 不是 PTY</h2></div>
+        </div>
+        <p class="chapter-intro">两个 <code>claude-code-web</code> 同名不同物：vultuk 版是 PTY 直桥（第 2.1 节），fafawlf 版是 Agent SDK 路线（路线 C）的完整参考实现。混淆两者是这条赛道最常见的选型错误。</p>
+        <div class="plan">
+          <div class="plan-cols">
+            <div class="plan-col">
+              <pre><span class="c"># 前置：Node 20+；服务器所在机器已有 claude 且已认证</span>
+<span class="c"># （claude login 或与 CLI 相同的环境变量）</span>
+git clone https://github.com/fafawlf/claude-code-web.git
+cd claude-code-web
+npm install &amp;&amp; npm run build
+
+<span class="hl-cmd">node server/dist/bin/claudecode-web.js</span>
+<span class="c"># → 打印带 token 的 URL：</span>
+<span class="c">#   http://localhost:8080/?t=&lt;token&gt;</span>
+
+<span class="c"># CLI 选项</span>
+<span class="c"># --port/-p &lt;n&gt;    默认 8080</span>
+<span class="c"># --host &lt;addr&gt;    默认 127.0.0.1（保持不动！）</span>
+<span class="c"># --cwd &lt;path&gt;     默认当前目录</span>
+
+<span class="c"># 远程机场景：本机起服务 + SSH 隧道</span>
+ssh -L 8080:127.0.0.1:8080 user@remote-host</pre>
+            </div>
+            <div class="plan-col">
+              <div class="kv">
+                <div class="kv-row"><b>机制</b><span><code>ClaudeSession.ts</code> import SDK 的 <code>query()</code>，按 cwd / resume / permissionMode 构造 options，把 SDKMessage 流推给 Fastify WebSocket；permission / plan broker 在浏览器端出审批卡。</span></div>
+                <div class="kv-row"><b>与 vultuk 的对照</b><span>不 attach 现有终端、不显示 TUI 画面；控制的是 Agent 能力面（diff 卡片 approve/reject、plan mode、事件重放、历史 viewer 显式 takeover）。</span></div>
+                <div class="kv-row"><b>验证成功</b><span>浏览器刷新后事件重放恢复现场；diff 卡片可逐个 approve/reject。</span></div>
+                <div class="kv-row"><b>边界</b><span>单用户定位；SSH 多节点执行在 roadmap/受限状态；README 明确非 Anthropic 官方项目。</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 第 4 章 ============ -->
+      <section class="chapter" id="ch4">
+        <div class="chapter-head">
+          <div class="chapter-no">04</div>
+          <div><div class="label">DEPTH · 平台适配</div><h2>Windows：先选宿主，再选工具</h2></div>
+        </div>
+        <p class="chapter-intro">对应要点 4。Windows 不是“换一套命令”的问题：ConPTY 与 Linux PTY 行为不同、Ctrl-C 与进程树终止语义不同、PowerShell 输出编码影响 WebSocket 数据。三条宿主路线按成熟度排序如下。</p>
+        <section class="panel" style="margin-bottom:14px">
+          <div class="head"><div class="label">WINDOWS · 宿主路线</div><div class="page-no">D4-01</div></div>
+          <h2>三条宿主路线与适用项目</h2>
+          <div class="list">
+            <div class="list-item"><strong>01</strong><div><b>WSL2（成熟度最高）</b><span>purplemux / Agent of Empires / CodeHelm / 一切 tmux 系项目的归宿；PTY、tmux、信号、进程组语义全齐，代价是路径映射（/mnt/c）与端口桥接。AoE 官方 FAQ 明确：原生 Windows 不支持，仅 WSL2。</span></div><div class="icon">L</div></div>
+            <div class="list-item"><strong>02</strong><div><b>psmux（tmux 语义替代）</b><span>OmniTerm 的 Windows 路线；保留 tmux 的会话持久化与 attach 模型，换取工具在原生 Windows 可用。</span></div><div class="icon">P</div></div>
+            <div class="list-item"><strong>03</strong><div><b>原生 ConPTY（可行但需实测）</b><span>tlive（named pipes + ConPTY，官方自述 less battle-tested）、ttyd（winget/scoop 有二进制）、webterminal（PowerShell/WinPTY）。逐项验证：Ctrl-C 传达、进程树终止、UTF-8 编码、PowerShell 输出转义对 xterm.js 的影响。</span></div><div class="icon">W</div></div>
+          </div>
+        </section>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>项目</th><th>Windows 声明</th><th>宿主依赖</th><th>给 Windows 用户的一句话</th></tr></thead>
+            <tbody>
+              <tr><td class="mode">vultuk/claude-code-web</td><td>未声明平台限制</td><td>Node ≥16 + claude on PATH</td><td>理论可跑（node-pty 有 win32 预编译），但需实测 ConPTY 行为</td></tr>
+              <tr><td class="mode">tlive</td><td>design 支持</td><td>named pipes + ConPTY</td><td>能用但官方自述验证较少；报 issue 通道开放</td></tr>
+              <tr><td class="mode">Claude Code Studio</td><td>支持（桌面版安装包）</td><td>Node 22.13+（免编译）</td><td>Windows 安装包直接用；数据目录 %APPDATA%</td></tr>
+              <tr><td class="mode">OmniTerm</td><td>支持</td><td>psmux 替代 tmux</td><td>PowerShell 一键脚本 install.ps1；先装 psmux</td></tr>
+              <tr><td class="mode">purplemux</td><td>明确不支持</td><td>macOS / Linux only</td><td>想用就进 WSL2 或找 macOS/Linux 机器</td></tr>
+              <tr><td class="mode">Agent of Empires</td><td>仅 WSL2</td><td>tmux + POSIX</td><td>WSL2 里一切照常</td></tr>
+              <tr><td class="mode">TUAN webterminal</td><td>Windows 优先</td><td>PowerShell/WinPTY + PM2</td><td>最顺的 Windows 路径，但无认证，仅可信 LAN</td></tr>
+              <tr><td class="mode">ttyd</td><td>支持</td><td>releases 二进制 / winget / scoop</td><td>最快验证 ConPTY 行为的探针</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ 第 5 章 ============ -->
+      <section class="chapter" id="ch5">
+        <div class="chapter-head">
+          <div class="chapter-no">05</div>
+          <div><div class="label">DEPTH · 安全边界</div><h2>WebSocket 可写 ≈ 远程终端输入</h2></div>
+        </div>
+        <p class="chapter-intro">对应要点 4 的安全面。PTY Web UI 一旦被未授权访问，等价于远程命令执行入口——这不是“有没有加密”的问题，而是“谁拿到了 stdin”。基线来自 OWASP WebSocket Cheat Sheet 与 ttyd 的默认设计（默认只读、显式开写）。</p>
+        <section class="grid2">
+          <article class="panel black">
+            <div class="head"><div class="label">RISK · 红线</div><div class="page-no">D5-01</div></div>
+            <h2>这四条不满足就不要部署</h2>
+            <p>· 默认只监听 127.0.0.1；远程访问走 Tailscale / WireGuard / SSH 隧道，绝不 0.0.0.0 裸奔公网；<br>
+            · WebSocket 校验精确 Origin + 认证（token 至少 0600 权限落盘，参照 tlive 的 web-token 模型）；<br>
+            · 每个 session 默认单 writer，其余连接只读 observer（多端同时打字 = 输入流污染）；<br>
+            · 限制连接数、消息大小与 PTY 数量——无界输入可打爆后端。</p>
+          </article>
+          <article class="panel">
+            <div class="head"><div class="label">CHECK · 部署前 checklist</div><div class="page-no">D5-02</div></div>
+            <h2>照着核对一遍</h2>
+            <p>· 凭证、环境变量、.env 永不进浏览器（fafawlf 与 tlive 都把 token 留在服务端）；<br>
+            · 日志不记录 token、完整 prompt 与敏感输出（tlive 卡片不携带 dashboard 链接就是这条）；<br>
+            · 默认拒绝：认证失败即断链，超时回退到本地终端对话框（tlive 的 fail-closed / fallback-is-silence 模式）；<br>
+            · 自动审批是特权：/trust、Always-allow 类开关必须显式开启、可随时关闭、重启即清；<br>
+            · 审计：谁在何时连接、谁批准了什么。</p>
+          </article>
+        </section>
+      </section>
+
+      <!-- ============ 第 6 章 ============ -->
+      <section class="chapter" id="ch6">
+        <div class="chapter-head">
+          <div class="chapter-no">06</div>
+          <div><div class="label">DEPTH · 口径与局限</div><h2>排序口径、活跃度快照与不作推断的边界</h2></div>
+        </div>
+        <p class="chapter-intro">主观结论的度量衡放在最后，供你决定信任多少。</p>
+        <div class="grid2">
+          <article class="panel">
+            <div class="head"><div class="label">RANKING · 阅读顺序</div><div class="page-no">D6-01</div></div>
+            <h2>第 2 章顺序的口径</h2>
+            <div class="rank">
+              <div class="rank-row"><div class="name">vultuk/claude-code-web</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="score">A</div></div>
+              <div class="rank-row"><div class="name">tlive</div><div class="track"><div class="fill" style="width:92%"></div></div><div class="score">A</div></div>
+              <div class="rank-row"><div class="name">Claude Code Studio</div><div class="track"><div class="fill" style="width:84%;background:var(--blue2)"></div></div><div class="score">B</div></div>
+              <div class="rank-row"><div class="name">OmniTerm</div><div class="track"><div class="fill" style="width:78%;background:var(--blue2)"></div></div><div class="score">B</div></div>
+              <div class="rank-row"><div class="name">purplemux</div><div class="track"><div class="fill" style="width:72%;background:var(--blue3)"></div></div><div class="score">B</div></div>
+              <div class="rank-row"><div class="name">Agent of Empires</div><div class="track"><div class="fill" style="width:66%;background:var(--blue3)"></div></div><div class="score">C</div></div>
+              <div class="rank-row"><div class="name">TUAN webterminal</div><div class="track"><div class="fill" style="width:58%;background:var(--blue3)"></div></div><div class="score">C</div></div>
+            </div>
+            <p class="tag-note">A=优先评估，B=场景匹配后评估，C=特定路线适用。维度：PTY/TUI 适配度、Windows 友好度、维护成熟度、部署成本；本卡编辑判断，非统一测试排名。</p>
+          </article>
+          <article class="panel gray">
+            <div class="head"><div class="label">LIMITS · 证据局限</div><div class="page-no">D6-02</div></div>
+            <h2>三条边界</h2>
+            <p>· <b>活跃度快照</b>：stars / 推送时间 / npm 下载为 2026-09-20 调研值，会漂移；vultuk（97★，npm 3.4.0/2025-10）、Studio（136★）、AoE（约 3.3k★）、webterminal（16★）。</p>
+            <p>· <b>未运行验证</b>：本卡所有命令取自 README 原文并逐条核对，但未在本机逐一安装运行；“验证成功”小节转述自 README 的自检方式。</p>
+            <p>· <b>官方协议</b>：Remote Control 内部握手、token 语义与多端写入策略未公开，本卡仅转述文档行为，不作推断。</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ 边界与行动 ============ -->
       <section class="wide">
         <article class="chart-card">
-          <div class="head"><div class="label">REALITY · 接管能力矩阵</div><div class="page-no">PAGE 11</div></div>
-          <h2>“接管已有 TUI”要拆开看</h2>
+          <div class="head"><div class="label">ACTION · 边界与行动</div><div class="page-no">ACT 01</div></div>
+          <h2>装完之后：30 秒验证清单</h2>
           <div class="tbl-wrap">
-            <table style="min-width:520px">
-              <thead><tr><th>方案</th><th>接管对象</th><th>是否显示原始终端</th><th>能否接任意已开窗口</th></tr></thead>
+            <table style="min-width:560px">
+              <thead><tr><th>方案</th><th>验证成功的信号</th><th>失败的第一个排查点</th></tr></thead>
               <tbody>
-                <tr><td class="mode">Remote Control</td><td>Claude 会话层</td><td>否，结构化 UI</td><td>按官方会话语义，非任意终端</td></tr>
-                <tr><td class="mode">PTY 项目</td><td>终端进程层</td><td>是</td><td>通常仅限自家托管的 PTY/tmux</td></tr>
-                <tr><td class="mode">Agent SDK UI</td><td>Agent 生命周期</td><td>否</td><td>否，新建/恢复 SDK 会话</td></tr>
+                <tr class="hl"><td class="mode">Remote Control</td><td>终端出现 /rc active 指示器，claude.ai/code 见到会话</td><td>是否被 ANTHROPIC_API_KEY 覆盖登录态 / BASE_URL 指向</td></tr>
+                <tr><td class="mode">vultuk</td><td>token 页可开，TUI 回显输入</td><td>claude 是否真的在 PATH</td></tr>
+                <tr><td class="mode">tlive</td><td>dashboard 会话卡片出现；wrapped 有 TLIVE_SESSION</td><td>旧版 ~/.tlive 残留 → 重新 setup</td></tr>
+                <tr><td class="mode">Studio / OmniTerm / purplemux</td><td>登录页可达，能建会话</td><td>tmux/psmux 是否装好、Node 版本</td></tr>
+                <tr><td class="mode">ttyd</td><td>7681 端口出现 bash；-W 后可输入</td><td>忘了 -W（默认只读）</td></tr>
               </tbody>
             </table>
           </div>
         </article>
         <aside class="note-panel">
           <div><div class="label">BOTTOM LINE</div><div class="big">托管<br>优先</div></div>
-          <p>没有方案能无条件抓取任意已打开的终端窗口。可靠的模型始终是：Broker 托管 ConPTY / psmux / tmux 会话，已有对话用 <code>claude --resume &lt;session-id&gt;</code> 恢复，而不是直接抓取窗口。</p>
+          <p>没有方案能无条件抓取任意已打开的终端窗口。可靠的模型始终是：Broker 托管 ConPTY / psmux / tmux 会话，已有对话用 <code>claude --resume &lt;session-id&gt;</code> 恢复，而不是直接抓取窗口。下一步：先用 Remote Control 跑通“远程继续会话”，确认不够用再进 PTY 路线，并按第 5 章 checklist 收紧。</p>
         </aside>
       </section>
 
       <section class="panel" style="margin-top:14px">
-        <div class="head"><div class="label">SOURCES · 来源</div><div class="page-no">PAGE 12</div></div>
+        <div class="head"><div class="label">SOURCES · 来源</div><div class="page-no">SRC 01</div></div>
         <h2>官方文档、项目仓库与安全参考</h2>
         <div class="meta-grid">
           <div class="meta-box"><b>官方文档</b><span class="source-list">
             <a href="https://code.claude.com/docs/en/remote-control">code.claude.com/docs/en/remote-control</a>
             <a href="https://code.claude.com/docs/en/claude-code-on-the-web">code.claude.com/docs/en/claude-code-on-the-web</a>
+            <a href="https://code.claude.com/docs/en/agent-sdk/overview">code.claude.com/docs/en/agent-sdk/overview</a>
+            <a href="https://code.claude.com/docs/en/agent-sdk/quickstart">code.claude.com/docs/en/agent-sdk/quickstart</a>
             <a href="https://code.claude.com/docs/en/desktop">code.claude.com/docs/en/desktop</a>
           </span></div>
           <div class="meta-box"><b>项目仓库</b><span class="source-list">
@@ -318,16 +727,17 @@ xterm.js ── WebSocket ── Auth Broker
           <div class="meta-box"><b>安全与组件参考</b><span class="source-list">
             <a href="https://github.com/xtermjs/xterm.js">github.com/xtermjs/xterm.js</a>
             <a href="https://github.com/tsl0922/ttyd">github.com/tsl0922/ttyd</a>
+            <a href="https://github.com/psmux/psmux">github.com/psmux/psmux</a>
             <a href="https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html">OWASP WebSocket Security Cheat Sheet</a>
             <a href="https://datatracker.ietf.org/doc/html/rfc6455">RFC 6455 WebSocket</a>
           </span></div>
         </div>
-        <p class="tag-note">项目活跃度（stars / 最近推送 / npm 下载）为 2026-09-20 调研快照，会随时间漂移；Remote Control 内部协议、token 语义与多端写入策略未公开，本卡不作推断。</p>
+        <p class="tag-note">所有安装/启动命令于 2026-09-20 自各仓库 README（GitHub raw / 官方 docs markdown）核对；未在本机逐一运行。项目活跃度为当日快照。</p>
       </section>
 
       <footer class="footer">
         <div>SOURCE · CODE.CLAUDE.COM / GITHUB REPOS / OWASP</div>
-        <div>STYLE · infocard-bigwhite-style · 2026-09-20</div>
+        <div>STYLE · infocard-bigwhite-style · v2 PROGRESSIVE · 2026-09-20</div>
       </footer>
     </div>
   </main>
