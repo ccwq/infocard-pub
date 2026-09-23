@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>repowise：让 Agent 不再为重新认识代码库烧 token</title>
+<style>
+:root{
+  --bg:#F5F4EF; --paper:#FAFAF7; --ink:#1C1C1A;
+  --green:#5F7E62; --green-deep:#3D5A42; --green-soft:#E9EDE7;
+  --muted:#6B6B63; --muted-2:#9E9E94;
+  --line:#D4D2C9; --line-strong:#B8B6AB;
+  --fill:#ECEAE1; --dark:#1E2620;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:Inter,"Helvetica Neue",Helvetica,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+.page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:20px 0 0}
+
+.header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;padding-bottom:11px;border-bottom:1px solid var(--line)}
+.header-brand{font:700 10.5px/1.3 "JetBrains Mono",monospace;letter-spacing:.05em;color:var(--ink);white-space:nowrap}
+.header-center{text-align:center;font:600 10.5px/1.3 "JetBrains Mono",monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.header-center .ref-id{display:block;font-weight:400;color:var(--muted-2);margin-top:2px;letter-spacing:.04em}
+.header-center .src-count{color:var(--ink);font-weight:700}
+.watch-badge{display:flex;align-items:center;gap:5px;font:700 11px/1 "JetBrains Mono",monospace;letter-spacing:.08em;color:var(--green-deep);text-transform:uppercase;border:1px solid var(--green-deep);padding:5px 12px;white-space:nowrap}
+
+.hero{margin-top:18px;border:1px solid var(--line);background:var(--paper)}
+.hero-ref{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--line-strong)}
+.hero-ref-cell{padding:10px 14px;font:500 10px/1.4 "JetBrains Mono",monospace;color:var(--muted)}
+.hero-ref-cell:not(:last-child){border-right:1px solid var(--line)}
+.hero-ref-cell .lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);display:block}
+.hero-ref-cell .val{color:var(--ink);font-weight:600;margin-top:1px}
+.hero-body{padding:14px 16px;border-bottom:1px solid var(--line)}
+.hero-title{font:800 22px/1.15 Inter,sans-serif;letter-spacing:-.02em;color:var(--ink);margin-bottom:6px}
+.hero-title em{font-style:normal;color:var(--green)}
+.hero-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font:500 10.5px/1 "JetBrains Mono",monospace;color:var(--muted);margin-bottom:10px}
+.hero-meta .tag{background:var(--green-soft);color:var(--green-deep);padding:2px 7px;font-weight:600;letter-spacing:.04em}
+.hero-summary{font-size:12.5px;line-height:1.65;color:#333;max-width:680px}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-top:none;background:var(--paper)}
+.stat-cell{padding:11px 14px;border-right:1px solid var(--line);text-align:center}
+.stat-cell:last-child{border-right:none}
+.stat-num{display:block;font:800 22px/.9 "JetBrains Mono",monospace;color:var(--green-deep)}
+.stat-lbl{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-top:3px;font-family:"JetBrains Mono",monospace}
+
+.section{border:1px solid var(--line);border-top:none;background:var(--paper)}
+.sec-block{padding:13px 16px;border-bottom:1px solid var(--line)}
+.sec-block:last-child{border-bottom:none}
+.sec-title{font:700 10px "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;display:flex;align-items:center;gap:8px}
+.sec-title .no{color:var(--green-deep);font-weight:700}
+.sec-title::after{flex:1;content:'';height:1px;background:var(--line)}
+.sec-title.green{color:var(--green)}
+.sec-title.green::after{background:var(--green)}
+p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+p:last-child{margin-bottom:0}
+p strong{color:var(--ink)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.mini{background:var(--green-soft);padding:10px 12px}
+.mini .mi-head{font:700 9.5px "JetBrains Mono",monospace;color:var(--green-deep);margin-bottom:4px;letter-spacing:.05em}
+.mini .mi-body{font-size:11px;line-height:1.55;color:#2a3a2e}
+.mini .mi-body strong{color:var(--ink)}
+.mini.dark{background:var(--dark)}
+.mini.dark .mi-head{color:#9fc4a4}
+.mini.dark .mi-body{color:#d8e0d5}
+.mini.dark .mi-body strong{color:#fff}
+.mini .mi-body code{font-size:10.5px;color:var(--green-deep);background:rgba(255,255,255,.55);padding:0 4px}
+.mini.dark .mi-body code{color:#cfe3d2;background:rgba(255,255,255,.08)}
+table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:8px}
+th,td{padding:7px 9px;border:1px solid var(--line);text-align:left;vertical-align:top;line-height:1.5}
+th{background:var(--fill);font:700 9.5px "JetBrains Mono",monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+td code{font-size:10.5px;color:var(--green-deep)}
+tr:nth-child(even) td{background:#F2F1EA}
+.win{color:var(--green-deep);font-weight:700}
+.lose{color:#A0522D;font-weight:600}
+.codeblk{background:var(--dark);border:1px solid var(--line);padding:10px 13px;overflow-x:auto;margin-bottom:8px}
+.codeblk .clabel{font:700 9px "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:#7a9a80;margin-bottom:6px}
+.codeblk pre{margin:0;font-size:11.5px;line-height:1.7;white-space:pre;color:#d8e0d5}
+.codeblk .cg{color:#9fc4a4}
+.codeblk .cm{color:#6d7f70}
+.tweet-src{border:1px solid var(--line);background:var(--fill);padding:10px 13px;margin-bottom:8px}
+.tweet-src .ts-head{font:700 9.5px "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:flex;gap:10px;flex-wrap:wrap}
+.tweet-src .ts-head .eng{color:var(--green-deep)}
+.tweet-src p{font-size:11.5px;line-height:1.65;color:#444;margin:0 0 6px}
+.tweet-src p:last-child{margin-bottom:0}
+.judgment-box{border:1px solid var(--green);background:var(--green-soft);padding:10px 13px;margin-bottom:8px}
+.jb-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:6px 0;border-bottom:1px solid rgba(95,126,98,.18)}
+.jb-row:last-child{border-bottom:none;padding-bottom:0}
+.jb-lbl{font:600 9.5px "JetBrains Mono",monospace;color:var(--green-deep);letter-spacing:.05em}
+.jb-val{font-weight:700;color:var(--dark)}
+.jb-val.neg{color:var(--muted)}
+.next-item{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;line-height:1.55;color:#222;margin-bottom:8px}
+.next-item:last-child{margin-bottom:0}
+.next-num{font:700 9.5px "JetBrains Mono",monospace;color:#fff;background:var(--green-deep);width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.next-item code{font-size:10.5px;color:var(--green-deep)}
+.source-bar{border:1px solid var(--line);border-top:none;background:var(--fill);padding:8px 14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;font:500 9.5px "JetBrains Mono",monospace;color:var(--muted)}
+.sb-item{display:flex;align-items:center;gap:4px}
+.sb-lbl{color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase}
+.sb-val{color:var(--ink);font-weight:600}
+.sb-link{color:var(--green-deep);font-weight:600}
+.sb-sep{flex:1}
+.footer{margin-top:10px;padding:8px 0 16px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;font:500 9.5px "JetBrains Mono",monospace;color:var(--muted-2)}
+.footer a{color:var(--green-deep);font-weight:600}
+@media(max-width:720px){
+  .page{width:min(100% - 16px,1040px)}
+  .hero-ref{grid-template-columns:1fr 1fr}
+  .hero-ref-cell:nth-child(2){display:none}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .stat-cell:nth-child(2){border-right:none}
+  .stat-cell:nth-child(1),.stat-cell:nth-child(2){border-bottom:1px solid var(--line)}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .header{grid-template-columns:1fr auto}
+  .header-center{display:none}
+  .hero-title{font-size:19px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="header">
+  <div class="header-brand">X · @GitHub_Daily</div>
+  <div class="header-center">
+    CODEBASE INTELLIGENCE FOR AI AGENTS
+    <span class="ref-id">REF <span class="src-count">20260923-REPOWISE</span></span>
+  </div>
+  <div class="watch-badge">
+    <svg viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M5 2.5V5L6.5 6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    MCP
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hero-ref">
+    <div class="hero-ref-cell">
+      <span class="lbl">GitHub</span>
+      <span class="val">repowise-dev/repowise</span>
+    </div>
+    <div class="hero-ref-cell">
+      <span class="lbl">License</span>
+      <span class="val">AGPL-3.0 / Commercial</span>
+    </div>
+    <div class="hero-ref-cell">
+      <span class="lbl">Install</span>
+      <span class="val">pip install repowise</span>
+    </div>
+  </div>
+  <div class="hero-body">
+    <div class="hero-title">repowise：Agent 不再为<em>重新认识代码库</em>烧 token</div>
+    <div class="hero-meta">
+      <span class="tag">MCP Server</span>
+      <span class="tag">本地索引</span>
+      <span class="tag">零 LLM 调用</span>
+      <span>26 种语言</span>
+      <span>自托管</span>
+    </div>
+    <p class="hero-summary">用 Claude Code 改大项目，每个新任务都要重新翻文件、认结构，上次弄明白的全忘掉，token 就这么烧掉。repowise 把这些活提前做一次：给仓库建本地索引——依赖图、git 历史、测试、文档、架构决策——Agent 和人都能直接查。给 Claude Code、Codex、Cursor 提供 10 个按任务设计的 MCP 工具，问"改了这个文件会影响谁"直接给带引用的答案。</p>
+  </div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-cell">
+    <span class="stat-num">-31.6%</span>
+    <span class="stat-lbl">Agent 输出 token</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">3.8 vs 7.2</span>
+    <span class="stat-lbl">工具调用次数</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">-97.2%</span>
+    <span class="stat-lbl">单次上下文负载</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">10</span>
+    <span class="stat-lbl">MCP 工具</span>
+  </div>
+</div>
+
+<div class="section">
+
+  <!-- 01 推文原文 -->
+  <div class="sec-block">
+    <div class="sec-title"><span class="no">01</span> 推文说了什么</div>
+    <div class="tweet-src">
+      <div class="ts-head">
+        <span>@GitHub_Daily</span>
+        <span class="eng">61 likes · 12 RTs</span>
+        <span>2026-09-23</span>
+      </div>
+      <p>核心推荐逻辑：作者在 <strong>django 仓库跑了 43 个问题做对比</strong>，Agent 工具调用从 7.2 次降到 3.8 次，输出少 31.6%，<strong>样本、方法和输掉的行全部公开在仓库里</strong>。</p>
+      <p>推文还点出三个差异化：① 改代码前算一份 <strong>0-10 风险分</strong>，按仓库近期提交分布排序，列出受波及的调用方、该跑的测试、以往总一起改的文件这次有没有漏；② 代码健康有 <strong>51 个检测器</strong>，缺陷风险/可维护性/性能分开打分，给出可直接丢给 Agent 执行的重构方案；③ 建图、算风险、查健康度、找死代码<strong>都不调用大模型</strong>，不用 API Key，索引留在自己机器上，支持 26 种语言，另有免费 PR 机器人。</p>
+    </div>
+  </div>
+
+  <!-- 02 官方实测数据 -->
+  <div class="sec-block">
+    <div class="sec-title"><span class="no">02</span> 官方基准数据（README 全部公开方法与样本）</div>
+    <table>
+      <tr><th>指标</th><th>数值</th><th>条件</th><th>说明</th></tr>
+      <tr><td>Agent 输出减少</td><td class="win">-31.6%</td><td>n=43 · p&lt;0.0001</td><td>Codex (gpt-5.6-sol) 在 django/django 固定 commit 上跑 43 问，对裸 Agent 对照组；<strong>Claude Code 上复测为 15.9%</strong>，官方明说 Claude 结果不如 Codex 稳定</td></tr>
+      <tr><td>工具调用</td><td class="win">3.8 vs 7.2</td><td>同一实验</td><td>打开文件数也从 7.2 降到 3.0——省 token 的机制直接可见</td></tr>
+      <tr><td>单次上下文负载</td><td class="win">393 vs 13,984 tokens</td><td>30 个 Flask commits</td><td>加载一个 commit 的 context，97.2% 更小；官方强调这是<strong>单次检索负载</strong>，不是端到端总节省</td></tr>
+      <tr><td>文件定位覆盖</td><td class="win">0.876 vs 0.610</td><td>n=42 sealed · p=0.00004</td><td>ContextBench 封闭 42 实例（Python/Go），对 CodeGraph 19 胜 1 负；确定性判定，无 LLM judge</td></tr>
+      <tr><td>调用手精度</td><td class="win">84.8% vs 57.0%</td><td>540 行人工标注</td><td>编译器判定的 7 个单元（37,853 条 oracle 边）里，"找得多且更准"全部保持</td></tr>
+      <tr><td>建图内存</td><td class="win">75 MB vs 757 MB</td><td>5 工具 · 35 repos</td><td>35 个仓库全部最低</td></tr>
+      <tr><td>索引速度</td><td class="lose">366.8s vs 16.4s</td><td>django 全量索引</td><td><strong>官方自己公布的输掉项</strong>：最慢，约 22 倍于 CodeGraph——因为一次建 5 层；一次性成本，之后增量更新</td></tr>
+      <tr><td>缺陷浮现</td><td class="win">2.3×</td><td>2,770 files · p=0.003</td><td>同样的 20% 行数预算下，比对照多找出的缺陷</td></tr>
+    </table>
+    <p><strong>读法提醒（官方原话）：</strong>"竞争对手常把第一种当 token savings 宣传；我们两个都发布，且只把第二种称为 agent savings。"——单次负载的 97.2% 与端到端的 31.6% 是两个不同口径的数字。</p>
+  </div>
+
+  <!-- 03 十个工具 -->
+  <div class="sec-block">
+    <div class="sec-title"><span class="no">03</span> 10 个 MCP 工具：按任务设计，不是按数据实体</div>
+    <p>官方对比：多数 MCP 工具围绕数据实体（一个文件、一个 symbol）设计，把 Agent 逼进"长链路顺序调用"；repowise 的工具围绕<strong>任务</strong>——一次调用传多个目标，拿回完整上下文：</p>
+    <div class="grid-2">
+      <div class="mini">
+        <div class="mi-head">get_answer(question)</div>
+        <div class="mi-body">混合检索（全文+向量 RRF）、PageRank 偏置、1-hop 图扩展，一次往返返回<strong>带引用的答案</strong> + 校准的 retrieval_quality。把"搜索→读→推理"折叠成一次调用。</div>
+      </div>
+      <div class="mini">
+        <div class="mi-head">get_context(targets, include?)</div>
+        <div class="mi-body">文件/模块/symbol 的分诊卡：摘要、签名、hotspot 标记、约束决策。include 打开调用方/被调方/归属/指标，<strong>可批量传多个目标</strong>。</div>
+      </div>
+      <div class="mini">
+        <div class="mi-head">get_risk(targets, changed_files?)</div>
+        <div class="mi-body">热点、依赖方、co-change 伙伴、归属、测试缺口、bug 历史。传 changed_files 进 <strong>PR 模式</strong>，返回 directive 块。</div>
+      </div>
+      <div class="mini">
+        <div class="mi-head">get_change_risk(revspec)</div>
+        <div class="mi-body">合并前风险分：这次 commit 让缺陷/可维护性/性能<strong>新恶化了什么</strong>、归因、触及的测试覆盖、diff 形状在近期提交中的排名。</div>
+      </div>
+      <div class="mini">
+        <div class="mi-head">get_why(query?, targets?)</div>
+        <div class="mi-body">架构决策及其原文证据，标注 exact / fuzzy / unverified 三级置信。没有决策记录时<strong>回退到 git 考古</strong>。</div>
+      </div>
+      <div class="mini">
+        <div class="mi-head">get_health / get_dead_code</div>
+        <div class="mi-body">51 个检测器分三路打分（缺陷/可维护性/性能）+ 按置信分级的死代码清单；include 可展开<strong>结构化重构方案</strong>直接交给 Agent。</div>
+      </div>
+    </div>
+    <div class="mini dark">
+      <div class="mi-head">还有 4 个：get_overview / search_codebase / get_symbol / list_repos</div>
+      <div class="mi-body"><code>get_overview()</code> 是接手陌生仓库的第一个调用（架构摘要+模块图+入口+git 健康）；workspace 模式自动增加 <code>get_architecture</code> / <code>get_blast_radius</code> 等跨仓工具；另有 4 个 opt-in（<code>get_dependency_path</code> 等）。VS Code 插件额外向 GitHub Copilot 暴露 6 个工具。</div>
+    </div>
+  </div>
+
+  <!-- 04 差异化 -->
+  <div class="sec-block">
+    <div class="sec-title"><span class="no">04</span> 与竞品的关键差异（README 对比表实测行）</div>
+    <div class="grid-3">
+      <div class="mini">
+        <div class="mi-head">零 LLM 分析</div>
+        <div class="mi-body">图、风险、健康、测试、死代码、PR review <strong>全部不调用大模型</strong>；生成 prose 是可选项。确定性结果 + 无 API Key + 索引不出机器。</div>
+      </div>
+      <div class="mini">
+        <div class="mi-head">Agent 主动性</div>
+        <div class="mi-body">Claude Code / Codex 有 <strong>hook 级拦截</strong>（Full tier）：自动注入决策与风险；VS Code/Cursor/OpenCode 是 Good tier（MCP + instructions 文件）。Hermes 也在支持列表。</div>
+      </div>
+      <div class="mini">
+        <div class="mi-head">自动生成指令文件</div>
+        <div class="mi-body">init 时自动写 <code>CLAUDE.md</code>（Claude Code）和托管 <code>AGENTS.md</code>（Codex），含架构/入口/热点/约定，<strong>随代码库变化保持更新</strong>——Agent 零调用先获得定向。</div>
+      </div>
+    </div>
+    <p><strong>与编辑器内置索引的区别（官方 FAQ）：</strong>Cursor/Continue 的索引是临时的、单仓的、纯 embedding——按需重新嵌入然后忘掉。repowise 是持久的结构层，带健康分、git 历史、归属和架构决策，跨多仓 workspace，任何 MCP 客户端都能调。诚实项：如果你只需要调用图，CodeGraph 更快更省，官方明说"这是正确的取舍，你该选它"。</p>
+  </div>
+
+  <!-- 05 上手 -->
+  <div class="sec-block">
+    <div class="sec-title green"><span class="no">05</span> 三步上手（官方 Quickstart）</div>
+    <div class="codeblk">
+      <div class="clabel">// 一条命令装好，无需 API Key（首次建索引不调用 LLM）</div>
+      <pre>pip install repowise
+cd /path/to/your/repo
+repowise init --no-prose -y   <span class="cm"># 建图/git/决策/健康/死代码/结构 wiki</span>
+repowise serve                <span class="cg"># init 已自动为 Claude Code 写好 .mcp.json</span>
+
+<span class="cm"># 然后直接问 Agent：</span>
+<span class="cg">#   "Use Repowise get_overview to summarize this repository"</span>
+<span class="cg">#   "What breaks if I change src/auth.py?"</span></pre>
+    </div>
+    <div class="next-item"><div class="next-num">1</div><div>跑 <code>repowise agents</code> 确认接线；6 个支持目标：Claude Code / Codex（Full 级）、VS Code / Cursor / OpenCode / <strong>Hermes</strong>（Good 级）</div></div>
+    <div class="next-item"><div class="next-num">2</div><div>想要模型润色的文档就去掉 <code>--no-prose</code>（默认 init 需要一个 LLM key 写 prose；结构层永远不需要）</div></div>
+    <div class="next-item"><div class="next-num">3</div><div>装 Claude Code 插件可获得 6 个自动激活 skills + 18 个 slash commands + hook 上下文注入；装不上就跑 <code>repowise doctor</code></div></div>
+  </div>
+
+  <!-- 06 判断 -->
+  <div class="sec-block">
+    <div class="sec-title"><span class="no">06</span> 评测判断</div>
+    <div class="judgment-box">
+      <div class="jb-row"><span class="jb-lbl">Overall</span><span class="jb-val">推荐 ★★★★☆（大型仓库 / 多 Agent 团队）</span></div>
+      <div class="jb-row"><span class="jb-lbl">证据质量</span><span class="jb-val">罕见地公开方法+样本+输掉的行</span></div>
+      <div class="jb-row"><span class="jb-lbl">隐私</span><span class="jb-val">本地索引 · 无 API Key · AGPL-3.0</span></div>
+      <div class="jb-row"><span class="jb-lbl">代价</span><span class="jb-val neg">首索引最慢（366.8s @ django）；Claude 增益 15.9% 低于 Codex</span></div>
+      <div class="jb-row"><span class="jb-lbl">适用</span><span class="jb-val">大仓、多仓 workspace、高频 Agent 协作</span></div>
+      <div class="jb-row"><span class="jb-lbl">不适用</span><span class="jb-val neg">只要调用图（选 CodeGraph 更快）；小仓收益有限</span></div>
+    </div>
+    <p><strong>一句话：</strong>它解决的不是"Agent 不会写代码"，而是"Agent 每个任务都要重新交一遍学费"。43 问基准的可贵之处不在 31.6% 这个数字，而在方法全公开——包括自己输掉的那一行。</p>
+  </div>
+
+</div>
+
+<div class="source-bar">
+  <div class="sb-item">
+    <span class="sb-lbl">tweet</span>
+    <span class="sb-link">x.com/GitHub_Daily/status/2102337131532488908</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-lbl">repo</span>
+    <span class="sb-link">github.com/repowise-dev/repowise</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-lbl">docs</span>
+    <span class="sb-link">docs.repowise.dev</span>
+  </div>
+  <div class="sb-sep"></div>
+  <div class="sb-item">
+    <span class="sb-val">2026-09-23</span>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="footer-l">Generated by infocard-pub · sage-swiss-style</div>
+  <div class="footer-r">
+    <a href="https://repowise.dev">repowise.dev →</a>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
