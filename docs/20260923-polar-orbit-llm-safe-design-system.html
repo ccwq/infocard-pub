@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Polar Orbit：让 LLM 写不出偏离设计系统的代码</title>
+  <style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 60px}
+    .topbar{display:grid;grid-template-columns:1.28fr .72fr;border-bottom:3px solid var(--line);margin-bottom:14px;overflow:hidden}
+    .topbar-hero{padding:18px 18px 14px;background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);color:#fff}
+    .kicker{display:inline-block;border:2px solid #fff;padding:4px 8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px}
+    h1.demo-title{margin:10px 0 6px;font-size:clamp(20px,3.2vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.05}
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+    .topbar-meta{padding:14px;border-left:3px solid var(--line);display:grid;grid-template-rows:auto auto;gap:0;align-content:start;background:#f6f1f1}
+    .meta-row-high{display:grid;grid-template-columns:1.4fr 1fr;gap:5px;padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:5px}
+    .meta-row-low{display:grid;grid-template-columns:1.2fr 1fr 0.8fr;gap:5px}
+    .meta-pill-lg{border:2px solid var(--line);padding:7px 9px 5px;background:#fff;font-weight:900;font-size:14px;line-height:1.1}
+    .meta-pill-lg .sub{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:2px}
+    .meta-pill-md{border:2px solid var(--line);border-left:4px solid var(--red);padding:4px 7px 3px;background:#fff;font-weight:800;font-size:11.5px;line-height:1.25}
+    .meta-pill-md .sub{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1px}
+    .meta-pill-sm{border:2px solid var(--line);border-left:4px solid #666;padding:3px 7px;background:#fff;font-weight:700;font-size:11px;color:#555;line-height:1.3}
+    .meta-pill-sm .sub{display:block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-top:1px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.68;color:#333}
+    .overview-body p{margin:0}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+    .pills{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:14px}
+    .pillrow{display:block}
+    .pill{display:inline-block;padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff;margin:2px 4px 2px 0}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{background:var(--ink);color:#fff;padding:7px 12px;display:grid;grid-template-columns:auto 1fr;justify-content:space-between;align-items:center}
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:10px 12px}
+    h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+    p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+    .grid-2,.grid-3{display:grid;gap:10px;margin-bottom:10px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+    .card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left;vertical-align:top}
+    th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    tr:nth-child(even) td{background:#faf8f4}
+    .codeblk{background:#0a0a0a;color:#d4d0c8;border:2px solid var(--line);padding:10px 12px;overflow-x:auto;margin-bottom:10px}
+    .codeblk .clabel{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#666;margin-bottom:6px}
+    .codeblk pre{margin:0;font-size:11.5px;line-height:1.7;white-space:pre-wrap}
+    .codeblk .cr{color:#c8102e}
+    .codeblk .cg{color:#8fbf7f}
+    .codeblk .cm{color:#666}
+    .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;margin-bottom:10px;box-shadow:var(--shadow)}
+    .flow-item{border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .flow-arrow{text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg);padding:0 4px}
+    .quote{border:2px solid var(--line);border-left:6px solid var(--red);background:#fff;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+    .quote p{font-size:13px;font-weight:700;line-height:1.6;color:var(--ink);margin:0}
+    .quote .qsrc{display:block;margin-top:6px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888}
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+    .source-note a{color:var(--red);font-weight:700}
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 50px}
+      .grid-3,.grid-2{grid-template-columns:1fr}
+      .stats{grid-template-columns:1fr 1fr}
+      .stat:nth-child(2){border-right:none}
+      .stat:nth-child(1),.stat:nth-child(2){border-bottom:2px solid var(--line)}
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:0;border-top:3px solid var(--line)}
+      h1.demo-title{font-size:clamp(18px,6vw,28px)}
+      .flow{grid-template-columns:1fr}
+      .flow-arrow{padding:2px 0}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <header class="topbar">
+    <div class="topbar-hero">
+      <span class="kicker">LLM × Design System · Polar Blog 全文拆解</span>
+      <h1 class="demo-title">Orbit：让 LLM<br>写不出跑偏的 UI</h1>
+      <p class="sub-line">Polar 的答案不是更好的 Prompt，而是类型系统 + CI 契约——把"希望它遵守"变成"无法不遵守"</p>
+      <span class="tagline">Building an LLM safe design system</span>
+    </div>
+    <div class="topbar-meta">
+      <div class="meta-row-high">
+        <div class="meta-pill-lg">StyleX + Box<span class="sub">技术栈</span></div>
+        <div class="meta-pill-lg">Oxlint<span class="sub">CI 强制</span></div>
+      </div>
+      <div class="meta-row-low">
+        <div class="meta-pill-md">禁 &lt;div&gt;<span class="sub">raw HTML 布局</span></div>
+        <div class="meta-pill-md">light-dark()<span class="sub">零 dark: 变体</span></div>
+        <div class="meta-pill-sm">早期<span class="sub">阶段</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="overview">
+    <div class="overview-sentence">核心论点：文档里的规范只是概率，CI 里的规则才是契约——设计系统应变成"代码中唯一能被表达出来的决策"。</div>
+    <div class="overview-body">
+      <p>2026-09-22，@ricouii 在 X 发布 Polar 博客《Building an LLM safe design system》中文全译。背景：Polar 大部分 UI 代码已有 LLM 参与，团队发现问题不是 LLM 不会写 CSS——而是它不知道样式背后的设计决策：p-4、bg-gray-100、dark: 变体、text-[#3b82f6] 全部合法可编译，却在几千次生成后累积成"大量略有差异的灰色"。Polar 正在构建的设计系统 Orbit 的对策：① Token 按设计意图（Intent）命名（background-card 而非色号）；② 用 Meta 的 StyleX 构建 &lt;Box /&gt; 原语，Props 类型只接受预定义 token；③ 禁止裸 &lt;div&gt;，用 Oxlint 规则 'polar/no-raw-html-layout' 强制；④ 颜色 token 用 CSS light-dark() 内置双值，dark: 变体从源头消失。效果：Code Review 从抓 Style Drift 转向讨论行为与布局。文章同时明确：不是批评 Tailwind——是人类还是 LLM 在写代码，决定了开放性是优势还是风险。</p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><strong>40 处</strong><span>六个月后无法分辨意图的 bg-gray-100</span></div>
+    <div class="stat"><strong>3 周</strong><span>Visual Regression 的典型发现延迟</span></div>
+    <div class="stat"><strong>0 个</strong><span>Orbit 组件里可写错的 dark: 变体</span></div>
+    <div class="stat"><strong>2 选 1</strong><span>漏网错误：写成规则，或接受结果</span></div>
+  </div>
+
+  <div class="pills">
+    <div class="pillrow">
+      <span class="pill red">String Surface 是风险根源</span>
+      <span class="pill dark">Intent Token</span>
+      <span class="pill soft">&lt;Box /&gt; 替代 &lt;div&gt;</span>
+      <span class="pill">CI 契约</span>
+      <span class="pill">light-dark()</span>
+      <span class="pill">Correct by Construction</span>
+    </div>
+  </div>
+
+  <!-- 01 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <span class="label">问题：LLM 的写法全都"合法"，但全都不属于你的系统</span>
+    </div>
+    <div class="sec-body">
+      <p>文章的起点是一个精确的观察：LLM 写 Card 时会自然产出 <code>p-4、rounded-lg、bg-gray-100、dark:bg-zinc-900、text-gray-500</code>——单独看每个值都合理，但"它们不一定属于你的设计系统"。即使 CLAUDE.md 里明确写过不要这么做，效果也不可靠。</p>
+      <table>
+        <tr><th>LLM 的写法</th><th>为什么"合法"</th><th>实际错在哪</th></tr>
+        <tr><td><code>p-4 / p-5 / p-[17px] / px-4 py-3</code></td><td>全部通过编译，代表不同间距</td><td>没有任何一个天然是你的间距标准</td></tr>
+        <tr><td><code>bg-gray-100 / bg-zinc-100 / bg-neutral-100</code></td><td>全部是合法的灰色</td><td>没有一个天然是项目标准色</td></tr>
+        <tr><td>漏写 <code>dark:</code> 变体</td><td>lint 和编译都不报错</td><td>Dark Mode 坏掉，渲染后才能发现</td></tr>
+        <tr><td><code>text-[#3b82f6]</code>（arbitrary value）</td><td>完全绕过调色板</td><td>off-system：脱离设计系统</td></tr>
+      </table>
+      <p>最麻烦的是：这些都不是语法错误——能过 lint、能编译、能渲染。传统静态分析很难发现"脱离设计系统"这类错误。而且为字符串写 lint rule 是场无休止的追逐：不断加规则、补 regex，总有漏网的特殊情况。LLM 还特别喜欢 escape hatch（裸 className / inline style），因为训练数据里到处都是这种写法。</p>
+    </div>
+  </div>
+
+  <!-- 02 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">02</span>
+      <span class="label">核心洞察：Class 是一个值，不是一个设计决策</span>
+    </div>
+    <div class="sec-body">
+      <p>文章先把 LLM 放到一边，指出一个更基础的问题：设计系统不是一堆数值的集合，而是一组设计决策——Card 用哪种 Surface、弱化信息用什么颜色、两个元素之间保持多大间距。<strong>具体数值只是决策产生的结果，不是决策本身。</strong></p>
+      <p><code>p-4</code> 只表达"这里有 16px 的 Padding"，完全没有告诉你为什么是 16px、哪些地方允许用、该和哪些组件保持一致。换成 CSS Variable 也一样：<code>--color-gray-100: #f3f4f6;</code> 只是把名字管理得更好，依然不包含"这个颜色用来做什么"。后果是：六个月后代码里有 40 处 <code>bg-gray-100</code>，你已经分不清哪些当初想表达"这是 Card 的背景"——要改 Card Background 只能全局搜颜色，而不是改一个明确的设计决策。</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">按数值命名（旧）</div>
+          <h4>bg-gray-100 / p-4</h4>
+          <p>LLM 面对的是货架上几百个看起来都合理的选项，要选对需要具备设计判断和"品味"。</p>
+        </div>
+        <div class="card" style="border-color:var(--red)">
+          <div class="lead">按意图命名（Orbit）</div>
+          <h4>background-card / padding="l"</h4>
+          <p>LLM 是在一组提前做好的设计决策中选择。m/l/xl 表示 Spacing Scale 中的角色，不是碰巧喜欢的几个像素值。</p>
+        </div>
+      </div>
+      <div class="quote">
+        <p>"我们不是要求 LLM 自己拥有设计品味。我们只是要求它正确说出：它现在正在构建什么。"</p>
+        <span class="qsrc">Polar · Building an LLM safe design system</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">03</span>
+      <span class="label">文档只是建议，CI 才是契约</span>
+    </div>
+    <div class="sec-body">
+      <p>最自然的第一反应是把规则写进 CLAUDE.md / Style Guide / System Prompt。文章的判断很直接：<strong>任何写在文档里的规范，本质上都只是一个概率，而不是保证。</strong>LLM 会把规范和 Context 里的其他信息一起权衡，"大多数情况下遵守"——但生成次数到几千次后，偶尔的遗漏不断累积，你还是要人工检查每一个 Diff。文章金句：</p>
+      <div class="quote">
+        <p>"Make it hard to express an off-brand decision in code in the first place. Ideally close to impossible."（让偏离品牌的决策在一开始就很难用代码表达，最好接近不可能。）</p>
+        <span class="qsrc">Polar Orbit 的设计原则</span>
+      </div>
+      <p>Polar 的落地方式是把规则写成 <strong>Oxlint Rule</strong>，得到一份确定性 Contract：PR 绿了就能安全合并。同时接受一个反向原则——如果错误设计通过了检查，<strong>那是规则有缺口，不是作者违规</strong>。只有两个选择：把它写成规则，或接受结果。不存在"但是 Guidelines 明明写了不要这样做"。这改变了"谁需要小心"：约束从"每个作者每次都要记住规范"转移到一个"不会被忘记、跳过、或被 Prompt 说服忽略"的检查机制。</p>
+      <div class="flow">
+        <div class="flow-item">LLM 随便写</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item red">CI 规则拦截</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-item">合入即安全</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="label">Orbit 实现：Token 成为唯一的设计词汇</span>
+    </div>
+    <div class="sec-body">
+      <p>Orbit 用 Meta 的编译时类型安全 Styling 库 <strong>StyleX</strong> 替代 Tailwind——但文章强调 StyleX 不是重点，只是手段。真正重要的是在其上构建统一原语 <code>&lt;Box /&gt;</code>：Props 类型直接来自 Token Definitions（API 受 Shopify Restyle 启发）。<code>padding</code> 不能接收 <code>16px</code>，只能从预定义尺寸中选；<code>backgroundColor</code> 不能接 hex，只能用定义过的颜色名。</p>
+      <div class="codeblk">
+        <div class="clabel">// Orbit 写法：每个值都来自已定义的设计决策</div>
+        <pre>&lt;Box
+  backgroundColor=<span class="cr">"background-card"</span>
+  padding=<span class="cr">"l"</span>
+  borderRadius=<span class="cr">"m"</span>
+&gt;
+  {children}
+&lt;/Box&gt;
+
+<span class="cm">/* Token 定义（Intent 命名 + light-dark 双值） */</span>
+background-card: light-dark(
+  hsl(233, 4%, 81%),
+  hsl(233, 4%, 3.5%)
+)</pre>
+      </div>
+      <p>效果：LLM 生成 Orbit 代码时面对的不再是整个 CSS 世界，而是一个小菜单——Autocomplete 直接告诉它哪些 token 可用；名字写错是 <strong>Type Error</strong>，而不是三周后才被偶然发现的 Visual Regression。</p>
+    </div>
+  </div>
+
+  <!-- 05 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">05</span>
+      <span class="label">最激进的一步：禁止直接使用 &lt;div&gt;</span>
+    </div>
+    <div class="sec-body">
+      <p>这是全文讨论最多、也是团队"越来越确信应该坚持"的决定：即使 &lt;Box /&gt; 的 Props 再严格，只要旁边还放着一个完全不受限的裸 &lt;div&gt;（可接任何 className、inline style、attribute），所有约束都形同虚设。<strong>只有不存在绕过 Token 的方式时，Token 的约束才真正成立。</strong>这一点对 LLM 比对人更重要：人类看一遍 Contribution Guide 就记住了，而 LLM 每次新 Prompt 都要重新认识整个代码库，且天然倾向阻力最小的路径——训练数据会不断把它拉回 <code>&lt;div className="..."&gt;</code>。想改变默认选择，可靠的方法不是劝，而是让原始 Element 不可用。</p>
+      <p>Semantic HTML 怎么办？文章的答案：Box 是 Polymorphic 的，被禁的元素都能通过 <code>as</code> Prop 渲染——最终 DOM 里依然是真正的 <code>&lt;nav&gt;</code>、<code>&lt;ul&gt;</code>，DOM Props 依然有类型并向下传递。<strong>拿掉的不是 HTML 语义，是那个完全开放的 String Surface。</strong>as 是封闭的 Allowed Elements 集合；直接写 &lt;nav&gt; 则重新打开一扇不受约束的门。执行靠 Oxlint：</p>
+      <div class="codeblk">
+        <div class="clabel">// oxlint 配置 + 违规报错原文</div>
+        <pre><span class="cr">'polar/no-raw-html-layout'</span>: <span class="cg">'error'</span>
+
+<span class="cm">// 直接使用 &lt;div /&gt; 时：</span>
+Use &lt;Box /&gt; from @polar-sh/orbit instead of &lt;div /&gt;.
+This ensures we follow the Orbit design system.</pre>
+      </div>
+      <div class="quote">
+        <p>"真正能够穿过 LLM 每一次全新 Context Window、依然稳定生效的指令只有一种：让错误的写法直接无法通过编译。"</p>
+        <span class="qsrc">Polar</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">06</span>
+      <span class="label">不可能被忘记的 Dark Mode</span>
+    </div>
+    <div class="sec-body">
+      <p>每个颜色 Token 内置 Light / Dark 两个值（见 04 节代码），由浏览器原生 CSS <code>light-dark()</code> 函数决定当前用哪个。这意味着：<strong>根本不存在需要 LLM 记住的 dark: 变体，也不存在第二遍 Dark Mode Styling。</strong>写一次 <code>backgroundColor="background-card"</code>，两个主题自动解析。LLM 没有机会生成"Light Mode 正常、Dark Mode 全坏"的组件——因为那类 bug 在代码层面<strong>无法被表达出来</strong>。文章称之为最常见的一类 Theme Bug 被"从代码层面根本无法被表达出来"消灭。</p>
+    </div>
+  </div>
+
+  <!-- 07 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">07</span>
+      <span class="label">已观察到的变化与诚实边界</span>
+    </div>
+    <div class="sec-body">
+      <div class="grid-3">
+        <div class="card">
+          <div class="lead">Code Review 转向</div>
+          <h4>不再抓 Style Drift</h4>
+          <p>过去审生成 UI 要找错误灰色、错误间距、漏掉的 dark:、arbitrary value；现在讨论转向行为与布局等真问题。</p>
+        </div>
+        <div class="card">
+          <div class="lead">正确性来源</div>
+          <h4>Correct by Construction</h4>
+          <p>开发者不需要熟悉整套 Design System——正确性从代码结构上保证，而不是靠人记住规范。</p>
+        </div>
+        <div class="card">
+          <div class="lead">渐进迁移</div>
+          <h4>不做大规模 Rewrite</h4>
+          <p>App 大部分仍是 Legacy Tailwind；每次改文件时顺带一个文件一个文件迁移。</p>
+        </div>
+      </div>
+      <p>文章同时保持诚实：Orbit 还在早期，判断可能被推翻。已知问题：<strong>封闭 Token Set 对某些实际 UI 还太小</strong>——几乎每周都在加新 token，同时观察"约束成本什么时候大于节省的成本"；每允许一个 escape hatch 都是在保证体系上开一条裂缝，所以持续审查所有 <code>oxlint-disable</code>——例外变多会被视为<strong>设计系统自身的 Bug</strong>，而不是开发者违规。</p>
+      <div class="quote">
+        <p>"过去，设计系统是一组你希望大家遵守的设计决策。但当大部分代码开始由 LLM 编写之后，'希望它遵守'已经不能算是一种策略。设计系统需要变成：一组在代码中唯一能够被表达出来的设计决策。"</p>
+        <span class="qsrc">Polar Orbit 押注的方向</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 08 -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="num">08</span>
+      <span class="label">读法：与 DESIGN.md 路线互补，不是对立</span>
+    </div>
+    <div class="sec-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="lead">文档层 · 上一张卡：Refero Styles</div>
+          <h4>DESIGN.md：给 Agent 一份规范去读</h4>
+          <p>零成本起步，适合任何能读文件的 Agent。约束方式是上下文——文档是概率，大多数时候遵守。适合独立开发者、Vibe Coding、没有 CI 体系的项目。</p>
+        </div>
+        <div class="card" style="border-color:var(--red)">
+          <div class="lead">机制层 · 本卡：Polar Orbit</div>
+          <h4>Type + CI：让违规代码无法通过</h4>
+          <p>需要 StyleX/Oxlint 基建投入。约束方式是编译与 CI——保证而非概率。适合有工程团队、代码由 LLM 大量生成的生产代码库。</p>
+        </div>
+      </div>
+      <p>两条路线回应同一个问题（AI 生成的 UI 跑偏），处在约束强度的两端：DESIGN.md 改善<strong>第一稿</strong>的质量分布，Orbit 式机制保证<strong>合入线</strong>的确定性。Polar 自己也两者都用——他们有 CLAUDE.md，只是不再指望它兜底。对个人开发者的可操作建议：先用文档层约束拿到 80 分的初稿；如果项目开始规模化、多人或多 Agent 协作，把最重要的 5–8 条规范升级为 lint 规则进 CI。</p>
+    </div>
+  </div>
+
+  <div class="source-note">
+    来源：<a href="https://x.com/i/article/2102237779828895745">Polar《Building an LLM safe design system》原文</a> ·
+    <a href="https://x.com/ricouii/status/2102241395511836992">@ricouii 中文全译（X Article, 2026-09-22）</a> ·
+    本文所有引文与数据（40 处 / 3 周 / Oxlint 规则名 / light-dark token）均出自原文 ·
+    相关卡：<a href="./20260922-refero-styles-design-md.html">Refero Styles：2000+ AI 可读设计系统</a>
+  </div>
+
+</main>
+</body>
+</html>
