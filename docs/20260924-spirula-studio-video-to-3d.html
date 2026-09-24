@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spirula Studio：一段视频进去，一个 3D 模型出来</title>
+  <style>
+    :root{
+      --bg:#FFF5E6; --paper:#FBF1DA; --ink:#2D1B00; --ink-soft:#3a2a14; --muted:#7a6747;
+      --line:#2D1B00; --orange:#E65100; --orange-soft:#FFB066;
+      --blue-mid:#81D4FA; --blue-pale:#B3E5FC; --blue-deep:#1E5CB5; --note:#FFE9C9;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13.6px;line-height:1.7;text-rendering:optimizeLegibility}
+    a{color:inherit;text-decoration:none}
+    code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .page{width:min(1180px,calc(100% - 28px));margin:0 auto;padding:18px 0 70px;position:relative}
+
+    .pix{border:3px solid var(--line);box-shadow:4px 4px 0 0 var(--line);background:var(--paper)}
+    .topbar{display:flex;justify-content:space-between;gap:14px;align-items:center;font:800 12px/1.4 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-deep);padding:10px 14px;margin-bottom:16px}
+    .topbar .dots{display:inline-block;width:10px;height:10px;background:var(--orange);box-shadow:14px 0 0 var(--blue-deep),28px 0 0 var(--blue-mid);margin-right:34px;vertical-align:middle}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:20px;padding:24px;margin-bottom:18px;background:linear-gradient(180deg,#FFF8EA,#FBEFD2)}
+    .badge{display:inline-block;border:2px solid var(--ink);background:var(--orange);color:#fff;font:800 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;padding:6px 10px;text-transform:uppercase}
+    h1{font-size:clamp(28px,4.4vw,50px);font-weight:900;line-height:1.05;letter-spacing:-.02em;margin:12px 0 12px}
+    .hero-lead{font-size:14.6px;line-height:1.78;color:var(--ink-soft);max-width:640px;margin:0 0 14px}
+    .hero-lead b{color:var(--ink)}
+    .meta-pills{display:flex;flex-wrap:wrap;gap:8px;font:700 11.5px/1.4 ui-monospace,Menlo,monospace}
+    .meta-pills span{border:2px solid var(--ink);background:#fff;padding:4px 9px}
+    /* pipeline SVG panel */
+    .panel{padding:16px;display:flex;flex-direction:column;justify-content:center;background:#fff}
+    .panel-title{font:800 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--blue-deep);margin-bottom:10px}
+    svg{width:100%;height:auto;display:block}
+    .pnode rect{fill:#FBF1DA;stroke:#2D1B00;stroke-width:2.5}
+    .pnode.hot rect{fill:#FFB066}
+    .pnode.cool rect{fill:#B3E5FC}
+    .pnode text{font:700 12.5px ui-monospace,Menlo,monospace;fill:#2D1B00}
+    .pnode .sub{font:600 9.5px ui-monospace,Menlo,monospace;fill:#7a6747}
+    .pedge{stroke:#2D1B00;stroke-width:2;fill:none;marker-end:url(#arr)}
+    .plabel{font:700 9.5px ui-monospace,Menlo,monospace;fill:#1E5CB5}
+
+    h2.sec{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:900;letter-spacing:-.01em;margin:26px 0 12px}
+    h2.sec:before{content:"";width:14px;height:14px;background:var(--orange);box-shadow:3px 3px 0 var(--line);flex:none}
+    .lede-line{font-size:13.8px;color:var(--ink-soft);margin:0 0 14px;max-width:900px}
+    .lede-line b{color:var(--ink)}
+
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:8px}
+    .kcard{padding:16px 16px 14px}
+    .kcard .num{font:900 26px/1 Georgia,serif;color:var(--orange)}
+    .kcard h3{font-size:14.5px;font-weight:900;margin:6px 0 6px}
+    .kcard p{margin:0;font-size:12.3px;color:var(--ink-soft);line-height:1.65}
+    .kcard p code{font-size:11.5px;background:var(--blue-pale);padding:0 4px}
+
+    table{width:100%;border-collapse:collapse;background:#fff;font-size:12.6px;margin:4px 0 14px}
+    th,td{border:2px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top;line-height:1.55}
+    th{background:var(--blue-deep);color:#fff;font:800 11px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
+    tr:nth-child(even) td{background:#FFF8EA}
+    td b{color:var(--blue-deep)}
+    .win{color:#1B7A2F;font-weight:800}
+    .lose{color:#C62828;font-weight:800}
+    .tbl-note{font-size:11.8px;color:var(--muted);margin:-6px 0 14px}
+
+    .duo{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px}
+    .ncard{padding:16px}
+    .ncard h3{font-size:14.5px;font-weight:900;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+    .ncard h3 i{width:10px;height:10px;flex:none}
+    .ncard ul{margin:0;padding:0;list-style:none}
+    .ncard li{border-top:2px dashed rgba(45,27,0,.25);padding:7px 0;font-size:12.4px;line-height:1.6;color:var(--ink-soft)}
+    .ncard li b{color:var(--ink)}
+
+    .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:8px}
+    .stepc{padding:14px;text-align:left;position:relative}
+    .stepc .n{display:inline-block;width:26px;height:26px;line-height:24px;text-align:center;font:900 14px/24px ui-monospace,Menlo,monospace;color:#fff;background:var(--blue-deep);border:2px solid var(--line);margin-bottom:8px}
+    .stepc h3{font-size:13.5px;font-weight:900;margin:0 0 4px}
+    .stepc p{margin:0;font-size:11.9px;color:var(--ink-soft);line-height:1.6}
+
+    .callout{display:flex;gap:12px;padding:14px 16px;background:var(--note);margin:0 0 8px}
+    .callout .ico{font-size:18px;line-height:1.3}
+    .callout p{margin:0;font-size:12.6px;line-height:1.65;color:var(--ink-soft)}
+    .callout b{color:var(--ink)}
+
+    .footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 4px 0;color:var(--muted);font-size:11.8px}
+    .footer a{font-weight:700;color:var(--blue-deep);border-bottom:2px solid var(--blue-mid)}
+
+    @media(max-width:900px){
+      .hero{grid-template-columns:1fr}
+      .grid3{grid-template-columns:1fr}
+      .duo{grid-template-columns:1fr}
+      .steps{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:560px){
+      .steps{grid-template-columns:1fr}
+      th,td{padding:7px 8px;font-size:11.8px}
+      .topbar{font-size:10.5px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <div class="topbar pix">
+      <span><span class="dots"></span>Spirula Studio · 视频转 3D 流水线</span>
+      <span>数据核对 2026-09-24 · GPLv3 · 930★</span>
+    </div>
+
+    <section class="hero pix">
+      <div>
+        <span class="badge">3D Gaussian Splatting · One Binary</span>
+        <h1>一段视频丢进去，<br>出来就是一个能用的 3D 模型</h1>
+        <p class="hero-lead">Spirula Studio 把「拍摄 → 相机位姿 → 高斯泼溅训练 → 带贴图网格」整条流水线塞进<b>一个自包含可执行程序</b>：不装 Python/PyTorch，不单独装 COLMAP，Windows/Linux/macOS 三端，<b>NVIDIA、AMD、Intel、Apple Silicon</b> 显卡通吃。8 GB 显存可训练 <b>1000 万个 SH3 高斯点</b>，鱼眼、360°、等距柱状投影原生支持，无需去畸变。</p>
+        <div class="meta-pills">
+          <span>C++ / Vulkan</span><span>GPLv3</span><span>930★ · 70 forks</span><span>4,622 downloads</span><span>一人主导（896/908 commits）</span>
+        </div>
+      </div>
+      <div class="panel pix">
+        <div class="panel-title">Pipeline · video → splat → mesh</div>
+        <svg viewBox="0 0 460 300" role="img" aria-label="Spirula 流水线">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#2D1B00"/>
+            </marker>
+          </defs>
+          <g class="pnode hot">
+            <rect x="20" y="26" width="120" height="52"/>
+            <text x="32" y="48">视频 / 照片</text>
+            <text x="32" y="64" class="sub">鱼眼·360·等距柱状</text>
+          </g>
+          <path class="pedge" d="M140,52 L178,52"/>
+          <text x="146" y="44" class="plabel">内置SfM</text>
+          <g class="pnode cool">
+            <rect x="180" y="26" width="118" height="52"/>
+            <text x="192" y="48">相机位姿</text>
+            <text x="192" y="64" class="sub">免装COLMAP·LoMa可选</text>
+          </g>
+          <path class="pedge" d="M298,52 L336,52"/>
+          <text x="300" y="44" class="plabel">AI masking</text>
+          <g class="pnode">
+            <rect x="338" y="26" width="102" height="52"/>
+            <text x="350" y="48">抽帧+遮罩</text>
+            <text x="350" y="64" class="sub">SAM·GPU解码15x</text>
+          </g>
+          <path class="pedge" d="M389,78 L389,116"/>
+          <g class="pnode hot">
+            <rect x="110" y="118" width="240" height="62"/>
+            <text x="176" y="143">3DGS 训练（Vulkan）</text>
+            <text x="126" y="162" class="sub">MCMC/IGS+/MRNF 混合策略 · 量化训练 · 10M SH3 / 8GB</text>
+          </g>
+          <path class="pedge" d="M230,180 L230,218"/>
+          <text x="238" y="204" class="plabel">meshing</text>
+          <g class="pnode cool">
+            <rect x="110" y="220" width="240" height="52"/>
+            <text x="176" y="242">带贴图网格 / Web查看器</text>
+            <text x="126" y="259" class="sub">编辑·渲染导出（v2026.9.24 新增）</text>
+          </g>
+          <text x="20" y="292" class="plabel">PPISP + Bilateral grid：曝光/白平衡校正，无色偏·不发黑</text>
+        </svg>
+      </div>
+    </section>
+
+    <h2 class="sec">为什么它省事：传统 3DGS 三座大山，逐个拆</h2>
+    <p class="lede-line">做过三维高斯泼溅的都懂：环境是第一道墙。Spirula 的解法不是「打包得更优雅」，而是<b>把训练引擎整个用 Vulkan compute 重写</b>——底层是其作者一作、发表于 Eurographics 2026 的 <b>VkSplat</b> 论文，号称首个达到 SOTA 性能的全 Vulkan 3DGS 训练管线。</p>
+    <div class="grid3">
+      <div class="kcard pix">
+        <div class="num">0</div>
+        <h3>环境依赖清零</h3>
+        <p>传统流程：COLMAP 算位姿 + Python/PyTorch 环境 + CUDA 工具链，配一趟三小时起步。Spirula 解压即用：Windows 包 <code>33-39MB</code>，macOS DMG <code>45-55MB</code>，双击开 GUI；云端训练走 CLI（<code>spirula train</code> 自带 HTTP 查看器，SSH 端口转发即可盯进度）。</p>
+      </div>
+      <div class="kcard pix">
+        <div class="num">N/AMD/Intel/苹果</div>
+        <h3>显卡解锁</h3>
+        <p>CUDA 生态把 AMD/Intel/苹果用户挡在门外；Vulkan 后端全厂商通吃，macOS 经 MoltenVK 静态链接、零依赖运行。代价也有：论文实测同场景 RTX 3090 跑 575 秒、RX 7800 XT 跑 1201 秒——<b>AMD 慢约 2.1 倍</b>，最大瓶颈在主机→显卡的 loss 数据传输（24s vs 303s）。</p>
+      </div>
+      <div class="kcard pix">
+        <div class="num">10M</div>
+        <h3>8GB 显存训 1000 万 SH3 高斯点</h3>
+        <p>量化训练（quantized training）压显存：论文 Table 2，MCMC 配置下 VkSplat 每场景 <b>285 秒 / 0.93 GiB</b>，CUDA+PyTorch 基线 <b>995 秒 / 1.37 GiB</b>——快 3.3 倍、省 33% 显存，质量持平。鱼眼/360/等距柱状相机模型原生内置，素材不用先去畸变。</p>
+      </div>
+    </div>
+
+    <h2 class="sec">论文级 Hard Numbers</h2>
+    <table>
+      <tr><th style="width:34%">指标（每场景均值，7 场景）</th><th>GSplat CUDA+PyTorch 基线</th><th>VkSplat（Spirula 底层）</th><th>差距</th></tr>
+      <tr><td>默认配置 总时长 / 显存</td><td>1384 s / 4.56 GiB</td><td><b>412 s / 3.01 GiB</b></td><td><span class="win">3.4× 快 · 省 34%</span></td></tr>
+      <tr><td>MCMC 配置 总时长 / 显存</td><td>995 s / 1.37 GiB</td><td><b>285 s / 0.93 GiB</b></td><td><span class="win">3.5× 快 · 省 32%</span></td></tr>
+      <tr><td>Rasterization Bwd（最重一步）</td><td>246 s</td><td><b>120 s</b></td><td><span class="win">2.1× 快</span></td></tr>
+      <tr><td>Proj Bwd + Optim（融合后）</td><td>61+398 s</td><td><b>131 s</b></td><td><span class="win">3.5× 快</span></td></tr>
+      <tr><td>跨厂商实测（bicycle 场景，同质量指标）</td><td colspan="2">RTX 3090：575 s ｜ RX 7800 XT：1201 s</td><td><span class="lose">AMD 慢 2.1×</span></td></tr>
+      <tr><td>抽帧（GPU 解码 vs ffmpeg 外调）</td><td colspan="2">开启 <code>-DSS_ENABLE_PATENTED=ON</code> 约 <b>15× 快</b></td><td><span class="lose">AVC/HEVC 专利自担</span></td></tr>
+    </table>
+    <p class="tbl-note">来源：VkSplat 论文（arXiv 2605.00219，Eurographics 2026，RTX 3090 实测）； 论文作者 Jingxiang Chen 等（华为加拿大）即 Spirula 作者 Harry (J.X.) Chen——研究成果直接产品化。</p>
+
+    <h2 class="sec">迭代节奏与功能版图</h2>
+    <div class="duo">
+      <div class="ncard pix">
+        <h3><i style="background:var(--orange)"></i>9 月以来 6 个版本（一周一更）</h3>
+        <ul>
+          <li><b>v2026.9.24：</b>3DGS/稀疏重建/网格<b>编辑功能</b> + 图像视频渲染导出（最新）</li>
+          <li><b>v2026.9.13：</b>从视频/照片<b>遥测元数据恢复真实尺度与朝向</b>——治「重建结果过大过小或倾斜」的高频吐槽（EXIF GPS 版本 9.8 已上）</li>
+          <li><b>v2026.9.8：</b>SfM 接入 <b>LoMa</b> 特征匹配，专治困难数据集</li>
+          <li><b>v2026.8.14：</b>macOS/Apple Silicon 验证通过并上架 Release</li>
+          <li><b>v2026.8.8：</b>13 种语言界面：英/日/<b>简体中文</b>/<b>繁體中文</b>/韩/德/法/西/葡/意/荷/俄/土</li>
+          <li>更早（v2026.9.20）：自适应抽帧、360 相机 rig 约束、<b>从现有 3DGS PLY 热启动续训</b>、预设与批处理</li>
+        </ul>
+      </div>
+      <div class="ncard pix">
+        <h3><i style="background:var(--blue-deep)"></i>推文没讲的边界与坑</h3>
+        <ul>
+          <li><b>许可证三层：</b>本体 GPLv3；GPU 视频解码的 <code>PATENTED</code> 开关带 AVC/HEVC 专利风险（默认关）；AI 遮罩的 SAM 模型不打包——<b>SAM 2.1 是 Apache-2.0，SAM 3 是 Meta 自家非标准许可证</b>，GUI 首次使用时展示条款再下载</li>
+          <li><b>Defender 误报：</b>issue #92（09-22）报告 v2026.9.20 Windows 包被报 Trojan:Script/Wacatac.H!ml，作者定性误报、已提交微软申诉——下载时安全软件报警先别慌，也别无脑放行</li>
+          <li><b>单人项目：</b>10 位贡献者里作者 896/908 commits，README 自述「几乎一个人开发维护」；issue 回复可能慢但都会看</li>
+          <li><b>名字由来：</b>Spirula = 深海头足类「旋壳乌贼」，前身项目 spirulae-splat（2024-05 创建）</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 class="sec">四步上手</h2>
+    <div class="steps">
+      <div class="stepc pix"><span class="n">1</span><h3>下载解压</h3><p>GitHub Releases 选平台：Windows zip / macOS DMG / Ubuntu zip，双击开 GUI。</p></div>
+      <div class="stepc pix"><span class="n">2</span><h3>丢视频或照片</h3><p>鱼眼、360°、等距柱状直接喂；数据集创建模块自动抽帧 + AI 遮罩 + SfM 算位姿。</p></div>
+      <div class="stepc pix"><span class="n">3</span><h3>训练 & 监控</h3><p>8GB 显存可上 10M SH3；云 GPU 用 CLI，内置 HTTP 查看器 SSH 转发盯进度。</p></div>
+      <div class="stepc pix"><span class="n">4</span><h3>导出</h3><p>splat 可网页查看（Web Viewer）；v2026.9.24 起可编辑模型并导出图像/视频渲染与带贴图网格。</p></div>
+    </div>
+
+    <div class="callout pix">
+      <span class="ico">🗿</span>
+      <p><b>判断：</b>它把三维重建从「先配三小时环境」拉回「点开就能跑」，是 3DGS 民主化路线目前最完整的一个实现。期待值校准：质量属「消费级设备可达的上限」，不如专业摄影棚多机位采集；AMD 仍有约 2 倍速度税；单人项目，企业级 SLA 别想。适合：数字资产/文博留存/游戏素材原型/Vlog 空间片段。GitHub：<b>github.com/harry7557558/spirula-studio</b>（GPLv3，免费）。</p>
+    </div>
+
+    <footer class="footer">
+      <span>来源：GitHub API/README/Releases/issue#92 + VkSplat 论文（arXiv 2605.00219）· 推文 @Ryrenz（291 赞）· 核对 2026-09-24</span>
+      <span><a href="https://github.com/harry7557558/spirula-studio">GitHub →</a> <a href="https://harry7557558.github.io/spirula-studio/viewer/">Web Viewer →</a></span>
+    </footer>
+
+  </main>
+</body>
+</html>
