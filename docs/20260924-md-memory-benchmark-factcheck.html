@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>纯 Markdown 记忆库逆袭：Agent 记忆系统实测拆解</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f6f4ef;color:#111;font-size:13px}
+    .page{width:100%;max-width:720px;margin:0 auto;padding:0 0 80px}
+    header{background:#111;color:#fff;padding:10px 14px;border-bottom:3px solid #d80018}
+    .tag{display:inline-block;padding:2px 8px;border:1.5px solid #fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+    h1{font-size:18px;font-weight:700;margin:0;letter-spacing:-.02em;line-height:1.3}
+    .sub{font-size:12px;color:#ccc;margin-top:3px;line-height:1.5}
+    .blue-band{background:#1f63ff;color:#fff;padding:8px 14px;margin:12px 0 0;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+    .blue-band::before{content:'▶';font-size:10px}
+    section{padding:12px 14px 0}
+    h2{font-size:15px;font-weight:700;margin:0 0 8px;color:#111;border-bottom:2px solid #1f63ff;padding-bottom:5px}
+    p{font-size:13px;line-height:1.7;margin:0 0 10px;color:#333}
+    p code, td code, li code{font-family:ui-monospace,monospace;font-size:12px;background:#eef4ff;padding:1px 5px;border-radius:3px;color:#1a3fa8}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+    th,td{padding:6px 10px;border:1.5px solid #111;text-align:left;line-height:1.5}
+    th{background:#111;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    tr:nth-child(even) td{background:#eef4ff}
+    .check{color:#15803d;font-weight:900}
+    .cross{color:#c8102e;font-weight:900}
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+    .chip{padding:3px 9px;border:1.5px solid #111;font-size:11px;font-weight:700}
+    .chip.blue{border-color:#1f63ff;color:#1f63ff;background:#eef4ff}
+    .chip.red{border-color:#d80018;color:#d80018;background:#fde9eb}
+    .chip.green{border-color:#15803d;color:#15803d;background:#dcfce7}
+    .warn{border-left:4px solid #d80018;padding:10px 14px;background:#fde9eb;margin:0 0 12px;font-size:13px;line-height:1.65}
+    .warn strong{color:#d80018}
+    .ok{border-left:4px solid #15803d;padding:10px 14px;background:#dcfce7;margin:0 0 12px;font-size:13px;line-height:1.65}
+    .ok strong{color:#15803d}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+    .card{border:2px solid #111;padding:10px 12px;background:#fff}
+    .card .lead{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#1f63ff;margin-bottom:4px}
+    .card h4{font-size:13px;font-weight:700;margin:0 0 4px}
+    .card p{font-size:12px;line-height:1.6;margin:0;color:#444}
+    pre{background:#111;color:#e8e8e8;padding:10px 12px;border-radius:6px;font-size:11px;font-family:ui-monospace,monospace;overflow-x:auto;margin-bottom:12px;line-height:1.65}
+    pre .cm{color:#8a8a8a}
+    .src{border-top:2px solid #111;margin-top:4px;padding:10px 14px 0;font-size:11.5px;color:#666;line-height:1.9}
+    .src a{color:#1f63ff;font-weight:700}
+    @media(max-width:640px){
+      .grid2{grid-template-columns:1fr}
+      h1{font-size:16.5px}
+      th,td{padding:5px 7px}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="tag">Agent Memory · 事实核查</div>
+      <h1>实测 1800 个任务，最强记忆插件居然是纯 MD？</h1>
+      <div class="sub">一篇热传文章的核查结果：核心论点有硬证据，但关键数字未溯源——哪些可信、哪些存疑、怎么选型，一次说清</div>
+    </header>
+
+    <div class="blue-band">核查结论先行：论点成立，数字存疑，选型照做</div>
+
+    <section>
+      <div class="ok"><strong>✓ 可证实：</strong>"朴素文件方案打平甚至胜过专用记忆系统"有多个独立来源背书——Letta 官方实验：纯文件存储 + search_files 工具，在 LoCoMo 拿 <strong>74.0%</strong>，显著超过 Mem0 自报的图谱变体 68.5%；memento-memory 三方对比：<strong>Markdown 80.8% &gt; 向量库 79.8%</strong>（多会话与时间推理两项 md 全面占优）。</div>
+      <div class="warn"><strong>⚠ 未溯源：</strong>文章标题级数字——"1800+ 真实任务、12 个系统、纯 MD 与 Cognee 并列 97.1 分、响应快 5 倍、60% 翻车因过度切片、3 个系统要求遗忘后数据泄漏"——四轮检索（中英文 + GitHub + arXiv）<strong>均未找到原始基准出处</strong>。97.1 恰是 LongMemEval 单会话-user 类目的常见分数段，"1800"与 Mem0 论文的 tokens/对话数撞车，疑似转述时数字混装。引用前请当"未核实转述"处理。</div>
+    </section>
+
+    <section>
+      <h2>01 / 各家成绩单（真实可查部分）</h2>
+      <table>
+        <tr><th>方案</th><th>成绩</th><th>出处与口径</th></tr>
+        <tr><td>Letta 纯文件存储</td><td class="check">LoCoMo 74.0%</td><td>Letta 官方博客 2025-08，gpt-4o-mini，只加 search_files/answer_question 两个工具</td></tr>
+        <tr><td>Mem0 图谱变体</td><td>LoCoMo 68.5%</td><td>Mem0 自报（同年 4 月口径 68.44%）</td></tr>
+        <tr><td>Full-context 全量塞</td><td class="check">LoCoMo 72.9%</td><td>Mem0 自家表格——<strong>无工具基线在自家论文里赢了所有工具</strong>，代价是 26,031 tokens / p95 17.1s</td></tr>
+        <tr><td>Markdown 提取式</td><td>LongMemEval 80.8%</td><td>memento-memory 开源基准：md 80.8% vs 向量 79.8% vs 图谱 90.8%</td></tr>
+        <tr><td>Cognee 图谱</td><td>BEAM 100K 0.79</td><td>Cognee 官方自测，README 注明"方向性信号"非定论</td></tr>
+        <tr><td>Mem0 新算法</td><td>LoCoMo 91.6 / LME 93.4</td><td>2026-04 自报，托管平台口径，开源 SDK 未复现</td></tr>
+      </table>
+      <p><strong>读表须知：</strong>上表每一行的评测方、模型、判分器都不同——LoCoMo 上 Zep 报 84% 后自己修正为 75.14%，Mem0 复测只得 58.44%。这就是记忆评测的现状：<strong>每个厂商都在自己调好的设置里赢</strong>。任何单一榜单都别当真。</p>
+    </section>
+
+    <section>
+      <h2>02 / "复杂工具反而翻车"的三个实锤机制</h2>
+      <div class="grid2">
+        <div class="card">
+          <div class="lead">机制一 · 过度切片</div>
+          <h4>写入时切碎，召回时失忆</h4>
+          <p>文章说"六成翻车源于过度切片"。可验证的对应事实：Mem0 写入按 LLM 抽取事实分片存储；MemoryAgentBench 论文实测 Cognee 在准确检索类目仅 22.8 分（满分 100），并专门设了 FactConsolidation 数据集测"选择性遗忘"。切片粒度确实是结构化系统的真实失败面。</p>
+        </div>
+        <div class="card">
+          <div class="lead">机制二 · 写入即滤除</div>
+          <h4>"关键名词当噪音"有同款案例</h4>
+          <p>Reddit 那位"排查大半天"的用户无法溯源，但机制成立：所有抽取式记忆（Mem0/LangMem）都要先过一道"什么值得记"的 LLM 判断——memento 实测显示 LLM 蒸馏偏向用户侧陈述，<strong>助理侧问题丢了约 60%</strong>（41.1%）。抽错在写入那一刻就发生了，日志里什么都没有。</p>
+        </div>
+      </div>
+      <div class="warn"><strong>机制三 · 遗忘即泄漏：</strong>文章称"3 个系统要求遗忘后数据泄漏"。直接证据未找到，但有旁证：MemoryAgentBench 的 SF（selective forgetting）类目里，Cognee 得分 <strong>2.3/100</strong>、MemGPT 也仅 3.0/100——"要求忘掉"和"真的删干净"在主流系统里几乎不成立。删不干净的普遍性，比"3 个系统"这个精确数字更值得警惕。</div>
+    </section>
+
+    <section>
+      <h2>03 / 纯 MD 为什么能打：四个工程理由</h2>
+      <table>
+        <tr><th>理由</th><th>机制</th><th>证据</th></tr>
+        <tr><td>零写入损耗</td><td>没有"什么值得记"的预判，原文全量保真，抽错的入口不存在</td><td>Letta 实验：不做任何抽取直接存文件</td></tr>
+        <tr><td>检索够用</td><td>现代模型 + BM25/grep 级检索，长上下文窗口内自读自答</td><td>Letta 74.0% 仅用 2 个工具；OpenDB FTS5 实测 7.5ms 中位延迟</td></tr>
+        <tr><td>人类可审计</td><td>记错了直接打开文件改，git diff 可追溯，错了能修</td><td>文章核心卖点，与 CLAUDE.md/AGENTS.md 实践完全同构</td></tr>
+        <tr><td>成本近零</td><td>无向量化 API、无图谱构建 LLM 调用、无数据库运维</td><td>对照：图谱系统每问约百次模型调用（第三方估测）</td></tr>
+      </table>
+      <p><strong>但纯 MD 有边界：</strong>memento 数据里它单会话-assistant 类目崩到 41.1%（蒸馏丢助理侧事实）；MemoryAgentBench 显示长史档（115K-1.44M tokens）下结构化方法在事实更新类占优（Zep substring-EM 44%）。<strong>语料小、单人用、可全量读 → 纯 MD；跨会话综合、事实频繁更新、多实体关系 → 该上结构</strong>。</p>
+    </section>
+
+    <section>
+      <h2>04 / 普通人落地：分类 MD 记忆库模板</h2>
+      <pre><span class="cm"># 目录结构（按用途分类，别按时间堆一坨）</span>
+memory/
+├── profile.md        <span class="cm"># 我是谁：身份/技术栈/长期偏好</span>
+├── preferences.md    <span class="cm"># 协作偏好：语言/详略/代码风格</span>
+├── projects/&lt;name&gt;.md <span class="cm"># 每项目一份：路径/约定/进行中事项</span>
+└── lessons.md        <span class="cm"># 踩坑教训：出错→根因→修法（一条一节）</span>
+
+<span class="cm"># 写入纪律（三条就够）</span>
+<span class="cm"># 1. 每条带日期前缀，方便过期判断：2026-09-24 | 内容</span>
+<span class="cm"># 2. 事实被推翻时改原文，不追加"更正"——记忆库不要新闻体</span>
+<span class="cm"># 3. 单文件超 ~200 行就拆分：全文截断是 md 方案的隐形成本</span>
+
+<span class="cm"># 让 Agent 用起来（CLAUDE.md / AGENTS.md 各加一句）</span>
+<span class="cm"># "回答前先读 memory/ 下相关文件；新稳定事实写入对应文件"</span></pre>
+      <div class="chips">
+        <span class="chip green">成本 ≈ 0</span>
+        <span class="chip green">git 全程可审计</span>
+        <span class="chip blue">与 Claude Code/AGENTS.md 生态同构</span>
+        <span class="chip red">超长语料请上结构化方案</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>05 / 判断</h2>
+      <p><strong>可信的部分：</strong>"先试纯 MD，不够再上专用系统"是被 Letta/memento/Mem0 三方数据共同支持的正确默认顺序；"复杂系统有写入静默失败面"有论文级证据。</p>
+      <p><strong>别信的部分：</strong>97.1 并列最高分、快 5 倍、60% 翻车率、3 系统泄漏——这些精确小数在传播链里找不到母本，且与已知基准数字高度相似（97.1≈LongMemEval 单会话类目、1800≈Mem0 tokens/对话），<strong>大概率是"真数字张冠李戴"的二次加工</strong>。看见此类"实测 N 个任务"的转述文，先找 benchmark 仓库或论文原文，找不到就按传闻处理。</p>
+    </section>
+
+    <div class="src">
+      核查来源：<a href="https://www.letta.com/blog/benchmarking-ai-agent-memory/">Letta 官方博客（74.0% 文件方案）</a> ·
+      <a href="https://github.com/shane-farkas/memento-memory">memento-memory（md 80.8% vs 向量 79.8%）</a> ·
+      <a href="https://arxiv.org/html/2507.05257v3">MemoryAgentBench 论文（Cognee SF 2.3 分等）</a> ·
+      <a href="https://datapace.ai/blog/ai-agent-memory-tools-2026">Datapace 五系统横评（含 Mem0/Zep 口径冲突记录）</a> ·
+      <a href="https://github.com/mem0ai/mem0">Mem0 README（full-context 72.9% 自证）</a> ·
+      <a href="https://www.cognee.ai/">Cognee（BEAM 0.79 自报）</a> · 均于 2026-09-24 抓取；"1800 任务/97.1 分"未找到原始出处，已在文中标注
+    </div>
+  </div>
+</body>
+</html>
