@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>docx-editor — 纯浏览器 DOCX 编辑器</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f6f4ef;color:#111;font-size:13px;line-height:1.55}
+    .page{width:100%;max-width:720px;margin:0 auto;padding:0 0 80px}
+
+    /* 顶部黑栏 */
+    header{background:#111;color:#fff;padding:10px 14px;border-bottom:3px solid #1f63ff}
+    .tag{display:inline-block;padding:2px 8px;border:1.5px solid #1f63ff;font-size:10px;font-weight:700;color:#1f63ff;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+    h1{font-size:18px;font-weight:700;margin:0;letter-spacing:-.02em}
+    .sub{font-size:12px;color:#a8b7df;margin-top:3px}
+
+    /* 蓝色横条 */
+    .blue-band{background:#1f63ff;color:#fff;padding:8px 14px;margin:12px 0 0;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    /* 内容区 */
+    section{padding:12px 14px 0}
+    h2{font-size:15px;font-weight:700;margin:0 0 8px;color:#111;border-bottom:2px solid #1f63ff;padding-bottom:5px}
+    p{font-size:13px;line-height:1.7;margin:0 0 10px;color:#333}
+
+    /* 痛点表格 */
+    .pain-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;table-layout:fixed}
+    .pain-table th,.pain-table td{padding:6px 10px;border:1.5px solid #111;text-align:left;vertical-align:top}
+    .pain-table th{background:#111;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .pain-table td{color:#333}
+    tr:nth-child(even) td{background:#eef4ff}
+    .pain-table .arrow{color:#1f63ff;font-weight:900;font-size:14px;text-align:center;padding:6px 4px;word-break:normal}
+    .pain-table .sol{color:#15803d;font-weight:800;word-break:break-word;overflow-wrap:break-word}
+
+    /* 步骤流 */
+    .steps{margin-bottom:12px;overflow:hidden}
+    .steps-inner{display:table;width:100%;table-layout:fixed;border-collapse:collapse}
+    .step{display:table-cell;border:2px solid #1f63ff;padding:8px 4px 6px;text-align:center;position:relative}
+    .step-n{display:block;font-size:18px;font-weight:900;color:#1f63ff;line-height:1}
+    .step-label{display:block;font-size:10px;font-weight:700;color:#333;margin-top:3px}
+    .step.active{background:#1f63ff}
+    .step.active .step-n,.step.active .step-label{color:#fff}
+    .step-arrow{display:table-cell;width:18px;text-align:center;color:#1f63ff;font-size:14px;font-weight:900;vertical-align:middle}
+
+    /* 芯片 */
+    .chips{margin-bottom:10px}
+    .chips-inner{font-size:0}.chips-inner .chip{display:inline-block;margin:0 6px 6px 0}
+    .chip{padding:3px 9px;border:1.5px solid #111;font-size:11px;font-weight:700}
+    .chip.blue{border-color:#1f63ff;color:#1f63ff;background:#eef4ff}
+    .chip.green{border-color:#15803d;color:#15803d;background:#dcfce7}
+    .chip.red{border-color:#d80018;color:#d80018;background:#fde9eb}
+    .chip.yellow{border-color:#b45309;color:#b45309;background:#fef3c7}
+
+    /* 功能表格 */
+    .feat-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px;table-layout:fixed}
+    .feat-table th,.feat-table td{padding:5px 8px;border:1.5px solid #111;text-align:left;vertical-align:top}
+    .feat-table th{background:#111;color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .feat-table td{color:#333}
+    tr:nth-child(even) td{background:#eef4ff}
+    .check{color:#15803d;font-weight:900}
+    .cross{color:#c8102e;font-weight:900}
+
+    /* npm对照表 */
+    .npm-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px;table-layout:fixed}
+    .npm-table th,.npm-table td{padding:5px 8px;border:1.5px solid #111;text-align:left;vertical-align:top}
+    .npm-table th{background:#1f63ff;color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .npm-table td{color:#333}
+    tr:nth-child(even) td{background:#eef4ff}
+    code.pack{font-family:ui-monospace,monospace;font-size:11px;background:#eef4ff;padding:1px 4px;border-radius:3px;color:#1f63ff}
+
+    /* 警示框 */
+    .warn{border-left:4px solid #d80018;padding:10px 14px;background:#fde9eb;margin:0 0 12px;font-size:13px;line-height:1.65}
+    .warn strong{color:#d80018}
+    .note{border-left:4px solid #1f63ff;padding:10px 14px;background:#eef4ff;margin:0 0 12px;font-size:13px;line-height:1.65}
+    .note strong{color:#1f63ff}
+
+    /* 代码块 */
+    pre{background:#111;color:#e8e8e8;padding:10px 12px;border-radius:6px;font-size:11px;font-family:ui-monospace,monospace;overflow-x:auto;margin-bottom:12px;white-space:pre-wrap;word-break:break-all}
+    code{font-family:ui-monospace,monospace;font-size:12px;background:#eef4ff;padding:1px 5px;border-radius:3px}
+    pre code{background:none;padding:0;color:#e8e8e8;font-size:11px}
+
+    /* 适用/不适用 */
+    .boundary-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;table-layout:fixed}
+    .boundary-table th,.boundary-table td{padding:6px 10px;border:1.5px solid #111;text-align:left;vertical-align:top}
+    .boundary-table th{background:#111;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .boundary-table td{color:#333}
+    tr:nth-child(even) td{background:#eef4ff}
+    .ok{color:#15803d;font-weight:800}
+    .no{color:#c8102e;font-weight:800}
+
+    /* 链接按钮 */
+    .btns{margin-bottom:12px}
+    .btn{display:inline-block;padding:7px 14px;border:2px solid #1f63ff;background:#1f63ff;color:#fff;font-size:12px;font-weight:700;text-decoration:none;margin-right:8px;margin-bottom:6px}
+    .btn.outline{display:background:none;border-color:#1f63ff;background:transparent;color:#1f63ff}
+
+    /* 页脚 */
+    footer{margin:16px 14px 0;padding:10px 14px;background:#111;color:#a8b7df;font-size:11px;border-top:3px solid #1f63ff;text-align:center}
+    footer a{color:#1f63ff;font-weight:700}
+
+    /* 响应式 */
+    @media(max-width:480px){
+      body{font-size:12.5px}
+      .pain-table,.feat-table,.npm-table,.boundary-table{font-size:11px}
+      pre{font-size:10.5px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 顶栏 -->
+  <header>
+    <div class="tag">开源工具 · 浏览器运行</div>
+    <h1>docx-editor：纯浏览器 DOCX 编辑器</h1>
+    <div class="sub">零后端 · OOXML直读直写 · 排版不丢失 · Yjs实时协作 · AI Agent MCP</div>
+  </header>
+
+  <!-- 蓝色横条 -->
+  <div class="blue-band">作者用 Claude Code 几个晚上开发出商业级编辑器</div>
+
+  <section>
+    <!-- 项目定位 -->
+    <h2>是什么</h2>
+    <p>docx-editor 是纯浏览器运行的在线 DOCX 编辑器，不需要任何后端服务。直接操作 OOXML（DOCX 的底层格式），不走传统 DOCX→HTML→DOCX 转换路线，从根本上避免排版丢失。</p>
+    <p>作者是 <strong>Jedr Blaszyk</strong>（GitHub: eigenpal），他用 Claude Code 辅助，在几个晚上内完成了商业级质量的产品。</p>
+
+    <!-- 核心技术方案 -->
+    <h2>核心技术方案</h2>
+    <div class="chips">
+      <div class="chips-inner">
+        <span class="chip blue">OOXML 直读直写</span>
+        <span class="chip blue">Yjs 实时协作</span>
+        <span class="chip green">修订模式</span>
+        <span class="chip green">AI Agent MCP</span>
+        <span class="chip blue">插件系统</span>
+        <span class="chip blue">所见即所得</span>
+      </div>
+    </div>
+
+    <!-- 痛点表格 -->
+    <h2>痛点与解法</h2>
+    <table class="pain-table">
+      <tr><th style="width:30%">传统方案痛点</th><th style="width:10%"></th><th style="width:60%">docx-editor 解法</th></tr>
+      <tr>
+        <td>Word Online 需要微软账号和企业订阅</td>
+        <td class="arrow">→</td>
+        <td class="sol">纯浏览器打开即用，无需注册登录</td>
+      </tr>
+      <tr>
+        <td>DOCX&#8203;→&#8203;HTML&#8203;→&#8203;DOCX 转换排版丢失</td>
+        <td class="arrow">→</td>
+        <td class="sol">直接操作 OOXML 内部结构，保真还原</td>
+      </tr>
+      <tr>
+        <td>在线协作文档需要 Google Docs 账号</td>
+        <td class="arrow">→</td>
+        <td class="sol">内置 Yjs，支持多人实时协同编辑</td>
+      </tr>
+      <tr>
+        <td>文档审稿依赖人工比对修订</td>
+        <td class="arrow">→</td>
+        <td class="sol">修订模式 + AI Agent MCP 自动审稿</td>
+      </tr>
+    </table>
+
+    <!-- 步骤流 -->
+    <h2>上手流程</h2>
+    <div class="steps">
+      <div class="steps-inner">
+        <div class="step active"><div class="step-n">1</div><div class="step-label">打开Demo</div></div>
+        <div class="step-arrow">›</div>
+        <div class="step"><div class="step-n">2</div><div class="step-label">上传DOCX</div></div>
+        <div class="step-arrow">›</div>
+        <div class="step"><div class="step-n">3</div><div class="step-label">编辑/协作</div></div>
+        <div class="step-arrow">›</div>
+        <div class="step"><div class="step-n">4</div><div class="step-label">下载保存</div></div>
+      </div>
+    </div>
+
+    <!-- 功能速览 -->
+    <h2>功能速览</h2>
+    <table class="feat-table">
+      <tr><th>功能</th><th>支持</th><th>说明</th></tr>
+      <tr><td>纯浏览器运行</td><td class="check">✓</td><td>无需后端，无服务依赖</td></tr>
+      <tr><td>OOXML 直读直写</td><td class="check">✓</td><td>不走HTML中间层，排版保真</td></tr>
+      <tr><td>所见即所得编辑</td><td class="check">✓</td><td>在浏览器里还原 Word 体验</td></tr>
+      <tr><td>修订模式（Track Changes）</td><td class="check">✓</td><td>显示每处修改的作者和时间</td></tr>
+      <tr><td>Yjs 实时多人协作</td><td class="check">✓</td><td>WebSocket 连接，多人同步编辑</td></tr>
+      <tr><td>AI Agent MCP 集成</td><td class="check">✓</td><td>AI 审稿、建议、批量修改</td></tr>
+      <tr><td>插件系统</td><td class="check">✓</td><td>可扩展编辑器能力</td></tr>
+      <tr><td>多语言界面</td><td class="check">✓</td><td>zh-CN / en / de / fr / he / pl / pt / tr</td></tr>
+      <tr><td>复杂表格编辑</td><td class="cross">✗</td><td>嵌套复杂表格支持不完美</td></tr>
+      <tr><td>图片嵌套编辑</td><td class="cross">✗</td><td>图片处理能力有限</td></tr>
+      <tr><td>脚注 / 尾注编辑</td><td class="cross">✗</td><td>不支持脚注尾注的精确编辑</td></tr>
+    </table>
+
+    <!-- npm 安装包 -->
+    <h2>npm 安装包</h2>
+    <table class="npm-table">
+      <tr><th>框架</th><th>包名</th><th>说明</th></tr>
+      <tr>
+        <td>React</td>
+        <td><code class="pack">@eigenpal/docx-editor-react</code></td>
+        <td>React 组件封装，开箱即用</td>
+      </tr>
+      <tr>
+        <td>Vue</td>
+        <td><code class="pack">@eigenpal/docx-editor-vue</code></td>
+        <td>Vue 3 组件封装</td>
+      </tr>
+      <tr>
+        <td>Nuxt</td>
+        <td><code class="pack">@eigenpal/nuxt-docx-editor</code></td>
+        <td>Nuxt 模块，SSR 友好</td>
+      </tr>
+    </table>
+
+    <!-- 安装代码 -->
+    <h2>安装命令</h2>
+<pre><code># React 项目
+npm install @eigenpal/docx-editor-react
+
+# Vue 3 项目
+npm install @eigenpal/docx-editor-vue
+
+# Nuxt 项目
+npm install @eigenpal/nuxt-docx-editor
+
+# 直接打开在线 Demo（无需安装）
+# https://docx-editor.dev</code></pre>
+
+    <!-- AI Agent MCP 亮点 -->
+    <h2>AI Agent MCP 集成亮点</h2>
+    <div class="note">
+      <strong>MCP（Model Context Protocol）：</strong>docx-editor 通过 MCP 与 AI Agent 深度集成，可让 AI 直接读取、审校、建议修改文档内容，实现「AI 辅助写作 → 自动修订」的闭环。
+    </div>
+    <p>典型场景：法律/合同文档的 AI 审稿、标准化文书的 AI 批量润色、多人协作时的 AI 语法检查。MCP 让 AI 拥有对文档的「工具级」操作权限，不再只是生成文本。</p>
+
+    <!-- 适用边界 -->
+    <h2>适用场景</h2>
+    <table class="boundary-table">
+      <tr><th style="width:50%">适合</th><th style="width:50%">不适合</th></tr>
+      <tr>
+        <td><span class="ok">✓</span> 个人/小团队文档协作（无需 Google/微软账号）</td>
+        <td><span class="no">✗</span> 需要完整 Word 功能的企业级文档（复杂表格、脚注）</td>
+      </tr>
+      <tr>
+        <td><span class="ok">✓</span> 需要 AI 辅助审稿的法律/合同文档</td>
+        <td><span class="no">✗</span> 已有 Google Docs / Microsoft 365 工作流的企业</td>
+      </tr>
+      <tr>
+        <td><span class="ok">✓</span> 嵌入现有 React/Vue/Nuxt 应用内使用</td>
+        <td><span class="no">✗</span> 需要与 Outlook/SharePoint 深度集成的场景</td>
+      </tr>
+      <tr>
+        <td><span class="ok">✓</span> 注重隐私、不希望文档上传到云端的用户</td>
+        <td><span class="no">✗</span> 依赖 .doc 旧格式（仅支持 .docx）</td>
+      </tr>
+    </table>
+
+    <!-- 局限性与坑 -->
+    <h2>已知局限</h2>
+    <div class="warn">
+      <strong>⚠ 注意：</strong>复杂表格（合并单元格、嵌套表）、图片精确编辑、脚注/尾注的精细编辑目前支持不完美，使用前请在 Demo（<code>https://docx-editor.dev</code>）上实测你的文档类型。
+    </div>
+
+    <!-- GitHub 链接 -->
+    <h2>资源链接</h2>
+    <div class="btns">
+      <a class="btn" href="https://github.com/eigenpal/docx-editor" target="_blank">GitHub 仓库</a>
+      <a class="btn outline" href="https://docx-editor.dev" target="_blank">在线 Demo</a>
+      <a class="btn outline" href="https://github.com/eigenpal/docx-editor#readme" target="_blank">英文 README</a>
+    </div>
+
+    <!-- 本地开发 -->
+    <h2>本地开发</h2>
+<pre><code># 克隆仓库
+git clone https://github.com/eigenpal/docx-editor.git
+cd docx-editor
+
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 构建生产版本
+npm run build</code></pre>
+
+  </section>
+
+  <!-- 页脚 -->
+  <footer>
+    GitHub: <a href="https://github.com/eigenpal/docx-editor">eigenpal/docx-editor</a> · Demo: <a href="https://docx-editor.dev">docx-editor.dev</a>
+  </footer>
+
+</div>
+<script>
+(function(){
+  function send(){var h=document.body.scrollHeight;window.parent.postMessage({type:'theme-height',slug:'20260924-docx-editor',height:h},'*');}
+  if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+  setTimeout(send,500);
+})();
+</script>
+</body>
+</html>
