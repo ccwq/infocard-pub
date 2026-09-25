@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docker Sandbox Kit Spec v3：把"Agent 被允许做什么"变成可 diff 的 OCI 镜像</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f6f4ef;color:#111;font-size:13px}
+    .page{width:100%;max-width:720px;margin:0 auto;padding:0 0 80px}
+    header{background:#111;color:#fff;padding:10px 14px;border-bottom:3px solid #1f63ff}
+    .tag{display:inline-block;padding:2px 8px;border:1.5px solid #fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+    h1{font-size:18px;font-weight:700;margin:0;letter-spacing:-.02em;line-height:1.3}
+    .sub{font-size:12px;color:#ccc;margin-top:3px;line-height:1.5}
+    .blue-band{background:#1f63ff;color:#fff;padding:8px 14px;margin:12px 0 0;font-size:13px;font-weight:700}
+    .blue-band::before{content:'▶ ';font-size:10px}
+    section{padding:12px 14px 0}
+    h2{font-size:15px;font-weight:700;margin:0 0 8px;color:#111;border-bottom:2px solid #1f63ff;padding-bottom:5px}
+    h3{font-size:13.5px;font-weight:700;margin:14px 0 6px;color:#111}
+    h3::before{content:'§ ';color:#1f63ff}
+    p{font-size:13px;line-height:1.7;margin:0 0 10px;color:#333}
+    p code, td code, li code{font-family:ui-monospace,monospace;font-size:12px;background:#eef4ff;padding:1px 5px;border-radius:3px;color:#1a3fa8;overflow-wrap:anywhere;word-break:break-word}
+    blockquote{border-left:4px solid #1f63ff;margin:0 0 12px;padding:8px 14px;background:#eef4ff;font-size:12.5px;line-height:1.7;color:#1a3fa8}
+    blockquote em{color:#111}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+    th,td{padding:6px 10px;border:1.5px solid #111;text-align:left;line-height:1.5}
+    th{background:#111;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    tr:nth-child(even) td{background:#eef4ff}
+    td code{overflow-wrap:anywhere;word-break:break-word}
+    .check{color:#15803d;font-weight:900}
+    .mid{color:#b45309;font-weight:700}
+    pre{background:#111;color:#e8e8e8;padding:10px 12px;border-radius:6px;font-size:11px;font-family:ui-monospace,monospace;overflow-x:auto;margin-bottom:12px;line-height:1.65;white-space:pre}
+    pre .cm{color:#8a8a8a}
+    pre .kw{color:#7dd3fc}
+    ol.steps{margin:0 0 12px;padding-left:20px}
+    ol.steps li{font-size:12.5px;line-height:1.7;margin-bottom:6px;color:#333}
+    ol.steps li b{color:#111}
+    .warn{border-left:4px solid #d80018;padding:10px 14px;background:#fde9eb;margin:0 0 12px;font-size:13px;line-height:1.65}
+    .warn strong{color:#d80018}
+    .ok{border-left:4px solid #15803d;padding:10px 14px;background:#dcfce7;margin:0 0 12px;font-size:13px;line-height:1.65}
+    .ok strong{color:#15803d}
+    .info{border-left:4px solid #1f63ff;padding:10px 14px;background:#eef4ff;margin:0 0 12px;font-size:13px;line-height:1.65}
+    .info strong{color:#1f63ff}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+    .card{border:2px solid #111;padding:10px 12px;background:#fff}
+    .card .lead{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#1f63ff;margin-bottom:4px}
+    .card h4{font-size:13px;font-weight:700;margin:0 0 4px}
+    .card p{font-size:12px;line-height:1.6;margin:0;color:#444}
+    .chips{font-size:0;margin-bottom:10px}
+    .chip{display:inline-block;padding:3px 9px;border:1.5px solid #111;font-size:11px;font-weight:700;margin:0 6px 6px 0}
+    .chip.green{border-color:#15803d;color:#15803d;background:#dcfce7}
+    .chip.blue{border-color:#1f63ff;color:#1f63ff;background:#eef4ff}
+    .chip.red{border-color:#d80018;color:#d80018;background:#fde9eb}
+    .src{border-top:2px solid #111;margin-top:4px;padding:10px 14px 0;font-size:11.5px;color:#666;line-height:1.9}
+    .src a{color:#1f63ff;font-weight:700}
+    @media(max-width:640px){
+      .grid2{grid-template-columns:1fr}
+      h1{font-size:16.5px}
+      th,td{padding:5px 7px;font-size:11.5px}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="tag">Docker Sandbox Kit Spec v3 · 逐条核查 + 规范拆解</div>
+      <h1>Docker Sandbox Kit 规范 v3：把"Agent 被允许做什么"塞进一个可 diff 的 OCI 镜像</h1>
+      <div class="sub">推文方向全部属实；本卡进一步拆规范原文（53.7KB SPEC + 15 个 capability 页 + 两套 conformance 套件）与 gh/claude 官方示例——三个推文没讲的关键设计决定了它是真规范还是 YAML 装饰</div>
+    </header>
+
+    <div class="blue-band">核查先行：v3 规范/CNCF 中立治理/OCI 镜像打包全部属实（2026-09-24 官宣，Apache-2.0 开源）；细节修正——CNCF 目前是"带入治理"阶段，且 Kit 本身不授权：声明是请求，conforming runtime 才是执行者</div>
+
+    <section>
+      <h2>01 / 推文逐条核查</h2>
+      <table>
+        <tr><th style="width:42%">推文声称</th><th>核查结果</th></tr>
+        <tr><td>"Docker 发布 Sandbox Kit 规范 v3"</td><td class="check">属实</td><td><code>docker/sandbox-kit-spec</code>（Apache-2.0，2026-09-16 建仓），仓库自述逐字："Docker Sandbox Kit Specification v3 — the kit descriptor grammar, the OCI artifact, the build frontend, and the conformance suites"。规范文档 53.7KB、12 节、33 处 RFC 2119 MUST</td></tr>
+        <tr><td>"联合 Linux Foundation/CNCF 推为中立开放标准"</td><td class="mid">方向属实，注意时态</td><td>官宣原话是"bringing the spec to CNCF, under their neutral governance"（带入 CNCF 治理），CNCF CTO Chris Aniszczyk 公开背书；但这是 Docker 主导捐赠的开始阶段，与当年 OCI 正式成立尚有流程距离</td></tr>
+        <tr><td>"网络规则、凭据、卷、工具、指令打包成普通 OCI 镜像"</td><td class="check">属实</td><td>实测规范仓库 <b>15 个 capability 类型页</b>：network-policy(@1+@2)、credential、volume、port、privileged、resources、usb-device、lifecycle、agent-context、agent-sessions、agent-skills、kit-registry、long-running、sbx；声明放在 manifest annotation <code>vnd.docker.sandbox.kit.descriptor</code>，无自定义 mediaType，普通 <code>docker buildx build</code>/<code>docker pull</code>/扫描/签名工具全兼容</td></tr>
+        <tr><td>"可版本化、可审查、可复现、可跨运行时移植"</td><td class="check">属实且是点题</td><td>规范作者 Christian Dupuis 的总结句："Dockerfiles made software reproducible. <b>Kits make authority reproducible.</b>" 两套 conformance 套件分别判定"这是否合法 Kit"与"runtime 是否按规范行为"，runtime 以适配器可执行文件受测（"可以是 shell 脚本"）</td></tr>
+      </table>
+      <p><strong>推文没讲的背景：</strong>Kits 不是新概念——v1/v2 早已是 Docker Sandboxes 的打包格式；v3 的变化恰恰是"产物变了"：从自有格式变成普通 OCI 镜像。发布场合是 WeAreDevelopers 大会主题演讲，同日还发布了 Docker Cloud Sandboxes（同一套 Kit 跑在弹性云容量上）。合作方名单：AWS、Box、Datadog、Dynatrace、JFrog、NanoClaw、OpenClaw、Palo Alto Networks、Snyk。</p>
+    </section>
+
+    <section>
+      <h2>02 / 关键设计一：Kit 不授权，只"请求"</h2>
+      <p>这是整份规范最容易被误读的地方。官方示例 <code>gh</code> Kit（GitHub CLI mixin）的声明：</p>
+      <pre><span class="cm"># com.docker.sandbox/network-policy@2（节选）</span>
+runtime:
+  allow:
+    - github.com
+    - hosts: [api.github.com]
+      methods: [GET, HEAD, POST, PATCH, PUT, DELETE]
+  deny:
+    - hosts: [api.github.com]
+      methods: [DELETE]
+      paths: [/repos/**]
+<span class="cm"># com.docker.sandbox/credential@1（节选）</span>
+service: github
+proxyManaged: true
+inject: - {domain: api.github.com, header: Authorization, format: "Bearer %s"}</pre>
+      <p>规范作者的原话解读："把这份声明<b>读成一张许可申请</b>。这个 Kit 申请访问 GitHub 且仅 GitHub；API 大部分方法可用但 <code>/repos/**</code> 的 DELETE 被拒——<b>deny 优先</b>。能开 PR 的 token 删不了仓库。"两个关键词：<b>asks</b>（Kit 给自己授不了权，每条都是请求，宿主决定）与 <b>conforming</b>（实现规范行为的 runtime 会拦截清单外主机）。<b>没有 conforming runtime，annotation 是惰性的</b>——那只是一个带注释的镜像，没有任何强制力。</p>
+      <div class="info"><strong>credential 的工程细节：</strong>默认 <code>proxyManaged</code>——沙箱内部只有一个 sentinel 占位符，真实 token 由 runtime 在代理层注入到指定域名的请求头。Agent 进程从头到尾摸不到真凭据，泄露面从"整个文件系统"缩到"单域 HTTP 出口"。</div>
+    </section>
+
+    <section>
+      <h2>03 / 关键设计二：组合是函数，不是命令序列</h2>
+      <p>两种 Kit：<b>workload</b>（提供根文件系统，一次组合<b>恰好一个</b>）与 <b>mixin</b>（覆盖层，零或多个——一个带网络规则的 CLI、一个凭据绑定、一段 agent 上下文）。组合规则是硬性的：</p>
+      <table>
+        <tr><th style="width:30%">规则</th><th>行为</th></tr>
+        <tr><td>依赖解析</td><td>按 <code>provides</code>/<code>requires</code> 声明的依赖图排序，<b>不是你敲参数的顺序</b>；同一集合永远组成同一镜像</td></tr>
+        <tr><td>严格解析</td><td>每个 <code>requires</code> 必须由集合内部满足，<b>缺一个就整体失败</b>，不会悄悄去拉东西补洞</td></tr>
+        <tr><td>同名冲突</td><td>两个 Kit provide 同名能力 → <b>报错而非静默遮蔽</b>（官方点名经典错误：Claude workload 配 Claude mixin）</td></tr>
+        <tr><td>声明合并</td><td>网络规则取并集、hook 按依赖序执行、指引文档合一、许可证并集；<b>不兼容请求是错误，不是抛硬币</b></td></tr>
+        <tr><td><code>kind: set</code></td><td>描述符可以打包引用其他 Kit；发布时在<b>构建期</b>跑同一套一致性检查——不合法的集合在你自己的构建就失败，不是在别人的启动时</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>04 / 关键设计三：diff 就是审查，还有不靠人的第二道门</h2>
+      <p>因为声明在镜像里，<b>pin 住 digest 就同时 pin 住了内容与权限请求</b>。Claude Code Kit 升级时多要一个域名、第二个凭据——那不是"软件更新"，是<b>权限变更</b>，在 PR 里以新增行的形式出现，人可以拒绝。但规范没把宝押在"有人读 diff"上，它定义了第二道不依赖人的门：</p>
+      <ol class="steps">
+        <li><b>每个 descriptor 归约为一个规范化授权集合</b>（宿主必须授予的全部内容）。</li>
+        <li><b>runtime 记录当前版本的这个集合</b>，与下一版本对比。</li>
+        <li><b>集合内的版本变更静默应用</b>；任何扩权<b>暂停并询问</b>。</li>
+        <li><b>删 deny 规则也算扩权</b>：若新版 gh Kit 掉了 <code>DELETE /repos/**</code> 的拒绝项，runtime 扣住升级。</li>
+      </ol>
+      <blockquote>"这正是声明必须住在 artifact 里而不是旁边的理由。" —— SPEC 作者 Christian Dupuis</blockquote>
+    </section>
+
+    <section>
+      <h2>05 / 怎么上手：官方示例实测清单</h2>
+      <p>规范仓库 examples/ 目录实测 <b>28 个 Kit</b>：claude、codex、gemini、cursor、devin、opencode 六大 agent 及各自 mixin/ACP-set，加上 gh、wordpress、hello、shell、team 等。三条命令起步：</p>
+      <pre><span class="cm"># sbx 是沙箱 CLI</span>
+brew install docker/tap/sbx
+
+<span class="cm"># 从仓库 checkout 跑第一个 Kit（hello workload + gh mixin）</span>
+cd examples && sbx run ./hello --kit ./gh
+
+<span class="cm"># 编辑 descriptor 后只有该 Kit 重建；发布走普通 buildx</span>
+docker buildx build --push .</pre>
+      <p><strong>claude.yaml 值得当模板抄：</strong>args 版本号默认 2.1.282 且正则校验、<code>provides: ["claude@${{ kit.args.version }}"]</code>、network-policy 精确到六七个域名（api.anthropic.com:443 等）、credential 同时声明 apiKey 与 oauth（<b>由宿主凭据状态决定模式</b>，v3 默认反转为 required，除非显式 opt-out）。</p>
+      <div class="warn"><strong>两个冷静剂：</strong>① 目前只有 Docker Sandboxes 自己是 conforming runtime——生态承诺还处在"第一个实现"阶段，官方自己承认"它不应是唯一一个"；② Docker 捐 OCI 的历史剧本很动人，但"带到 CNCF"与"CNCF 正式接管"之间隔着 TOC 投票与孵化流程，把今天当成"已成中立标准"为时过早。</div>
+    </section>
+
+    <section>
+      <h2>06 / 判断</h2>
+      <p><strong>这是 Agent 基础设施里少见的"先想清楚授权语义再写 YAML"的规范：</strong>请求/执行分离（Kit asks, runtime enforces）、组合作为纯函数、授权 diff 化与二阶自动门禁，三层设计直接命中"Agent 权限散落在 shell history 和某人的记忆里"这个真实痛点。把能力清单装进普通 OCI 镜像借力现有供应链（扫描/签名/注册表零改造），是教科书级的生态打法——官方那句"MCP 给了 Agent 与工具对话的标准方式，Kits 给了生态发布整套安排的标准方式"定位准确。</p>
+      <p><strong>观察点：</strong>非 Docker runtime 何时通过 conformance 套件（Kubernetes 侧若有 runtime 接入才是标准成真的信号）、CNCF 治理流程走到哪一步、以及 15 个 capability 类型里 agent-sessions/agent-skills 这类尚新的类型会不会被社区挑战。给做 Agent 平台的团队：现在读 SPEC-v3 与两个官方博客，把现有 agent 的权限整理成 descriptor 草稿，成本一周以内；等生态投票后再迁移，代价会大得多。</p>
+      <div class="chips">
+        <span class="chip green">Apache-2.0 开源</span>
+        <span class="chip blue">15 capability 类型</span>
+        <span class="chip blue">两套 conformance 套件</span>
+        <span class="chip red">首个 runtime 仍是 Docker 自己</span>
+      </div>
+    </section>
+
+    <div class="src">
+      核查来源（2026-09-25 抓取）：<a href="https://github.com/docker/sandbox-kit-spec">docker/sandbox-kit-spec（Apache-2.0，281 文件）</a> ·
+      <a href="https://www.docker.com/blog/docker-sandbox-kit-spec-cncf/">Docker×CNCF 官宣（Eli Aleyner &amp; Srini Sekaran, 2026-09-24）</a> ·
+      <a href="https://www.docker.com/blog/docker-sandbox-kit-spec/">From Dockerfile to Kit（规范作者 Christian Dupuis：gh mixin 逐行解读 + 二阶门禁）</a> ·
+      <a href="https://raw.githubusercontent.com/docker/sandbox-kit-spec/main/docs/spec/SPEC-v3.md">SPEC-v3.md（53.7KB / 12 节 / 33 MUST）</a> ·
+      <a href="https://raw.githubusercontent.com/docker/sandbox-kit-spec/main/docs/spec/conformance.md">conformance.md（双套件 + 适配器协议）</a> ·
+      <a href="https://raw.githubusercontent.com/docker/sandbox-kit-spec/main/examples/claude/claude.yaml">examples/claude/claude.yaml（workload 模板）</a> ·
+      <a href="https://www.docker.com/press-release/cloud-sandboxes-extending-secure-ai-agent-isolation-beyond-the-laptop/">Cloud Sandboxes 新闻稿</a> · 推文 <a href="https://x.com/shao__meng/status/2103450618195288492">@shao__meng</a>（27 赞）
+    </div>
+  </div>
+</body>
+</html>
