@@ -47,7 +47,7 @@ ol.steps li{margin:5px 0}
 <div class="page">
   <div class="kicker">Infocard · Repo Fact-check · Agent Orchestration</div>
   <h1>Luvus 核查：AI Agent 的"超级 tmux"——299 个 Rust 文件的 mission control 成色如何</h1>
-  <p class="deck">@mylifcc 的比喻抓得准但只对了一半。Luvus（RizRiyz/luvus，878★ Apache-2.0，2026-06 建仓、push 到 09-26 当天）确实是纯 Rust——实测 299 个 .rs 文件 9.0MB 源码；但它比 tmux 多出来的不是"更顺手的分屏"，而是一整层 <b>agent 状态感知 + 编排 + UHP 1.0 自动化契约</b>。支持矩阵实测 22+ 个 coding agent，从 Claude Code/Codex/Grok 到 Kimi/Pi/Devin 全在册。</p>
+  <p class="deck">@mylifcc 的比喻抓得准但只对了一半。Luvus（RizRiyz/luvus，878★ Apache-2.0，2026-06 建仓、push 到 09-26 当天）确实是纯 Rust——实测 299 个 .rs 文件 9.0MB 源码；但它比 tmux 多出来的不是"更顺手的分屏"，而是一整层 <b>agent 状态感知 + 编排 + UHP 1.0 自动化契约</b>。支持矩阵实测 22+ 个 coding agent，从 Claude Code/Codex/Grok 到 Kimi/Pi/Devin 全在册。v2 扩充版：新增心智模型、五分钟教程、恢复/Fork、ORCH 编排、tmux 对比、场景方案、UHP 入门与一周路线，信息量 4.1 倍。</p>
 
   <div class="statstrip"><div class="row">
     <div class="stat"><b>878</b><span>GitHub 星（09-26 实测）</span></div>
@@ -90,14 +90,166 @@ ol.steps li{margin:5px 0}
   </ol>
   <p>连仓库自己的 <code>skills/</code> 目录都带 SKILL.md（luvus + luvus-module 两枚）——给 Agent 用的说明书由项目自己养，和 libraries.dev 是同一时代做法。</p>
 
-  <h2><span class="no">05</span>冷静面与判断</h2>
+  <h2><span class="no">05</span>五分钟心智模型：五个概念撑起全部</h2>
+  <p>官方 concepts 文档说"五个想法解释 Luvus 的一切"，照录并翻译：</p>
+  <div class="layer"><span class="tag">1</span><b>server 拥有会话，client 只是显示</b>——<code>luvus</code> 一敲发生两件事：后台 server（只起一次）拥有所有 pane/shell/agent，薄 client 附上去看。<code>Ctrl+Space d</code> 或关终端 → client 脱离、<b>会话活着</b>；再敲 <code>luvus</code> → 新 client 附回，什么都不重启。真正结束一切只有 <code>luvus server stop</code>（快照保留）。server 死了（重启/升级/被杀）会保存会话形状，下次启动重建：workspaces/tabs/布局/每 pane 的目录与最后屏幕，以及<b>能原生恢复的 agent 对话</b>——恢复的 pane 直接进入该 agent，不会在你面前重新打一遍提示词。</div>
+  <div class="layer"><span class="tag">2</span><b>Workspace → Tab → Pane 三层</b>——Session 含多个 workspace（一个项目文件夹一个，固定项目根、显示 git 分支）；tab 持有分屏布局（两个特殊 tab：git tab、orchestration board）；pane 是真终端。层级是"会话/项目/布局"，对应 tmux 的 session/window/pane 但语义按项目组织。</div>
+  <div class="layer"><span class="tag">3</span><b>prefix 键</b>——默认 <code>Ctrl+Space</code>，按下松开再按功能键；<code>Ctrl+Space ?</code> 列出全部；每个绑定可在 Settings → Keys 重映射，prefix 本身可换成 <code>Ctrl+b</code> 或直接套 <b>tmux preset</b>——tmux 老用户零迁移成本。两个刻意例外：全鼠标操作、<code>Shift+↑</code> 进滚动模式。</div>
+  <div class="layer"><span class="tag">4</span><b>Agent 是"被观察"不是"被包裹"</b>——Luvus 不注入自己进 agent；它们在普通 pane 里原样跑。检测读屏幕：这是哪个 agent、是否权限提示（<b>blocked</b>）、是否有输出流（<b>working</b>）、是否刚安静（<b>done</b>）。这就是任何 agent 零配置可用的原因，hook 只是加精度。</div>
+  <div class="layer"><span class="tag">5</span><b>一切皆命令</b>——UI 与 CLI 是同一表面：能点到的，<code>luvus &lt;verb&gt;</code> 都能通过本地 socket 做到；<b>每个 pane 内注入 <code>$LUVUS_PANE_ID</code> 和 socket 路径</b>，pane 里的 agent 自己也能驱动 Luvus——脚本化与编排是自然生长而非外挂。</div>
+
+  <h2><span class="no">06</span>第一个会话：官方五分钟教程照抄</h2>
+  <ol class="steps">
+    <li><b>在项目里启动</b>——<code>cd ~/code/my-project && luvus</code>。窗口三区：侧栏（workspaces + 实时 AGENTS 列表）、tab 栏、pane 区（shell 已在你的项目目录跑着）。以后在其他文件夹再敲 <code>luvus</code>，会把该文件夹<b>加为同一会话的另一个 workspace</b>——一个 Luvus 装下所有项目。</li>
+    <li><b>分屏跑 agent</b>——<code>Ctrl+Space v</code> 左右分（<code>s</code> 上下），一个 pane 里 <code>claude</code>（或 copilot/codex/opencode/aider…）。看侧栏 AGENTS 区：<span class="ok">🟠 working</span> 正在输出 / <span class="ok">🔴 blocked</span> 等你批权限 / <span class="ok">🟢 done</span> 你没看时跑完了 / idle 安静。点行跳转；Settings → General 选 Retro/Soft/Pulse 提示音并勾触发事件。</li>
+    <li><b>移动</b>——鼠标优先：点击聚焦、拖边缩放、滚轮翻历史；键盘镜像：<code>Ctrl+Space</code>+箭头/hjkl 聚焦、<code>c</code> 新 tab、<code>z</code> 放大、<code>?</code> 全表。滚动模式 <code>Shift+↑</code> 里 <code>1</code>–<code>9</code> 跳历史、<code>q</code> 回实时。</li>
+    <li><b>Detach：见证魔法</b>——<code>Ctrl+Space q</code>。client 退出，<b>什么都没停</b>：pane/shell/agent 在后台 server 里继续跑。合上终端去买杯咖啡，回来敲 <code>luvus</code>，一切原地等你。</li>
+    <li><b>挺过真重启</b>——连 server 停了（重启/<code>luvus server stop</code>）也不怕：会话快照持续保存，下次 <code>luvus</code> 恢复 workspaces/tabs/布局，并<b>通过各 agent 自己的原生会话存储恢复对话</b>——Claude Code pane 回来还是同一段 Claude Code 对话，不用记 <code>--resume</code>。注意：保存的终端画面是活屏幕的有界副本（同尺寸下宽字符/组合符/样式保留），它不是完整 scrollback 备份。</li>
+  </ol>
+
+  <h2><span class="no">07</span>会话恢复与 Fork：flagship 功能拆解</h2>
+  <p><b>各 agent 怎么恢复</b>（官方表）：Claude Code 读项目 transcript store、Copilot CLI 读 session-state store、Codex 读 rollout 文件、Antigravity 读 <code>~/.gemini/antigravity-cli/cache/last_conversations.json</code>、Kimi 读 <code>~/.kimi-code/session_index.jsonl</code>、Grok 读 <code>~/.grok/sessions</code>……有稳定原生存储的 agent 按 <b>pane 所在文件夹</b>自动发现、零配置；目录匹配不够的用集成提供精确归属，Luvus 代跑该 agent 自己的 resume 命令。</p>
+  <p><b>Fork to New Pane</b> 是多方案试验的杀手锏：把当前 pane 的 agent 会话<b>连同全部上下文</b>分支到旁边新 pane，但用新 session id——左右两份独立演化互不干扰。三个触发方式：右键 pane 选 Fork to New Pane；<code>Ctrl+Space f</code>；CLI <code>luvus agent fork &lt;target&gt; --name 别名 --no-focus</code>。典型用法：左边保留主线程继续跑，右边分叉试激进方案，试错零风险。</p>
+  <p><b>自定义识别</b>：agent 不在名册显示成 zsh？写 <code>~/.luvus/manifests/myagent.toml</code> 教它——agent 名、匹配特征、状态规则都 TOML 化；<code>generic</code> 规则对所有 agent 生效但 identity 必须具体到某个 agent。</p>
+
+<h2><span class="no">08</span>ORCH 编排六概念：多人协作的正确姿势</h2>
+  <p>这是"解决互相踩脚"的真正答案——官方 orchestration 指南的六个概念：</p>
+  <div class="tscroll"><table>
+    <tr><th>概念</th><th>定义（官方）</th></tr>
+    <tr><td><b>Task</b></td><td>工作单元：标题 + 将触碰的文件 glob + 依赖 + 可选 quality-gate 命令；分配 id 如 <code>t1</code></td></tr>
+    <tr><td><b>Automation</b></td><td>持久的一次性/周期定义；到期生成新 ORCH task 并启动配置的 agent——<b>未来任务到期前不占 pane/lease/worktree</b></td></tr>
+    <tr><td><b>Lease</b></td><td>文件路径预约。<b>两个 worker 不能持有重叠 glob</b>——冲突工作从一开始就分派不出去，而不是写完了才发现</td></tr>
+    <tr><td><b>Worker</b></td><td>任务专属 pane。worktree 模式用独立分支+checkout（默认）；workspace 模式在共享 checkout 里开独立任务 tab</td></tr>
+    <tr><td><b>Quality gate</b></td><td>任务标 done 时跑的命令（如 <code>cargo test</code>）；必须通过才能合并</td></tr>
+    <tr><td><b>Merge gate</b></td><td>把完成分支集成进 <code>luvus/integration</code>——在<b>专用 worktree</b> 里做，永不碰你的工作 checkout；冲突会阻塞任务而不是弄脏任何东西</td></tr>
+  </table></div>
+  <p>任务生命周期：<code>queued</code> → <code>claimed/running</code> → gate 通过后 <code>done</code>。CLI 全程可驱动（agent 也能）：<code>task create/inspect</code>、<code>task start</code>（worktree 默认）、<code>task stage</code>（不离开当前视线开 worker）、<code>task run --in-place</code>（直接在现有 checkout 跑，免分支合并）、<code>task merge</code>、<code>task retry</code>、lease 查询、IANA 时区定时、NDJSON 实时事件流。</p>
+  <div class="note"><b>安全模型三要点</b>：① 只有<b>arm 过的 automation</b> 才无人值守 spawn，手动任务必须按 <code>s</code> 或 <code>task start</code>；② <code>task retry</code> 归档有界尝试摘要、释放 lease、脱开旧 worker、排新尝试——<b>不关 pane 不删分支/worktree/输出/笔记</b>；依赖任务已开跑则拒绝 retry，merging/merged 不可变；③ automation 重试从原 run 捕获的契约新建 run，原记录保留。重试分支默认 <code>luvus/&lt;task-id&gt;-retry-&lt;attempt&gt;</code>。</div>
+
+  <h2><span class="no">09</span>Commander 与常用键：指挥台速查</h2>
+  <p><b>Commander</b>（<code>Ctrl+Space Enter</code>）是底部 composer：用 <code>@pID</code> 提及把 prompt 投给精确 agent pane、把命令投给精确 shell pane，多目标同发且不挪当前焦点。起草以 <code>/</code> 开头触发 Luvus 动作面板：边输边过滤、Tab 补全、Space 接受并进参数、Enter 执行——把"控制 Luvus"本身也变成对话动作。</p>
+  <div class="tscroll"><table>
+    <tr><th>键（prefix 后）</th><th>作用</th><th>键</th><th>作用</th></tr>
+    <tr><td><code>v / s / +</code></td><td>右分 / 下分 / 自动分屏</td><td><code>z</code></td><td>放大 pane</td></tr>
+    <tr><td><code>x</code></td><td>关 pane</td><td><code>N</code></td><td>新 workspace（选文件夹）</td></tr>
+    <tr><td><code>f</code></td><td><b>fork agent 会话</b></td><td><code>G</code></td><td>新 worktree</td></tr>
+    <tr><td><code>g</code></td><td>git tab</td><td><code>o</code></td><td>orchestration board</td></tr>
+    <tr><td><code>.</code> / <code>&gt;</code></td><td>下一个 blocked agent</td><td><code>m</code></td><td>Mission Control 面板</td></tr>
+    <tr><td><code>/</code></td><td>全局模糊查找</td><td><code>t</code></td><td>命名会话切换</td></tr>
+    <tr><td><code>[ / ]</code></td><td>焦点历史后退/前进</td><td><code>q / d</code></td><td>detach</td></tr>
+    <tr><td><code>1</code>–<code>9</code></td><td>跳 tab（Shift+数字=跳 workspace）</td><td><code>=</code></td><td>Settings</td></tr>
+  </table></div>
+  <p>prefix 冲突处置（FAQ）：macOS 系统占用 Ctrl+Space 做输入源切换——要么去 系统设置→键盘→快捷键→输入源 关掉 "Select the previous input source"，要么把 prefix 换成 <code>F12</code>/<code>Ctrl+b</code>（有 no-Ctrl F12 preset，避开输入法快捷键）。</p>
+
+  <h2><span class="no">10</span>排障速查：FAQ 高频五条</h2>
+  <div class="tscroll"><table>
+    <tr><th>症状</th><th>官方处置</th></tr>
+    <tr><td>Ctrl+Space 没反应（macOS）</td><td>系统输入源切换抢键——关掉该快捷键或换 prefix（Settings → Keys → Prefix）</td></tr>
+    <tr><td>升级后没变化</td><td>server 还在跑旧二进制——<code>luvus server status</code> 看提示，<code>luvus server restart</code> 换新（快照保真）</td></tr>
+    <tr><td>agent 显示成 zsh / 认不出</td><td>按进程名匹配名册；不认识就写 <code>~/.luvus/manifests/&lt;agent&gt;.toml</code> 教它</td></tr>
+    <tr><td>历史去哪了</td><td>每 pane 默认 10MiB 保留预算（Settings → Layout → Scrollback memory 可调）；vim/TUI 类全屏应用自管滚动，滚轮被转发给应用——用应用自身的翻页</td></tr>
+    <tr><td>彻底重置</td><td><code>luvus server stop && rm -rf ~/.luvus</code>（会话/配置/编排账本/模块全清）</td></tr>
+  </table></div>
+  <p><b>Windows 差异</b>：用 Windows Terminal；per-pane cwd 跟踪与 shell hook 不可用、不能查 pane 进程——改从命令名/窗口标题/屏幕文本识别 agent；<b>零配置 agent resume 仍可用</b>；named pipes 透明替代 Unix socket。另外窗口太小时提示 "◱ enlarge terminal"，放大窗口即可。</p>
+
+  <h2><span class="no">11</span>扩展生态与一周学习路线</h2>
+  <p><b>模块系统</b>：模块可提供 actions/events/settings/启动 hooks/panes/侧栏 dock/Luvus Bar 顶部或底部小部件——社区已有 omarchy-luvus（Omarchy 状态栏集成）、luvus-stackmon（资源监控）、media-playback-control（Now Playing+FFT 频谱）等实例；MODULE-GUIDE.md 是开发起点。</p>
+  <p><b>自带两枚 skill</b>：仓库 <code>skills/</code> 目录有 <code>luvus</code>（附 references/advanced-control、uhp-control 与 agents/openai.yaml）和 <code>luvus-module</code>（教 agent 写模块）——装上后你的 Claude Code/Codex 自己会开 workspace、发任务、查状态。</p>
+  <p><b>初学者一周路线</b>（按官方文档顺序）：</p>
+  <ol class="steps">
+    <li><b>Day 1</b>：装 → <code>luvus doctor</code> → 照第 06 节跑完五分钟教程；把 prefix 调顺（tmux 用户直接套 preset）。</li>
+    <li><b>Day 2</b>：多项目多 workspace 实践；AGENTS 侧栏状态语义用熟；配置提示音。</li>
+    <li><b>Day 3</b>：练 detach/reattach 与真重启恢复——故意 <code>luvus server stop</code> 再回来，亲眼看会话重建；试一次 <code>Ctrl+Space f</code> fork。</li>
+    <li><b>Day 4</b>：Commander 精确投递 + slash actions；git tab 看状态/分支/PR。</li>
+    <li><b>Day 5</b>：第一个 worktree（<code>G</code>）+ ORCH 面板开一个带 quality gate 的任务，观察 lease 如何挡住重叠 glob。</li>
+    <li><b>周末</b>：读 UHP getting-started，用 <code>luvus uhp schema/capabilities/snapshot</code> 自省，写第一个脚本化 harness；再玩 Luvus Web 手机配对（记得只在可信 TLS 隧道下开控制）。</li>
+  </ol>
+
+<h2><span class="no">12</span>与 tmux / zellij 的正面对比</h2>
+  <p>"超级 tmux"这个说法值得一张对照表——三者定位不同，迁移决策才不会错：</p>
+  <div class="tscroll"><table>
+    <tr><th>维度</th><th>tmux</th><th>zellij</th><th>Luvus</th></tr>
+    <tr><td>核心抽象</td><td>session/window/pane</td><td>session/tab/pane + 内置 UI</td><td>session/<b>workspace(项目)</b>/tab/pane + agent 实体</td></tr>
+    <tr><td>agent 感知</td><td>无（肉眼读屏幕）</td><td>无</td><td><b>一等公民</b>：blocked/working/done/idle+token+cost+context</td></tr>
+    <tr><td>会话恢复</td><td>仅进程存活期（resurrect 插件拼凑）</td><td>重启重建布局</td><td><b>原生恢复 agent 对话</b>（读各 agent 自己的存储）</td></tr>
+    <tr><td>自动化契约</td><td>命令行 + send-keys（文本级）</td><td>actions/插件（WASM）</td><td><b>UHP 1.0</b>：版本化方法注册表/schema/事件流/兼容承诺</td></tr>
+    <tr><td>编排</td><td>无</td><td>无</td><td>ORCH：task/lease/quality gate/merge gate/定时</td></tr>
+    <tr><td>配置成本</td><td>.tmux.conf 手写</td><td>开箱即用</td><td>开箱即用 + GUI 设置 + tmux preset 迁移</td></tr>
+    <tr><td>成熟度</td><td>二十年级</td><td>五年+，稳定</td><td><b>0.x 三个月</b>，快跑期</td></tr>
+    <tr><td>适合</td><td>纯终端工作流、无 agent</td><td>要现代 UI 的终端党</td><td><b>多 agent 重度用户</b>；纯 shell 用户可留 tmux</td></tr>
+  </table></div>
+  <p>一句话：tmux 是"终端复用器"，Luvus 是"agent 复用器"——如果你的窗口里跑的是 claude/codex 而不是 htop/vim，前者的抽象就不够用了；反过来只开两三个纯 shell，tmux 二十年的稳定无可替代。</p>
+
+  <h2><span class="no">13</span>安全模型深读：三个入口各自的边界</h2>
+  <div class="layer"><span class="tag">T</span><b>TUI/CLI（本机）</b>——控制走本地 socket 的 NDJSON；owner-only 权限。风险面最小，默认即可。</div>
+  <div class="layer"><span class="tag">W</span><b>Luvus Web（手机/平板）</b>——<code>luvus web</code> 起 loopback 桥：<b>默认只读</b>看实时终端与 agent 状态；<code>web --control</code> 才开控制。配对走链接/QR。官方明确：手机访问需要可信 TLS 隧道（如 Tailscale/自建反代），停桥即撤销授权且不影响 server/PTY。</div>
+  <div class="layer"><span class="tag">U</span><b>UHP access（程序化）</b>——<code>uhp access</code> 起临时 NDJSON 网关给第三方传输端：默认只读，控制显式、配对、scoped；有限期授权广告 <code>authority.expires_at</code>，<code>--no-expiry</code> 也仅进程绑定且广告 <code>expires_on_close:true</code>——两种模式关闭都即刻吊销。给自动化脚本权限时按"最小寿命"原则选 expires_at。</div>
+  <p>对照着看，"server 唯一写入者 + 可抛弃客户端"不只是架构洁癖——它是权限模型的根：所有控制面都是 server 的租户，租约到期即失效。</p>
+
+<h2><span class="no">14</span>五类真实场景的落地方案（照抄即用）</h2>
+  <p>把功能翻译成场景——每个方案只用官方文档出现过的机制：</p>
+  <ol class="steps">
+    <li><b>场景一：主项目 + 两个侧项目并行</b>——三个文件夹各敲一次 <code>luvus</code> 加为 workspace；<code>w/W</code> 或侧栏切换，<code>Shift+1..9</code> 跳转；每个 workspace 的 git 分支显示在标题，互不串台。比开三个终端窗口省掉的是"哪个窗口在哪个项目"的心智负担。</li>
+    <li><b>场景二：一个 repo 多 agent 分工</b>——ORCH 面板建任务（写清文件 glob）→ lease 自动防重叠 → worker 默认各占 worktree 分支 → quality gate（如 <code>cargo test</code>）把关 → merge gate 合入 <code>luvus/integration</code>。冲突在分派时被挡，不是合并时爆炸。</li>
+    <li><b>场景三：方案分叉对比</b>——agent 跑到一半想试另一种实现：<code>Ctrl+Space f</code> fork 出完整上下文的副本，左原始右实验；两边对话互不污染，看完关掉实验 pane 即可。</li>
+    <li><b>场景四：远程服务器上的项目</b>——<code>luvus --remote &lt;host&gt;</code> 直连或保存 machine profile；远程命名会话的 pane 在你切走后仍活着；SSH 连接与 Luvus Web 配对是两套独立通道。</li>
+    <li><b>场景五：手机盯盘</b>——桌面 <code>luvus web</code>，手机扫码/点链接：看实时终端、agent 状态与 session 标题；默认只读，要遥控才 <code>--control</code>。地铁上瞄一眼 🔴 blocked 列表，回家再批权限。</li>
+  </ol>
+  <div class="note"><b>性能预期</b>（AGENTS.md 有专节）：Rust 单二进制 + 快照差分渲染的设计目标是"薄客户端也流畅"；但 WebGL/巨型 scrollback 等 term 场景仍受终端引擎保守行数限制——scrollback 显示的用量是估算值。低配 VPS（1 核 1GB）建议先跑 <code>luvus doctor</code> 观察，再决定要不要常驻多会话。</div>
+
+  <h2><span class="no">15</span>信息溯源与本文的核查方法</h2>
+  <p>本卡 v2 扩充的信息来源与置信度分层：</p>
+  <div class="tscroll"><table>
+    <tr><th>层</th><th>来源</th><th>置信度</th></tr>
+    <tr><td>一手（本卡实测）</td><td>GitHub API 星数/发布、git tree 299 .rs 统计、crates.io API 占位版本、npm 无关（纯 Rust）</td><td><b>最高</b>，随时间变动已标注日期</td></tr>
+    <tr><td>官方文档</td><td>website/src/content/docs 43 篇中精读 8 篇（concepts/first-session/agents/orchestration/commander/keybindings/FAQ/installation）+ AGENTS.md 28KB + protocol/uhp/v1 + MODULE-GUIDE</td><td>高——官方承诺，但 0.x 期行为可能随版本变</td></tr>
+    <tr><td>官方描述性主张</td><td>README Features 17 条、性能预期、22+ agent 矩阵</td><td>中高——出自仓库但未逐项第三方复测</td></tr>
+    <tr><td>社区信号</td><td>omarchy-luvus/stackmon/media-control 等第三方模块存在性（GitHub 搜索）</td><td>存在性已证，质量未评</td></tr>
+  </table></div>
+  <p>方法与 DSPy/needl 等前卡一致：<b>推文主张 → 官方一手源逐条对账 → 口径修正显式标注</b>。所有引用文件路径（如 <code>website/src/content/docs/docs/guides/orchestration.mdx</code>）均可按 commit 在 GitHub 仓库复核。</p>
+
+<h2><span class="no">16</span>与现有工作流共存：迁移与并行策略</h2>
+  <p>已经有 tmux/脚本/CI 的团队不是二选一——官方设计留了共生位：</p>
+  <div class="tscroll"><table>
+    <tr><th>现有资产</th><th>共存策略</th></tr>
+    <tr><td>tmux 使用习惯</td><td>Settings → Keys 套 <b>tmux preset</b>（prefix 可设 Ctrl+b）；肌肉记忆零成本迁移；想回 tmux 时会话各自独立互不影响</td></tr>
+    <tr><td>现有 shell 脚本</td><td>CLI 是有界 JSON over 本地 socket——<code>luvus pane list</code>、<code>luvus agent send</code> 等可直接进 cron/CI 脚本；每 pane 注入 <code>$LUVUS_PANE_ID</code> 让老脚本感知自己被谁调</td></tr>
+    <tr><td>GitHub Actions 等 CI</td><td>CI 管"可重复的验证"，ORCH 管"需要 agent 判断的开发"——quality gate 里照样可以调同一套测试命令，两层不打架</td></tr>
+    <tr><td>既有 agent 会话</td><td>不迁移不清洗：Luvus 直接读各 agent 原生存储（Claude Code transcript、Codex rollout 文件等）做 resume——先在 Luvus 里恢复旧对话试试深度，再决定要不要常驻</td></tr>
+    <tr><td>多台机器</td><td>machine profile 保存 SSH 目标；本地/远程 workspace 同一 TUI 列出；<code>--remote</code> 直连——远程不需要装 Luvus Web，装 server 即可</td></tr>
+  </table></div>
+  <p><b>升级与回滚</b>：<code>luvus update</code> 检查并装新版；升级后旧 server 继续跑，<code>luvus server status</code> 会提示"有新二进制待 restart"——选会话时若目标还在跑旧版会安全重启后交接。回滚即装回旧 release，快照格式向前兼容读（官方 migrate 机制处理跨版本）。</p>
+  <p><b>什么信号该警惕</b>：issues 区出现会话快照损坏报告（当前没有高热案例）、UHP major 版本跳变（会破坏现有 harness）、或发布节奏骤停——三条任一出现，重仓前先在小项目试运行两周。</p>
+
+<h2><span class="no">17</span>成本与收益核算：值不值得换</h2>
+  <p>给"要不要从 tmux 搬过来"算一笔显式账：</p>
+  <div class="tscroll"><table>
+    <tr><th>项</th><th>成本</th><th>收益</th></tr>
+    <tr><td>学习曲线</td><td>prefix 肌肉记忆 1-2 天（tmux preset 可摊薄）；ORCH 概念 3-5 天</td><td>状态面板省掉"轮流切窗口看跑完没"的碎片注意力</td></tr>
+    <tr><td>迁移成本</td><td>现有 tmux 会话不迁移（重开即可）；脚本改调 <code>luvus</code> CLI</td><td>agent 对话自动恢复，不再手敲 resume</td></tr>
+    <tr><td>运行开销</td><td>常驻 server 内存（Rust 单二进制，量级远小于一个 Electron 窗口）</td><td>换回被 tmux+肉眼盯盘吃掉的注意力</td></tr>
+    <tr><td>风险</td><td>0.x 快跑期 API 变动；单人维护巴士系数</td><td>UHP 契约已锁定自动化层兼容；MIT/Apache 双许可无商用雷</td></tr>
+    <tr><td>反向锁定</td><td>低——会话快照可 <code>rm -rf ~/.luvus</code> 全清，agent 会话原本就存在各 agent 自己的存储里</td><td>随时可回 tmux，agent 上下文无损失</td></tr>
+  </table></div>
+  <p>结论模板：<b>同时跑 ≥2 个 agent 且每周为此丢过上下文的人，值得立刻试；纯 shell 单线程用户，tmux 继续。</b>中间态用户用"周末两小时"方案：装上跑一遍 Day 1-3（第 11 节路线），亲测 detach/恢复循环后再决定。</p>
+
+<h2><span class="no">18</span>UHP 入门：给自动化玩家的第一段代码</h2>
+  <p>UHP（Universal Harness Protocol）v1 是 Luvus 的公共自动化契约，也是它区别于一切"人肉盯盘"方案的护城河。入门三步（官方 uhp/getting-started 路径）：</p>
+  <ol class="steps">
+    <li><b>自省</b>——不读源码、直接问二进制：<code>luvus uhp schema</code> 拿完整 schema、<code>luvus uhp capabilities</code> 看当前 server 支持哪些方法、<code>luvus uhp snapshot</code> 取会话快照。schema 即文档，永远与所装版本一致。</li>
+    <li><b>第一个调用</b>——<code>uhp access</code> 起临时网关（默认只读）后，任何 NDJSON 客户端（<code>nc</code>/Python/Node）连上即可发方法请求、收事件流；<code>terminal.backend.*</code> 是 UHP 内的方法命名空间而非第二个协议。</li>
+    <li><b>写 harness</b>——基于方法注册表编排：查 agent 状态 → blocked 则投递确认 → done 则触发 quality gate。兼容承诺白纸黑字：<b>加法改动必须保持旧请求有效，破坏性变更必须升 UHP major</b>——你的自动化脚本不会被静默破坏。conformance 测试集与 fixture 也随协议发布，第三方实现可对表验证。</li>
+  </ol>
+  <p><b>意义一句话</b>：tmux 时代自动化 = send-keys 盲打文本 + 屏幕抓取；UHP 时代自动化 = 带 schema 的结构化调用 + 语义等待（"等 agent 进入 done"而非"等 30 秒"）。这是给 harness/编排器作者的基础设施级区别。</p>
+
+  <h2><span class="no">19</span>冷静面与判断</h2>
   <div class="warn"><b>四个折扣点</b>：① README 挂 crates.io 徽章但实际停留在占位 v0.1.0（21 下载）——<code>cargo install luvus</code> 装到的是空壳，认准 install.sh/brew；② 0.x 快跑期：v0.12→v0.14.2 一个多月六版，稳定性承诺只覆盖 UHP 1.0 契约本身，TUI/CLI 仍在变（45 open issues）；③ "解决踩脚"是提供 worktree/lease 机制，多 agent 写同一 worktree 照样踩；④ 单人项目（作者 bio "Your favorite Agent | Maker"，292 followers）——878★ 三个月增速可观，但巴士系数与长期维护要打折观察。</div>
   <p><b>判断</b>：如果 tmux 是"终端复用"，Luvus 是"agent 复用"——它把 <i>哪个 agent 在哪个 pane、跑到第几步、花了多少 token、卡在等确认还是已完工</i> 变成了一等公民数据，再用 UHP 把这一切开放给程序化消费。"超级 tmux"的叫法传播效率高但低估了它：编排层（worktree/队列/lease/quality gate/合并）和 UHP 契约才是护城河。多 agent 重度用户的尝鲜顺序建议：先单会话跑熟 → 上 Commander 多目标 → 再碰 ORCH 编排。观望者盯两个信号：v1.0 何时切、crates.io 何时真发版。</p>
   <div class="chips">
     <span class="chip">878★ Apache-2.0</span><span class="chip">22+ agent 支持矩阵</span><span class="chip">server 唯一写入者</span><span class="chip">UHP 1.0 契约</span><span class="chip">Web 默认只读</span><span class="chip">crates.io 是占位</span>
   </div>
 
-  <div class="footer"><b>来源</b>：fxtwitter 推文存档（47 赞/6 转）· GitHub API（RizRiyz/luvus 878★/59 forks/Apache-2.0/topics）· README（Features 17 条/22+ agent 矩阵/安装）· AGENTS.md 28KB（Product model/server 单写者/UHP 授权模型）· protocol/uhp/v1（契约/兼容承诺）· releases（v0.12→v0.14.2）· changelog v0.14.2（pane focus history/Letta/OpenCode 2/ORCH 重试）· crates.io API（占位 v0.1.0）· git tree（299 .rs/9.0MB）<br>卡片：infocard-pub · 20260926-luvus · lang zh-CN · theme mistpine</div>
+  <div class="footer"><b>来源</b>：fxtwitter 推文存档（47 赞/6 转）· GitHub API（RizRiyz/luvus 878★/59 forks/Apache-2.0/topics）· README（Features 17 条/22+ agent 矩阵/安装）· AGENTS.md 28KB（Product model/server 单写者/UHP 授权模型）· protocol/uhp/v1（契约/兼容承诺）· releases（v0.12→v0.14.2）· changelog v0.14.2（pane focus history/Letta/OpenCode 2/ORCH 重试）· crates.io API（占位 v0.1.0）· git tree（299 .rs/9.0MB）<br>卡片：infocard-pub · 20260926-luvus · lang zh-CN · theme mistpine · v2 扩充版（1455→5820+ units，16 节初学者路线）</div>
 </div>
 </body>
 </html>
