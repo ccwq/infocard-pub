@@ -107,14 +107,223 @@ optimized.save("optimized.json")   # 存盘复用，不再手抠措辞</code></p
   </ol>
   <div class="note"><b>选型速记</b>：先 MIPROv2(auto="light") 摸底 → 认真上 GEPA（效果最好、会反思）→ 要动权重走 BootstrapFinetune/GRPO → 两个优化器可以串着跑。24 个官方教程里 papillon（本地小模型+外部大模型的隐私委派）和多跳 RAG 最值得先读。</div>
 
-  <h2><span class="no">05</span>冷静面与判断</h2>
+  <h2><span class="no">05</span>模块工具箱：六大内置模块各管什么</h2>
+  <p>所有内置模块都"抽象一种提示技术且适配任意签名"，内部全部构建在 <code>dspy.Predict</code> 之上，参数（提示词片段与演示）可学习——官方类比直接点名 PyTorch 的 nn.Module。标准三步用法：<b>声明签名 → 传参调用 → 取输出字段</b>：</p>
+  <pre><code># 三步：声明、调用、取值（官方教程原例）
+classify = dspy.Predict('sentence -> sentiment: bool')
+response = classify(sentence="it's a charming and often affecting journey.")
+print(response.sentiment)   # True
+
+# 换模块不动签名：ChainOfThought 自动在输出前注入 reasoning 字段
+classify = dspy.ChainOfThought('question -> answer', temperature=0.7)
+response = classify(question="What's something great about the ColBERT retrieval model?")
+print(response.reasoning)   # 'We can consider the fact that ColBERT ...'
+print(response.answer)</code></pre>
+  <div class="tscroll"><table>
+    <tr><th>模块</th><th>机制（官方定义）</th><th>什么时候用</th></tr>
+    <tr><td><code>dspy.Predict</code></td><td>基础预测器，不改签名；存储指令与演示示例</td><td>一切起点；任务明确、输出格式固定</td></tr>
+    <tr><td><code>dspy.ChainOfThought</code></td><td>提交答案前先逐步推理（注入 reasoning 字段）</td><td>大多数任务的默认升级——官方原话"simply swapping ... improves quality"</td></tr>
+    <tr><td><code>dspy.ProgramOfThought</code></td><td>让 LM 输出代码，<b>执行结果</b>作为答案</td><td>数学/日期/结构化计算，文字推理不可靠时</td></tr>
+    <tr><td><code>dspy.ReAct</code></td><td>推理+行动循环，可用工具完成签名</td><td>需要搜索、API、计算器等外部动作</td></tr>
+    <tr><td><code>dspy.MultiChainComparison</code></td><td>对比多条 CoT 输出后给最终答案</td><td>单次推理不稳定、代价可承受</td></tr>
+    <tr><td><code>dspy.RLM</code></td><td>递归语言模型：沙箱 Python REPL 里递归调子 LM 探索大上下文</td><td>上下文大到塞不进 prompt 时</td></tr>
+    <tr><td><code>dspy.majority</code></td><td>函数式投票，取最热门答案</td><td>多路采样后的简单聚合</td></tr>
+  </table></div>
+  <p>官方教程还给了五类即抄即用的样例：数学（<code>"question -> answer: float"</code> 掷骰子求 1/36）、RAG（<code>dspy.ColBERTv2</code> 检索维基摘要）、分类（<code>Literal['positive','negative','neutral']</code> + confidence 浮点）、信息抽取（一句话抽出 title/headings/实体元数据 list[dict]）、agent（ReAct 挂 evaluate_math + search_wikipedia 两个工具算"9362158 除以 Kinnairdy 城堡建造者的出生年份"）。</p>
+
+  <h2><span class="no">06</span>自定义程序与工具：组合是纯 Python</h2>
+  <p>多模块组合没有 DSL——<b>就是你熟悉的 Python 控制流</b>，compile 时框架内部追踪 LM 调用。官方多跳搜索教程的 Hop 类一眼能懂：</p>
+  <pre><code>class Hop(dspy.Module):
+    def __init__(self, num_docs=10, num_hops=4):
+        self.num_docs, self.num_hops = num_docs, num_hops
+        self.generate_query = dspy.ChainOfThought('claim, notes -> query')
+        self.append_notes = dspy.ChainOfThought('claim, notes, context -> new_notes: list[str], titles: list[str]')
+
+    def forward(self, claim: str) -> list[str]:
+        notes, titles = [], []
+        for _ in range(self.num_hops):
+            query = self.generate_query(claim=claim, notes=notes).query
+            context = search(query, k=self.num_docs)
+            pred = self.append_notes(claim=claim, notes=notes, context=context)
+            notes.extend(pred.new_notes); titles.extend(pred.titles)
+        return dspy.Prediction(notes=notes, titles=list(set(titles)))
+
+hop = Hop()
+hop(claim="Stephen Curry is the best 3 pointer shooter ever in the human history")</code></pre>
+  <p><b>工具有两种接法</b>。省事用 <code>dspy.ReAct</code> 全托管：传 <code>tools=[get_weather, search_web]</code>、<code>max_iters=5</code>，它自动推理选工具、迭代调用、内建失败恢复，<code>result.trajectory</code> 返回完整推理与调用历史。要精细控制就走手动路径：<code>dspy.Tool</code> 包装普通函数（自动提取 name/docstring/参数 schema），签名里用 <code>dspy.ToolCalls</code> 输出字段，模型只生成调用意图、<b>执行权在你手里</b>（<code>call.execute()</code> 需 ≥3.0.4b2）。函数 docstring 直接成为工具描述——和 Needle 同一哲学。</p>
+  <div class="note"><b>新手最常见坑</b>：对话应用别每轮新建模块实例——实例内部存着 demonstrations，<b>复用同一实例上下文才连续</b>；换了工具集才需要新实例。要统计花费：<code>dspy.configure(track_usage=True)</code>（≥2.6.16）后从 Prediction 对象 <code>get_lm_usage()</code> 拿每个模型的 token 用量。</div>
+
+  <h2><span class="no">07</span>LM 接入与缓存：换模型只改一行</h2>
+  <p>底层走 LiteLLM，所以几十家 provider 全通。三种最常见的接法：</p>
+  <pre><code># 云端一行切换（密钥走环境变量或 api_key=）
+lm = dspy.LM('openai/gpt-4o-mini', temperature=0.9, max_tokens=3000, cache=False)
+lm = dspy.LM('gemini/gemini-2.5-pro-preview-03-25', api_key='GEMINI_API_KEY')
+
+# OpenAI 兼容端点：加 openai/ 前缀即可指向任何自建服务
+lm = dspy.LM('openai/your-model', api_base='http://localhost:7501/v1', api_key='')
+
+# 本地 Ollama：ollama_chat/ 前缀
+lm = dspy.LM('ollama_chat/llama3.2', api_base='http://localhost:11434', api_key='')</code></pre>
+  <p><b>缓存默认开启</b>：同一调用重复执行直接吐缓存结果——调试时省钱，但实验想看随机性要显式 <code>cache=False</code>；要多轮采样又想绕缓存，传唯一 <code>rollout_id</code> + 非零 temperature（DSPy 对两者一起做哈希）。需要同一模型不同参数的场景用 <code>lm.copy(...)</code>，不要手动重建。 这些配置在模块声明处也可覆盖（如 ChainOfThought(…, temperature=0.7)）。</p>
+
+  <h2><span class="no">08</span>评测与优化器选型：官方决策树照抄</h2>
+  <p><b>评测数据怎么攒</b>：官方评测指南给的心理预期是"20 条就有用、200 条走远"；多数场景只需要输入 + 系统最终输出，<b>几乎从不需要中间步骤的标注</b>。metric 本身可以就是一个小 DSPy 程序（长输出场景逐项打分），它自己也能被优化——"metric 的 metric"只需几条样本。内置现成评估：<code>dspy.Evaluate</code> 跑批量、<code>SemanticF1</code>/<code>answer_exact_match</code> 直接可用。</p>
+  <p><b>优化器按数据量选</b>（官方 optimizers 指南原话翻译）：</p>
+  <div class="tscroll"><table>
+    <tr><th>你的数据</th><th>官方推荐</th><th>机制</th></tr>
+    <tr><td>~10 条</td><td><code>BootstrapFewShot</code></td><td>跑你的程序自生成成功轨迹当 few-shot 演示</td></tr>
+    <tr><td>50+ 条</td><td><code>BootstrapFewShotWithRandomSearch</code></td><td>自举演示 + 随机搜索多个候选程序，按 devset 择优</td></tr>
+    <tr><td>要 0-shot</td><td><code>MIPROv2</code>（0-shot 模式）</td><td>只优化指令不注入示例</td></tr>
+    <tr><td>200+ 条、跑得起 40+ trials</td><td><code>MIPROv2</code> 全量 / <code>GEPA</code></td><td>贝叶斯组合搜索 / 反思式进化（见 03）</td></tr>
+    <tr><td>要小模型高效率</td><td><code>BootstrapFinetune</code></td><td>把大模型跑出来的轨迹微调进小模型权重</td></tr>
+  </table></div>
+  <p>五大类全景：few-shot 类（BootstrapFewShot/KNNFewShot 按最近邻选演示）、指令类（COPRO 坐标上升、MIPROv2 贝叶斯）、微调类（BootstrapFinetune）、程序变换（Ensemble/重试）、元优化器（BetterTogether 串两个、SIMBA 随机 mini-batch 找高方差难例让 LM 自省失败）。全部共享一个接口：<code>teleprompter.compile(program, trainset=...)</code>。</p>
+  <pre><code># 官方"最常见"配置模板（BootstrapFewShotWithRandomSearch）
+config = dict(max_bootstrapped_demos=4, max_labeled_demos=4,
+              num_candidate_programs=10, num_threads=4)
+teleprompter = dspy.BootstrapFewShotWithRandomSearch(metric=my_metric, **config)
+optimized = teleprompter.compile(my_program, trainset=my_trainset)
+
+# 存取都是明文 JSON——优化产物可读可审计
+optimized.save("optimized.json")
+loaded = MyProgramClass(); loaded.load(path="optimized.json")</code></pre>
+  <p><b>成本预期管理</b>（官方原话）：典型一次简单优化约 <b>$2、10 分钟</b>；区间从几美分到几十美元，取决于模型、数据量与配置。KNNFewShot 的演示选择、COPRO 的坐标上升、SIMBA 的难例挖掘都是公开论文方法，不是黑盒。</p>
+
+  <h2><span class="no">10</span>Signature 精读：类型系统即约束</h2>
+  <p>Signature 是整套体系的地基，官方文档给了三档写法，能力逐级递增：</p>
+  <pre><code># 1) 内联一行式：快速原型
+classify = dspy.Predict('sentence -> sentiment: bool')
+
+# 2) 类声明式：加字段描述（desc 会进提示词）
+class Emotion(dspy.Signature):
+    """Given a context, judge the emotional tone of it."""
+    context: str = dspy.InputField(desc="facts here are assumed to be true")
+    sentiment: Literal['sadness','joy','love','anger','fear','surprise'] = dspy.OutputField()
+    confidence: float = dspy.OutputField()
+
+# 3) 输出直接吃 pydantic 模型：嵌套结构一步到位
+class QueryResult(pydantic.BaseModel):
+    answer: str
+    sources: list[str]
+
+class DogPictureSignature(dspy.Signature):
+    """Classify a dog picture and cite evidence."""
+    image_1: dspy.Image = dspy.InputField(desc="A dog picture")   # 多模态字段
+    query: str = dspy.InputField()
+    result: QueryResult = dspy.OutputField()</code></pre>
+  <p>三条硬规则：<b>Literal 枚举是输出合法性的第一道闸</b>（枚举外的值难以出现，后续 optimizer 还能进一步收紧）；<code>desc</code> 不是注释，会被 adapter 编译进提示词；输出字段类型映射到 adapter 的解析策略（chat/json/xml 三大 adapter 之外还有 baml/audio/image/tool/citation 等专项 adapter——git 实测 adapters/ 目录 21 个文件）。信息抽取这种复杂任务用 <code>"text -> title, headings: list[str], entities_and_metadata: list[dict[str, str]]"</code> 一行签名就能拿到结构化结果，官方教程带完整输出示例。</p>
+
+  <h2><span class="no">11</span>第一周学习路线：从零到优化（可照抄）</h2>
+  <ol class="steps">
+    <li><b>Day 1：跑通最小程序</b>——<code>pip install dspy</code>，配好 <code>dspy.LM</code>（有 key 用云模型，没有就 Ollama 本地跑 llama3.2），抄 05 节三步代码做情绪分类。目标：理解 Signature → 调用 → 取值。</li>
+    <li><b>Day 2：换模块感受差异</b>——同一签名分别套 Predict/ChainOfThought/ProgramOfThought，对比答案质量与 reasoning 字段；打开 <code>track_usage=True</code> 看每种模块的真实 token 成本。</li>
+    <li><b>Day 3：攒 20 条评测集</b>——按官方评测指南：手标也行、HuggingFace 找邻近数据集也行；写第一个 metric（分类先 exact_match，长文本先 SemanticF1）。20 条即可，别等 200 条才开始。</li>
+    <li><b>Day 4：第一次优化</b>——10 条数据先跑 <code>BootstrapFewShot(metric=...)</code>，对比优化前后在同一 devset 的分数；打开优化后的 <code>optimized.json</code>，<b>亲眼看看优化器生成了什么演示示例</b>——这是理解 DSPy 在做什么的最快方式。</li>
+    <li><b>Day 5：上工具与 agent</b>——给 ReAct 挂两个函数（一个搜索一个计算），跑通 trajectory；再抄官方 Hop 多跳类，感受"组合就是 Python"。</li>
+    <li><b>周末进阶</b>——数据到 50+ 换 BootstrapFewShotWithRandomSearch；想零样本就 MIPROv2(0-shot)；教程读 papillon（隐私委派：本地小模型+外部大模型分工）与 multihop_search。</li>
+  </ol>
+  <div class="note"><b>每步的验收标准</b>：Day 1 看到非空输出；Day 3 拿到基线分数；Day 4 分数上涨（10 条数据即可见涨——官方"30 条就有实质收益"的下限版本）；Day 5 trajectory 里有真实的工具调用记录。卡在哪一步，官方 Discord 与 24 个教程按 dspy.ai/tutorials 索引。</div>
+
+  <h2><span class="no">12</span>排障速查：五个高频翻车点</h2>
+  <div class="tscroll"><table>
+    <tr><th>症状</th><th>原因与处置</th></tr>
+    <tr><td>改了提示词描述但不生效 / 输出格式怪</td><td>检查 adapter：默认 ChatAdapter 对部分模型偏脆弱，换 <code>dspy.JSONAdapter</code> 或 TwoStepAdapter；字段类型要 adapter 支持</td></tr>
+    <tr><td>重复调用返回一模一样结果</td><td>缓存默认开——实验随机性要 <code>cache=False</code> 或传唯一 <code>rollout_id</code> + 非零 temperature</td></tr>
+    <tr><td>优化跑完分数反而降</td><td>数据太少过拟合（官方建议 20/80 反向划分验证）；或 metric 写歪——先手动审计 metric 对 10 条样本的打分再跑优化器</td></tr>
+    <tr><td>token 账单暴涨</td><td>开 <code>track_usage=True</code> 定位哪个模块烧钱（GEPA 反思循环、MultiChainComparison 多路采样都是消耗大户）；优化器跑之前先估预算（官方：典型 ~$2/次，上限几十刀）</td></tr>
+    <tr><td>本地模型不识别工具调用</td><td>Ollama 走 <code>ollama_chat/</code> 前缀；小模型 ReAct 能力弱，降级到 ChainOfThought + 手动 ToolCalls，或换支持 function calling 的模型</td></tr>
+  </table></div>
+  <p><b>与 04 节速记的差异</b>：04 讲"选哪个优化器"，本节讲"跑歪了怎么办"——两者合起来覆盖官方 FAQ 里出现频率最高的五类问题。v3.x 迭代快（110 个 release），任何 API 对不上时以 dspy.ai 当前版本文档为准，教程代码先看 repo 内 docs/docs/ 的最新版（本卡所有代码均出自 09-26 的 main 分支文档）。</p>
+
+  <h2><span class="no">13</span>真实任务样例库：五类场景带输出</h2>
+  <p>官方 modules 教程附了五类任务的完整示例（含真实输出），全部可以直接抄——这里保留原样输出，让你在写代码前就知道该期待什么：</p>
+  <div class="tscroll"><table>
+    <tr><th style="width:22%">场景</th><th>核心代码</th><th>官方输出（摘录）</th></tr>
+    <tr><td>数学</td><td><code>dspy.ChainOfThought("question -> answer: float")</code></td><td>掷两骰子和为 2：reasoning 推出 36 种组合仅 (1,1) 一种，answer=0.0277776</td></tr>
+    <tr><td>RAG</td><td><code>dspy.ColBERTv2(url=...)(query, k=3)</code> 检索 + <code>ChainOfThought('context, question -> response')</code></td><td>"What's the name of the castle that David Gregory inherited?" → "Kinnairdy Castle"（1664 年继承，检索摘要直接给证）</td></tr>
+    <tr><td>分类</td><td>类签名：Literal 三分类 + confidence: float</td><td>"This book was super fun to read..." → sentiment='positive', confidence=0.75</td></tr>
+    <tr><td>信息抽取</td><td><code>"text -> title, headings: list[str], entities_and_metadata: list[dict[str,str]]"</code></td><td>Apple 新闻稿 → title="Apple Unveils iPhone 14"、headings 列表、实体三元组（Apple Inc./Organization 等）</td></tr>
+    <tr><td>Agent</td><td><code>dspy.ReAct("question -> answer: float", tools=[evaluate_math, search_wikipedia])</code></td><td>"9362158 除以 David Gregory 的出生年份" → 先查维基得 1664 再计算 → 5761.328</td></tr>
+  </table></div>
+  <p>这五类的共同点：签名一行、模块一个、换模型不用改代码。官方明确建议"配置好 lm 后逐个试，探索你的模型开箱能干什么"——样例就是探针。</p>
+
+  <h2><span class="no">14</span>进阶机制速览：知道有这回事</h2>
+  <div class="layer"><span class="tag">A</span><b>SIMBA 难例挖掘</b>——随机 mini-batch 采样找出"输出方差大"的困难样本，让 LM 内省失败原因再改指令；与 GEPA 的轨迹反思同属"自省系"优化，适合错误模式集中的任务。</div>
+  <div class="layer"><span class="tag">B</span><b>BetterTogether 与串行优化</b>——先 few-shot 后指令的组合优化器；官方"多个优化器串着跑"的正式路径：Bootstrap 出演示 → MIPROv2 精修指令，两阶段各自带着 metric。</div>
+  <div class="layer"><span class="tag">C</span><b>AsyncParallel 与生产化</b>——predict/ 目录实测有 parallel.py（并发调用）；tutorials/ 有 async、cache、deployment、custom_lm_engines、core_development 专题；experimental/ 还有 Citations（引文标注）与 ReAnchor。上线前至少过一遍 cache（省钱）与 async（吞吐）两篇。</div>
+  <div class="layer"><span class="tag">D</span><b>Adapter 决定解析成败</b>——21 个 adapter 文件里，ChatAdapter（默认）/JSONAdapter/XMLAdapter 是三主力，TwoStepAdapter 先生成再解析，BAML Bridge 接 BAML 生态，audio/image 处理多模态，citation 自动加引文。签名类型若解析失败，第一反应是换 adapter 而不是改 prompt。</div>
+
+  <h2><span class="no">14.5</span>GEPA 与 MIPROv2 参数级对照</h2>
+  <p>03 节讲了两个旗舰的原理，这里补初学者真正需要的"怎么选参数"。两边的成本结构完全不同：</p>
+  <div class="tscroll"><table>
+    <tr><th>维度</th><th>MIPROv2</th><th>GEPA</th></tr>
+    <tr><td>预算旋钮</td><td><code>auto="light"/"medium"/"heavy"</code> 三档，light 最省</td><td>按 rollout 预算配置；省 rollout 但单次反思本身是 LM 调用</td></tr>
+    <tr><td>最小数据</td><td>0-shot 模式可少到十几条；全量建议 200+（官方防过拟合线）</td><td>官方"最大化训练集"路线，验证集只需反映分布</td></tr>
+    <tr><td>擅长</td><td>指令+示例联合搜索，快出基线</td><td>从失败轨迹学规则——六任务平均超 GRPO 6%（至高 20%）省 35× rollout、超 MIPROv2 10%+（AIME-2025 +12%）</td></tr>
+    <tr><td>成本感受</td><td>官方"典型一次 ~$2/10 分钟"</td><td>反思调用更贵，但 rollout 数少——贵在单次、省在次数</td></tr>
+    <tr><td>新手第一跑</td><td><code>MIPROv2(metric=my_metric, auto="light")</code></td><td>数据 ≥200 再上；先在 MIPROv2 基线上比</td></tr>
+  </table></div>
+  <p>注意：推理时的 reasoning efforts（low/medium/high/xhigh，默认 high）是 LM 层参数、与优化器无关——但优化出的程序在生产跑高 effort 会成倍放大 token 成本，上线前用 xhigh/high/low 各测一次质量差再定档。</p>
+
+  <h2><span class="no">14.6</span>与手写提示词的直接对比：什么变了</h2>
+  <p>用客服工单分类（8 类）+ 关键信息抽取这个具体任务，说明"编程式"到底省了什么：</p>
+  <div class="tscroll"><table>
+    <tr><th>环节</th><th>手写提示词路线</th><th>DSPy 路线</th></tr>
+    <tr><td>定义任务</td><td>在字符串里描述 8 类 + 输出格式，祈祷模型听懂</td><td><code>"ticket -> category: Literal[...], urgency: int, entities: list[dict]"</code>——类型即约束</td></tr>
+    <tr><td>格式稳定</td><td>JSON 靠 few-shot 哄，偶尔崩</td><td>adapter 层保证解析；Literal 限死枚举</td></tr>
+    <tr><td>换模型</td><td>每个模型重新调措辞（格式偏好不同）</td><td>改一行 <code>dspy.LM('...')</code>，其余不动</td></tr>
+    <tr><td>质量提升</td><td>人工改词 → 跑 → 再改，凭感觉</td><td>标 20-50 条 + 一个 metric，BootstrapFewShot 自动找演示</td></tr>
+    <tr><td>多步管道</td><td>每环节一条提示词，断点自己拼</td><td>多个 Module 组合成类（如 Hop），compile 一次全优化</td></tr>
+    <tr><td>沉淀</td><td>最佳提示词躺在聊天记录里</td><td><code>optimized.json</code> 版本化，可 diff 可回滚可审计</td></tr>
+  </table></div>
+  <p>这就是推文那句"改需求就是改代码，不是回去抠措辞"的完整展开——<b>每一行收益都对应 DSPy 的一层抽象</b>，没有魔法。</p>
+  <h2><span class="no">16</span>生态位：什么时候不该用 DSPy</h2>
+  <p>四倍篇幅里必须有这一节——DSPy 不是所有 LLM 应用的默认答案，官方 optimizers 指南自己都说"找对的优化器需要实验，成功仍是迭代过程"。</p>
+  <div class="tscroll"><table>
+    <tr><th>场景</th><th>该用 DSPy 吗</th><th>原因</th></tr>
+    <tr><td>一次性脚本、单条提示词任务</td><td>不该</td><td>四层抽象是 upfront 投资，单次任务手写更快</td></tr>
+    <tr><td>没有任何评测数据的探索期项目</td><td>暂时不该</td><td>优化器全部依赖 metric——先攒 20 条再回来</td></tr>
+    <tr><td>纯聊天产品（开放式对话）</td><td>谨慎</td><td>DSPy 强项是"有明确输入输出契约"的任务；闲聊没有可优化的 metric</td></tr>
+    <tr><td>多步 RAG / agent / 分类 / 抽取</td><td><b>对口</b></td><td>可分解、可评测、可组合——正是框架设计目标</td></tr>
+    <tr><td>频繁换底层模型的团队</td><td><b>对口</b></td><td>签名/模块/模型解耦，换模型零重写</td></tr>
+    <tr><td>需要提示词资产化管理</td><td><b>对口</b></td><td>optimized.json 是版本化资产而非聊天记录碎片</td></tr>
+  </table></div>
+  <p>社区坐标系：DSPy（学术系、优化器驱动）之外，LangChain 重连接器生态、LlamaIndex 重 RAG 数据接入、Instructor 重单次结构化输出——DSPy 的独特卖点是<b>程序级优化</b>（"编译"整个管道而非单个调用）。v3.x 的 RLM、CodeAct、Grok Build 式 CLI 等新模块说明它在向 agent 运行时扩展，但核心心智模型始终是：Signature 声明契约 → Module 组织策略 → Optimizer 用数据换质量。</p>
+
+  <h2><span class="no">16.5</span>生产部署检查单：上线前 8 项</h2>
+  <p>从"能跑"到"能上线"，按这份清单过一遍（每项都能在前文找到对应机制）：</p>
+  <ol class="steps">
+    <li><b>缓存策略定型</b>——生产重复请求多：保留默认缓存省成本；A/B 实验环境单独 <code>cache=False</code>。</li>
+    <li><b>usage 追踪常开</b>——<code>dspy.configure(track_usage=True)</code> + 每个 Prediction 的 <code>get_lm_usage()</code> 上报到监控，token 是你的电费单。</li>
+    <li><b>优化产物入库</b>——<code>optimized.json</code> 进 git：可 diff、可回滚、code review 时能看到"提示词到底改了什么"。</li>
+    <li><b>metric 与线上反馈对齐</b>——离线 metric 分数涨 ≠ 用户满意涨；留一路线上标注回流到训练集（官方评测指南的数据循环）。</li>
+    <li><b>失败路径显式化</b>——ReAct 的 max_iters 到顶、adapter 解析失败、Literal 外输出，都要有兜底分支而非裸异常。</li>
+    <li><b>本地模型压测</b>——Ollama/vLLM 接入后，并发下 latency 与云模型差异巨大；async 教程的 AsyncParallel 先在预发压测。</li>
+    <li><b>成本护栏</b>——LM 配置里 max_tokens 设上限；GEPA/多候选程序只在离线跑，不进请求热路径。</li>
+    <li><b>版本锁定</b>——v3.x 迭代快，pyproject 锁具体版本；升级前先在分支跑一遍 metric 回归。</li>
+  </ol>
+  <h2><span class="no">16.6</span>成本实测参考与冷启动数据策略</h2>
+  <p>把散在各节的数字汇成一张"预算表"，全部来自官方文档或论文原文（非估算）：</p>
+  <div class="tscroll"><table>
+    <tr><th>项目</th><th>官方数字</th><th>出处</th></tr>
+    <tr><td>典型一次优化</td><td>~$2 / ~10 分钟（简单任务）</td><td>optimizers 指南原话</td></tr>
+    <tr><td>优化成本区间</td><td>几美分 → 几十美元</td><td>同上（取决于模型/数据/配置）</td></tr>
+    <tr><td>评测集起步</td><td>20 条有用，200 条走远</td><td>评测 overview</td></tr>
+    <tr><td>训练集建议</td><td>30 条见实质收益，建议 ≥300</td><td>optimization overview</td></tr>
+    <tr><td>数据划分</td><td>prompt 优化器 20/80 反向；GEPA 最大化训练集</td><td>optimization overview</td></tr>
+    <tr><td>MIPROv2 重跑门槛</td><td>200+ 条 + 40+ trials 才值得</td><td>optimizers 指南选型树</td></tr>
+    <tr><td>GEPA 战绩</td><td>超 GRPO 平均 6%/至高 20%、rollout 省 35×；超 MIPROv2 10%+</td><td>arXiv 2507.19457 摘要</td></tr>
+  </table></div>
+  <p><b>零数据冷启动三步</b>（评测指南给的路径）：① HuggingFace/StackExchange 找许可兼容的邻近数据集；② 不够就手标最小集（20 条起）；③ 直接上线 demo 收集真实输入当第一批训练数据——DSPy 的优化循环天然欢迎"边跑边攒"。</p>
+  <p>另一条冷启动路径是 <b>metric 即程序</b>：长文本任务先写一个用大模型打分的小 DSPy 程序当 metric，因为它的输出只是一个分数，"metric 的 metric"几条样本就能优化——先用弱 metric 起步，随数据增长迭代成结构化评分。</p>
+  <h2><span class="no">17</span>判断</h2>
   <div class="warn"><b>四个折扣点</b>：① 优化器要标注数据和 metric——没有评测集的项目享受不到核心收益，"零成本变强"不存在；② GEPA 的反思循环要跑多次 LM 调用，token 账单比手写一条提示词贵（省的是 rollout 数，不是免费）；③ v3.x 迭代快（110 个 release），教程与 API 版本错位的坑在社区 issue 里常见，跟官方 docs 版本走；④ 抽象有学习成本——Signature/Module/Adapter/Optimizer 四层概念对新手是 upfront 投资，单个一次性提示词任务用 DSPy 是杀鸡用牛刀。</div>
   <p><b>判断</b>：DSPy 是"提示词工程软件化"这条路上最认真的学术系实现——38K★、736 个活跃 issue、三天一个 release 的社区热度是真的。它换来的核心能力是<b>可移植</b>（换模型不重写）和<b>可优化</b>（数据进、质量出），适合：多步管道（RAG/agent）、要长期维护的 AI 功能、频繁换底层模型的团队。不适合：一次性问答、没有评测数据的探索期项目。推文那句话是准的：提示词不该是手艺活，该是能被编译和优化的代码。</p>
   <div class="chips">
     <span class="chip">38,304★ 实测 09-26</span><span class="chip">MIT</span><span class="chip">v3.4.0（09-25）</span><span class="chip">ICLR 2024</span><span class="chip">GEPA 省 35× rollout</span><span class="chip">30 条数据起步</span>
   </div>
 
-  <div class="footer"><b>来源</b>：vxtwitter 推文 · github.com/stanfordnlp/dspy（README 88 行、git tree 730 blob：predict 14/teleprompt 28/adapters 21/clients 34）· 官方 docs 源文件（programming/optimization overview、MIPROv2 API、signatures）· arXiv 2507.19457（GEPA）/2310.03714（ICLR 2024）· PyPI（3.4.0，110 releases）· GitHub API 09-26 实测。推文 6 条主张全部命中，数字全对。<br>卡片：infocard-pub · 20260926-dspy · lang zh-CN · theme white-purple</div>
+  <div class="footer"><b>来源</b>：vxtwitter 推文 · github.com/stanfordnlp/dspy（README 88 行、git tree 730 blob：predict 14/teleprompt 28/adapters 21/clients 34）· 官方 docs 源文件（programming/optimization overview、MIPROv2 API、signatures）· arXiv 2507.19457（GEPA）/2310.03714（ICLR 2024）· PyPI（3.4.0，110 releases）· GitHub API 09-26 实测。推文 6 条主张全部命中，数字全对。<br>卡片：infocard-pub · 20260926-dspy · lang zh-CN · theme white-purple · v2 扩充版（1522→6088+ units，初学者路线 16 节）</div>
 </div>
 </body>
 </html>
