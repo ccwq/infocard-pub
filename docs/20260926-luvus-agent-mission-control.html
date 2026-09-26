@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luvus 核查：AI Agent 的"超级 tmux"——299 个 Rust 文件的 mission control 成色如何</title>
+<style>
+:root{--bg:#f0f3f2;--paper:#fbfdfc;--ink:#152420;--muted:#5b6e66;--line:#d5e0db;--teal:#0d7d6c;--teal-deep:#093f36;--amber:#a8760b;--red:#b5433a;--code-bg:#0c2620;--code-ink:#d2e8df}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.72}
+.page{max-width:760px;margin:0 auto;background:var(--paper);padding:26px 22px 30px}
+.kicker{font-size:11px;letter-spacing:.18em;color:var(--teal);font-weight:700;text-transform:uppercase}
+h1{font-size:25px;line-height:1.35;margin:8px 0 6px;color:var(--teal-deep);overflow-wrap:anywhere}
+.deck{font-size:13.5px;color:var(--muted);margin:0 0 14px}
+.statstrip{border-top:2px solid var(--teal-deep);border-bottom:1px solid var(--line);padding:10px 0;margin:0 0 18px}
+.statstrip .row{font-size:0}
+.stat{display:inline-block;width:25%;min-width:118px;vertical-align:top;margin:0 0 8px;font-size:13px}
+.stat b{display:block;font-size:19px;color:var(--teal-deep);font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:11.5px}
+h2{font-size:17px;color:var(--teal-deep);margin:26px 0 8px;padding-left:10px;border-left:4px solid var(--teal)}
+h2 .no{color:var(--amber);font-variant-numeric:tabular-nums;margin-right:6px}
+p{margin:8px 0}
+.tscroll{overflow-x:auto;margin:10px 0}
+table{width:100%;min-width:540px;border-collapse:collapse;font-size:12.5px}
+th{background:var(--teal-deep);color:#fff;text-align:left;padding:7px 8px;font-weight:600}
+td{border-bottom:1px solid var(--line);padding:7px 8px;vertical-align:top}
+tr:nth-child(even) td{background:rgba(13,125,108,.05)}
+code{font-family:"SF Mono",Consolas,Menlo,monospace;font-size:.92em;background:rgba(13,125,108,.09);color:var(--teal-deep);padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);color:var(--code-ink);padding:13px 14px;border-radius:8px;overflow-x:auto;font-size:11.5px;line-height:1.55;margin:10px 0}
+pre code{background:none;color:inherit;padding:0;font-size:inherit}
+.note{border-left:4px solid var(--amber);background:rgba(168,118,11,.07);padding:9px 12px;margin:10px 0;font-size:12.5px}
+.warn{border-left:4px solid var(--red);background:rgba(181,67,58,.07);padding:9px 12px;margin:10px 0;font-size:12.5px}
+.ok{color:var(--teal);font-weight:700}
+.chips{margin:14px 0 4px;font-size:0}
+.chip{display:inline-block;font-size:11.5px;font-weight:700;color:var(--teal-deep);border:1.5px solid var(--teal);border-radius:999px;padding:3px 11px;margin:0 6px 6px 0;background:rgba(13,125,108,.06)}
+.footer{margin-top:22px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.footer b{color:var(--ink)}
+.layer{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:12.8px;background:#fff}
+.layer b{color:var(--teal-deep)}
+.layer .tag{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:var(--teal);border-radius:4px;padding:1px 7px;margin-right:6px;vertical-align:1px}
+ol.steps{padding-left:20px;margin:8px 0}
+ol.steps li{margin:5px 0}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="kicker">Infocard · Repo Fact-check · Agent Orchestration</div>
+  <h1>Luvus 核查：AI Agent 的"超级 tmux"——299 个 Rust 文件的 mission control 成色如何</h1>
+  <p class="deck">@mylifcc 的比喻抓得准但只对了一半。Luvus（RizRiyz/luvus，878★ Apache-2.0，2026-06 建仓、push 到 09-26 当天）确实是纯 Rust——实测 299 个 .rs 文件 9.0MB 源码；但它比 tmux 多出来的不是"更顺手的分屏"，而是一整层 <b>agent 状态感知 + 编排 + UHP 1.0 自动化契约</b>。支持矩阵实测 22+ 个 coding agent，从 Claude Code/Codex/Grok 到 Kimi/Pi/Devin 全在册。</p>
+
+  <div class="statstrip"><div class="row">
+    <div class="stat"><b>878</b><span>GitHub 星（09-26 实测）</span></div>
+    <div class="stat"><b>22+</b><span>支持的 coding agent</span></div>
+    <div class="stat"><b>299</b><span>.rs 文件 / 9.0MB 源码</span></div>
+    <div class="stat"><b>v0.14.2</b><span>09-16 发布（当天仍 push）</span></div>
+  </div></div>
+
+  <h2><span class="no">01</span>推文四主张逐条对账</h2>
+  <div class="tscroll"><table>
+    <tr><th style="width:40%">推文说</th><th>实测（09-26）</th></tr>
+    <tr><td>开一堆 tmux 窗口肉眼盯盘是真实痛点</td><td><span class="ok">场景成立</span>：README 功能清单逐条对应——blocked/working/done/idle 状态、session 标题、token、花费、context 占用、可选声音提醒，全部自动探测无需接线</td></tr>
+    <tr><td>纯 Rust 打造</td><td><span class="ok">属实</span>：299 个 .rs 文件 9.0MB；单二进制四角色——无命令=TUI 客户端、detached server 拥有全部状态、CLI 发有界 JSON 即退、<code>web</code> 起浏览器桥</td></tr>
+    <tr><td>解决多 Agent 跑飞、窗口爆炸、互相踩脚</td><td><span class="ok">机制在但要读细</span>：跑飞=状态面板+声音告警；窗口爆炸=workspace/tab/pane 持久化+命名会话；踩脚=<b>worktree 编排 + path leases 按项目隔离</b>——是提供机制，不是自动免疫</td></tr>
+    <tr><td>"超级 tmux"</td><td><span class="ok">类比一半</span>：交互层确有 split/zoom/copy-mode/mouse；但本质差异是 <b>server 常驻 + agent 语义 + UHP 自动化契约</b>——tmux 没有"agent 在等确认"这个概念</td></tr>
+  </table></div>
+
+  <h2><span class="no">02</span>支持矩阵：22+ agent 三档能力（README 原表）</h2>
+  <div class="tscroll"><table>
+    <tr><th>档位</th><th>Agent</th><th>缺什么</th></tr>
+    <tr><td>满配（状态+恢复+hook 精确事件）</td><td>Claude Code、GitHub Copilot CLI、Codex、opencode、Kimi、Grok、Oh My Pi (omp)</td><td>—</td></tr>
+    <tr><td>状态+恢复（hook 弱或需集成）</td><td>Antigravity、Letta Code、Hermes CLI、Pi、Muse Code、Fx、Arc Studio</td><td>Pi/Muse/Fx 无 hook；Letta/Hermes 需集成；Arc 无会话恢复</td></tr>
+    <tr><td>仅 live 状态（零集成）</td><td>Cursor（resume command）、Kilo/Devin（exact-ID resume）、Gemini、Aider、Amp、Droid、Qwen、Kiro</td><td>无精确事件</td></tr>
+  </table></div>
+  <p>关键设计：<b>live status 不需要 agent 集成</b>（读终端即可），hook 精确事件才要——这让它对新 agent 的兼容成本近乎零，README 敢把 22+ 齐刷刷列出来的底气在此。</p>
+
+  <h2><span class="no">03</span>架构读法：server 是唯一写入者</h2>
+  <div class="layer"><span class="tag">A</span><b>单二进制多角色</b>——无命令起/附着 TUI；detached server 拥有 workspaces/tabs/panes/PTY/终端网格/agent 状态/持久化/编排/API；CLI 发完 JSON 就退；<code>--session name</code> 切命名会话（按需冷启动，不断开其他客户端）；<code>--local</code> 是开发用的单体模式。</div>
+  <div class="layer"><span class="tag">B</span><b>可抛弃客户端</b>——detach 留活 pane；杀 server 才杀 PTY，但下一个 server 会恢复布局并尽可能恢复支持的 agent 原生会话。"断线重连"是第一公民，不是补丁。</div>
+  <div class="layer"><span class="tag">C</span><b>安全边界写进了产品</b>——Luvus Web 默认 loopback 只读，<code>--control</code> 才开控制，QR/链接配对手机，停桥只撤销授权不停 server/PTY；<code>uhp access</code> 网关默认只读，控制显式配对且带 <code>authority.expires_at</code> 有限期（<code>--no-expiry</code> 也只是进程绑定、关闸即失效）。</div>
+  <div class="layer"><span class="tag">D</span><b>编排层</b>——worktrees 创建、依赖任务协调、任务队列与 path leases 按项目隔离、时区感知定时任务、quality gates、完成后合并（merge completed work）。这一层是它区别于"tmux+肉眼"的真正增量。</div>
+
+  <h2><span class="no">04</span>上手五步与 UHP 自动化契约</h2>
+  <ol class="steps">
+    <li><b>装</b>：<code>curl -fsSL https://luvus.dev/install.sh | sh</code>（macOS/Linux/FreeBSD）或 <code>brew install RizRiyz/luvus/luvus</code>；Windows 走 PowerShell 脚本。</li>
+    <li><b>体检</b>：<code>luvus doctor</code> 查 git/gh/ssh 三件套；<code>luvus update</code> 自更新。</li>
+    <li><b>开跑</b>：项目目录里敲 <code>luvus</code>，分屏起 agent，自动探测；macOS 记得关"选择上一个输入源"释放 Ctrl+Space。</li>
+    <li><b>指挥</b>：Commander 底部 composer 向<b>精确的</b> agent pane 发 prompt、向精确 shell pane 发命令，支持多目标同发且不动当前焦点；ORCH 任务可不带焦点启动、失败可安全重试不丢队列（v0.14.2）。</li>
+    <li><b>自动化</b>：UHP 1.0 是版本化公共契约——<code>luvus uhp schema / capabilities / snapshot</code> 自省；NDJSON over loopback、owner-only IPC；<b>兼容承诺：加法兼容，破坏性变更必须升 major</b>。harness/编排器该建在这上面而不是 screen-scraping。</li>
+  </ol>
+  <p>连仓库自己的 <code>skills/</code> 目录都带 SKILL.md（luvus + luvus-module 两枚）——给 Agent 用的说明书由项目自己养，和 libraries.dev 是同一时代做法。</p>
+
+  <h2><span class="no">05</span>冷静面与判断</h2>
+  <div class="warn"><b>四个折扣点</b>：① README 挂 crates.io 徽章但实际停留在占位 v0.1.0（21 下载）——<code>cargo install luvus</code> 装到的是空壳，认准 install.sh/brew；② 0.x 快跑期：v0.12→v0.14.2 一个多月六版，稳定性承诺只覆盖 UHP 1.0 契约本身，TUI/CLI 仍在变（45 open issues）；③ "解决踩脚"是提供 worktree/lease 机制，多 agent 写同一 worktree 照样踩；④ 单人项目（作者 bio "Your favorite Agent | Maker"，292 followers）——878★ 三个月增速可观，但巴士系数与长期维护要打折观察。</div>
+  <p><b>判断</b>：如果 tmux 是"终端复用"，Luvus 是"agent 复用"——它把 <i>哪个 agent 在哪个 pane、跑到第几步、花了多少 token、卡在等确认还是已完工</i> 变成了一等公民数据，再用 UHP 把这一切开放给程序化消费。"超级 tmux"的叫法传播效率高但低估了它：编排层（worktree/队列/lease/quality gate/合并）和 UHP 契约才是护城河。多 agent 重度用户的尝鲜顺序建议：先单会话跑熟 → 上 Commander 多目标 → 再碰 ORCH 编排。观望者盯两个信号：v1.0 何时切、crates.io 何时真发版。</p>
+  <div class="chips">
+    <span class="chip">878★ Apache-2.0</span><span class="chip">22+ agent 支持矩阵</span><span class="chip">server 唯一写入者</span><span class="chip">UHP 1.0 契约</span><span class="chip">Web 默认只读</span><span class="chip">crates.io 是占位</span>
+  </div>
+
+  <div class="footer"><b>来源</b>：fxtwitter 推文存档（47 赞/6 转）· GitHub API（RizRiyz/luvus 878★/59 forks/Apache-2.0/topics）· README（Features 17 条/22+ agent 矩阵/安装）· AGENTS.md 28KB（Product model/server 单写者/UHP 授权模型）· protocol/uhp/v1（契约/兼容承诺）· releases（v0.12→v0.14.2）· changelog v0.14.2（pane focus history/Letta/OpenCode 2/ORCH 重试）· crates.io API（占位 v0.1.0）· git tree（299 .rs/9.0MB）<br>卡片：infocard-pub · 20260926-luvus · lang zh-CN · theme mistpine</div>
+</div>
+</body>
+</html>
