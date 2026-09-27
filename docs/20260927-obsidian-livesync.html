@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sage-swiss">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>obsidian-livesync · 自托管双向实时同步</title>
+<style>
+/* ============================================================
+   SAGE SWISS — obsidian-livesync 定制样式
+   ============================================================ */
+:root{
+  --bg:#F5F4EF;
+  --paper:#FAFAF7;
+  --ink:#1C1C1A;
+  --green:#5F7E62;
+  --green-deep:#3D5A42;
+  --green-soft:#E9EDE7;
+  --muted:#6B6B63;
+  --muted-2:#9E9E94;
+  --line:#D4D2C9;
+  --line-strong:#B8B6AB;
+  --fill:#ECEAE1;
+  --dark:#1E2620;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{
+  font-family:Inter,"Helvetica Neue",Helvetica,system-ui,-apple-system,
+    "PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);
+  font-size:12.5px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre,.mono{
+  font-family:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+.page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:20px 0 0}
+
+/* ============================================================
+   1. HEADER
+   ============================================================ */
+.header{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:16px;
+  padding-bottom:11px;
+  border-bottom:1px solid var(--line);
+}
+.header-brand{
+  font:700 10.5px/1.3 "JetBrains Mono",monospace;
+  letter-spacing:.05em;color:var(--ink);
+  white-space:nowrap;
+}
+.header-center{
+  text-align:center;
+  font:600 10.5px/1.3 "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+}
+.header-center .ref-id{
+  display:block;font-weight:400;color:var(--muted-2);margin-top:2px;letter-spacing:.04em;
+}
+.header-center .src-count{color:var(--ink);font-weight:700}
+.watch-badge{
+  display:flex;align-items:center;gap:5px;
+  font:700 11px/1 "JetBrains Mono",monospace;
+  letter-spacing:.08em;color:var(--green-deep);text-transform:uppercase;
+  border:1px solid var(--green-deep);padding:5px 12px;
+  cursor:default;white-space:nowrap;
+}
+.watch-badge svg{width:10px;height:10px}
+
+/* ============================================================
+   2. HERO
+   ============================================================ */
+.hero{
+  margin-top:18px;
+  border:1px solid var(--line);
+  background:var(--paper);
+}
+.hero-ref{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  border-bottom:1px solid var(--line-strong);
+}
+.hero-ref-cell{
+  padding:10px 14px;
+  font:500 10px/1.4 "JetBrains Mono",monospace;
+  color:var(--muted);
+}
+.hero-ref-cell:not(:last-child){border-right:1px solid var(--line)}
+.hero-ref-cell .lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);display:block}
+.hero-ref-cell .val{color:var(--ink);font-weight:600;margin-top:1px}
+
+.hero-body{
+  padding:14px 16px;
+  border-bottom:1px solid var(--line);
+}
+.hero-title{
+  font:800 20px/1.15 Inter,sans-serif;
+  letter-spacing:-.02em;color:var(--ink);margin-bottom:6px;
+}
+.hero-title em{font-style:normal;color:var(--green)}
+.hero-meta{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  font:500 10.5px/1 "JetBrains Mono",monospace;color:var(--muted);margin-bottom:10px;
+}
+.hero-meta .tag{
+  background:var(--green-soft);color:var(--green-deep);
+  padding:2px 7px;font-weight:600;letter-spacing:.04em;
+}
+.hero-summary{
+  font-size:12.5px;line-height:1.65;color:var(--dark);
+  max-width:680px;
+}
+
+/* ============================================================
+   3. STATS ROW
+   ============================================================ */
+.stats-row{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--paper);
+}
+.stat-cell{
+  padding:11px 14px;
+  border-right:1px solid var(--line);
+  text-align:center;
+}
+.stat-cell:last-child{border-right:none}
+.stat-num{
+  display:block;
+  font:800 22px/.9 "JetBrains Mono",monospace;
+  color:var(--green-deep);
+}
+.stat-lbl{
+  display:block;
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted-2);margin-top:3px;
+  font-family:"JetBrains Mono",monospace;
+}
+
+/* ============================================================
+   4. MAIN GRID
+   ============================================================ */
+.main-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--bg);
+}
+.main-left,.main-right{
+  border-right:1px solid var(--line);
+}
+.main-right{border-right:none}
+
+/* ---- BACKEND COMPARISON TABLE ---- */
+.table-head{
+  display:grid;
+  grid-template-columns:26px 1fr 90px 80px;
+  gap:0;
+  background:var(--fill);
+  border-bottom:1px solid var(--line-strong);
+}
+.th{
+  padding:7px 10px;
+  font:700 9.5px/1 "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);
+}
+.th:not(:last-child){border-right:1px solid var(--line)}
+
+.table-body{}
+.table-row{
+  display:grid;
+  grid-template-columns:26px 1fr 90px 80px;
+  gap:0;
+  border-bottom:1px solid var(--line);
+  background:var(--paper);
+}
+.table-row:last-child{border-bottom:none}
+.td{
+  padding:9px 10px;
+  font-size:11.5px;line-height:1.5;color:var(--dark);
+  border-right:1px solid var(--line);
+  display:flex;align-items:center;
+}
+.td:last-child{border-right:none}
+.td-num{
+  font:600 9.5px "JetBrains Mono",monospace;
+  color:var(--muted-2);justify-content:center;
+}
+.td-skill{font-weight:600;color:var(--ink)}
+.td-cat{
+  font:500 9.5px/1 "JetBrains Mono",monospace;
+  color:var(--muted);font-size:9.5px;
+}
+.td-lvl{
+  font:700 9px "JetBrains Mono",monospace;
+  font-size:9px;letter-spacing:.04em;
+}
+
+/* backend highlight rows */
+.table-row.row-couchdb .td-skill{color:var(--green-deep)}
+.table-row.row-webrtc .td-skill{color:var(--green-deep)}
+.table-row.row-storage .td-skill{color:var(--green-deep)}
+
+.backend-note{
+  padding:10px 14px;
+  font-size:11px;line-height:1.6;color:var(--muted);
+  background:var(--bg);
+  border-bottom:1px solid var(--line);
+  margin-left:26px;margin-right:0;
+}
+
+/* ---- RIGHT COLUMN ---- */
+.right-section{padding:13px 14px;border-bottom:1px solid var(--line)}
+.right-section:last-child{border-bottom:none}
+.right-title{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:9px;
+  display:flex;align-items:center;gap:8px;
+}
+.right-title::after{flex:1;content:'';height:1px;background:var(--line)}
+.right-title.green{color:var(--green)}
+.right-title.green::after{background:var(--green)}
+.right-title.red{color:var(--green-deep)}
+.right-title.red::after{background:var(--green-deep)}
+
+.analysis-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+.analysis-item{
+  background:var(--green-soft);
+  padding:11px 13px;
+}
+.analysis-item .ai-head{
+  font:700 9.5px "JetBrains Mono",monospace;
+  color:var(--green-deep);margin-bottom:5px;letter-spacing:.05em;
+}
+.analysis-item .ai-body{
+  font-size:11px;line-height:1.5;color:var(--green-deep);
+}
+.analysis-item .ai-body strong{color:var(--ink)}
+
+.judgment-box{
+  border:1px solid var(--green);
+  background:var(--green-soft);
+  padding:10px 13px;
+}
+.judgment-box .jb-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:11px;padding:6px 0;border-bottom:1px solid var(--green-soft);
+}
+.judgment-box .jb-row:last-child{border-bottom:none;padding-bottom:0}
+.judgment-box .jb-lbl{font:600 9.5px "JetBrains Mono",monospace;color:var(--green-deep);letter-spacing:.05em}
+.judgment-box .jb-val{font-weight:700;color:var(--dark)}
+.judgment-box .jb-val.neg{color:var(--muted)}
+
+.warning-box{
+  border:1px solid var(--green-deep);
+  background:var(--green-soft);
+  padding:10px 13px;
+}
+.warning-box .wb-row{
+  display:flex;align-items:flex-start;gap:6px;
+  font-size:11px;padding:5px 0;border-bottom:1px solid var(--line);
+}
+.warning-box .wb-row:last-child{border-bottom:none;padding-bottom:0}
+.warning-box .wb-icon{
+  font:700 9px "JetBrains Mono",monospace;
+  color:var(--paper);background:var(--green-deep);
+  width:14px;height:14px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;border-radius:0;
+}
+.warning-box .wb-text{color:var(--green-deep);line-height:1.5}
+
+.next-steps{}
+.next-item{
+  display:flex;align-items:flex-start;gap:6px;
+  font-size:11.5px;line-height:1.5;color:var(--dark);
+  margin-bottom:8px;
+}
+.next-item:last-child{margin-bottom:0}
+.next-num{
+  font:700 9.5px "JetBrains Mono",monospace;
+  color:var(--paper);background:var(--green-deep);
+  width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+}
+.next-text strong{color:var(--ink)}
+
+/* ============================================================
+   5. SOURCE BAR
+   ============================================================ */
+.source-bar{
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--fill);
+  padding:8px 14px;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  font:500 9.5px "JetBrains Mono",monospace;color:var(--muted);
+}
+.source-bar .sb-item{display:flex;align-items:center;gap:4px}
+.source-bar .sb-lbl{color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase}
+.source-bar .sb-val{color:var(--ink);font-weight:600}
+.source-bar .sb-link{color:var(--green-deep);font-weight:600}
+.source-bar .sb-link:hover{text-decoration:underline}
+.source-bar .sb-sep{flex:1}
+
+/* ============================================================
+   6. FOOTER
+   ============================================================ */
+.footer{
+  margin-top:10px;
+  padding:8px 0;
+  border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+  font:500 9.5px "JetBrains Mono",monospace;color:var(--muted-2);
+}
+.footer-l{letter-spacing:.04em}
+.footer-r a{color:var(--green-deep);font-weight:600}
+.footer-r a:hover{text-decoration:underline}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media(max-width:720px){
+  .hero-ref{grid-template-columns:1fr 1fr}
+  .hero-ref-cell:nth-child(2){display:none}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .main-grid{grid-template-columns:1fr}
+  .main-right{border-right:none;border-top:1px solid var(--line)}
+  .table-head,.table-row{grid-template-columns:26px 1fr 70px}
+  .th:nth-child(4),.td:nth-child(4){display:none}
+  .analysis-grid{grid-template-columns:1fr}
+  .header{grid-template-columns:auto 1fr}
+  .header-center{display:none}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-brand">@vrtmrz</div>
+  <div class="header-center">
+    OBSIDIAN SYNC ENGINE
+    <span class="ref-id">REF <span class="src-count">OBS-LIVESYNC-20260927</span></span>
+  </div>
+  <div class="watch-badge">
+    <svg viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/>
+      <path d="M5 2.5V5L6.5 6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>
+    LIVESYNC
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-ref">
+    <div class="hero-ref-cell">
+      <span class="lbl">Source</span>
+      <span class="val">GitHub</span>
+    </div>
+    <div class="hero-ref-cell">
+      <span class="lbl">Min Obsidian</span>
+      <span class="val">v1.7.2</span>
+    </div>
+    <div class="hero-ref-cell">
+      <span class="lbl">Created</span>
+      <span class="val">2021-10-12</span>
+    </div>
+  </div>
+  <div class="hero-body">
+    <div class="hero-title">obsidian-<em>livesync</em> · 自托管双向实时同步</div>
+    <div class="hero-meta">
+      <span class="tag">同步</span>
+      <span class="tag">Obsidian</span>
+      <span class="tag">E2E 加密</span>
+      <span>@vrtmrz</span>
+      <span>12,202 ★</span>
+    </div>
+    <p class="hero-summary">
+      Obsidian 双向实时同步插件，支持 CouchDB、对象存储（S3 兼容）和 WebRTC P2P 三种后端方案。端到端加密、最小流量、冲突自动合并，1.0 版本正式支持设置/主题/插件同步。
+    </p>
+  </div>
+</div>
+
+<!-- STATS ROW -->
+<div class="stats-row">
+  <div class="stat-cell">
+    <span class="stat-num">12,202</span>
+    <span class="stat-lbl">Stars</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">447</span>
+    <span class="stat-lbl">Forks</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">MIT</span>
+    <span class="stat-lbl">License</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">v1.0</span>
+    <span class="stat-lbl">Obsidian ≥1.7.2</span>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="main-grid">
+
+  <!-- LEFT: BACKEND COMPARISON -->
+  <div class="main-left">
+    <div class="table-head">
+      <div class="th">#</div>
+      <div class="th">后端方案</div>
+      <div class="th">协议</div>
+      <div class="th">成本</div>
+    </div>
+    <div class="table-body">
+      <div class="table-row row-couchdb">
+        <div class="td td-num">01</div>
+        <div class="td td-skill">CouchDB</div>
+        <div class="td td-cat">自托管</div>
+        <div class="td td-lvl">灵活</div>
+      </div>
+      <div class="table-row row-storage">
+        <div class="td td-num">02</div>
+        <div class="td td-skill">对象存储</div>
+        <div class="td td-cat">S3 兼容</div>
+        <div class="td td-lvl">低/免费</div>
+      </div>
+      <div class="table-row row-webrtc">
+        <div class="td td-num">03</div>
+        <div class="td td-skill">WebRTC P2P</div>
+        <div class="td td-cat">点对点</div>
+        <div class="td td-lvl">免费</div>
+      </div>
+    </div>
+    <div class="backend-note">
+      <strong>CouchDB</strong>：自建 fly.io / IBM Cloudant / Raspberry Pi · 高度可控<br>
+      <strong>对象存储</strong>：MinIO / AWS S3 / Cloudflare R2（免费额度）· 即开即用<br>
+      <strong>WebRTC P2P</strong>：无中心服务器，节点发现仍需 Signalling Relay
+    </div>
+
+    <div style="padding:13px 14px;border-bottom:1px solid var(--line);background:var(--paper)">
+      <div class="right-title green" style="margin-bottom:9px">核心功能</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:flex-start;gap:6px;font-size:11.5px;line-height:1.5;color:var(--dark)">
+          <div style="font:700 9.5px 'JetBrains Mono',monospace;color:var(--paper);background:var(--green-deep);width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">✓</div>
+          <span>多后端支持（<strong>CouchDB</strong> / <strong>对象存储</strong> / <strong>WebRTC P2P</strong>）</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:6px;font-size:11.5px;line-height:1.5;color:var(--dark)">
+          <div style="font:700 9.5px 'JetBrains Mono',monospace;color:var(--paper);background:var(--green-deep);width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">✓</div>
+          <span>端到端加密传输，数据主权完全属于用户</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:6px;font-size:11.5px;line-height:1.5;color:var(--dark)">
+          <div style="font:700 9.5px 'JetBrains Mono',monospace;color:var(--paper);background:var(--green-deep);width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">✓</div>
+          <span>设置 / 代码片段 / 主题 / 插件同步（<strong>Customisation Sync Beta</strong>）</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:6px;font-size:11.5px;line-height:1.5;color:var(--dark)">
+          <div style="font:700 9.5px 'JetBrains Mono',monospace;color:var(--paper);background:var(--green-deep);width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">✓</div>
+          <span>冲突自动合并，多设备协作无忧</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:6px;font-size:11.5px;line-height:1.5;color:var(--dark)">
+          <div style="font:700 9.5px 'JetBrains Mono',monospace;color:var(--paper);background:var(--green-deep);width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">✓</div>
+          <span>最小流量高效同步，状态栏实时显示同步状态</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="main-right">
+
+    <div class="right-section">
+      <div class="right-title green">使用场景</div>
+      <div class="analysis-grid">
+        <div class="analysis-item">
+          <div class="ai-head">自托管玩家</div>
+          <div class="ai-body">已有 <strong>CouchDB</strong> 实例或愿意自建，追求完全数据控制权。</div>
+        </div>
+        <div class="analysis-item">
+          <div class="ai-head">预算优先</div>
+          <div class="ai-body">使用 <strong>Cloudflare R2</strong> 免费额度或自建 <strong>MinIO</strong>，几乎零成本。</div>
+        </div>
+        <div class="analysis-item">
+          <div class="ai-head">隐私敏感</div>
+          <div class="ai-body"><strong>E2E 加密</strong>保证数据在传输和存储全程均为密文，服务商无法窥视。</div>
+        </div>
+        <div class="analysis-item">
+          <div class="ai-head">多设备协作</div>
+          <div class="ai-body">手机、平板、电脑多端同步，冲突自动合并，无需手动管理版本。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-section">
+      <div class="right-title">优势</div>
+      <div class="judgment-box">
+        <div class="jb-row">
+          <span class="jb-lbl">数据主权</span>
+          <span class="jb-val">完全自控</span>
+        </div>
+        <div class="jb-row">
+          <span class="jb-lbl">加密</span>
+          <span class="jb-val">E2E</span>
+        </div>
+        <div class="jb-row">
+          <span class="jb-lbl">灵活性</span>
+          <span class="jb-val">三种后端自由切换</span>
+        </div>
+        <div class="jb-row">
+          <span class="jb-lbl">维护</span>
+          <span class="jb-val">活跃 (@vrtmrz)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-section">
+      <div class="right-title red">⚠ 注意事项</div>
+      <div class="warning-box">
+        <div class="wb-row">
+          <div class="wb-icon">!</div>
+          <div class="wb-text">与官方 <strong>Obsidian Sync</strong> 不兼容，二选一</div>
+        </div>
+        <div class="wb-row">
+          <div class="wb-icon">!</div>
+          <div class="wb-text">1.0 版本要求 Obsidian <strong>1.7.2</strong> 及以上</div>
+        </div>
+        <div class="wb-row">
+          <div class="wb-icon">!</div>
+          <div class="wb-text">不可与 iCloud、OneDrive 等同步方案同时启用</div>
+        </div>
+        <div class="wb-row">
+          <div class="wb-icon">!</div>
+          <div class="wb-text">安装前强烈建议<strong>备份 vault</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-section">
+      <div class="right-title green">下一步</div>
+      <div class="next-steps">
+        <div class="next-item">
+          <div class="next-num">1</div>
+          <div class="next-text">确认 Obsidian 版本 ≥ <strong>1.7.2</strong></div>
+        </div>
+        <div class="next-item">
+          <div class="next-num">2</div>
+          <div class="next-text">备份 vault，关闭其他同步插件</div>
+        </div>
+        <div class="next-item">
+          <div class="next-num">3</div>
+          <div class="next-text">在 Community Plugins 中搜索安装 <strong>obsidian-livesync</strong></div>
+        </div>
+        <div class="next-item">
+          <div class="next-num">4</div>
+          <div class="next-text">按需配置 CouchDB / 对象存储 / WebRTC 后端</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-right -->
+</div><!-- /main-grid -->
+
+<!-- SOURCE BAR -->
+<div class="source-bar">
+  <div class="sb-item">
+    <span class="sb-lbl">src</span>
+    <span class="sb-link">github.com/vrtmrz/obsidian-livesync</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-lbl">license</span>
+    <span class="sb-val">MIT</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-lbl">generated</span>
+    <span class="sb-val">2026-09-27</span>
+  </div>
+  <div class="sb-sep"></div>
+  <div class="sb-item">
+    <span class="sb-val">infocard-pub</span>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-l">Generated by infocard-pub · sage-swiss-style · obsidian-livesync</div>
+  <div class="footer-r">
+    <a href="https://github.com/vrtmrz/obsidian-livesync">View Source →</a>
+  </div>
+</div>
+
+</div><!-- /page -->
+</body>
+</html>
