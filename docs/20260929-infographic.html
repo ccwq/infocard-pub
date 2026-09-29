@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="crayon">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AntV Infographic：声明式信息图渲染引擎</title>
+<meta name="theme-contract" content="theme/crayon.html">
+<style>
+/* ============================================================
+   infocard-crayon-style — R6 纸感编辑风
+   基于 R5（空间效率优化）叠加以下改造：
+   ① 常规档字号层级：标题 36–56px / 序号 52px / 条目 18px / 正文 14px
+   ② 时间轴骨架：左侧大号衬线编号 + 赭石色虚线 / 圆点
+   ③ 五色降饱和保留识别性（-35%）
+   ④ 衬线 / 无衬线混排：标题衬线、编号衬线、正文无衬线
+   ⑤ 编辑海报式标题层级：眉标 + 大衬线标题 + 赭石副标题 + 装饰线
+   ⑥ 底部工作流轻量编辑化
+   ⑦ 默认适用于 3–7 个并列条目的编辑型内容，不锁定当前 demo 内容
+   ============================================================ */
+
+/* ============================================================
+   COMPONENT TOKENS — 供主题外部复用
+   ============================================================ */
+
+:root {
+  /* --- 背景与纸张 --- */
+  --crayon-bg:         #f0ead8;   /* 暖米白纸底 */
+  --crayon-paper:       #f5f0e2;   /* 略深纸卡底 */
+
+  /* --- 墨色体系 --- */
+  --crayon-ink:        #1c1c1c;   /* 主文字 */
+  --crayon-muted:      #6b6252;   /* 次级文字 */
+  --crayon-faint:      #9b8e7a;   /* 极淡辅助 */
+
+  /* --- 赭石强调色 --- */
+  --crayon-accent:     #b8924a;   /* 赭石/土黄，用于副标题、装饰圆点 */
+
+  /* --- 五色（降饱和 -35%，保留识别性）--- */
+  --crayon-blue:       #4a7fa8;   /* 原 #2a6fa8 */
+  --crayon-green:      #3a8a70;   /* 原 #2a8a6e */
+  --crayon-purple:     #7a5aaa;   /* 原 #7955ab */
+  --crayon-orange:     #c06030;   /* 原 #d45c1a */
+  --crayon-yellow:     #b08830;   /* 原 #c8971f */
+
+  /* --- 通用 --- */
+  --crayon-red:        #c23a2a;
+  --crayon-line:       rgba(0,0,0,.10);      /* 细分隔线 */
+  --crayon-dash:       rgba(83,73,57,.45);   /* 虚线 */
+  --crayon-radius:     0px;                  /* R6 无圆角，保持编辑感 */
+  --crayon-shadow:     none;                 /* R6 无阴影，保持纸质感 */
+}
+
+/* 主题画布：demo 与实际输出都从视口边缘开始，不保留浏览器白边 */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--crayon-bg);
+}
+body { min-width: 0; }
+
+/* 统一盒模型：避免主题被外部页面注入样式后重新产生边缘溢出 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   POSTER SHELL — 纸感编辑海报覆盖层
+   ============================================================ */
+
+/* 主容器：温暖米白 + 宽松页边 + 纸感 */
+.poster-shell {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  box-sizing: border-box;
+  margin: 0 auto;
+  background: var(--crayon-bg);
+  padding: 32px 34px 26px;
+}
+
+/* 眉标 */
+.poster-shell .poster-kicker {
+  font: 700 10px/1.2 Georgia, "Songti SC", serif;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--crayon-faint);
+  margin-bottom: 16px;
+}
+.poster-shell .poster-kicker strong {
+  color: var(--crayon-accent);
+}
+
+/* ============================================================
+   HERO — 编辑海报式标题区
+   ============================================================ */
+
+.poster-shell .hero {
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--crayon-ink);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 0 22px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+/* 标题条纹（隐藏） */
+.poster-shell .hero-stripe { display: none; }
+
+/* 表情图标：小号 */
+.poster-shell .hero-inner { padding-top: 0; }
+.poster-shell .hero-emoji {
+  font-size: 20px;
+  opacity: .5;
+  margin-bottom: 8px;
+}
+
+/* 主标题：常规档衬线字，保留编辑入口层级 */
+.poster-shell .hero-title {
+  font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
+  font-size: clamp(36px, 6vw, 56px);
+  font-weight: 700;
+  line-height: .95;
+  letter-spacing: -.04em;
+  color: var(--crayon-ink);
+  max-width: 600px;
+  margin-bottom: 14px;
+}
+
+/* 副标题：赭石色强调 */
+.poster-shell .hero-subtitle {
+  font-family: Georgia, "Songti SC", serif;
+  color: var(--crayon-accent);
+  font-size: 16px;
+  max-width: none;
+  margin-bottom: 14px;
+}
+
+/* 标签行：黑 / 灰，无色块 */
+.poster-shell .hero-tags { gap: 0; margin-top: 12px; }
+.poster-shell .hero-tag {
+  background: transparent !important;
+  color: var(--crayon-muted) !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  font: 11px/1.4 Georgia, "Songti SC", serif !important;
+}
+.poster-shell .hero-tag:not(:last-child)::after {
+  content: "  ·  ";
+  color: var(--crayon-faint);
+}
+
+/* 标题底部装饰线 + 圆点 */
+.hero::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--crayon-accent) 0,
+    var(--crayon-accent) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+.hero .hero-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hero .hero-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--crayon-accent);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   STAT ROW — 编辑索引带（无卡片 / 无阴影）
+   ============================================================ */
+
+.poster-shell .stat-row {
+  display: flex;
+  gap: 0;
+  margin: 0 0 16px;
+  padding: 0 0 16px;
+  border-bottom: 1px dashed var(--crayon-dash);
+  flex-wrap: wrap;
+}
+
+.poster-shell .stat-item {
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px dashed var(--crayon-dash) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  min-width: 0;
+  padding: 0 16px;
+  text-align: left;
+  flex: 1;
+  min-width: 80px;
+}
+.poster-shell .stat-item:first-child { padding-left: 0; }
+.poster-shell .stat-item:last-child { border-right: 0 !important; }
+
+/* 数字放大，正文保持清晰 */
+.poster-shell .stat-item b {
+  font: 700 26px/1 Georgia, "Noto Serif SC", serif;
+  color: var(--crayon-ink);
+  display: block;
+}
+.poster-shell .stat-item span {
+  font: 10px/1.4 Georgia, "Songti SC", serif;
+  color: var(--crayon-muted);
+  display: block;
+  margin-top: 3px;
+}
+
+/* ============================================================
+   SECTION TITLE — 章节眉标
+   ============================================================ */
+
+.poster-shell .section-title {
+  font: 700 10px/1.2 Arial, sans-serif;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--crayon-faint);
+  background: transparent;
+  border-bottom: 1px dashed var(--crayon-dash);
+  padding: 0 0 6px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.poster-shell .section-title .num {
+  color: var(--crayon-accent);
+  background: transparent;
+  padding: 0;
+  font-size: 10px;
+}
+
+/* ============================================================
+   CARDS GRID — 时间轴网格
+   ============================================================ */
+
+.poster-shell .cards-grid { display: block; margin: 0; }
+
+/* 单条目骨架：左侧编号列 + 赭石虚线 / 圆点 + 右侧正文 */
+.poster-shell .skill-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 100px 1fr;   /* R6: 编号列扩到 100px，容纳 32px 留白 */
+  gap: 0;
+  border-bottom: 1px dashed var(--crayon-dash);
+  min-height: 104px;                 /* 常规档行高 */
+}
+.poster-shell .skill-card:last-child { border-bottom: 0; }
+
+/* 编号格 */
+.poster-shell .card-num {
+  grid-column: 1;
+  grid-row: 1;
+  background: transparent !important;
+  color: var(--crayon-blue) !important;  /* 灰蓝色衬线大字 */
+  border-radius: 0;
+  padding: 0 32px 0 0;                /* R6: 编号与时间轴之间 32px 留白 */
+  margin: 0;
+  font: 400 52px/.9 Georgia, "Times New Roman", serif;
+  letter-spacing: -.05em;
+  text-align: right;
+  align-self: center;
+}
+.poster-shell .card-num.green  { color: var(--crayon-green)  !important; }
+.poster-shell .card-num.purple { color: var(--crayon-purple) !important; }
+.poster-shell .card-num.orange { color: var(--crayon-orange) !important; }
+.poster-shell .card-num.yellow { color: var(--crayon-yellow) !important; }
+
+/* 赭石色时间轴：竖虚线 */
+.poster-shell .card-stripe {
+  position: absolute;
+  left: 96px;              /* R6: 与网格列右缘 100px 配合，预留 4px 余量 */
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  height: auto;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--crayon-accent) 0,
+    var(--crayon-accent) 5px,
+    transparent 5px,
+    transparent 9px
+  );
+  opacity: .7;
+}
+
+/* 时间轴圆点 */
+.poster-shell .card-stripe::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -3px;
+  transform: translateY(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--crayon-accent);
+}
+
+/* 五色条纹（细线） */
+.poster-shell .card-stripe.blue   { background-color: var(--crayon-blue);   opacity: .6; }
+.poster-shell .card-stripe.green  { background-color: var(--crayon-green);  opacity: .6; }
+.poster-shell .card-stripe.purple { background-color: var(--crayon-purple); opacity: .6; }
+.poster-shell .card-stripe.orange { background-color: var(--crayon-orange); opacity: .6; }
+.poster-shell .card-stripe.yellow { background-color: var(--crayon-yellow); opacity: .6; }
+
+/* 正文区 */
+.poster-shell .card-body {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 14px 22px 14px 18px;
+  min-width: 0;
+  position: relative;
+}
+
+/* 条目标题：无衬线粗体，常规档 18px */
+.poster-shell .card-title {
+  font: 700 18px/1.3 Arial, "PingFang SC", sans-serif;
+  color: var(--crayon-ink);
+  margin: 0 0 6px 0;
+}
+
+/* 正文：无衬线，常规档 14px */
+.poster-shell .card-desc {
+  font: 14px/1.6 Arial, "PingFang SC", sans-serif;
+  color: var(--crayon-muted);
+  max-width: none;
+}
+
+/* 标签链 */
+.poster-shell .card-tags { margin-top: 8px; gap: 0; }
+.poster-shell .card-tag {
+  background: transparent;
+  color: var(--crayon-faint);
+  border-radius: 0;
+  padding: 0;
+  font: 10px/1.3 Georgia, "Songti SC", serif;
+}
+.poster-shell .card-tag:not(:last-child)::after {
+  content: "  |  ";
+  color: var(--crayon-faint);
+}
+
+/* ============================================================
+   USAGE — 底部工作流（轻量编辑化）
+   ============================================================ */
+
+.poster-shell .usage-shell {
+  margin: 18px 0 0;
+  border-top: 1px solid var(--crayon-ink);
+  border-bottom: 1px solid var(--crayon-ink);
+}
+.poster-shell .usage-stripe { display: none; }
+
+.poster-shell .usage-body {
+  padding: 14px 0;
+}
+
+.poster-shell .usage-title {
+  font: 700 10px/1.2 Georgia, "Songti SC", serif;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--crayon-faint);
+  margin-bottom: 10px;
+  background: none;
+  -webkit-text-fill-color: initial;
+  padding: 0;
+}
+
+/* 步骤网格：无边框，虚线分隔 */
+.poster-shell .usage-grid {
+  display: flex;
+  gap: 0;
+  border-top: 1px dashed var(--crayon-dash);
+}
+.poster-shell .usage-step {
+  flex: 1;
+  border: 0;
+  border-right: 1px dashed var(--crayon-dash);
+  border-radius: 0;
+  padding: 10px 12px;
+  background: transparent;
+  box-shadow: none;
+}
+.poster-shell .usage-step:last-child { border-right: 0; }
+.poster-shell .usage-step b {
+  font: 700 9px/1 Arial, sans-serif;
+  color: var(--crayon-faint);
+  display: block;
+  margin-bottom: 4px;
+}
+.poster-shell .usage-step h4 {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 0 3px;
+  color: var(--crayon-ink);
+}
+.poster-shell .usage-step p {
+  font: 10px/1.35 Georgia, "Songti SC", serif;
+  color: var(--crayon-muted);
+  margin: 0;
+}
+
+/* 代码块：缩小视觉权重 */
+.poster-shell .code-block {
+  border-radius: 0;
+  margin-top: 12px;
+  font-size: 10px;
+  opacity: .85;
+  background: #161412;
+  color: #cdd9e5;
+  padding: 10px 14px;
+  overflow-wrap: anywhere;        /* R6: 防止 npx 长 token 撑破 390px */
+  word-break: break-word;
+}
+
+/* ============================================================
+   FOOTER — 出版信息
+   ============================================================ */
+
+.poster-shell .footer {
+  border-top: 1.5px solid var(--crayon-ink);
+  padding: 10px 0 0;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font: 10px/1.4 Georgia, "Songti SC", serif;
+  color: var(--crayon-faint);
+  margin-top: 14px;
+}
+
+.poster-shell .poster-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--crayon-dash);
+  font: 10px/1.4 Georgia, "Songti SC", serif;
+  color: var(--crayon-faint);
+}
+
+/* ============================================================
+   RESPONSIVE — 移动端适配
+   ============================================================ */
+
+@media (max-width: 720px) {
+  .poster-shell {
+    padding: 22px 20px 18px;  /* 20px 左右内边距保证英文长字符串不贴边 */
+  }
+
+  /* 标题压缩但不破坏层级 */
+  .poster-shell .hero-title {
+    font-size: clamp(32px, 9vw, 46px);
+  }
+  .poster-shell .hero-subtitle {
+    font-size: 14px;
+  }
+
+  /* 常规档移动端：编号列 72px，间距与桌面端成比例 */
+  .poster-shell .skill-card {
+    grid-template-columns: 72px 1fr;
+    min-height: 104px;
+  }
+  .poster-shell .card-num {
+    font-size: 42px;
+    padding-right: 24px;              /* R6: 移动端编号-时间轴留白 */
+  }
+  .poster-shell .card-stripe {
+    left: 68px;
+  }
+  .poster-shell .card-body {
+    padding: 12px 10px 12px 14px;
+  }
+  .poster-shell .card-title {
+    font-size: 16px;
+  }
+  .poster-shell .card-desc {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* 统计带：保持横向但更紧凑 */
+  .poster-shell .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .poster-shell .stat-item {
+    padding: 0 8px;
+    min-width: 0;
+    border-right: 1px dashed var(--crayon-dash) !important;
+  }
+  .poster-shell .stat-item:nth-child(3n) { border-right: 0 !important; }
+  .poster-shell .stat-item:nth-child(n+4) { margin-top: 10px; }
+  .poster-shell .stat-item b {
+    font-size: 20px;
+  }
+
+  /* 工作流改为 2 列 */
+  .poster-shell .usage-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .poster-shell .usage-step {
+    border-right: 1px dashed var(--crayon-dash);
+    border-bottom: 1px dashed var(--crayon-dash);
+  }
+  .poster-shell .usage-step:nth-child(2n) { border-right: 0; }
+  .poster-shell .usage-step:nth-last-child(-n+2) { border-bottom: 0; }
+  .poster-shell .footer { flex-direction: column; }
+}
+</style>
+</head>
+<body><main>
+<div class="poster-shell">
+  <div class="poster-kicker"><strong>ANTV</strong> · 声明式信息图生成与渲染引擎</div>
+  <div class="hero">
+    <div class="hero-emoji" aria-hidden="true">🦋</div>
+    <h1 class="hero-title">Infographic<br>让文字活起来</h1>
+    <p class="hero-subtitle">声明式语法 · 约 200 个内置模板 · 默认 SVG 输出 · 支持 AI 流式渲染</p>
+    <div class="hero-tags"><span class="hero-tag">声明式语法</span><span class="hero-tag">AI 流式渲染</span><span class="hero-tag">内置编辑器</span><span class="hero-tag">主题系统</span><span class="hero-tag">SVG 输出</span></div>
+    <div class="hero-dots"><span class="hero-dot"></span><span class="hero-dot"></span><span class="hero-dot"></span></div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-item"><b>~200</b><span>内置模板</span></div>
+    <div class="stat-item"><b>5</b><span>内置 Skill</span></div>
+    <div class="stat-item"><b>SVG</b><span>默认输出</span></div>
+    <div class="stat-item"><b>流式</b><span>逐 token 渲染</span></div>
+    <div class="stat-item"><b>6,917</b><span>GitHub 星标</span></div>
+    <div class="stat-item"><b>MIT</b><span>许可证</span></div>
+  </div>
+  <div class="section-title"><span class="num">01</span>五项核心能力</div>
+  <div class="cards-grid">
+    <div class="skill-card"><div class="card-stripe blue"></div><div class="card-num blue">01</div><div class="card-body"><h3 class="card-title">AI 友好 <span aria-hidden="true">🤖</span></h3><p class="card-desc">配置与语法是照着“让 AI 生成”来调的：提供精简 prompt，并支持 AI 流式输出与同步渲染——生成一个字就能看到一个字的版式。</p><div class="card-tags"><span class="card-tag">精简 prompt</span><span class="card-tag">流式渲染</span><span class="card-tag">AI 生成</span></div></div></div>
+    <div class="skill-card"><div class="card-stripe green"></div><div class="card-num green">02</div><div class="card-body"><h3 class="card-title">开箱即用 <span aria-hidden="true">📦</span></h3><p class="card-desc">约 200 个内置信息图模板，加上数据项组件与布局，几分钟就能拼出专业级信息图，不需要从空画布开始。</p><div class="card-tags"><span class="card-tag">~200 模板</span><span class="card-tag">数据项组件</span><span class="card-tag">布局</span></div></div></div>
+    <div class="skill-card"><div class="card-stripe purple"></div><div class="card-num purple">03</div><div class="card-body"><h3 class="card-title">主题系统 <span aria-hidden="true">🎨</span></h3><p class="card-desc">手绘、渐变、图案三类风格，外加多套预设主题，并允许深度自定义，避免所有图看起来都出自同一个模板。</p><div class="card-tags"><span class="card-tag">手绘</span><span class="card-tag">渐变</span><span class="card-tag">图案</span></div></div></div>
+    <div class="skill-card"><div class="card-stripe orange"></div><div class="card-num orange">04</div><div class="card-body"><h3 class="card-title">内置编辑器 <span aria-hidden="true">🧑‍💻</span></h3><p class="card-desc">框架自带编辑器，AI 生成完还能继续手工改：改文案、调结构、换主题，不必回到代码里重生成。</p><div class="card-tags"><span class="card-tag">所见即所得</span><span class="card-tag">二次编辑</span><span class="card-tag">人机接力</span></div></div></div>
+    <div class="skill-card"><div class="card-stripe yellow"></div><div class="card-num yellow">05</div><div class="card-body"><h3 class="card-title">高质量 SVG <span aria-hidden="true">📐</span></h3><p class="card-desc">默认以 SVG 渲染输出，视觉保真且在任意尺寸下清晰，也方便进一步编辑与二次开发。</p><div class="card-tags"><span class="card-tag">矢量输出</span><span class="card-tag">可编辑</span><span class="card-tag">保真</span></div></div></div>
+  </div>
+  <div class="usage-shell">
+    <div class="usage-stripe"></div>
+    <div class="usage-body">
+      <div class="usage-title">五种接入路径</div>
+      <div class="usage-grid">
+        <div class="usage-step"><b>01</b><h4>npm 安装</h4><p><code>npm install @antv/infographic</code>，库形态直接进你的前端项目。</p></div>
+        <div class="usage-step"><b>02</b><h4>Claude Code</h4><p>仓库内 <code>skills/</code> 目录提供 Skill，走 <code>/plugin marketplace add</code> 装载。</p></div>
+        <div class="usage-step"><b>03</b><h4>Codex</h4><p>用 <code>$skill-installer install</code> 安装同一套 Skill。</p></div>
+        <div class="usage-step"><b>04</b><h4>站点</h4><p>infographic.antv.vision 提供 Docs、Learn 与 Gallery 三块入口。</p></div>
+        <div class="usage-step"><b>05</b><h4>生态</h4><p>Markdown Viewer、Obsidian、VS Code、slidev、Plotly Dash 等场景已有集成。</p></div>
+      </div>
+      <div class="code-block"><span class="cm">// 声明式语法：描述结构，不写坐标</span><span class="kw">infographic</span> <span class="kw">theme</span> hand-drawn <span class="kw">layout</span> list-row</div>
+    </div>
+  </div>
+  <footer class="footer"><span>来源 github.com/antvis/Infographic · README 与站点（2026-09-29 实时读取）</span><span>MIT · 6,917★ · 483 forks</span></footer>
+  <div class="poster-note"><span>AntV 出品 · 声明式信息图渲染引擎</span><span>AI 生成 + 逐 token 流式渲染 + SVG 输出</span></div>
+</div>
+</main></body>
+</html>

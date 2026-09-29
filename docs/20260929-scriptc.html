@@ -1,0 +1,269 @@
+<!doctype html><html lang="zh-CN" data-theme="handline"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-contract" content="theme/handline.html"><title>scriptc：TypeScript 直接编译成原生可执行文件</title><style>
+    :root{color-scheme:light;--bg:#f1ece2;--paper:#fbf7ef;--paper-2:#fffaf3;--ink:#181614;--ink-body:#2d2926;--muted:#5a5248;--line:#2c2723;--line-mid:#7c6e62;--accent:#a76632;--accent-2:#c9762f;--accent-soft:#f2decb;--blue:#1e5cb5;--blue-soft:#edf3ff;--black:#111111;--green:#355f35;--max:1220px}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:radial-gradient(circle at 14% 10%, rgba(255,255,255,.58) 0, rgba(255,255,255,0) 24%),radial-gradient(circle at 84% 8%, rgba(255,255,255,.3) 0, rgba(255,255,255,0) 16%),linear-gradient(180deg,#f4efe6 0%,#efe9de 100%);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13.5px;line-height:1.68;text-rendering:optimizeLegibility}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;background-image:repeating-linear-gradient(0deg, rgba(45,41,38,.016) 0 1px, transparent 1px 5px),repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 7px);mix-blend-mode:multiply;z-index:0}
+    a{color:inherit;text-decoration:none}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .page{width:min(var(--max),calc(100% - 34px));margin:0 auto;padding:18px 0 88px;position:relative;z-index:1}
+
+    /* ── border only: JS generates SVG jittered lines; text stays clean ── */
+    .rough-box{
+      position:relative;
+      /* filter removed: text must NOT be jittered, only borders/lines are hand-drawn */
+    }
+
+    /* ── outer frame ── */
+    .frame{background:linear-gradient(180deg,#fbf7ef 0%,#f8f2e8 100%);padding:16px;transform:rotate(-0.12deg)}
+
+    /* ── topbar ── */
+    .topbar{display:flex;justify-content:space-between;gap:14px;font:800 12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:#1e5cb5;margin-bottom:10px;border-bottom:1px solid #d0c8be;padding-bottom:9px}
+
+    /* ── hero ── */
+    .hero{display:grid;grid-template-columns:minmax(0,1fr) 354px;gap:14px;align-items:start}
+    .hero-title{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:clamp(36px,6vw,72px);line-height:.93;letter-spacing:-.048em;color:#171513;margin:0 0 10px}
+    .hero-lead{font-size:14.6px;line-height:1.72;color:#2d2926;max-width:760px;margin:0 0 10px}
+    .hero-lead b{color:var(--black)}
+    .hero-note{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#5a5248}
+
+    /* ── compare box ── */
+    .compare-box{background:#111;padding:14px;color:#ede8e0;transform:rotate(0.2deg)}
+
+    /* ── quote band ── */
+    .quote-band{margin-top:11px;background:linear-gradient(135deg,#c99d78 0%,#b07b51 100%);padding:12px 15px;color:#2a1f17;transform:rotate(-0.18deg)}
+
+    /* ── process bar ── */
+    .process{margin-top:12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .step{background:#1e1c1a;padding:12px;color:#fff;min-height:88px}
+    .step:nth-child(odd){transform:rotate(-0.35deg)}
+    .step:nth-child(even){transform:rotate(0.28deg)}
+
+    /* ── columns ── */
+    .columns{margin-top:11px;display:grid;grid-template-columns:1.05fr .95fr .98fr;gap:11px;align-items:start}
+    .section-card{background:#fffaf3;padding:13px}
+    .columns>.section-card:nth-child(1){transform:rotate(-0.18deg)}
+    .columns>.section-card:nth-child(2){transform:rotate(0.12deg)}
+    .columns>.section-card:nth-child(3){transform:rotate(-0.06deg)}
+
+    .section-kicker{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:9px;padding-bottom:8px;border-bottom:2px dashed #231f1c}
+    .section-cn{font:900 18px/1.06 Georgia,"Times New Roman","Songti SC",serif;letter-spacing:-.02em;color:#181614}
+    .section-en{color:#1e5cb5;font:800 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;text-align:right;max-width:124px}
+
+    /* ── principles ── */
+    .principles{display:grid;gap:9px}
+    .principle{background:#f4f8ff;padding:8px 9px;display:grid;grid-template-columns:30px 1fr;gap:9px;align-items:start;transform:rotate(0.03deg)}
+    .principle-num{display:grid;place-items:center;width:30px;height:30px;background:#1e5cb5;color:#fff;font:900 13.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;border-radius:8px;flex-shrink:0}
+    .principle b{display:block;margin-bottom:3px;font-size:13.2px;line-height:1.28;color:#181614}
+    .principle p{margin:0;font-size:12px;line-height:1.58;color:#2d2926}
+
+    /* ── agent note ── */
+    .agent-note{margin-top:10px;background:#fff5ef;padding:10px 12px;border-left:6px solid #c8442f;color:#5a2a20;font-size:12px;line-height:1.62;transform:rotate(-0.14deg)}
+
+    /* ── subcard ── */
+    .subsection{display:grid;gap:8px;margin-top:8px}
+    .subcard{background:#fffdf8;padding:11px 12px;transform:rotate(0.05deg)}
+    .subcard h3{margin:0 0 5px;font-size:13.5px;line-height:1.26;display:flex;justify-content:space-between;gap:8px;align-items:center;color:#181614}
+    .subcard h3 .mini{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:#a76632}
+    .subcard p,.subcard li{margin:0;font-size:12px;line-height:1.6;color:#2d2926}
+    .subcard ul{margin:7px 0 0 16px;padding:0;display:grid;gap:4px}
+
+    /* ── tiny rail ── */
+    .tiny-rail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+    .tiny-rail div{background:#edf3ff;padding:8px 9px;border-radius:10px;font-size:11.5px;line-height:1.4;color:#1e5cb5}
+    .tiny-rail div b{display:block;margin-bottom:3px;color:#181614;font-size:12.5px}
+
+    /* ── defense stack ── */
+    .defense-stack{display:grid;gap:8px}
+    .defense{background:#fffcf6;padding:11px 12px}
+    .defense-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:5px}
+    .defense-row b{font-size:13px;line-height:1.26;color:#181614}
+    .defense-row span{font:800 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#355f35;letter-spacing:.06em;text-transform:uppercase}
+    .defense p{margin:0;font-size:12px;line-height:1.6;color:#2d2926}
+
+    /* ── showboat ── */
+    .showboat{margin-top:8px;background:#f3efe7;padding:10px 11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.2px;line-height:1.55;white-space:pre-wrap;color:#2a2622}
+
+    /* ── footer ── */
+    .footer{margin-top:12px;background:#fbf7ef;padding:11px 12px;color:#5a5048;font-size:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;border:2px dashed #c0b8a8;transform:rotate(0.08deg)}
+
+    /* ── save btn ── */
+    .save-wrap{display:flex;justify-content:flex-end;margin-top:14px;padding-right:2px}
+    #saveBtn{border:0;border-radius:8px;padding:.8rem .95rem;background:linear-gradient(135deg,#a76632,#bf5f14);color:#fff;font-weight:800;font-size:.82rem;cursor:pointer;box-shadow:0 12px 28px rgba(167,102,50,.2)}
+
+    /* ── mobile ── */
+    @media(max-width:1080px){.hero{grid-template-columns:1fr}.compare-box{max-width:440px}.columns{grid-template-columns:1fr}}
+    @media(max-width:720px){.page{width:min(100% - 18px,var(--max));padding:10px 0 28px}.frame{padding:13px}.topbar,.footer{flex-direction:column;align-items:flex-start;font-size:12px;line-height:1.4}.hero{gap:12px}.process{grid-template-columns:1fr 1fr;gap:8px}.section-cn{font-size:16px}.save-wrap{justify-content:flex-start}.subcard p,.subcard li,.principle p,.defense p{font-size:12.5px;line-height:1.65}.process p{font-size:12.2px}}
+    @media(max-width:420px){.process{grid-template-columns:1fr}.hero-note{gap:6px}.tiny-rail{grid-template-columns:1fr}}
+  </style></head><body>
+  <main class="page" id="card">
+    <div class="frame rough-box">
+      <div class="topbar">
+        <div>scriptc · TypeScript 直接编译成原生可执行文件</div>
+        <div>vercel-labs/scriptc · 2026-09-29 实时数据</div>
+      </div>
+
+      <section class="hero">
+        <div>
+          <h1 class="hero-title">scriptc</h1>
+          <p class="hero-lead">同一份 TypeScript，编译成<b>不用装 Node 的原生可执行文件</b>：解析与类型检查交给 TypeScript 官方编译器，再经 typed IR → C → LLVM IR，落到原生汇编、对象、二进制与 WASM。静态构建里既没有 Node，也没有任何 JS 引擎。</p>
+          <div class="hero-note">
+            <span class="tag-chip rough-box">TypeScript 进，机器码出</span>
+            <span class="tag-chip rough-box">Apache-2.0</span>
+            <span class="tag-chip rough-box">Node 24+</span>
+            <span class="tag-chip rough-box">macOS / Linux / Windows / WASI</span>
+            <span class="tag-chip rough-box">5,661★</span>
+          </div>
+        </div>
+        <div class="compare-box rough-box">
+          <div class="compare-head">scriptc ≠ 把 JS 引擎一起打包</div>
+          <div class="compare-grid">
+            <div class="compare-item rough-box"><b>bun build --compile / pkg 一类</b><p>产物里塞进了 JS 引擎，运行时仍然在解释执行 JavaScript，只是省掉了安装 Node 这一步。</p></div>
+            <div class="compare-item rough-box"><b>scriptc 的做法</b><p>真的编译到机器码：静态可编译的部分编进小型原生运行时，编不了的代码被报成诊断，或用 <code>--dynamic</code> 显式嵌入 quickjs-ng。</p></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="quote-band rough-box">
+        <p class="quote-big">不能静态编译的代码不是被忽略，而是被报成诊断。</p>
+        <div class="quote-small"><code>scriptc coverage</code> 会对每一个动态或不支持的调用点给出带错误码的诊断。网络 socket / fetch、子进程、OS 信号、文件系统监控这几类在 WASI Preview 1 上缺失的能力，会在链接前以 <code>SC3002</code> 失败，而不是留到运行时才炸。</div>
+      </div>
+
+      <div class="process rough-box">
+        <div class="step rough-box"><span class="step-n">01 · 写 TS</span><b>保留类型系统</b><p>async/await、promise、generator、timers、stdin/readline 事件、回调与 promise 风格的文件系统 API 都在支持范围内。</p></div>
+        <div class="step rough-box"><span class="step-n">02 · 解析 + 类型检查</span><b>复用 TS 编译器</b><p>解析和类型检查直接用 TypeScript 自己的编译器，类型错误在编译期暴露，不拖到产物运行时。</p></div>
+        <div class="step rough-box"><span class="step-n">03 · typed IR</span><b>--emit=ir</b><p>只调 Node 就能产出 <code>.scriptc/hello.ir.json</code>，不拉起 clang、archiver 或链接器。</p></div>
+        <div class="step rough-box"><span class="step-n">04 · C / LLVM</span><b>--emit=c | llvm</b><p>继续降级为可读的 C 源码 <code>hello.c</code> 与文本 LLVM IR <code>hello.ll</code>，每一步都能人工审计。</p></div>
+        <div class="step rough-box"><span class="step-n">05 · 汇编 / 对象 / 二进制</span><b>--emit=asm | obj</b><p><code>hello.s</code>、<code>hello.o</code>，直到 <code>scriptc build hello.ts -o hello</code> 产出独立可执行文件。</p></div>
+      </div>
+
+      <div class="columns">
+        <div class="section-card rough-box">
+          <div class="section-kicker">
+            <div class="section-cn">产出矩阵 · 五种中间态</div>
+            <div class="section-en">emit matrix</div>
+          </div>
+          <div class="subsection">
+            <div class="subcard rough-box"><h3><span>--emit=ir</span><span class="mini">只需 Node</span></h3><p>typed IR JSON，落在 <code>.scriptc/hello.ir.json</code>；连链接器都不需要。</p></div>
+            <div class="subcard rough-box"><h3><span>--emit=c · --emit=llvm</span><span class="mini">可读中间产物</span></h3><p>生成 <code>hello.c</code> 与 <code>hello.ll</code>。不同产出种类会累积在 <code>.scriptc/</code> 里，同一种重建即覆盖。</p></div>
+            <div class="subcard rough-box"><h3><span>--emit=asm · --emit=obj</span><span class="mini">捆绑 helper</span></h3><p>macOS 15+ arm64 上用 scriptc 自带的平台 helper 与预编译运行时包，不需要编译器、archiver、链接器或 SDK，产物部署目标是 <code>arm64-apple-macosx14.0.0</code>。</p></div>
+            <div class="subcard rough-box"><h3><span>--emit=obj 的对象语义</span><span class="mini">relocatable</span></h3><p>写出的可重定位程序对象带未定义的 <code>scr_*</code> 运行时引用与必需的 <code>scr_runtime_abi_v3</code> 标记；需要自包含归档接口时走 <code>scriptc build --lib --profile</code>。</p></div>
+            <div class="tiny-rail"><div class="rough-box"><b>macOS</b><br>15+ arm64</div><div class="rough-box"><b>Linux</b><br>x64</div><div class="rough-box"><b>Windows</b><br>x64</div><div class="rough-box"><b>WASI</b><br>Preview 1</div></div>
+          </div>
+        </div>
+
+        <div class="section-card rough-box">
+          <div class="section-kicker">
+            <div class="section-cn">Node API · 覆盖率 · 动态兜底</div>
+            <div class="section-en">runtime / coverage / dynamic</div>
+          </div>
+          <div class="subsection">
+            <div class="subcard rough-box"><h3><span>Node API 真编到原生运行时</span><span class="mini">node:http</span></h3><p>受支持的 Node API 会编译进原生运行时：<code>node:http</code> 的 <code>createServer</code> 写成服务后 <code>scriptc build server.ts -o server</code>，直接 <code>./server</code> 监听 8080，不需要 Node 进程。</p></div>
+            <div class="subcard rough-box"><h3><span>覆盖率是逐点诊断，不是百分比</span><span class="mini">coverage</span></h3><p>对每个动态或不支持的调用点给一条带码诊断，静态可达比例直接算给你看，方便决定是先改代码还是先上 <code>--dynamic</code>。</p></div>
+          </div>
+          <div class="showboat rough-box">$ scriptc coverage hello.ts
+
+  statements analyzed   2
+  compile statically    2  (100%)
+
+  fully static — this program has no dynamic remainder.
+
+$ scriptc build hello.ts -o hello && ./hello ctate
+hello, ctate
+
+$ SCRIPTC_CC=zigcc SCRIPTC_TARGET=wasm32-wasi \
+    scriptc build hello.ts --no-keep-c -o hello.wasm
+$ file hello.wasm
+hello.wasm: WebAssembly (wasm) binary module version 0x1 (MVP)</div>
+          <div class="subsection" style="margin-top:10px;">
+            <div class="subcard rough-box"><h3><span>--dynamic：显式嵌入 quickjs-ng</span><span class="mini">npm 包</span></h3><p>给 <code>--dynamic</code> 后，npm 包的 JavaScript 会被嵌进可执行文件，运行时不读 <code>node_modules</code>。示例用 picocolors 上色，<code>./cli</code> 直接跑。</p></div>
+            <div class="subcard rough-box"><h3><span>外部对象消费仍属实验</span><span class="mini">--print=native-link-info</span></h3><p>该开关会输出对象并打印一份带版本号的 JSON 配方：目标三元组、<code>main</code> 入口、精确的 <code>@scriptc/runtime</code> 源包、必需系统库、FFI 输入与 ABI 标记，配方里不含隐藏缓存路径。</p></div>
+          </div>
+        </div>
+
+        <div class="section-card rough-box">
+          <div class="section-kicker">
+            <div class="section-cn">安装 · 平台 · 边界</div>
+            <div class="section-en">install / platforms / limits</div>
+          </div>
+          <div class="subsection">
+            <div class="subcard rough-box"><h3><span>安装成本</span><span class="mini">npm 一行</span></h3><ul><li><code>npm install -g scriptc</code>（编译器本身要 Node 24+）</li><li><code>--emit=ir|c|llvm</code> 只需要 Node</li><li>产出的可执行文件不需要 Node</li></ul></div>
+          </div>
+          <div class="defense-stack">
+            <div class="defense rough-box"><div class="defense-row"><b>边界一：实验项目</b><span>Vercel Labs EXPERIMENT</span></div><p>定位是 Vercel Labs 实验项目，API 与行为可能变更，不要拿它编译生产环境的服务端。</p></div>
+            <div class="defense rough-box"><div class="defense-row"><b>边界二：WASI 能力缺口</b><span>SC3002 链接前失败</span></div><p>网络 socket/fetch、子进程、OS 信号、文件系统监控在 WASI Preview 1 上于链接前报 <code>SC3002</code>；sanitizer 构建、原生 FFI、库模式归档在 WASI 上同为目标诊断。</p></div>
+            <div class="defense rough-box"><div class="defense-row"><b>边界三：构建依赖分层</b><span>linker / C compiler</span></div><p>普通 LLVM 层可执行文件需要平台链接器与 SDK/sysroot（<code>SCRIPTC_LINKER</code> 可选择驱动），但用的是捆绑 helper + 预编译运行时包，不编译生成代码与运行时 C；显式 C 构建、LLVM 回退、<code>--sanitize</code> 才额外需要 C 编译器。</p></div>
+          </div>
+          <div class="agent-note"><b>入口</b> = 文档在 scriptc.dev 的 quickstart / cli / dependencies / ffi / platforms / limitations；仓库自测走 <code>pnpm test:sandbox</code>，在一次性的 vercel/sandbox/universal 镜像里装配固定版本 Node、pnpm 与 LLVM 工具链。</div>
+        </div>
+      </div>
+
+      <div class="footer rough-box">
+        <div class="footer-brand">来源：<a href="https://github.com/vercel-labs/scriptc">github.com/vercel-labs/scriptc</a> · README · CLI 文档</div>
+        <div>Apache-2.0 · 5,661★ · 150 forks · 2026-07-22 创建 · 2026-09-29 实时快照</div>
+      </div>
+    </div>
+  </main>
+<script>
+  // Hand-drawn SVG border generator (no external deps)
+  function jitter(v, amt) { return v + (Math.random() - 0.5) * amt; }
+  function mk(tag, attrs) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function roughRect(x, y, w, h, opts) {
+    opts = opts || {};
+    var r = opts.roughness || 1.2, sw = opts.strokeWidth || 2;
+    var sc = opts.stroke || '#1a1a1a';
+    var g = mk('g', {});
+    var points = [
+      [x, y], [x + w, y], [x + w, y + h], [x, y + h]
+    ];
+    // each edge as a slightly perturbed path
+    for (var i = 0; i < 4; i++) {
+      var p1 = points[i], p2 = points[(i + 1) % 4];
+      var segs = 4, d = 'M ' + jitter(p1[0], r * 2) + ' ' + jitter(p1[1], r * 2);
+      for (var s = 1; s <= segs; s++) {
+        var t = s / segs;
+        d += ' L ' + jitter(p1[0] + (p2[0] - p1[0]) * t, r * 2) + ' ' + jitter(p1[1] + (p2[1] - p1[1]) * t, r * 2);
+      }
+      var path = mk('path', {d: d, stroke: sc, 'stroke-width': sw, fill: 'none',
+        'stroke-linecap': 'round', 'stroke-linejoin': 'round'});
+      g.appendChild(path);
+    }
+    return g;
+  }
+
+  function drawRough(el) {
+    var rect = el.getBoundingClientRect();
+    if (rect.width < 8 || rect.height < 8) return;
+    var svg = mk('svg', {
+      width: rect.width, height: rect.height,
+      style: 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:0'
+    });
+    var r = el._roughSeed || (el._roughSeed = Math.random() * 999);
+    svg.appendChild(roughRect(0, 0, rect.width, rect.height, {
+      roughness: 1.2, strokeWidth: 2, stroke: '#1a1a1a', seed: r
+    }));
+    el.style.position = el.style.position || 'relative';
+    el.insertBefore(svg, el.firstChild);
+  }
+
+  function initRough() {
+    var els = Array.prototype.slice.call(document.querySelectorAll('.rough-box'));
+    els.forEach(function(el) { drawRough(el); });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRough);
+  } else {
+    initRough();
+  }
+  window.addEventListener('resize', function() {
+    document.querySelectorAll('.rough-box svg').forEach(function(s) { s.parentNode.removeChild(s); });
+    initRough();
+  });
+  </script>
+</body>
+</html>
