@@ -110,10 +110,18 @@
     .install{font-size:.8rem;word-break:break-all}
     .panel,.panel-grid,.hero,.hero-copy,.hero-pills,.two-stack,.feature,.list,.rank,.wide,.chart-card,.sheet{min-width:0}
     .panel.black p{color:rgba(255,255,255,.92)}
+    .kv{display:grid;gap:8px}
+    .kv-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:10px;border-bottom:1px dashed var(--line);padding-bottom:7px;font-size:.86rem;line-height:1.5}
+    .kv-row:last-child{border-bottom:0;padding-bottom:0}
+    .kv-row>span:first-child{font-weight:700}
+    .kv-row code{font-size:.82em}
+    .panel.black code{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);color:#fff}
     @media(max-width:720px){
       .panel p,.list-item span,.feature p{font-size:.93rem}
       .install code{font-size:.72rem}
       .rank-row{grid-template-columns:96px minmax(0,1fr) 36px}
+      .kv-row{grid-template-columns:1fr;gap:3px}
+      .kv-row>span:first-child{color:var(--muted)}
     }
 
   </style>
@@ -262,14 +270,240 @@
   </aside>
 </section>
 
-<!-- SEC-F · footer -->
-<footer class="footer"><div>RAKAZO · elie222/rakazo · Apache-2.0 · TypeScript · React19/Vite/Hono/oRPC/PostgreSQL+Prisma/Better Auth/Pi · 自托管指南 docs/self-host.md</div><div>数据快照 2026-09-30 · 3112★ / 542 forks / created 2026-08-13 · 源文：公众号「小 G」《OpenAI 重磅发布 dots，我在 GitHub 找到了一个开源版》</div></footer>
-  </div>
-</main>
-</body>
-</html>
+<!-- SEC-G · PAGE 11-12：部署实操 -->
+<section class="panel-grid">
+  <article class="panel">
+    <div class="panel-head"><div class="label">DEPLOY · 七步跑通</div><div class="page-no">PAGE 11</div><h2 data-section="DEPLOY 七步跑通" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">DEPLOY 七步跑通</h2></div>
+    <h2>从空机器到能用的完整序列</h2>
+    <div class="kv">
+      <div class="kv-row"><span><b>① 装前置</b></span><span>Docker Engine + Compose 插件 + curl + OpenSSL，四样齐再往下</span></div>
+      <div class="kv-row"><span><b>② 拉安装脚本</b></span><span><code>mkdir -p rakazo &amp;&amp; cd rakazo &amp;&amp; curl -fsSLO …/infra/compose/install-images.sh &amp;&amp; bash install-images.sh</code></span></div>
+      <div class="kv-row"><span><b>③ 看它填了什么</b></span><span>脚本复制 <code>.env.images.example</code> 并用 openssl 填五个空必填键；重跑保留旧 .env，不轮换密钥</span></div>
+      <div class="kv-row"><span><b>④ 改三处</b></span><span>域名三件套 <code>BETTER_AUTH_URL</code> / <code>WEB_ORIGIN</code> / <code>API_URL</code> 指向你的 https 地址；邮件 <code>SMTP_URL</code> + <code>EMAIL_FROM</code>（本地可用 <code>EMAIL_EMULATOR=true</code>）</span></div>
+      <div class="kv-row"><span><b>⑤ 起栈</b></span><span>打开 <b>http://127.0.0.1:5173</b> 注册；镜像栈把 web 绑在回环，TLS 在宿主机终止后反代</span></div>
+      <div class="kv-row"><span><b>⑥ 验健康</b></span><span>公网 <code>curl --fail https://app.example.com/health</code> 只报存活；细节在 API 内部口：<code>node -e "fetch('http://127.0.0.1:3100/internal/health')…"</code></span></div>
+      <div class="kv-row"><span><b>⑦ 加固主机</b></span><span><code>sudo DEPLOY_USER=deploy bash infra/compose/harden-host.sh</code></span></div>
+    </div>
+  </article>
 
-  </div>
-</main>
+  <article class="panel">
+    <div class="panel-head"><div class="label">KEYS · 五个必填键</div><div class="page-no">PAGE 12</div><h2 data-section="KEYS 五个必填键" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">KEYS 五个必填键</h2></div>
+    <h2>脚本替你生成的，别自己抄重</h2>
+    <div class="kv">
+      <div class="kv-row"><span><code>POSTGRES_PASSWORD</code></span><span><code>openssl rand -hex 16</code> · Compose 内 Postgres 密码，必须 URI 安全</span></div>
+      <div class="kv-row"><span><code>BETTER_AUTH_SECRET</code></span><span><code>rand -hex 32</code> · 会话签名</span></div>
+      <div class="kv-row"><span><code>ENCRYPTION_KEY</code></span><span><code>rand -hex 32</code> · 落库凭据的加密钥匙</span></div>
+      <div class="kv-row"><span><code>SCREEN_PROXY_SECRET</code></span><span><code>rand -hex 32</code> · 签发短时 <code>/novnc/*</code> 看屏能力</span></div>
+      <div class="kv-row"><span><code>SANDBOX_SUPERVISOR_TOKEN</code></span><span><code>rand -hex 32</code> · API ↔ 沙箱监督进程互认</span></div>
+    </div>
+    <p style="margin:10px 0 0;"><b>四条铁律：</b>上面这几个必须<b>各自独立</b>（含可选的 <code>RAKAZO_UPDATER_TOKEN</code>，≥32 字符且与前面都不同）；<code>.env</code> 永不入库、永不贴进 issue/PR；没有备份和操作者同意不得覆盖已有 <code>.env</code>；<b>存过凭据之后再轮换 <code>ENCRYPTION_KEY</code>，旧密文直接读不出来</b>。空键会在 Compose 校验阶段 fail closed（<code>${VAR:?Set …}</code>）。</p>
+  </article>
+</section>
+
+<!-- SEC-H · PAGE 13-15：provider 选型 / 资源上限 / 受限网络 / 升级回滚 -->
+<section class="panel-grid">
+  <article class="panel">
+    <div class="panel-head"><div class="label">PROVIDER · 电脑放哪</div><div class="page-no">PAGE 13</div><h2 data-section="PROVIDER 电脑放哪" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">PROVIDER 电脑放哪</h2></div>
+    <h2>一个环境变量决定 bot 的电脑住哪</h2>
+    <div class="kv">
+      <div class="kv-row"><span><code>docker</code>（默认）</span><span>栈内监督进程按 <code>RAKAZO_COMPUTER_IMAGE</code> 起兄弟容器；要 Docker socket</span></div>
+      <div class="kv-row"><span><code>none</code></span><span>只跑 API/Web，不给 bot 配电脑；仍要 <code>SANDBOX_SUPERVISOR_TOKEN</code></span></div>
+      <div class="kv-row"><span><code>e2b</code></span><span>托管沙箱，需 <code>E2B_API_KEY</code></span></div>
+      <div class="kv-row"><span><code>daytona</code></span><span>需 <code>DAYTONA_API_KEY</code>，可选 <code>DAYTONA_API_URL</code>/<code>_TARGET</code>/<code>_SNAPSHOT</code></span></div>
+      <div class="kv-row"><span><code>box</code></span><span>需 <code>BOX_API_KEY</code>，可选 <code>BOX_API_URL</code></span></div>
+    </div>
+    <p style="margin:10px 0 0;">验证方式只有一条：<code>curl -fsS http://127.0.0.1:3100/internal/health</code> 里看到 <code>sandbox: docker</code>。文档明说——<b>监督令牌缺失属于 setup failure，不能把 <code>sandbox: "none"</code> 当成这条路径成功</b>。远端 provider 也不能替代 Postgres 与 Web UI。补充：注册和本地 Docker 电脑不需要任何 E2B 类账号。</p>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><div class="label">LIMITS · 每台电脑的硬上限</div><div class="page-no">PAGE 14</div><h2 data-section="LIMITS 每台电脑的硬上限" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">LIMITS 每台电脑的硬上限</h2></div>
+    <h2>三行环境变量管住一台电脑</h2>
+    <div class="kv">
+      <div class="kv-row"><span><code>RAKAZO_COMPUTER_MEMORY</code></span><span>默认 <code>2g</code>，写法 <code>1536m</code> 或字节数；下限 6m；<b>同时给 swap 封顶</b>，所以天花板是真的</span></div>
+      <div class="kv-row"><span><code>RAKAZO_COMPUTER_CPUS</code></span><span>默认 <code>2</code>，可以是小数如 <code>1.5</code></span></div>
+      <div class="kv-row"><span><code>RAKAZO_COMPUTER_PIDS_LIMIT</code></span><span>默认 <code>2048</code>，正整数</span></div>
+    </div>
+    <p style="margin:10px 0 0;">配套还有两条出网开关：默认全开（含云厂商链路本地元数据端点）；云 VM 上建议跑 <code>sudo bash infra/compose/restrict-computer-egress.sh</code> 切到 Restricted egress，撤掉这些规则用同脚本 <code>--remove</code>。规则按接口名匹配而不是网段——所以不会因为改子网而意外放开。</p>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><div class="label">OFFLINE · 镜像与断网环境</div><div class="page-no">PAGE 15</div><h2 data-section="OFFLINE 镜像与断网环境" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">OFFLINE 镜像与断网环境</h2></div>
+    <h2>GitHub 和镜像仓库拉不动怎么办</h2>
+    <p style="margin:0 0 10px;">这套脚本专门为受限网络做了开关：换源用 <code>RAKAZO_INSTALLER_URL</code>（脚本本身）+ <code>RAKAZO_DOWNLOAD_BASE</code>（Compose 文件）；只收非 HTTPS 会被拒、尾部斜杠自动裁、下载带有界重试。</p>
+    <p style="margin:0;">镜像拉不动就逐个覆盖：应用 <code>RAKAZO_IMAGE</code>/<code>RAKAZO_IMAGE_TAG</code>、电脑 <code>RAKAZO_COMPUTER_IMAGE</code>/<code>RAKAZO_COMPUTER_IMAGE_TAG</code>、Postgres 与 busybox 走 <code>POSTGRES_IMAGE</code>/<code>BUSYBOX_IMAGE</code> 或给 Docker 守护进程配 <code>registry-mirrors</code>。想复用已下好的文件：把 <code>docker-compose.images.yml</code> 与 <code>.env.images.example</code> 放进目录后跑 <code>bash install-images.sh --local --prepare-only</code>，等价于 <code>RAKAZO_DOWNLOAD_SKIP_EXISTING=1</code>；缺什么仍会自动补下。<b>注意</b>：模型与远端电脑 provider 依旧需要出网。</p>
+  </article>
+
+  <article class="panel black">
+    <div class="panel-head"><div class="label">UPDATE · 升级与回滚</div><div class="page-no">PAGE 16</div><h2 data-section="UPDATE 升级与回滚" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">UPDATE 升级与回滚</h2></div>
+    <h2>升级不留半条命</h2>
+    <p style="color:#fff;opacity:.92;">手动路线：按 tag 拉镜像后 <code>up -d --wait</code>——它要等新 API 健康、worker 与 web 容器也起来才算成功。<code>updater</code> 是可选的侧车 profile（独立镜像与 tag，跑在私有 control 网络，暴露 <code>/health</code> <code>/state</code> <code>/plan</code> <code>/apply</code> <code>/rollback</code>，除 /health 外全部要求共享 bearer 令牌并做常量时间比较）：它会重启栈、等 <code>https://$RAKAZO_HOST/health</code>、失败就回滚。两个坑：CLI 重建失败<b>不会</b>自动回滚，得自己用上一个 tag 恢复；sidecar 持有 Docker socket 等于宿主机 root 权限，所以只给它专属令牌与最小文件清单。<code>GIT_SHA</code> 传了，<code>/internal/health</code> 才会报 <code>revision</code>。</p>
+  </article>
+</section>
+
+<!-- SEC-I · PAGE 17-19：凭据与登录保护 -->
+<section class="panel-grid">
+  <article class="panel">
+    <div class="panel-head"><div class="label">SECRETS · 可复用凭据</div><div class="page-no">PAGE 17</div><h2 data-section="SECRETS 可复用凭据" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">SECRETS 可复用凭据</h2></div>
+    <h2>让 bot 自己用 key，但看不见 key</h2>
+    <p style="margin:0 0 10px;">你对 bot 说「连一下这个 API」，它调 <code>request_secret</code> 并给出引用名和 HTTPS 服务 origin——受保护的卡片会先把 origin 亮给你看，再让你填值。Web、桌面、手机共用同一后端；提交开始后输入框即清空，值不进消息、事件与模型输入。</p>
+    <p style="margin:0 0 10px;">值用部署的 <code>ENCRYPTION_KEY</code>（AES-256-GCM，记录级认证）加密存在 Postgres 的 <code>bot_secrets</code>；<b>只有这个 run 的用户能提交</b>，凭据归属该用户/空间/bot，跨 run 存活，随三者删除而删除。<code>list_secrets</code> 只返回名称、目标与鉴权配置这些元数据，不含值。</p>
+    <div class="kv">
+      <div class="kv-row"><span>鉴权三型</span><span>Bearer · 自定义头（<code>{"type":"header","name":"X-Api-Key"}</code>）· Basic（受保护值当密码，用户名自填）</span></div>
+      <div class="kv-row"><span>调用约束</span><span>origin 必须<b>精确匹配含端口</b>；重定向与不安全网络目标一律拒绝；30 秒超时；响应 ≤1 MB；只回 20,000 字符脱敏正文且不带响应头</span></div>
+      <div class="kv-row"><span>配额</span><span>每个用户、每个 bot 最多 100 条；单值上限 16,384 字符；换 origin 或鉴权方式前必须先删旧值；同名同配置再调 <code>request_secret</code> 直接返回已存引用，加 <code>"replace": true</code> 才换值</span></div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><div class="label">LOGIN · 网站登录代持</div><div class="page-no">PAGE 18</div><h2 data-section="LOGIN 网站登录代持" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">LOGIN 网站登录代持</h2></div>
+    <h2>账号密码存一次，之后它自己登</h2>
+    <p style="margin:0 0 10px;">登录用 <code>request_secret</code> 且 <code>auth.type = "login"</code>，卡片收用户名 + 密码，同样加密落库、模型两者都看不到。登录时 bot 先用 <code>browser_snapshot</code> 找到输入框，再用 <code>fill_secret</code> 依次填 username / password 后点提交。</p>
+    <div class="kv">
+      <div class="kv-row"><span>防串站</span><span>后端解密后，<b>只有页面此刻仍在保存的 origin 上</b>才键入——登录不可能被填进别站或跳转后的页面</span></div>
+      <div class="kv-row"><span>强制 HTTPS</span><span>网站登录的 origin 必须 https；<code>RAKAZO_SECRETS_ALLOW_PRIVATE_HTTP</code> 对它不生效</span></div>
+      <div class="kv-row"><span>传递通道</span><span>值经 stdin 送到电脑（不落命令行参数，避免出现在进程列表）；字段只填 type 为 text/email/password/tel 的输入框</span></div>
+      <div class="kv-row"><span>脱敏</span><span>快照永不上报持有登录的字段值；页面文本里的密码会被洗掉，用户名 ≥6 字符也洗（短用户名不洗，因为替换会波及正常文本）</span></div>
+      <div class="kv-row"><span>审批</span><span>填表<b>不需要</b>额外审批——保存登录本身就是审批，且绑定单一站点；登录值不能用于 <code>secret_request</code></span></div>
+    </div>
+    <p style="margin:10px 0 0;">二次验证码、CAPTCHA、passkey，以及你想自己登的站点，统一走 <code>request_takeover</code>——就是推文里说的「卡住会主动停下来找你」。</p>
+  </article>
+
+  <article class="panel black">
+    <div class="panel-head"><div class="label">BOUNDARY · 边界别误读</div><div class="page-no">PAGE 19</div><h2 data-section="BOUNDARY 边界别误读" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">BOUNDARY 边界别误读</h2></div>
+    <h2>三条它做不到的防护</h2>
+    <p style="color:#fff;opacity:.92;">① 模型没有读值的工具，后端也会剥掉直接与常见编码的回声，<b>但被授权的服务端仍会收到真值</b>——redaction 挡不住一个刻意变换凭据的恶意服务，所以密钥要按最小权限签发。② 值最终键入真实浏览器，任何能读那个浏览器的东西（包括 bot 自己的 shell 经页面或调试端口）都可能读到已填字段——不进模型输入只防误泄，不防一个被策反的 bot。③ 这套机制只覆盖「认证类 HTTP 请求」：<b>把凭据注入任意 shell 命令、文件或环境变量被明确排除</b>，因为那些命令能直接读走。自托管可开 <code>RAKAZO_SECRETS_ALLOW_PRIVATE_HTTP=1</code> 允许私网/回环的 <code>http://</code> origin（默认关，明文，同网谁都能读），但链路本地与云元数据地址始终封禁、公网 origin 始终要求 HTTPS。</p>
+  </article>
+</section>
+
+<!-- SEC-J · PAGE 20-22：运维开关 / 备份 / 失败点 -->
+<section class="panel-grid">
+  <article class="panel">
+    <div class="panel-head"><div class="label">OBSERVE · 工具活动卡</div><div class="page-no">PAGE 20</div><h2 data-section="OBSERVE 工具活动卡" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">OBSERVE 工具活动卡</h2></div>
+    <h2>想看 bot 到底调了什么</h2>
+    <div class="kv">
+      <div class="kv-row"><span>开关位置</span><span>默认<b>关</b>，会话保持干净；<b>设置 → 通用 → 高级 → Show tool activity</b> 打开</span></div>
+      <div class="kv-row"><span>存在哪</span><span>浏览器本地存储 <code>rakazo.showToolActivity</code>，只对该浏览器或桌面安装生效，<b>不入账号、不跨设备同步</b></span></div>
+      <div class="kv-row"><span>跑的时候</span><span>卡片默认展开，列最近 6 步并计数更早的步骤（一步可能代表同一工具的多次调用）；折叠后在该卡片卸载前保持折叠</span></div>
+      <div class="kv-row"><span>跑完了</span><span>折成一行，显示工具数与耗时；展开可看全部步骤。只有工具调用的 bot 消息渲染成细行而不是气泡</span></div>
+      <div class="kv-row"><span>重要区别</span><span>它只改客户端渲染——打开或关闭时，线程事件、落库消息、API 响应完全一致。仅 Web 与 Electron 桌面支持</span></div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><div class="label">OPS · 备份与日常命令</div><div class="page-no">PAGE 21</div><h2 data-section="OPS 备份与日常命令" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">OPS 备份与日常命令</h2></div>
+    <h2>四条命令覆盖日常运维</h2>
+    <div class="install"><code>./scripts/backup.sh</code></div>
+    <p style="margin:8px 0 10px;">pg_dump + <code>data/</code> 归档，失败即非零退出。持久状态都在 <code>DATA_DIR</code>（含工作区与检查点），远端沙箱的磁盘只是运行时缓存，不是真相来源。</p>
+    <div class="install"><code>sudo DEPLOY_USER=deploy bash infra/compose/harden-host.sh</code></div>
+    <p style="margin:8px 0 10px;">主机加固清单落地脚本。想更保守再加出网限制脚本（见 PAGE 14），撤销加 <code>--remove</code>。</p>
+    <div class="install"><code>docker compose up -d --wait</code></div>
+    <p style="margin:8px 0 10px;">升级入口：等到新 API、worker、web 都健康才返回成功。</p>
+    <div class="install"><code>docker compose down -v</code></div>
+    <p style="margin:0;color:var(--blue);font-weight:700;">危险：这个 -v 会把 Postgres 的全部状态删干净。</p>
+  </article>
+
+  <article class="panel black">
+    <div class="panel-head"><div class="label">PITFALLS · 自建最容易踩的八个坑</div><div class="page-no">PAGE 22</div><h2 data-section="PITFALLS 自建最容易踩的八个坑" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">PITFALLS 自建最容易踩的八个坑</h2></div>
+    <h2>上手前先读这八条</h2>
+    <p style="color:#fff;opacity:.92;">① 少写 <code>SANDBOX_SUPERVISOR_TOKEN</code> → 栈起不来，别把 <code>sandbox:"none"</code> 当通过；② 把几个密钥抄成同一个值 → 违反独立性规则；③ 存了凭据再轮换 <code>ENCRYPTION_KEY</code> → 旧密文永久读不出；④ 公网裸 HTTP → 只有回环与私网地址被接受，公网必须 HTTPS 反代；⑤ 以为 Team 电脑的文件夹分工是隔离 → 每个 bot 都能读整个团队工作区，私密任务另配 Private Computer；⑥ Docker 电脑默认出网全开 → 云 VM 上记得切 Restricted egress，否则等于把实例凭证摆在 bot 面前；⑦ 开了桌面版 <code>SANDBOX_PROVIDER=desktop</code> 却忘了它的命令跑在你自己的 OS 账户下；⑧ 把 <code>.env</code> 提交进仓库或贴进 issue。</p>
+  </article>
+</section>
+
+<!-- SEC-K · PAGE 23-24：仓库解剖 + beta 迭代实录 -->
+<section class="panel-grid">
+  <article class="panel">
+    <div class="panel-head"><div class="label">ANATOMY · 仓库解剖</div><div class="page-no">PAGE 23</div><h2 data-section="ANATOMY 仓库解剖" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">ANATOMY 仓库解剖</h2></div>
+    <h2>1,801 个文件的 monorepo</h2>
+    <div class="kv">
+      <div class="kv-row"><span><code>apps/</code> 707 文件</span><span>web · api · worker · desktop · mobile · www（官网），六个可独立构建的端</span></div>
+      <div class="kv-row"><span><code>packages/</code> 922 文件</span><span>core · db · auth · memory · contracts · adapters + adapter-kit · chat-ui · ui-web · ui-tokens · logging · testkit</span></div>
+      <div class="kv-row"><span><code>infra/</code> 88 文件</span><span>compose · sandboxes · systemd · updater——自托管的全部落地材料都在这</span></div>
+      <div class="kv-row"><span><code>docs/</code> 23 文件</span><span>其中 12 篇 markdown 指南：自托管、密钥清单、电脑运行时与隔离、沙箱 provider、受限网络、桌面/移动发布、性能、AI 数据共享评审、bot 凭据、工具活动</span></div>
+      <div class="kv-row"><span>工程基建</span><span><code>.github/</code> 17 个 CI 配置 · <code>.agents/</code> 12 个 agent 说明 · Turbo + pnpm workspace + Biome + Vitest + tsconfig.base</span></div>
+      <div class="kv-row"><span>仓库还带什么</span><span><code>VISION.md</code>（产品意图）· <code>SECURITY.md</code> · <code>CONTRIBUTING.md</code> · <code>AGENTS.md</code>/<code>CLAUDE.md</code>（给编码 agent 的仓库说明）</span></div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><div class="label">ITERATION · beta 迭代实录</div><div class="page-no">PAGE 24</div><h2 data-section="ITERATION beta 迭代实录" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">ITERATION beta 迭代实录</h2></div>
+    <h2>从 0.1.0-beta 到现在的真实改动</h2>
+    <p style="margin:0 0 10px;">起点 <b>0.1.0-beta（2026-08-13）</b>：web / Electron / Expo 三端客户端、Pi runtime、Docker 与 E2B 电脑、插件，以及单线程 + 单电脑 + 记忆 + 例程 + 历史的雏形。</p>
+    <p style="margin:0 0 10px;"><b>新增：</b>语音模式（朗读回复、按住说话口述、半双工通话，接 ElevenLabs / OpenAI / Cartesia / Fish Audio）；桌面版 Docker 可选「命令直接跑在本机 OS 账户下」；GitHub Copilot 与 SuperGrok / X Premium 登录；派生 peer bots 与线程内短命 subagents；ChatGPT Plus/Pro 登录；移动端可指向自托管 API、原生 iOS 收件箱、接管实时桌面；provider 中立的集成层（托管侧 Composio / Pipedream Connect，自装侧加密的 Treg / HTTPS MCP / OpenAPI 工具源）；<b>例程改大白话，不再写 cron</b>。</p>
+    <p style="margin:0;">调整：消息气泡放宽到窗口 84%/88%；每次运行的系统提示带上当前 UTC 日期时间，让 bot 按真实当下判断时效与排期；Slack / WhatsApp Business Cloud / Telegram DM 从「消息」设置接入（每个应用可绑不同 bot，与 iMessage/SMS 并列）；模型选择器加入 Grok 4.6 与 Ox Alpha Free / GLM-5.3（OpenCode Go）。</p>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><div class="label">FIXED · 值得记的修复</div><div class="page-no">PAGE 25</div><h2 data-section="FIXED 值得记的修复" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">FIXED 值得记的修复</h2></div>
+    <h2>beta 里被修掉的真实故障</h2>
+    <div class="kv">
+      <div class="kv-row"><span>Bedrock 全崩</span><span>走 Amazon Bedrock 的 Claude 模型每轮都失败，报 <code>input_schema does not support oneOf, allOf, or anyOf at the top level</code>——工具入参 schema 的顶层联合类型不被接受</span></div>
+      <div class="kv-row"><span>工具太多被拒</span><span>挂 20 个以上 MCP 工具、又用 Claude Pro/Max/Team 登录时会报「You're out of extra usage」；Pipedream 一次性暴露所有已连应用的工具，超过 20 个后连接器改为按需开放</span></div>
+      <div class="kv-row"><span>推理模型空回</span><span>推理模型的思考会占用与输出同一个上限，难题上可能出现「No response. Try again.」（32k 输出问题一并修掉）</span></div>
+      <div class="kv-row"><span>开场静默</span><span>新建 bot 的线程开局是空的且一直不吭声，导致 <code>title</code>/<code>description</code>/<code>instructions</code> 被读错也发现不了——现在会先自我介绍；介绍语运行期间发来的消息也不再由不能调工具的介绍语回答，而是排队等它结束</span></div>
+      <div class="kv-row"><span>消息被吞</span><span>同一线程里例程或入站 webhook 正在跑时发出的消息，会被折算进那一轮当 steering——现在独立处理</span></div>
+      <div class="kv-row"><span>图片失忆</span><span>早前消息里附的图片，在后续轮次提问时对能看图的模型不可见；现在只有当前轮次之外的也可见</span></div>
+    </div>
+  </article>
+</section>
+
+<!-- SEC-L · PAGE 26-27：云编码代理 + 验收分层与性能基准 -->
+<section class="panel-grid">
+  <article class="panel">
+    <div class="panel-head"><div class="label">CLOUD AGENT · 云端编码代理</div><div class="page-no">PAGE 26</div><h2 data-section="CLOUD AGENT 云端编码代理" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">CLOUD AGENT 云端编码代理</h2></div>
+    <h2>把仓库任务外包给云端编码代理</h2>
+    <p style="margin:0 0 10px;">这是和「bot 电脑」「线程内 subagents」并列的第三种执行路径：把仓库任务丢给托管编码代理，结果以状态与 PR 链接的形式回到 bot 会话里——Web、桌面、移动端看到的是同一份状态。默认 <code>CLOUD_AGENT_PROVIDER=none</code>，<b>核心工作流不依赖 Cursor 或任何托管编码服务</b>。</p>
+    <div class="kv">
+      <div class="kv-row"><span>开启条件</span><span><code>CLOUD_AGENT_PROVIDER=cursor</code> + <code>CLOUD_AGENT_SPACE_ID</code> + <code>CURSOR_API_KEY</code>，API 与 worker 必须配同一份；key 与显式 Space ID 缺一不可</span></div>
+      <div class="kv-row"><span>四个工具</span><span><code>cloud_agent_launch</code> / <code>cloud_agent_status</code> / <code>cloud_agent_reply</code> / <code>cloud_agent_cancel</code>；三个变更类走既有审批规则与自动审查策略——空规则集加关闭自动审查等于默认放行</span></div>
+      <div class="kv-row"><span>发起参数</span><span>prompt、可选仓库、图片、<code>openPr</code>；<b>故意不支持传环境变量</b>——把密钥放进模型生成的工具参数会把它留在普通历史里，远端密钥请在 provider 侧直接配</span></div>
+      <div class="kv-row"><span>归属隔离</span><span>每个 agent 额外绑定发起用户，别人拿到 agent ID 也查不到、回不了、取消不了；部署 key 永不作为模型工具参数传入</span></div>
+      <div class="kv-row"><span>断线恢复</span><span>归属与待办操作存在数据库里，与聊天卡片无关；worker 与对账器会恢复队列失败与中断的启动。Cursor 用稳定的 client agent ID，重试已接受的创建不会造出第二个远端 agent</span></div>
+      <div class="kv-row"><span>不假装成功</span><span>后续回复丢失时观察最新 run 而不是重发 prompt；在能区分出新 run 之前状态保持 pending，绝不说「旧 run 已完成」；取消同样在远端确认前保持 pending。结果长期不明就直接去 provider 站点看</span></div>
+      <div class="kv-row"><span>自动收尾</span><span>清空会话、删除或归档 bot、移除主人的 Space 成员身份，都会在下次对账时取消待办远端工作；终态通知按持久记录去重；key 或 provider 变化时凭据绑定 fail closed</span></div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><div class="label">VERIFY · 七层验收与性能基准</div><div class="page-no">PAGE 27</div><h2 data-section="VERIFY 七层验收与性能基准" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">VERIFY 七层验收与性能基准</h2></div>
+    <h2>确定性与真实模型分开测</h2>
+    <p style="margin:0 0 10px;">仓库把「确定性执行回归」和「真实模型任务质量」明确分层：脚本化回应只能证明工具调用会正确执行，只有真模型才能证明它会为一句自然语言挑对动作。</p>
+    <div class="kv">
+      <div class="kv-row"><span><code>pnpm test</code></span><span>现有快测：产品函数与契约真实，agent、服务、沙箱用脚本替身</span></div>
+      <div class="kv-row"><span><code>pnpm test:pi</code></span><span>Pi 协议回归：agent 循环、HTTP/SSE 解析、工具派发，模型端点走回环</span></div>
+      <div class="kv-row"><span><code>pnpm test:integration</code></span><span>Pi 产品旅程：API、已保存的模型连接、Postgres、executor 全真</span></div>
+      <div class="kv-row"><span><code>pnpm test:computer-replay</code></span><span>Docker 电脑回放：supervisor + Chromium + 页面助手 + 下载与文件，对本地样例站点</span></div>
+      <div class="kv-row"><span><code>pnpm test:evals --live</code></span><span>真模型任务质量（需要显式本地命令）</span></div>
+      <div class="kv-row"><span><code>pnpm test:computer</code></span><span>视觉验收：真视觉模型 + Box 或 E2B 桌面</span></div>
+    </div>
+    <p style="margin:10px 0 0;">纪律：默认与 PR 测试<b>永不</b>需要付费推理；夜间只跑 web 测试且用仿真 provider；Docker 拓扑与浏览器回放走手动工作流；夜间验收绝不启动电脑沙箱、也绝不索取模型或沙箱凭证。桌面性能另有基准：<code>pnpm perf:desktop -- --label=before</code>（报告只落本地 <code>.context/performance/</code>，<code>--samples=2</code> 快速迭代、<code>--asset-delay=80</code> 配 <code>--remote-renderer</code>/<code>--skip-build</code> 对比打包与远端加载、macOS 用 <code>--disable-warm-window</code> 对比销毁重建与保留热窗），改完一处性能敏感行为再用 <code>pnpm perf:compare</code> 做前后对照。它测的是打包 Electron 里的生产 Vite 渲染器 + 一次性 Postgres + 脚本化运行时 + 假沙箱，既不碰 provider 账号也不碰生产数据。</p>
+  </article>
+</section>
+
+<!-- SEC-M · PAGE 28：移动端同意流与自建者开关 -->
+<section class="panel-grid">
+  <article class="panel">
+    <div class="panel-head"><div class="label">MOBILE · 移动端数据同意</div><div class="page-no">PAGE 28</div><h2 data-section="MOBILE 移动端数据同意" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">MOBILE 移动端数据同意</h2></div>
+    <h2>手机端上传前先拿授权</h2>
+    <p style="margin:0 0 10px;">移动客户端在上传附件、提交消息、启动例程或发送语音内容之前会先取得许可，同意记录按<b>账号 + Space + 接收方 + 披露版本</b>分别保存；只读的披露/授权端点不改变 provider 的执行路径，Web、桌面、worker、辅助模型选择与自托管服务端行为都维持原样。</p>
+    <div class="kv">
+      <div class="kv-row"><span>覆盖范围</span><span>许可包含从手机端显式启动的后台工作；撤回只对<b>新的</b>移动端操作生效，不会取消已授权的工作——要停正在跑的任务请用既有控件＋关例程</span></div>
+      <div class="kv-row"><span>它不是</span><span>不是全局数据访问或运行撤销系统；也没有引入网关黑名单、provider 路由覆盖或外部元数据请求</span></div>
+      <div class="kv-row"><span>自建者开关</span><span>自托管可用 <code>PRIVACY_POLICY_URL</code> 指向自己的绝对 HTTP(S) 政策页；不设则链接 Rakazo 的政策（该页会区分托管与自托管运营方）。未知的自定义 provider 不会凭空生成 provider 政策链接</span></div>
+      <div class="kv-row"><span>发布顺序</span><span>先迁移同意记录并部署 API，再放移动客户端——旧服务端没有披露端点就撑不起新流程，但既有 Web/桌面客户端与 provider 执行不受影响</span></div>
+    </div>
+    <p style="margin:10px 0 0;">文件里还有一条值得学的工程态度：发布门禁要求核对评审账号<b>实际</b>的模型、语音、记忆与云代理配置，并验证所选 provider 的协议、留存、删除与安全措施是否达到「同等或更强保护」——<b>只有一个隐私链接不算证据</b>；涉及 OpenRouter/Vercel AI Gateway 时要核实真实下游路由，因为对方的驳回要求的是「披露接收方并取得许可」，而不是一律禁用这类网关。</p>
+  </article>
+</section>
+
+<!-- SEC-F · footer -->
+<footer class="footer"><div>RAKAZO · elie222/rakazo · Apache-2.0 · TypeScript · React19/Vite/Hono/oRPC/PostgreSQL+Prisma/Better Auth/Pi · 自托管指南 docs/self-host.md</div><div>数据快照 2026-09-30 · 3112★ / 542 forks / created 2026-08-13 · 源文：公众号「小 G」《OpenAI 重磅发布 dots，我在 GitHub 找到了一个开源版》</div></footer></div>
+  </main>
+  <script>
+    (function(){
+      function send(){window.parent.postMessage({type:'theme-height',slug:'bigwhite',height:document.body.scrollHeight},'*')}
+      if(document.readyState==='complete') send(); else window.addEventListener('load',send);
+      setTimeout(send,500); setTimeout(send,1500);
+    })();
+  </script>
 </body>
 </html>

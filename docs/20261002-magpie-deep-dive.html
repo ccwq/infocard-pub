@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sage-swiss">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magpie 深度解析 · 一个本地网关喂饱所有 Agent</title>
+<style>
+:root{
+  --bg:#F5F4EF;--paper:#FAFAF7;--ink:#1C1C1A;
+  --green:#5F7E62;--green-deep:#3D5A42;--green-soft:#E9EDE7;
+  --muted:#6B6B63;--muted-2:#9E9E94;--line:#D4D2C9;
+  --line-strong:#B8B6AB;--fill:#ECEAE1;--dark:#1E2620;
+  --code-ink:#D9E4D5;--code-dim:#8CA08A;--code-acc:#A8C8A0;
+  --red:#8B3A3A;--red-soft:#F3E4E0;--amber:#8B6A00;--amber-soft:#F5EDD4;
+  --ink-2:#333333;--ink-3:#444444;--tldr-ink:#2C332C;--risk-ink:#4A3030;
+  --white:#FFFFFF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{
+  font-family:Inter,"Helvetica Neue",Helvetica,system-ui,-apple-system,
+    "PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);
+  font-size:12.5px;line-height:1.6;-webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+code,.mono{font-family:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{width:min(1060px,calc(100% - 20px));margin:0 auto;padding:20px 0 0}
+
+/* header */
+.hdr{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding-bottom:11px;border-bottom:1px solid var(--line)}
+.brand{font:700 10.5px/1.3 "JetBrains Mono",monospace;letter-spacing:.05em;white-space:nowrap}
+.hc{text-align:center;font:600 10px/1.4 "JetBrains Mono",monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.hc .rid{display:block;font-weight:400;color:var(--muted-2);margin-top:2px;letter-spacing:.04em}
+.hc .sc{color:var(--ink);font-weight:700}
+.wb{display:flex;align-items:center;gap:5px;font:700 10.5px/1 "JetBrains Mono",monospace;letter-spacing:.08em;color:var(--green-deep);text-transform:uppercase;border:1px solid var(--green-deep);padding:5px 11px;white-space:nowrap}
+
+/* hero */
+.hero{margin-top:18px;border:1px solid var(--line);background:var(--paper)}
+.hb{padding:16px 18px 14px;border-bottom:1px solid var(--line)}
+.ht{font:800 24px/1.22 Inter,sans-serif;letter-spacing:-.02em;margin-bottom:8px}
+.ht em{font-style:normal;color:var(--green)}
+.hsub{font-size:13px;line-height:1.75;color:var(--ink-2);max-width:780px;margin-bottom:10px}
+.hm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:500 10px/1.4 "JetBrains Mono",monospace;color:var(--muted)}
+.hm .tag{background:var(--green-soft);color:var(--green-deep);padding:2px 7px;font-weight:600;letter-spacing:.04em}
+.hmlinks{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font:600 10.5px/1 "JetBrains Mono",monospace}
+.hmlinks a{color:var(--green-deep);border-bottom:1px solid var(--line-strong);padding-bottom:2px}
+
+/* stats row (required selector) */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-top:none;background:var(--paper)}
+.stat{padding:12px 14px;border-right:1px solid var(--line);text-align:center}
+.stat:last-child{border-right:none}
+.stat b{display:block;font:800 21px/1 "JetBrains Mono",monospace;color:var(--green-deep)}
+.stat span{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-top:4px;font-family:"JetBrains Mono",monospace}
+
+/* tldr */
+.tldr{margin-top:14px;border:1px solid var(--line-strong);background:var(--green-soft);padding:13px 16px}
+.tldr h2{font:800 15px/1.3 Inter,sans-serif;color:var(--green-deep);margin-bottom:6px}
+.tldr p{font-size:12.5px;line-height:1.75;color:var(--tldr-ink);margin-bottom:6px}
+.tldr p:last-child{margin-bottom:0}
+.tldr b{color:var(--green-deep)}
+
+/* section */
+.sec{margin-top:22px}
+.sec-h{display:flex;align-items:baseline;gap:10px;border-bottom:2px solid var(--ink);padding-bottom:7px;margin-bottom:12px}
+.sec-h .no{font:800 11px/1 "JetBrains Mono",monospace;color:var(--green);letter-spacing:.1em}
+.sec-h h2{font:800 18px/1.2 Inter,sans-serif;letter-spacing:-.015em}
+.sec-h .en{margin-left:auto;font:600 9.5px/1 "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+.sec p.body{font-size:12.5px;line-height:1.8;color:var(--ink-2);margin-bottom:9px}
+.sec p.body b{color:var(--ink)}
+.sec p.body em{font-style:normal;color:var(--green-deep);font-weight:600}
+.sec p.body code{background:var(--fill);padding:1px 5px;font-size:11px;color:var(--green-deep)}
+
+/* main grid (required selector) */
+.main-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:14px;align-items:start}
+.analysis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.acard{border:1px solid var(--line);background:var(--paper);padding:12px 13px}
+.acard h3{font:700 12.5px/1.4 Inter,sans-serif;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.acard h3 .dot{width:7px;height:7px;background:var(--green);flex-shrink:0}
+.acard p{font-size:11.5px;line-height:1.7;color:var(--ink-3)}
+.acard p code{background:var(--fill);padding:0 4px;font-size:10.5px;color:var(--green-deep)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+
+/* panels */
+.panel{border:1px solid var(--line);background:var(--paper)}
+.panel-h{padding:9px 13px;border-bottom:1px solid var(--line);font:700 10px/1 "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--green-deep);display:flex;align-items:center;gap:8px}
+.panel-h::after{flex:1;content:'';height:1px;background:var(--line)}
+.panel-b{padding:12px 13px}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);background:var(--paper)}
+table.t{width:100%;border-collapse:collapse;font-size:11.3px;min-width:520px}
+table.t th{background:var(--fill);text-align:left;padding:7px 10px;font:700 9.5px/1.3 "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line-strong);white-space:nowrap}
+table.t td{padding:7px 10px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top;line-height:1.55}
+table.t tr:last-child td{border-bottom:none}
+table.t td code{background:var(--fill);padding:0 4px;font-size:10.3px;color:var(--green-deep);white-space:nowrap}
+table.t .b{font-weight:700;color:var(--ink);white-space:nowrap}
+
+/* code blocks */
+.code{background:var(--dark);border:1px solid var(--line-strong);padding:11px 13px;font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.75;color:var(--code-ink);white-space:pre;overflow-x:auto}
+.code .c{color:var(--code-dim)}
+.code .a{color:var(--code-acc)}
+.code .k{color:var(--white);font-weight:700}
+
+/* risk panels */
+.risk{border:1px solid var(--red);background:var(--red-soft);padding:11px 13px}
+.risk-h{font:700 10px/1 "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--red);margin-bottom:7px;display:flex;align-items:center;gap:8px}
+.risk-h::after{flex:1;content:'';height:1px;background:var(--red)}
+.risk ul{list-style:none}
+.risk li{display:flex;gap:7px;font-size:11.3px;line-height:1.65;color:var(--risk-ink);margin-bottom:5px}
+.risk li:last-child{margin-bottom:0}
+.risk li::before{content:'!';font:800 10px/1.6 "JetBrains Mono",monospace;color:var(--red);flex-shrink:0}
+.note{border-left:3px solid var(--green);background:var(--paper);border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:9px 12px;font-size:11.5px;line-height:1.7;color:var(--ink-3);margin-top:10px}
+.note b{color:var(--green-deep)}
+
+/* process steps */
+.steps{display:grid;gap:7px;margin-top:10px}
+.step{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;border:1px solid var(--line);background:var(--paper);padding:9px 12px}
+.step .n{font:800 12px/1.5 "JetBrains Mono",monospace;color:var(--white);background:var(--green-deep);width:22px;height:22px;text-align:center;flex-shrink:0}
+.step p{font-size:11.5px;line-height:1.65;color:var(--ink-2)}
+.step p code{background:var(--fill);padding:0 4px;font-size:10.5px;color:var(--green-deep)}
+.step p b{color:var(--ink)}
+
+/* faq */
+.faq{display:grid;gap:8px}
+.qa{border:1px solid var(--line);background:var(--paper);padding:10px 13px}
+.qa .q{font-weight:800;font-size:12.3px;margin-bottom:4px;display:flex;gap:8px}
+.qa .q::before{content:'Q';font:800 11px/1.7 "JetBrains Mono",monospace;color:var(--green);flex-shrink:0}
+.qa .a{font-size:11.5px;line-height:1.7;color:var(--ink-3);display:flex;gap:8px}
+.qa .a::before{content:'A';font:800 11px/1.7 "JetBrains Mono",monospace;color:var(--muted);flex-shrink:0}
+.qa .a code{background:var(--fill);padding:0 4px;font-size:10.5px;color:var(--green-deep)}
+
+/* fit / fit-not */
+.fit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fit{border:1px solid var(--green);background:var(--paper)}
+.fit.n{border-color:var(--line-strong)}
+.fit-h{padding:8px 12px;font:700 10px/1 "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase}
+.fit.y .fit-h{color:var(--green-deep);background:var(--green-soft);border-bottom:1px solid var(--green)}
+.fit.n .fit-h{color:var(--muted);background:var(--fill);border-bottom:1px solid var(--line-strong)}
+.fit ul{list-style:none;padding:10px 12px}
+.fit li{display:flex;gap:7px;font-size:11.5px;line-height:1.65;color:var(--ink-2);margin-bottom:6px}
+.fit li:last-child{margin-bottom:0}
+.fit.y li::before{content:'+';font:800 11px/1.5 "JetBrains Mono",monospace;color:var(--green);flex-shrink:0}
+.fit.n li::before{content:'−';font:800 11px/1.5 "JetBrains Mono",monospace;color:var(--muted-2);flex-shrink:0}
+
+/* footer */
+.foot{margin-top:26px;border-top:2px solid var(--ink);padding:12px 0 40px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
+.foot .fl{font:600 10px/1.8 "JetBrains Mono",monospace;color:var(--muted)}
+.foot .fl a{color:var(--green-deep);border-bottom:1px solid var(--line-strong)}
+.foot .fr{text-align:right;font:600 10px/1.8 "JetBrains Mono",monospace;color:var(--muted-2)}
+
+@media (max-width:760px){
+  .stats-row{grid-template-columns:1fr 1fr}
+  .stat:nth-child(2){border-right:none}
+  .stat:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .main-grid,.g2,.fit-grid{grid-template-columns:1fr}
+  .hdr{grid-template-columns:1fr auto}
+  .hc{display:none}
+  .ht{font-size:20px}
+  .hb{padding:13px 13px 11px}
+  .sec-h h2{font-size:16px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="hdr">
+  <div class="brand">INFOCARD · YETONE/MAGPIE</div>
+  <div class="hc">DEEP DIVE · MODEL ROUTING FOR EVERY AGENT<span class="rid">snapshot 2026-10-02 · 4,108★ · MIT</span></div>
+  <div class="wb"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="1" y="1" width="8" height="8"/></svg>DEEP DIVE</div>
+</header>
+
+<section class="hero">
+  <div class="hb">
+    <h1 class="ht">Magpie：一个本地网关，<em>喂饱所有 Coding Agent</em></h1>
+    <p class="hsub">Codex 只讲 OpenAI Responses，Claude Code 只讲 Anthropic Messages，Gemini CLI 只讲 Gemini API——想让每个 Agent 用上别家的模型，过去只能手改 baseURL、写代理脚本、反复编辑配置文件。Magpie（yetone/magpie，2026-09-23 开源）把这件事压缩成一个菜单栏应用 + 一个本地网关：点一下换模型，所有 Agent 共用一个模型目录、共用你已付费的订阅，配置文件的注释和缩进一根毫毛都不动。</p>
+    <div class="hm">
+      <span class="tag">Go + Wails</span><span class="tag">&lt;15 MB 单二进制</span><span class="tag">系统 Webview · 无 Electron</span><span class="tag">macOS / Linux / Windows</span><span class="tag">30+ Agent</span><span class="tag">20+ Provider 预设</span>
+    </div>
+    <div class="hmlinks">
+      <a href="https://github.com/yetone/magpie">github.com/yetone/magpie</a>
+      <a href="https://usemagpie.ai">usemagpie.ai</a>
+      <a href="https://ccwq.github.io/infocard-pub/docs/20260927-magpie.html">入门卡（2026-09-27）</a>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat"><b>4,108</b><span>GitHub Stars</span></div>
+    <div class="stat"><b>30+</b><span>支持的 Agent</span></div>
+    <div class="stat"><b>4 APIs</b><span>网关双向翻译</span></div>
+    <div class="stat"><b>0600</b><span>密钥文件权限</span></div>
+  </div>
+</section>
+
+<section class="tldr">
+  <h2>TL;DR</h2>
+  <p>Magpie 是一个<b>菜单栏常驻的模型切换器 + 本地 API 网关</b>，可以拆成两层理解。配置平面：它列出机器上每个 AI Agent 及其当前模型，点值即改，且只改你动的那一个键（原子写入，原值存入 <code>stash.json</code> 可回滚）；Profile 把整套 Agent 配置快照成一键切换。数据平面：本地网关监听 <code>127.0.0.1:3425</code>，同时讲 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages、Google Gemini 四种 API 并双向翻译（含流式、工具调用、reasoning），Agent 们全部指向这一个端点，从同一个目录挑模型。</p>
+  <p>它的差异化在<b>订阅复用与多账号路由</b>：Claude Code、Codex（ChatGPT）、Copilot、Devin、Qoder、SuperGrok 的登录直接变成 Provider，模型以 <code>claude/claude-sonnet-5</code> 这样的拼写出现在所有其他 Agent 里；多个账号、多把 key 一起挂，网关按「谁快重置谁先上」的 smart 策略逐请求调度，欠费歇 30 分钟、限流遵守 Retry-After、故障指数退避——在回复第一个字节抵达 Agent 之前完成切换。本卡与 2026-09-27 的入门卡互补：那张回答「这是什么」，这张回答「它到底怎么运转、怎么用透」。</p>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">01</span><h2>问题与方案：两层拆掉 N × M 死结</h2><span class="en">Problem &amp; Architecture</span></div>
+  <p class="body">没有 Magpie 的世界是一个 N×M 死结：N 个 Agent 各有各的配置格式（<code>settings.json</code>、<code>config.toml</code>、<code>config.yaml</code>、<code>opencode.jsonc</code>…），M 个模型供应商各有各的 API 方言。想给 Codex 挂 DeepSeek、给 Claude Code 挂 Kimi，你得手写 <code>[model_providers.*]</code> 表、抢注环境变量、甚至自己架一层代理——改坏了注释没了，改错了原值找不回来，不同 Agent 的模型清单还互相不知道。更现实的痛是额度碎片化：Claude Max 的额度快重置了还剩一大截，ChatGPT Pro 已经限流，Copilot 席位闲着——没有任何原生机制让它们互相救场。</p>
+  <div class="analysis-grid">
+    <div class="acard"><h3><span class="dot"></span>配置平面</h3><p>每个 Agent 一行，模型一目了然；点值即改，<b>手术式编辑</b>只触碰你改的那一个键，注释、顺序、缩进原样存活，写入原子完成。被替换的原值存进 <code>~/.config/magpie/stash.json</code>，切回原生模型时原样放回。</p></div>
+    <div class="acard"><h3><span class="dot"></span>数据平面</h3><p>本地网关 <code>127.0.0.1:3425</code> 承接所有请求，按需在四种 API 间翻译；供应商本来就说这个 API 时直接<b>透传</b>，不做无谓转译。Agent 永远看不到供应商的 key 和 URL，密钥全部留在 Magpie 手里。</p></div>
+    <div class="acard"><h3><span class="dot"></span>目录平面</h3><p>模型列表不是编译进去的：Magpie 拿着你的 key <b>实时询问每家供应商</b>「你到底伺候哪些模型」，早上发布的模型下一次刷新就出现在 picker 里；<code>models.dev</code> 目录兜底补全名称与 reasoning 档位，后台自动刷新。</p></div>
+    <div class="acard"><h3><span class="dot"></span>入口平面</h3><p>同一套能力的四种形态：菜单栏弹出面板（<code>magpie</code>）、终端 TUI（<code>magpie tui</code>）、纯 CLI 脚本化、浏览器 UI（<code>magpie web</code>，WSL/SSH 服务器场景）。菜单栏图标 + 独立窗口 + 托盘菜单三处可达。</p></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">02</span><h2>安装与上手：一条命令，四种入口</h2><span class="en">Install &amp; First Run</span></div>
+  <div class="tbl-wrap">
+    <table class="t">
+      <tr><th>平台 / 方式</th><th>命令或产物</th><th>注意</th></tr>
+      <tr><td class="b">macOS / Linux 一键</td><td><code>curl -fsSL https://usemagpie.ai/install.sh | sh</code></td><td>命令进 <code>~/.local/bin</code>，App 进 <code>/Applications</code> 或应用菜单</td></tr>
+      <tr><td class="b">Windows</td><td>官网下载，或 release 里的 <code>magpie-cli-windows-amd64.exe</code>（纯终端版）</td><td>构建未签名，SmartScreen 可能拦一次</td></tr>
+      <tr><td class="b">源码安装</td><td><code>go install github.com/yetone/magpie@latest</code></td><td>Go 工具链即可</td></tr>
+      <tr><td class="b">本地构建</td><td><code>make build</code>（桌面）/ <code>make cli</code>（纯终端）/ <code>make app</code>（macOS 菜单栏无 Dock 图标）/ <code>make release-*</code></td><td>桌面版需 cgo + 平台 webview；Linux 需 <code>libgtk-3-dev</code> 与 <code>libwebkit2gtk-4.1-dev</code>；<code>make cli</code> 无 cgo、可交叉编译</td></tr>
+      <tr><td class="b">服务器</td><td><code>docker build -t magpie .</code>（详见第 11 节）</td><td>distroless / nonroot / 自带 HEALTHCHECK</td></tr>
+      <tr><td class="b">自更新</td><td>后台下载，重启时安装；终端 <code>magpie update</code></td><td>发行版集中在 <code>yetone/magpie-releases</code>；macOS 已签名公证</td></tr>
+    </table>
+  </div>
+  <div class="g2" style="margin-top:12px">
+    <div>
+      <p class="body">一个务实的上手顺序：装好后先 <code>magpie provider add</code> 挂上至少一个 preset 供应商（只需粘贴 key）；再挑一个主力 Agent 把模型切到 <code>provider/model</code> 拼写，验证网关链路；然后把其余 Agent 逐个接管；最后 <code>magpie save daily</code> 存一份 Profile——之后所有 Agent 的模型组合可以在「日用 / 省钱 / 全火力」几套 Profile 间一键横跳。</p>
+      <p class="body">TUI 与主界面同一套交互：<code>↑↓</code> 选 Agent、<code>←→</code> 选字段（model / effort / small…）、<code>↵</code> 打开 picker、输入即过滤（支持输入清单里没有的自定义值）、<code>s</code> 存 Profile、<code>p</code> 应用或删除 Profile、<code>S</code> 同步模型目录、<code>q</code> 退出。App 里点任意值弹出过滤列表，<code>esc</code> 关闭；窗口底部是 Profile chips，点击应用、<code>×</code> 删除。</p>
+    </div>
+    <div class="code"><span class="c"># 添加供应商：preset 只需要 key</span>
+magpie provider add deepseek sk-…
+magpie provider add moonshot sk-…
+magpie provider add ollama        <span class="c"># 本地服务无需 key</span>
+
+<span class="c"># 自定义中转：两个端点 + 指定模型</span>
+magpie provider add "My Relay" \
+  url=https://relay.example.com/v1 \
+  key=sk-… \
+  models=gpt-5.5,claude-sonnet-5
+
+<span class="c"># 把第三方模型塞给各家 Agent</span>
+magpie codex deepseek/deepseek-v4-pro
+magpie claude moonshot/kimi-k3
+magpie gemini zhipu/glm-5.3
+magpie opencode claude/claude-sonnet-5
+
+<span class="c"># Profile：整套快照，一键切换</span>
+magpie save work &amp;&amp; magpie use work
+magpie ls                         <span class="c"># 全体 Agent 现状</span></div>
+  </div>
+  <div class="note"><b>必记细节：</b>Agent 是在启动时读取配置的——运行中的会话保持旧模型直到新开会话，Codex 官方说明尤其要求切换后重启。切换没生效时先查这一条，再查 <code>magpie ls</code> 确认写入结果。</div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">03</span><h2>网关架构：一个端点讲四种方言</h2><span class="en">Gateway Internals</span></div>
+  <p class="body">网关随应用启动，监听 <code>127.0.0.1:3425</code>（<code>MAGPIE_ADDR</code> 可改），无头场景用 <code>magpie serve</code> 单独跑，反向代理/容器部署用 <code>MAGPIE_PUBLIC_URL</code> 对外公布基地址。API key 随便填（约定 <code>magpie</code>）——网关只听 loopback，这是它的默认信任模型。供应商本身就说 Agent 的 API 时请求直接透传；说不通时在网关内翻译，流式、工具调用、reasoning 全程保留。模型一律拼作 <code>provider/model</code>。</p>
+  <div class="main-grid">
+    <div>
+      <div class="tbl-wrap">
+        <table class="t">
+          <tr><th>网关路径</th><th>对应的 API</th></tr>
+          <tr><td><code>/v1/chat/completions</code></td><td>OpenAI Chat Completions</td></tr>
+          <tr><td><code>/v1/responses</code></td><td>OpenAI Responses</td></tr>
+          <tr><td><code>/v1/messages</code></td><td>Anthropic Messages</td></tr>
+          <tr><td><code>/v1/messages/count_tokens</code></td><td>Anthropic token 计数</td></tr>
+          <tr><td><code>/v1beta/models/{model}:generateContent</code></td><td>Google Gemini（含 :streamGenerateContent / :countTokens）</td></tr>
+          <tr><td><code>/v1/models</code> · <code>/v1beta/models</code></td><td>统一模型目录（含 reasoning 档位）</td></tr>
+        </table>
+      </div>
+      <p class="body" style="margin-top:9px">每个 <code>/v1/models</code> 条目自带 <code>reasoning</code> 与 <code>supported_reasoning_levels</code>；routing group 只列出全体成员都支持的档位。<code>native_endpoints</code> 字段标明哪些 API 对该模型是原样直通。Gateway 标签页把这些做成复制按钮和现成代码片段（shell / curl / Python / Node），<code>MAGPIE_DEBUG=1</code> 则在终端打印每次调用。</p>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-h">任何带 baseURL 的工具都能接入</div>
+        <div class="panel-b">
+          <p class="body" style="margin-bottom:7px">三个标准环境变量即插即用，key 都填 <code>magpie</code>：</p>
+          <div class="code" style="font-size:10.5px"><span class="a">OPENAI_BASE_URL</span>=http://127.0.0.1:3425/v1
+<span class="a">ANTHROPIC_BASE_URL</span>=http://127.0.0.1:3425
+<span class="a">GOOGLE_GEMINI_BASE_URL</span>=http://127.0.0.1:3425</div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:10px">
+        <div class="panel-h">两个观测/控制头</div>
+        <div class="panel-b">
+          <p class="body" style="margin-bottom:6px"><code>X-Magpie-Account:</code> 把请求钉在多账号订阅里的某一个账号上（邮箱或 Routing 页 id）；账号不存在、plan 不含该模型或正在休息时报错而不漂移。</p>
+          <p class="body" style="margin-bottom:0"><code>X-Magpie-Session:</code> 配合 <code>GET /v1/magpie/route?session=…</code> 在首 token 抵达前看到这一轮路由给了谁；带 <code>after=</code>/<code>wait=</code> 参数（最长 60 秒）可以一条请求挂住等路由变化，UI 便能逐步跟进一整轮 turn。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="body" style="margin-top:12px"><b>一次请求的完整生命周期</b>——以「Claude Code 收到 <code>group/opus</code> 模型的一个请求」为例：</p>
+  <div class="steps">
+    <div class="step"><span class="n">1</span><p><b>接收</b>：Claude Code 向 <code>ANTHROPIC_BASE_URL</code> 发 Anthropic Messages 请求，key 是无意义的 <code>magpie</code>；网关按模型字段认出这是一个 routing group。</p></div>
+    <div class="step"><span class="n">2</span><p><b>路由决策</b>：按组的策略（smart/order/rotate/usage）与每个成员账号的余额、重置时间、限流状态选出一个成员（provider + model + effort）；决策发生在向供应商发问之前，可通过 <code>/v1/magpie/route</code> 观测。</p></div>
+    <div class="step"><span class="n">3</span><p><b>翻译或透传</b>：成员是 <code>copilot/claude-opus-5.5</code> 这类「同 API 不同上游」时原样转发；跨 API 时做协议翻译——流式分片、工具调用 schema、reasoning 字段一一映射。Claude 订阅成员则走特殊路径：驱动本机真实 <code>claude</code> 二进制发起这一代。</p></div>
+    <div class="step"><span class="n">4</span><p><b>失败换人</b>：成员失败则指数退避拉黑片刻，立即换下一个成员重试——这一切发生在回复第一个字节返回给 Agent 之前，Agent 只看到一次成功。</p></div>
+    <div class="step"><span class="n">5</span><p><b>记账</b>：本次调用的 agent、provider、model、token 数（含缓存与 reasoning）、时延、实际应答的 <code>served_model</code>、实际服务的上游 key 指纹与保存名写入本地账本；OTLP 开启时异步导出元数据（正文永不导出）。</p></div>
+    <div class="step"><span class="n">6</span><p><b>会话粘性</b>：按 <code>stays=</code> 规则把这条会话与应答账号绑定一段时间，保住供应商侧的 prompt cache；下一条请求到来时回到第 2 步。</p></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">04</span><h2>订阅即供应商：已付费的登录，全员可用</h2><span class="en">Subscriptions as Providers</span></div>
+  <p class="body">Magpie 最锋利的一点：你在某个 Agent 里的<b>登录本身就是一份订阅资产</b>。Claude Code（Keychain 或 <code>~/.claude/.credentials.json</code> 的 OAuth）、Codex（<code>~/.codex/auth.json</code> 的 ChatGPT 登录）、Copilot、Devin、Qoder、SuperGrok、Cursor 订阅的登录出现在 <code>magpie providers</code> 里，模型以 <code>claude/claude-sonnet-5</code>、<code>codex/gpt-5.5</code>、<code>copilot/claude-sonnet-4.5</code> 的拼写进入所有其他 Agent 的 picker。不复制凭据、不粘贴 key，token 按各家 Agent 自己的方式刷新（轮换后的 token 会写回 Agent 找得到的位置），登出即消失。模型清单也是供应商官方的——用同一登录去问 Anthropic / Copilot / Codex 的 API，上游加了新模型下次刷新就有。</p>
+  <p class="body">各家背后的实现并不一样，这正是深度使用前该看清的部分：</p>
+  <div class="tbl-wrap">
+    <table class="t">
+      <tr><th>订阅</th><th>模型拼写</th><th>Magpie 的接入方式</th></tr>
+      <tr><td class="b">Claude Pro / Max</td><td><code>claude/claude-sonnet-5</code></td><td>Anthropic 会把其他 Agent 的 system prompt 归类为第三方流量，因此 Magpie 驱动<b>本机真实的 <code>claude</code> 二进制</b>发起每一代请求；调用方的工具经 MCP 桥接进同一次 turn，tool result 唤醒同一个 Claude Code 进程。Pi、OpenCode 等全部自动走这条路。需要本机装有并登录 Claude Code。</td></tr>
+      <tr><td class="b">ChatGPT Plus / Pro</td><td><code>codex/gpt-5.5</code></td><td>ChatGPT 后端只支持流式且拒绝少量参数——Magpie 把非流式请求改写为流式、剔除对方不收的参数。</td></tr>
+      <tr><td class="b">GitHub Copilot</td><td><code>copilot/claude-sonnet-4.5</code></td><td>读 <code>~/.config/github-copilot/apps.json</code> 的 GitHub 登录，服务任意 Agent。</td></tr>
+      <tr><td class="b">SuperGrok</td><td>grok 系列</td><td>直连 grok CLI 用的 Responses API，用 CLI 自己的登录，调用方工具透传。</td></tr>
+      <tr><td class="b">Cursor 订阅</td><td>cursor 系列</td><td>走 cursor-agent 的 Agent API；Cursor 模型把调用方工具当 MCP 工具调用，Cursor 自带工具不运行。</td></tr>
+      <tr><td class="b">Devin</td><td><code>devin/swe-2-max</code> 等</td><td><code>devin auth login</code> 的凭据（<code>~/.local/share/devin/credentials.toml</code>）直连 devin CLI 所用 API。</td></tr>
+      <tr><td class="b">Qoder / Qoder CN</td><td>qoder 系列</td><td>从 Magpie 内发起 OAuth device flow 登录；CN 与国际版是两套独立订阅体系。</td></tr>
+      <tr><td class="b">Gemini CLI / Antigravity</td><td>gemini 系列</td><td>直连 Google Code Assist API。注意：Google 已不对个人账号服务 Gemini CLI 登录，需要 Code Assist Standard/Enterprise 并指定 Google Cloud 项目（<code>magpie accounts project gemini …</code>）。</td></tr>
+    </table>
+  </div>
+  <div class="risk">
+    <div class="risk-h">订阅复用的边界，用前必读</div>
+    <ul>
+      <li>Google 明确表示可能封禁在 Antigravity 之外使用 Antigravity 登录的账号——Magpie 添加前会先征询，官方建议用「丢得起」的账号。</li>
+      <li>Claude 订阅路径要求本机安装并登录 Claude Code，本质是借真客户端发起请求；跨 Agent 共享订阅请自行确认与供应商条款的相容性。</li>
+      <li>Qoder CN（qoder.cn，阿里云/手机号账号）与 Qoder（qoder.com）账号互通但套餐独立，均需 BYOK 套餐。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">05</span><h2>多账号路由：把所有余量吃干榨净</h2><span class="en">Multi-Account Routing</span></div>
+  <p class="body">把手里所有账号和 key 全挂上——几个 Claude、几个 ChatGPT、几个 Copilot 或 Grok 账号、同一供应商的多把 key——每个请求由网关决定谁来接。核心目标只有一个：<b>不浪费任何一份即将过期的额度</b>，且 Agent 永远看不到失败。账号状态机全自动：欠费 key 歇 30 分钟；被限流的账号按供应商响应头（Retry-After / reset）精确回避，不猜测不硬撞；故障账号指数退避（一次比一次久），请求在回复第一个字节到达 Agent 之前就换下家重试。</p>
+  <div class="main-grid">
+    <div>
+      <div class="tbl-wrap">
+        <table class="t">
+          <tr><th>路由策略</th><th>行为</th></tr>
+          <tr><td class="b">smart（默认）</td><td>有余额的订阅里，<b>最快重置的先用</b>——重置就清零的余量先烧掉，同时保持其 prompt cache 温热。</td></tr>
+          <tr><td class="b">order</td><td>第一个模型用到不能答，再轮到下一个。</td></tr>
+          <tr><td class="b">rotate</td><td>每一轮换下一个成员。</td></tr>
+          <tr><td class="b">usage</td><td>用量最小的先用。</td></tr>
+        </table>
+      </div>
+      <p class="body" style="margin-top:9px"><code>stays=</code> 控制会话粘性：<code>auto</code>（默认，供应商缓存还值钱就粘住）、<code>session</code>、<code>turn</code>、<code>off</code>。还有一条容易被忽略的硬规则：上下文窗口是路由输入——某个成员被用到 <b>95% 窗口</b>时，请求自动转向装得下的成员，所以虚报窗口会让转移来得太晚。reply limit 则会写进 Agent 配置并公告在 <code>/models</code>；网关自身不截断回复。</p>
+      <p class="body">Routing 页按请求或按会话查看每一次调度；展开会话可见每条请求在有效价格下的成本估算（含缓存读写，未定价模型显示 <code>—</code>）。同一 route id 的多次尝试共享一个 trace id，方便和 OTLP 侧对账。</p>
+    </div>
+    <div>
+      <div class="code" style="font-size:10.5px"><span class="c"># 三订阅日常驾驶配置</span>
+<span class="c"># 1) 挂账号（登录过 Agent 即自动出现）</span>
+magpie providers
+<span class="c">#   claude   me@work.dev  Claude Max  serving</span>
+<span class="c">#   claude   me@home.dev  Claude Pro  38% · 2d</span>
+<span class="c">#   codex    me@home.dev  ChatGPT Pro 30% · 4d</span>
+<span class="c">#   copilot  octo-dev     Business    24% · 12d</span>
+
+<span class="c"># 2) 组一个跨订阅的 opus 组</span>
+magpie group add opus \
+  models=claude/claude-opus-5-5,copilot/claude-opus-5.5 \
+  routing=order stays=session
+magpie claude group/opus
+
+<span class="c"># 3) 追加成员 / 换策略</span>
+magpie group set opus \
+  models+=openrouter/anthropic/claude-opus-5.5 \
+  routing=usage
+
+<span class="c"># 4) 看每一步路由去了哪</span>
+curl 'http://127.0.0.1:3425/v1/magpie/route?session=…'</div>
+      <p class="body" style="margin-top:8px">导入旧配置也是一条命令的事：App 的 Import 对话框能读 Claude Code 的 <code>settings.json</code> 与 Codex 的 <code>config.toml</code>（自定义 provider、固定 header、profiles 模型目录一并导入），导入前逐条审查，指向 Magpie 自身或纯 <code>env_key</code> 的条目自动跳过。</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">06</span><h2>配置手术：只动一个键的编辑器</h2><span class="en">Surgical Config Editing</span></div>
+  <p class="body">Magpie 编辑 Agent 配置的方式是「手术式」的：只改你点的那一个键，<b>注释、键序、缩进原样保留</b>，写入是原子的。被替换的值存进 <code>~/.config/magpie/stash.json</code>——选回原生模型时，原来的环境变量、<code>[model_providers.*]</code> 表、auth 配置会被原样放回，不留残骸。这是它与「生成一版新配置文件覆盖掉」类工具的本质区别：你的配置文件始终是你的。</p>
+  <div class="g2">
+    <div>
+      <p class="body">每家 Agent 被写入的字段各有讲究：<b>Claude Code</b> 收到 <code>env</code> 块里的 <code>ANTHROPIC_BASE_URL</code>/<code>ANTHROPIC_AUTH_TOKEN</code> 与模型变量，选回原生 <code>opus</code>/<code>sonnet</code> 时全部移除还原；<b>Codex</b> 收到 <code>[model_providers.magpie]</code> 表加一份 <code>model_catalog_json</code>（从统一目录写出，模型直接出现在 Codex 自己的 <code>/model</code> 里），ChatGPT 登录永不触碰；<b>Gemini CLI</b> 的 auth 在 API key / Google 账号 / Vertex 间切换，key 落在 <code>~/.gemini/.env</code>；<b>OpenCode、Pi、Crush</b> 收到一个 <code>magpie</code> provider 条目；Claude Desktop 走第三方网关模式（Code 与 Cowork 指向 Magpie，重启生效）。手动改坏了也不用怕——切回原生模型即触发 stash 还原。</p>
+      <p class="body">每个 Agent 还有自己的「模型可见性」：Agent 名下 <i>Showing 5 / 32 models</i> 打开它的清单，点掉不想要的模型（连 Codex 的 <code>/model</code> 连 ChatGPT 官方模型一起管），别的 Agent 不受影响。上下文窗口 / 回复上限的声明（<code>magpie model context / output</code>）也会写进 Pi 的 <code>contextWindow</code>/<code>maxTokens</code>、OpenCode 的 <code>limit</code> 等字段——已运行的会话保持启动时的值，网关侧立即生效。</p>
+    </div>
+    <div class="code" style="font-size:10.5px"><span class="c"># 每个字段都可以独立驱动</span>
+magpie codex effort high
+magpie codex xhigh          <span class="c"># 裸 effort 也认识</span>
+magpie claude haiku deepseek/deepseek-v4-flash
+magpie claude haiku ""      <span class="c"># 单档位回归主模型</span>
+magpie gemini auth api-key
+
+<span class="c"># 供应商管理</span>
+magpie presets              <span class="c"># 已知供应商分组列出</span>
+magpie providers            <span class="c"># host/key/暴露模型/谁在用</span>
+magpie provider test deepseek <span class="c"># 每个 API 探一针带延迟</span>
+magpie provider models deepseek <span class="c"># 重拉模型清单</span>
+magpie model context relay-a/gpt-5.5 262144
+magpie model wire relay-b/m2 vendor-c/m2-preview
+magpie sync                 <span class="c"># 刷新目录与所有实时清单</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">07</span><h2>30+ Agent 支持清单（节选）</h2><span class="en">Agent Matrix</span></div>
+  <p class="body">README 维护着一张持续膨胀的支持表，从 Claude Code 到 Alma 覆盖 30+ 个 Agent。规则：只有已安装或已配置的 Agent 才显示；OpenCode、MiMo Code、Pi、OmO、Goose、Crush、omp、Hermes Agent 这类「provider-scoped」Agent 接收 <code>provider/model</code> 拼写。以下节选高频条目：</p>
+  <div class="tbl-wrap">
+    <table class="t">
+      <tr><th>Agent</th><th>配置文件</th><th>可驱动的字段</th></tr>
+      <tr><td class="b">Claude Code</td><td><code>~/.claude/settings.json</code></td><td>provider、model、opus/sonnet/haiku/fable 分档</td></tr>
+      <tr><td class="b">Codex</td><td><code>~/.codex/config.toml</code></td><td>provider、model、effort</td></tr>
+      <tr><td class="b">Gemini CLI</td><td><code>~/.gemini/settings.json</code> + <code>.env</code></td><td>auth、model</td></tr>
+      <tr><td class="b">OpenCode</td><td><code>~/.config/opencode/opencode.json(c)</code></td><td>model、small</td></tr>
+      <tr><td class="b">Cursor CLI</td><td><code>~/.cursor/cli-config.json</code></td><td>model</td></tr>
+      <tr><td class="b">Copilot CLI</td><td><code>~/.copilot/settings.json</code></td><td>model</td></tr>
+      <tr><td class="b">Goose</td><td><code>~/.config/goose/config.yaml</code></td><td>model</td></tr>
+      <tr><td class="b">Crush</td><td><code>~/.config/crush/crush.json</code></td><td>large、small</td></tr>
+      <tr><td class="b">Devin</td><td><code>~/.config/devin/config.json</code></td><td>model（<code>devin/swe-2-max</code> 等订阅模型）</td></tr>
+      <tr><td class="b">Hermes Agent</td><td><code>~/.hermes/config.yaml</code>（<code>$HERMES_HOME</code>）</td><td>model（provider-scoped）</td></tr>
+      <tr><td class="b">Kimi Code</td><td><code>~/.kimi/config.toml</code>（<code>$KIMI_SHARE_DIR</code>）</td><td>model（内置 <code>magpie</code> provider，模型进 Kimi 的 /model）</td></tr>
+      <tr><td class="b">MiniMax Code (mcode)</td><td><code>~/.minimax/config.yaml</code>（<code>$MINIMAX_DATA_DIR</code>）</td><td>model（<code>magpie</code> 自定义 provider）</td></tr>
+      <tr><td class="b">Droid (Factory)</td><td><code>~/.factory/settings.json</code></td><td>model（BYOK <code>customModels</code> 进 Droid 的 /model）</td></tr>
+      <tr><td class="b">Cline (CLI)</td><td><code>~/.cline/data/settings/providers.json</code></td><td>model、effort</td></tr>
+      <tr><td class="b">Qoder / Qoder CN</td><td><code>~/.qoder/settings.json</code> 等</td><td>model、effort（需 BYOK 套餐）</td></tr>
+      <tr><td class="b">Grok Build</td><td><code>~/.grok/config.toml</code>（<code>$GROK_HOME</code>）</td><td>model、effort</td></tr>
+      <tr><td class="b">Claude Desktop</td><td><code>Application Support/Claude/</code> 等三平台路径</td><td>provider（第三方网关模式，重启生效）</td></tr>
+    </table>
+  </div>
+  <p class="body" style="margin-top:9px">另有 DeepSeek Harness (dsh，<code>$DSH_HOME</code>，0.1.5 起走 <code>cordis.patch.yml</code> 自定义 provider)、Command Code、fx、omp (oh-my-pi)、MiMo Code、Pi、OmO（<code>$OMO_CODING_AGENT_DIR</code>）、Muse Code、ZCode、WorkBuddy、OpenHanako、Alma、OpenChamber 等条目；各 Agent 均标注环境变量覆盖（<code>$FACTORY_HOME_OVERRIDE</code>、<code>$CLINE_DIR</code>、<code>$QODER_CONFIG_DIR</code> 等）与字段级差异（large/small 分档、effort、BYOK 限制），完整表以 README 为准。</p>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">08</span><h2>供应商目录与密钥治理</h2><span class="en">Providers &amp; Key Hygiene</span></div>
+  <p class="body">内置 20+ preset，覆盖国内外主要供应商与中转：Anthropic、OpenAI、Gemini、DeepSeek、Kimi (Moonshot)、GLM (智谱)、MiniMax、StepFun、Qwen、百度千帆（含个人/企业 Token Plans 与按量付费，各自独立端点）、腾讯云 Token Plan、华为云 MaaS、火山方舟、Mistral、Groq、xAI、OpenRouter、Together、Fireworks、SiliconFlow、NVIDIA NIM、ModelScope、AiHubMix、PipeLLM、302.AI、Ollama、LM Studio。preset 之外的自定义供应商参数齐全：<code>url=</code>（OpenAI 兼容 base）、<code>anthropic=</code>（Anthropic 兼容 base）、<code>responses=</code>（独立 Responses 端点）、<code>catalog=</code>（借 models.dev 的模型清单）、<code>models=</code>（指定暴露哪些）；preset 不认识的字段都能用同样的方式覆盖。</p>
+  <div class="main-grid">
+    <div>
+      <p class="body">密钥治理是显式设计而非附带特性：<b>Magpie 从不读 shell 环境变量里的 API key</b>——你添加什么就用什么，杜绝「环境里躺着一把不知道哪来的 key」的隐性风险。供应商 key 存 <code>~/.config/magpie/providers.json</code>（权限 0600），Agent 永远看不到供应商 key 与 URL。网关对客户端另发<b>gateway key</b>（与上游 key 分离）：开启 LAN 共享后，远程请求必须携带启用的 gateway key（Bearer / <code>x-api-key</code> / <code>x-goog-api-key</code> / <code>?key=</code> 均可），loopback 保持宽松；key 可命名、停用、轮换、删除，轮换保留名称、启用状态与用量历史，删除需确认。凭据存 <code>caller-keys.json</code>（0600），永不进账本或列表响应。</p>
+      <div class="code" style="margin-top:8px;font-size:10.5px"><span class="c"># 无头网关先发钥匙再开门</span>
+magpie gateway-key add "Remote laptop"
+magpie gateway-key list
+magpie gateway-key rotate &lt;id&gt;
+magpie gateway-key remove &lt;id&gt;</div>
+    </div>
+    <div>
+      <p class="body">导入链路也照顾到了：供应商可以把 <code>magpie://import?preset=deepseek&amp;key=…</code> 链接或 <code>usemagpie.ai/import#…</code> 页面链接递给用户，打开即预填（名称、host、模型一览），<b>不按 Add 不落盘</b>，参数留在 fragment 里浏览器不会发给服务器。一家 Magpie 还可以服务多台电脑：Settings 里开 LAN 共享，其他电脑把它加成 <b>Remote magpie</b> provider（<code>magpie provider add remote-magpie sk-magpie-… url=http://192.168.1.20:3425 id=office</code>），providers、routing group（<code>office/group/…</code>）、用量都在共享实例上；每台电脑自己的 Magpie 仍然管理各自的 Agent，跨 API 的翻译只做一次，不会两台机器各翻一遍。</p>
+      <div class="note"><b>插件生态：</b>OpenCode 的 provider 插件（npm 包，自带 auth hook 的那种）可以直接装进 Magpie（<code>magpie plugin add …</code>），由 Magpie 首次按需下载的 <b>Bun</b> 运行——插件负责登录、列模型、发请求，Magpie 把它当普通 provider 服务给所有 Agent。没有订阅 Magpie 自身也能借插件登录（例如 <code>opencode-gemini-auth</code>）。给插件作者的扩展：auth hook 里加 <code>icon</code> 字段定义供应商图标（https 图像或 data URI，≤1 MB），<code>label</code>/<code>placeholder</code> 定制 key 输入框文案，<code>prompts</code> 先行问答再进 <code>authorize(inputs)</code>。</div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">09</span><h2>计费、改名与可观测性</h2><span class="en">Cost, Wire Names &amp; Telemetry</span></div>
+  <div class="g2">
+    <div>
+      <p class="body"><b>有效价格</b>：成本按「你为该 provider×model 设的价格 → 该 provider 自己目录的价 → models.dev 的厂商价」三级解析。中转商打折或加价时，默认计价是错的——主动声明四元组（input / output / cache read / cache write，USD 每百万 token，<code>0</code> 也是价格不是缺失）后，账本与 session 总额按有效价重述。注意两条语义：价格是<b>按 provider 分档的</b>（同一模型两家供应商两份价，<code>/*</code> 可整档覆盖），且账本是<b>读取时重估</b>的估算而非结算值——补录价格会改写历史数字。</p>
+      <p class="body"><b>wire 名字</b>：中转商常用自己的 id 伺服模型（加前缀、带日期、<code>-latest</code> 后缀）。<code>magpie model wire relay-b/model-2 vendor-c/model-2-preview</code> 告诉网关「对外问 vendor 时用这个名字」，对内目录、分组、计费仍用 Magpie 认识的名字；通配 <code>'relay-b/*' 'vendor-c/*'</code> 一条规则管全档（zsh 记得引号）。账本里的 <code>served_model</code> 记录供应商实际应答的名字用于对照，上游改名不会被误判成偷换。</p>
+    </div>
+    <div>
+      <p class="body"><b>用量账本</b>：按 Agent / 模型记录 token、缓存命中与成本；上游供应商 key 的指纹与保存名也入账（CSV 加 <code>provider_key_id</code>/<code>provider_key_name</code> 列），方便对上游账单——但原始凭据永不入账，删除的 key 保留历史身份，旧记录显示 <i>key not recorded</i> 而非拿今天的配置倒推。图片调用、账号/key 故障转移、System One 调用同样归因。调用方的 gateway key 也单独归因（<code>caller_key_*</code>）。</p>
+      <p class="body"><b>OTLP 导出</b>：Settings → Observability 可把网关请求元数据经 OTLP/HTTP (JSON) 导出（默认关，metrics 单独开关，改设置无需重启；<code>magpie serve</code> 可用 <code>MAGPIE_OTEL_*</code> 环境变量覆盖）。trace 含 agent、provider、model、token 数（含缓存与 reasoning）、HTTP 状态、时延、route id；Langfuse 走其 OTLP 摄取端点即可。红线清晰：<b>prompt/回复正文、工具参数、会话、账号名/key 永不导出</b>。工程细节对齐生产标准：有界队列 128 条、批量 32、5 秒 flush，队列满直接丢弃不拖累网关；429/502/503/504 重试两次封顶 60 秒；每次尝试 3 秒超时；SIGTERM 时网关最多 drain 3 秒。</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">10</span><h2>定位对照：与自建 API 网关怎么选</h2><span class="en">Positioning, Not Benchmarks</span></div>
+  <p class="body">社区里常见的另一类方案是自建统一网关（LiteLLM Proxy、one-api / New API 等）。以下<b>只是定位层面的定性对照</b>——帮你想清楚「要解决的是谁的问题」，各家具体能力以官方文档为准，本卡不做功能基准：</p>
+  <div class="tbl-wrap">
+    <table class="t">
+      <tr><th>维度</th><th>Magpie（本地优先）</th><th>自建网关（服务器优先）</th></tr>
+      <tr><td class="b">部署形态</td><td>菜单栏应用 / 单二进制 / Docker，默认 loopback</td><td>常驻服务器进程 + 数据库，面向多客户端</td></tr>
+      <tr><td class="b">Agent 配置</td><td><b>核心能力</b>：手术式写入 30+ Agent 的配置文件，stash 可回滚，per-agent 模型可见性</td><td>一般只提供统一 baseURL，Agent 侧配置仍需手改</td></tr>
+      <tr><td class="b">订阅复用</td><td><b>核心能力</b>：Claude / ChatGPT / Copilot 等订阅登录即 Provider，token 代刷新</td><td>通常面向 API key 池，订阅 OAuth 非标配</td></tr>
+      <tr><td class="b">多账号调度</td><td>smart 重置感知 / 限流尊重 / 字节级 failover，GUI 可观测</td><td>通道权重、优先级等策略，多在配置文件定义</td></tr>
+      <tr><td class="b">共享面</td><td>LAN 共享 + gateway key，服务自己的多台电脑</td><td>天然多用户 / 多团队，计费与配额体系更重</td></tr>
+      <tr><td class="b">适用判断</td><td>「我一个人的机器们要共享所有模型与订阅」</td><td>「一个团队 / 一组服务要统一模型出入口」</td></tr>
+    </table>
+  </div>
+  <p class="body" style="margin-top:9px">两者并不互斥：Magpie 的 Remote magpie 模式已经能覆盖「几台私人电脑共享」的轻量场景；再往上走团队级计费、配额、审计，才是自建网关的主场。选型先问部署位置和信任边界，再比功能清单。</p>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">11</span><h2>备份、同步与服务器部署</h2><span class="en">Backup, Sync &amp; Docker</span></div>
+  <div class="main-grid">
+    <div>
+      <p class="body"><b>备份</b>：<code>magpie backup</code> 生成 <code>magpie.magpie-backup</code>——providers（含 key，除非 <code>--no-keys</code>）、为 provider 选的图片、设置、profiles、每个 Agent 的模型与 library（指令集、MCP server、skills 及其文件；单文件超 2 MB 除外），端到端加密 <b>AES-256-GCM</b>，密钥经 PBKDF2-SHA256 从口令派生，服务器上只存得密文。恢复侧颗粒度够细：<code>magpie restore --no-agents</code> 只搬 provider 与设置不动 Agent 配置；<code>--no-library</code> 保留目标机 library；无 key 的 provider 保留目标机已有 key；piped 输入口令取 stdin 第一行。Subscriptions 不进备份——每台机器各自登录。</p>
+      <p class="body"><b>多机同步</b>：Settings → Sync 走 WebDAV（坚果云 / Nextcloud / 群晖）或 S3（AWS / Cloudflare R2 / B2 / MinIO / Garage / NAS），网关运行期间每 3 分钟对齐一次；每台机器只在「读到的版本」之上条件写入，另一台机器插进来的更新会被合并而不是覆盖。bucket 需已存在，access key 需读写 <code>/magpie/</code> 前缀（AWS 还需 list）；secret 交互式录入且只对录入时的 endpoint + access key 生效；不支持条件写的服务器退化为写前 ETag 校验。</p>
+    </div>
+    <div>
+      <p class="body"><b>Docker 部署</b>：官方镜像把纯终端二进制放进 distroless（nonroot，带 glibc 供插件的 Bun 使用），一切状态落在 <code>/config</code> 卷（Magpie 自身文件 + 各 Agent 的登录 + Bun 插件缓存；旧卷自动兼容），自带 HEALTHCHECK（<code>magpie healthcheck</code>），Compose 可用 <code>depends_on: condition: service_healthy</code>。端口发布纪律写得很硬：共享未开启前网关接受任意 key，所以 <b>3425（网关）与 3430（Web UI）只准发布在宿主机 loopback</b>；要跨机访问，先开 Settings 共享（生成命名 Magpie key）或在容器里 <code>magpie gateway-key add</code>，再放开端口。容器内 OAuth 回调落在 <code>localhost</code> 时把地址栏整段复制进 Callback URL 字段即可；Web UI 的 key 可用 <code>MAGPIE_WEB_KEY</code> 固定。</p>
+      <div class="code" style="margin-top:8px;font-size:10.5px">docker build -t magpie .
+docker run -d --name magpie \
+  -p 127.0.0.1:3425:3425 \
+  -p 127.0.0.1:3430:3430 \
+  -v magpie-config:/config magpie
+
+<span class="c"># 浏览器 UI 形态</span>
+docker exec -it magpie \
+  /magpie web --addr 0.0.0.0:3430 --no-open</div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">12</span><h2>高频疑问</h2><span class="en">FAQ</span></div>
+  <div class="faq">
+    <div class="qa"><div class="q">我的 key 会被上传到云上吗？</div><div class="a">不会。供应商 key 只存本机 <code>providers.json</code>（0600）；Magpie 不读 shell 环境变量里的 key；备份走口令加密（AES-256-GCM）；每日遥测只有随机 install-id + 版本 + 系统/架构，可用 <code>DO_NOT_TRACK=1</code> 关闭；源码构建永不发送。</div></div>
+    <div class="qa"><div class="q">切了模型，Agent 怎么还在用旧的？</div><div class="a">Agent 在启动时读取自己的配置，运行中的会话保持旧模型。新开会话即可；Codex 官方说明要求切换后重启。先用 <code>magpie ls</code> 确认写入已生效，再重启会话。</div></div>
+    <div class="qa"><div class="q">Claude 订阅共享给别的 Agent，账号会有风险吗？</div><div class="a">Magpie 的实现方式是驱动本机真实 <code>claude</code> 二进制发起请求，让流量落在 Anthropic 对 Claude Code 的既有分类内，而不是伪造客户端头；但「订阅能否跨工具使用」最终取决于你与供应商的条款，Google 对 Antigravity 登录的域外使用已明确警告会封号——共享订阅请自担条款风险，敏感账号用丢得起的。</div></div>
+    <div class="qa"><div class="q">和 one-api / LiteLLM 这类自建网关比，选哪个？</div><div class="a">看部署位置：Magpie 是本地优先的个人路由层（自动写 Agent 配置 + 订阅复用 + 菜单栏体验），自建网关是服务器优先的团队出入口（多用户、计费、配额）。个人多机用 Remote magpie 就够，团队级审计计费才需要后者。详见第 10 节定性对照。</div></div>
+    <div class="qa"><div class="q">中转商的模型名和官方对不上、价格也乱报怎么办？</div><div class="a">两个专门机制：<code>magpie model wire</code> 声明「对 vendor 用什么名字问」；<code>magpie model price</code> 按供应商×模型声明真实四元组价格，账本按有效价重估。窗口/输出上限也能声明（<code>model context / output</code>），窗口还参与路由决策，别虚报。</div></div>
+    <div class="qa"><div class="q">Linux 无桌面环境 / 服务器上怎么用？</div><div class="a">三条路：纯终端二进制（<code>make cli</code> 或 release 里的 cli 构建）+ <code>magpie serve</code> 跑无头网关；Docker 镜像（自带健康检查，状态全在 <code>/config</code> 卷）；<code>magpie web</code> 把完整 App 窗口开进浏览器（WSL / SSH 场景，<code>MAGPIE_WEB_KEY</code> 固定访问 key）。桌面 WebKitGTK 缺失时 Linux 自动只有 CLI 形态。</div></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">13</span><h2>隐私姿态与已知边界</h2><span class="en">Privacy &amp; Caveats</span></div>
+  <div class="g2">
+    <div>
+      <p class="body">遥测极简且可关：运行中的 Magpie 每天向 PostHog 发一条计数事件（本机随机 install-id、版本、系统与架构），<b>不含账号、key、provider、模型、prompt 或用量</b>。关闭方式三选一：Settings → Privacy、<code>DO_NOT_TRACK=1</code>、<code>MAGPIE_NO_STATS=1</code>；从源码构建的版本永不发送。文件布局全部 XDG 规矩、各就各位：</p>
+      <div class="tbl-wrap">
+        <table class="t" style="min-width:420px">
+          <tr><th>路径</th><th>内容</th></tr>
+          <tr><td><code>~/.config/magpie/profiles.json</code></td><td>已保存的 profiles</td></tr>
+          <tr><td><code>~/.config/magpie/providers.json</code></td><td>供应商与 key（0600）</td></tr>
+          <tr><td><code>~/.config/magpie/stash.json</code></td><td>被替换的原值，切回即还原</td></tr>
+          <tr><td><code>~/.config/magpie/caller-keys.json</code></td><td>gateway key（0600）</td></tr>
+          <tr><td><code>~/.config/magpie/plugins.json</code> + <code>plugins/</code></td><td>插件与其包</td></tr>
+          <tr><td><code>~/.cache/magpie/models.json</code></td><td>models.dev 目录缓存</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="risk">
+      <div class="risk-h">已知边界与工程注意</div>
+      <ul>
+        <li><code>magpie serve</code> 收 SIGTERM 直接退出不做 drain，最后一批 OTLP 记录可能丢失（best-effort 导出，本地账本不受影响）。</li>
+        <li>反向代理部署时代理必须自己鉴权，或启用 LAN 共享 + gateway key；代理经 loopback 转发的请求被视作本地请求，代理须自行把关。</li>
+        <li>手动编辑 settings 时若文件只读，默认 key 变更会失败而不半改——保证可写后重试；旧版遗留的 <code>lanKey</code> 镜像在禁用/删除默认 key 后被随机空值替换。</li>
+        <li>价格估算基于有效价，同一供应商内多把 key 差异定价仍无法从 provider 级价格精确核算。</li>
+        <li>ChatGPT 后端只支持流式——非流式请求由 Magpie 改写，个别参数被上游拒绝时会剔除。</li>
+        <li>Windows/Linux 构建未签名（SmartScreen 首次运行可能提示）。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><span class="no">14</span><h2>适配判断：谁该上，谁不必</h2><span class="en">Fit / Non-fit</span></div>
+  <div class="fit-grid">
+    <div class="fit y">
+      <div class="fit-h">强适配场景</div>
+      <ul>
+        <li>同时跑 3 个以上 Coding Agent，且每个都想用「别家最强」的模型——配置平面一次到位。</li>
+        <li>手上压着多份订阅（Claude Max + ChatGPT Pro + Copilot 席位）——smart 路由把重置前的余量吃干净。</li>
+        <li>重度中转/聚合 API 用户——wire 名字、有效价格、按 provider 分档计费都是为此设计的。</li>
+        <li>小团队/多机器——一台 Magpie LAN 共享 + gateway key，providers 与路由全队复用。</li>
+        <li>在意配置文件洁净度的人——手术式编辑 + stash 回滚，注释与缩进不受伤。</li>
+        <li>需要无头网关的服务器玩家——CLI / serve / Docker / web UI 四形态齐备，HEALTHCHECK 进 Compose。</li>
+      </ul>
+    </div>
+    <div class="fit n">
+      <div class="fit-h">可以绕开的场景</div>
+      <ul>
+        <li>只用一个 Agent、一家供应商、一把 key——切换器与网关都是冗余。</li>
+        <li>环境禁止安装本地常驻进程（严格受管的公司机器）——网关必须本地跑。</li>
+        <li>期望「官方 GUI 全功能」的 Linux 用户——Linux 桌面版依赖 WebKitGTK 4.1，未装则只有 CLI 形态；Windows/Linux 构建未签名。</li>
+        <li>要团队级计费、配额、多租户审计的——这是自建网关的主场（见第 10 节）。</li>
+        <li>想绕开供应商条款共享账号的——Magpie 的实现（如 Claude 走真客户端）恰恰是在条款框架内做事，不做绕过。</li>
+      </ul>
+    </div>
+  </div>
+  <p class="body" style="margin-top:10px">一句话收束：Magpie 把「模型选择」从每个 Agent 的配置难题变成一个操作系统级的选择器——<b>配置平面负责指哪个模型，数据平面负责把请求送到那个模型</b>，而订阅复用与多账号路由让已付费的额度在你的全部工具链里流动。4,108★（2026-10-02 快照）、开源五天、README 已写成小型产品手册——迭代速度本身就是它当前状态的注脚。</p>
+</section>
+
+<footer class="foot">
+  <div class="fl">
+    SOURCE <a href="https://github.com/yetone/magpie">github.com/yetone/magpie</a> · <a href="https://usemagpie.ai">usemagpie.ai</a><br>
+    INSTALL <span class="mono">curl -fsSL https://usemagpie.ai/install.sh | sh</span><br>
+    RELATED <a href="https://ccwq.github.io/infocard-pub/docs/20260927-magpie.html">20260927-magpie（入门卡）</a>
+  </div>
+  <div class="fr">SNAPSHOT 2026-10-02<br>LICENSE MIT<br>INFOCARD-PUB · SAGE-SWISS</div>
+</footer>
+
+</div>
+</body>
+</html>
