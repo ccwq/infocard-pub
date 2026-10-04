@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>answer-me-with-html · 让 AI Agent 用一页 HTML 回答复杂问题</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* Hero */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(22px,3.5vw,40px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:2px solid var(--line);padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#fff}
+    .mini-tag.red{background:var(--red);color:#fff}
+    .mini-tag.blue{background:var(--blue);color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:2px solid rgba(255,255,255,.8);padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"→";position:absolute;right:-17px;top:50%;transform:translateY(-50%);color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+
+    /* Sections */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* Grids */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+    .tag.green{background:#dcfce7}
+    .tag.orange{background:#fff7ed}
+
+    /* Matrix & Risk */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* Tables */
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
+    th,td{padding:8px 12px;border:2px solid var(--line);text-align:left}
+    th{background:#111;color:#fff;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+    tr:nth-child(even) td{background:var(--soft-ink)}
+    .check{color:#15803d;font-weight:900}
+    .cross{color:var(--red);font-weight:900}
+    .highlight{background:var(--soft-blue)!important;font-weight:900;color:var(--blue)}
+
+    /* Code */
+    pre{background:#111;color:#e8e8e8;padding:14px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto;margin-bottom:12px;line-height:1.72;white-space:pre-wrap;border:2px solid var(--line)}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:#e8f1ff;padding:1px 5px;border-radius:3px}
+
+    /* Alert variants */
+    .alert-red{border:2px solid var(--red);background:var(--soft-red);color:var(--red);padding:10px 12px}
+    .alert-red strong{display:block;font-size:13px;font-weight:900;margin-bottom:4px}
+
+    /* Benchmark visual */
+    .bench{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
+    .bench-item{border:3px solid var(--line);padding:14px;text-align:center;background:#fff}
+    .bench-item .v{font-size:28px;font-weight:950;line-height:1}
+    .bench-item .v.red{color:var(--red)}
+    .bench-item .v.blue{color:var(--blue)}
+    .bench-item .v.green{color:#15803d}
+    .bench-item .l{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:4px}
+
+    @media(max-width:1080px){.hero{grid-template-columns:1fr}.hero-copy{border-right:0;border-bottom:3px solid var(--line)}.grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.bench{grid-template-columns:1fr}}
+    @media(max-width:720px){.page{width:min(100% - 16px,1040px);padding:10px 0 60px}.hero{display:flex;flex-direction:column}.hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}.grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}.section-head{grid-template-columns:1fr;gap:10px}.section-no{width:72px;height:72px;font-size:28px}.card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}.bench{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-copy">
+      <div class="kicker">AGENT SKILL · HTML RENDERER · MIT</div>
+      <h1 class="demo-title">answer-me-with-html</h1>
+      <p class="subtitle">让 AI Agent 用一页可读的 HTML 回答复杂问题，不再是铺天盖地的文本。</p>
+      <div class="badge-row">
+        <span class="badge red">552 Stars</span>
+        <span class="badge blue">Token 减少 7.4×</span>
+        <span class="badge dark">速度提升 3.6×</span>
+        <span class="badge">MIT</span>
+      </div>
+      <div class="badge-row">
+        <span class="badge">Claude Code</span>
+        <span class="badge">Codex / Cursor</span>
+        <span class="badge">OpenCode</span>
+      </div>
+      <div class="alert">
+        <strong>核心洞察：</strong>
+        <p>直接问模型「输出一页 HTML」，模型要手写每一行 CSS、每个 div 和 SVG 坐标——这些全是输出 token。answer-me-with-html 让模型只写内容，渲染交给 CLI。</p>
+        <div class="mini-row">
+          <span class="mini-tag blue">模型写内容</span>
+          <span class="mini-tag">CLI 渲染 HTML</span>
+          <span class="mini-tag red">Token 大幅节省</span>
+        </div>
+      </div>
+    </div>
+    <aside class="hero-visual">
+      <div class="panel-top">
+        <div class="eyebrow">BENCHMARK · CLAUDE SONNET 5.5</div>
+        <h3>同样问题，不同输出方式</h3>
+        <p>直接输出 HTML vs answer-me-with-html（中位数，3 topics × 3 runs）</p>
+      </div>
+      <div class="panel-body">
+        <div class="bench">
+          <div class="bench-item">
+            <div class="v red">9,351</div>
+            <div class="l">直接 HTML<br>输出 Token</div>
+          </div>
+          <div class="bench-item">
+            <div class="v blue">923</div>
+            <div class="l">用 Skill<br>输出 Token</div>
+          </div>
+          <div class="bench-item">
+            <div class="v green">7.4×</div>
+            <div class="l">Token 减少</div>
+          </div>
+        </div>
+        <div class="bench" style="margin-top:-6px">
+          <div class="bench-item">
+            <div class="v red">46s</div>
+            <div class="l">直接 HTML<br>耗时</div>
+          </div>
+          <div class="bench-item">
+            <div class="v blue">13s</div>
+            <div class="l">用 Skill<br>耗时</div>
+          </div>
+          <div class="bench-item">
+            <div class="v green">3.6×</div>
+            <div class="l">速度提升</div>
+          </div>
+        </div>
+        <div class="quote" style="font-size:13px"><b>费用基本持平：</b>$0.22 vs $0.26——省的是等待时间，不是钱。</div>
+      </div>
+    </aside>
+  </header>
+
+  <!-- Section 01: How It Works -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">HOW IT WORKS · 工作原理</div>
+        <h2>模型只写内容，CLI 完成所有渲染</h2>
+        <p>Agent 写一段短 Markdown，CLI 负责 HTML/CSS/SVG 渲染。模型把精力放在「讲什么」而不是「怎么排版」。</p>
+      </div>
+    </div>
+    <div class="flow" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
+      <div class="flow-item">
+        <div class="t">Step 1</div>
+        <div class="c blue">用户提问</div>
+      </div>
+      <div class="flow-item">
+        <div class="t">Step 2</div>
+        <div class="c">Agent 写<br>短 Markdown</div>
+      </div>
+      <div class="flow-item">
+        <div class="t">Step 3</div>
+        <div class="c">CLI 渲染<br>HTML</div>
+      </div>
+      <div class="flow-item">
+        <div class="t">~50ms 后</div>
+        <div class="c green">浏览器打开<br>可读页面</div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">Model writes</span></div>
+        <h3>模型只写 Markdown 内容</h3>
+        <p style="font-size:13px">序列图、状态图、对比表格、流程图——全用 Markdown 语法描述，不需要写 HTML/CSS。</p>
+        <pre style="font-size:11px;padding:10px;margin:0">## Three-way handshake
+```sequence
+Client -> Server: SYN
+Server -> Client: SYN-ACK
+Client -> Server: ACK
+```
+> 客户端发送 SYN 请求建立连接。</pre>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag dark">CLI renders</span></div>
+        <h3>CLI 渲染为可读页面</h3>
+        <p style="font-size:13px">蓝图风格（默认）：格纸背景、字母编号、渐变线条。支持 shadcn 风格和亮/暗模式。</p>
+        <p style="font-size:13px;margin-top:8px">不需要安装任何依赖，CLI 已打包进 skill，安装即用。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Section 02: What You Ask / What You Get -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">02</div>
+      <div class="section-meta">
+        <div class="label b">PAGE TYPES · 页面类型</div>
+        <h2>你问什么，Agent 决定生成哪种页面</h2>
+        <p>Agent 会判断问题复杂度——单行问题直接回答，多步骤流程、对比分析、结构化解释才生成页面。</p>
+      </div>
+    </div>
+    <table>
+      <tr><th>你问</th><th>Agent 生成</th></tr>
+      <tr><td>Explain the TCP three-way handshake</td><td>序列图 + 状态图 + Flag 表格</td></tr>
+      <tr><td>Map out how the modules in this repo fit together</td><td>文件夹树 + 调用关系图</td></tr>
+      <tr><td>Redis or Memcached for our cache?</td><td>对比表（✓/✗）+ 结论判断</td></tr>
+      <tr><td>What's wrong with this paragraph?</td><td>逐句标注：错误词 + 修正建议</td></tr>
+      <tr><td>How did Kubernetes come about?</td><td>时间轴：关键节点高亮</td></tr>
+      <tr><td>How do I show hidden files with ls?</td><td class="highlight">不生成页面，一行问题直接一行回答</td></tr>
+    </table>
+  </section>
+
+  <!-- Section 03: Video Generation -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">03</div>
+      <div class="section-meta">
+        <div class="label k">VIDEO · 讲解视频</div>
+        <h2>am video：3Blue1Brown 风格的逐帧动画</h2>
+        <p>在 Markdown 中加入「旁白行」，<code>am video</code> 将其渲染为带动画和声音的播放器页面。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">Blueprint 风格</span><span class="tag dark">3Blue1Brown 风格</span></div>
+        <h3>两种视觉主题</h3>
+        <ul>
+          <li><strong>blueprint（默认）</strong>：格纸背景、字母编号、渐变线条</li>
+          <li><strong>theme: 3b1b</strong>：深色背景、3Blue1Brown 风格</li>
+          <li><strong>mode: dark / light</strong>：切换明暗模式</li>
+        </ul>
+        <p style="font-size:13px;margin-top:8px">视频与页面共享同一绘图风格，生成体验一致。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag green">声音支持</span></div>
+        <h3>旁白生成</h3>
+        <ul>
+          <li>ElevenLabs（需设置 <code>ELEVENLABS_API_KEY</code>）</li>
+          <li>macOS 系统 TTS：中文用 Tingting，英文用 Samantha</li>
+          <li>纯字幕（无语音时）</li>
+        </ul>
+        <p style="font-size:13px;margin-top:8px">音频嵌入页面，离线可播；加 <code>--mp4</code> 导出 1080p 视频（需 Chrome + ffmpeg + Node.js 22+）。</p>
+      </article>
+    </div>
+    <pre style="margin-top:12px">## 旁白行语法示例
+```sequence
+Client -> Server: SYN
+Server -> Client: SYN-ACK
+```
+> [Server] 收到 SYN 后返回 SYN-ACK。
+> [Client] 发送最后的 ACK，连接建立。
+
+# am video 关键参数
+am video examples/video-tcp.en.md        # 生成播放器页面
+am video examples/video-tcp.en.md --mp4  # 导出 MP4 视频
+# [Server] 触发相机聚焦和高亮节点
+# 音频与字幕同步，beat = 一段旁白 = 一个动画步骤</pre>
+  </section>
+
+  <!-- Section 04: Always-On Mode -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">04</div>
+      <div class="section-meta">
+        <div class="label">ALWAYS-ON · 常驻模式</div>
+        <h2>每次结论自动生成页面，不弹窗打扰</h2>
+        <p>开启后，Agent 每次给出结论、总结、比较或计划时，自动生成 2-4 面板页面，路径附在回复末尾，不自动打开。</p>
+      </div>
+    </div>
+    <div class="risk-grid">
+      <article class="risk" data-accent="blue">
+        <div class="n">1</div>
+        <h4>仅结论触发</h4>
+        <p>闲聊和无结论回复不生成页面。约 90 tokens 的提示词规则写入 Agent 自身规则文件。</p>
+      </article>
+      <article class="risk" data-accent="green">
+        <div class="n">2</div>
+        <h4>不弹窗打扰</h4>
+        <p>always-on 模式下页面不自动打开，只在回复末尾附上路径，不中断工作流。</p>
+      </article>
+      <article class="risk" data-accent="dark">
+        <div class="n">3</div>
+        <h4>Claude Code 插件</h4>
+        <p>安装 <code>answer-me-with-html-always</code> 插件即可开启；用 <code>/answer-me-with-html:config always off</code> 暂停。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Section 05: Settings -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">05</div>
+      <div class="section-meta">
+        <div class="label b">SETTINGS · 配置项</div>
+        <h2>无配置文件，全部 slash 命令搞定</h2>
+        <p>通过 <code>/answer-me-with-html:config</code> 或 <code>am config</code> 管理所有设置。</p>
+      </div>
+    </div>
+    <table>
+      <tr><th>参数</th><th>默认值</th><th>说明</th></tr>
+      <tr><td><code>open</code></td><td>on</td><td>生成后自动在浏览器打开；关闭后不弹窗</td></tr>
+      <tr><td><code>always</code></td><td>on</td><td>always-on 模式开关</td></tr>
+      <tr><td><code>theme</code></td><td>blueprint</td><td>默认主题：blueprint 或 shadcn</td></tr>
+      <tr><td><code>mode</code></td><td>auto</td><td>配色模式：auto / light / dark</td></tr>
+      <tr><td><code>style</code></td><td>80</td><td>写作检查：off / 80（警告）/ strict（拒绝渲染）</td></tr>
+      <tr><td><code>update_check</code></td><td>on</td><td>每周检查一次 GitHub 新版本，从不自动更新</td></tr>
+      <tr><td><code>voice</code></td><td>auto</td><td>视频旁白：auto / elevenlabs / system / off</td></tr>
+    </table>
+    <div class="alert" style="margin-top:12px;background:var(--soft-blue);border-color:var(--blue);color:var(--ink)">
+      <strong style="color:var(--blue)">存储路径：</strong>
+      <p>页面保存在 <code>~/.answer-me-with-html/pages/</code>；超过 200MB 或 30 天无清理时，Agent 主动提示，不自动删除。</p>
+    </div>
+  </section>
+
+  <!-- Section 06: Install -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">06</div>
+      <div class="section-meta">
+        <div class="label k">INSTALL · 安装方式</div>
+        <h2>一条命令，接入 Claude Code / Codex / Cursor / OpenCode</h2>
+        <p>Node.js 20+ 即可，无需 npm install，CLI 已打包进 skill。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">推荐方式</span></div>
+        <h3>让 Agent 自己安装</h3>
+        <pre style="font-size:11px;padding:10px;margin:0"># 粘贴给 Claude Code / Codex / Cursor：
+Install the Answer me with HTML skill:
+npx -y skills add QingYunA/answer-me-with-html -g -y
+# 加上 -a claude-code（Claude Code 专用）</pre>
+        <p style="font-size:12px;margin-top:8px">安装器是 <a href="https://github.com/vercel-labs/skills" style="color:var(--blue)">vercel-labs/skills</a>，支持 70+ Agent Skills。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag dark">Claude Code 插件</span></div>
+        <h3>Claude Code 插件安装</h3>
+        <pre style="font-size:11px;padding:10px;margin:0">/plugin marketplace add QingYunA/answer-me-with-html
+/plugin install answer-me-with-html@answer-me-with-html
+
+# always-on 模式插件
+/plugin install answer-me-with-html-always@answer-me-with-html</pre>
+        <p style="font-size:12px;margin-top:8px">支持插件热更新，规则写入 <code>AGENTS.md</code> 即可同步给其他 Agent。</p>
+      </article>
+    </div>
+    <div class="grid-3" style="margin-top:12px">
+      <article class="card">
+        <div class="tagrow"><span class="tag">Codex</span></div>
+        <h3>Codex</h3>
+        <p style="font-size:13px">复制到 <code>~/.codex/skills/</code></p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag">Cursor</span></div>
+        <h3>Cursor</h3>
+        <p style="font-size:13px">复制到 <code>~/.cursor/skills/</code></p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag">OpenCode</span></div>
+        <h3>OpenCode</h3>
+        <p style="font-size:13px">复制到 <code>~/.config/opencode/skill/</code></p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Section 07: Design Principles -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">07</div>
+      <div class="section-meta">
+        <div class="label">DESIGN · 设计理念</div>
+        <h2>ASD-STE100 原则：用最少的词把事情讲明白</h2>
+        <p>源自特殊教育简化沟通理论（ASD-STE100），指导模型在最少输出中达到最大理解效果。</p>
+      </div>
+    </div>
+    <div class="risk-grid">
+      <article class="risk" data-accent="blue">
+        <div class="n">1</div>
+        <h4>ASD-STE100 原则</h4>
+        <p>用最少的词把事情讲明白——不是简化内容，是精炼表达。模型不需要写 HTML/CSS，只写核心信息。</p>
+      </article>
+      <article class="risk" data-accent="red">
+        <div class="n">2</div>
+        <h4>Karpathy Ladder 第 4 层</h4>
+        <p>Karpathy 的 LLM 输出理解阶梯：Text → Markdown → HTML → <strong>可视化解释页面</strong>。answer-me-with-html 让 Agent 到达第 4 层。</p>
+      </article>
+      <article class="risk" data-accent="dark">
+        <div class="n">3</div>
+        <h4>Token 节省的本质</h4>
+        <p>输出 token 是「你等待的成本」。Token 节省 7.4× = 等待时间减少 3.6×；费用基本不变，因为模型多了两步短调用。</p>
+      </article>
+    </div>
+    <div class="quote-block" style="margin-top:12px">
+      <b>为什么不用直接输出 HTML？</b>模型现在能写出不错的 HTML。问题是它要手写每一行 CSS、每个 wrapper div 和每个 SVG 坐标——这些都是输出 token，而你就在屏幕前等着。
+    </div>
+  </section>
+
+  <div class="rule"></div>
+  <p class="source-note">
+    answer-me-with-html · MIT License · GitHub: github.com/QingYunA/answer-me-with-html · Stars: 552<br>
+    推文来源 @smk7z（464 赞，61 RT）· Benchmark: Claude Sonnet 5.5, 3 topics × 3 runs, medians
+  </p>
+
+</main>
+</body>
+</html>
