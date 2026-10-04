@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FluxDown · Rust 多协议下载管理器（免费开源 IDM 平替）</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+      --grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8efc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.18);color:#ede3ff}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}.mini-icon.green{color:var(--green)}.mini-icon.yellow{color:var(--yellow)}.mini-icon.purple{color:var(--purple)}.mini-icon.blue{color:var(--blue)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .shell{display:grid;grid-template-columns:1fr 1.28fr .92fr;gap:12px;background:rgba(9,12,22,.42);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+    .panel{min-width:0;background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.18);display:flex;flex-direction:column}
+    .panel-head{padding:10px 12px 9px;border-bottom:1.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .panel-head h3{margin:0;font-size:12px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:#fff}
+    .panel-head .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#dfe8ff;font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .search{display:flex;align-items:center;gap:8px;border:1.5px solid rgba(255,255,255,.1);background:#0f1424;padding:9px 10px;border-radius:12px;color:#9fb0de;font-size:12px}
+    .project{border:1.5px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2131,#171c2b);padding:10px 11px;border-radius:14px;display:grid;gap:4px;min-width:0}
+    .project .name{font-size:13px;font-weight:900;color:#fff}
+    .project .path{font-size:11.5px;color:#9fb0de;overflow-wrap:anywhere}
+    .project .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .mini-dot{width:10px;height:10px;border-radius:50%;margin-top:2px;background:linear-gradient(135deg,var(--cyan),var(--purple));box-shadow:0 0 0 3px rgba(88,195,255,.12)}
+    .task{border:1.5px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#1a2030,#151a28);padding:10px 11px;border-radius:14px;display:grid;gap:8px}
+    .task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .task-name{font-size:13px;font-weight:900;color:#fff}
+    .status{font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:rgba(45,179,106,.14);color:#7fe1a2;border:1px solid rgba(45,179,106,.32)}
+    .task p{font-size:12px;line-height:1.55;color:#d9e2ff;margin:0}
+    .progress{height:10px;border-radius:999px;background:#101525;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .progress>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--green))}
+    .task-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#b6c5f2}
+    .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);padding:4px 8px;border-radius:999px}
+    .status-list{display:grid;gap:8px}
+    .status-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.08);background:#0f1424;padding:9px 10px;border-radius:12px;font-size:12px;color:#d8e2ff}
+    .status-item .left{display:grid;gap:2px}
+    .status-item .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
+    .term{background:#0b1020;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .term-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#111831;border-bottom:1px solid rgba(255,255,255,.08);color:#dfe8ff;font-size:11px}
+    .term-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a8f59f;font-size:12px;line-height:1.7;min-height:180px;white-space:pre-wrap}
+    .term .url{color:#7ad9ff}
+    .editor{background:#0f1524;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .editor-top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 12px;background:#131a2d;border-bottom:1px solid rgba(255,255,255,.08);color:#fff;font-size:11px}
+    .editor-top .tab{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .code{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dbe5ff;font-size:11.8px;line-height:1.7;white-space:pre-wrap}
+    .code .kw{color:#7ad9ff}
+    .diff{border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;background:#0d1220}
+    .diff-top{padding:9px 12px;background:#13192c;color:#fff;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)}
+    .diff-body{padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.6;color:#dbe5ff;white-space:pre-wrap}
+    .diff .add{color:#90f0a8}
+    .stats{background:#13192c;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}
+    .stats-top{padding:9px 12px;background:#171f35;color:#fff;border-bottom:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .stats-body{padding:12px;display:grid;gap:12px;color:#dce4ff}
+    .stat{display:grid;gap:6px}
+    .stat .label{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+    .bar{height:10px;border-radius:999px;background:#0d1220;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .bar>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--purple))}
+    .donut{width:126px;height:126px;border-radius:50%;background:conic-gradient(#58c3ff 0 38%, #2db36a 38% 62%, #f4c84c 62% 80%, #8459ff 80% 92%, #54627f 92% 100%);margin:4px auto 0;position:relative;box-shadow:inset 0 0 0 14px #13192c}
+    .donut::after{content:"PROTOCOLS";position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);color:#fff;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+    .feature-row{margin-top:14px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+    .feature{background:#171c2b;border:1.5px solid rgba(255,255,255,.08);border-radius:16px;padding:11px 9px;color:#e8edf8;text-align:center;display:grid;gap:7px;min-width:0}
+    .icon{width:28px;height:28px;margin:0 auto;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;font-size:14px;color:#fff}
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+    .download{margin:16px auto 0;display:flex;justify-content:center}
+    .download-btn{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--purple),#6a4cff 54%, var(--blue));color:#fff;border:0;border-radius:18px;padding:16px 24px;box-shadow:0 16px 36px rgba(132,89,255,.34);font-weight:950;letter-spacing:.02em;font-size:18px}
+    .download-btn small{display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em}
+    .footer{margin-top:14px;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#dfe8ff;font-size:12px;flex-wrap:wrap}
+    .footer .stars{font-weight:900}
+    .section{margin:18px 0;padding:18px 20px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(20,28,52,.78), rgba(12,18,38,.82));box-shadow:0 14px 30px rgba(0,0,0,.34)}
+    .section-head{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .section-no{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#f4f9ff;background:linear-gradient(135deg,#3aa8ff,#4a78ff 60%,#8459ff);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 8px 18px rgba(74,120,255,.30)}
+    .section-no.b{background:linear-gradient(135deg,#8459ff,#4a78ff)}
+    .section-no.k{background:linear-gradient(135deg,#2db36a,#3aa8ff)}
+    .section-meta .label{font-size:12px;color:#9fb0e0;letter-spacing:.08em;margin-bottom:4px}
+    .section-meta h2{margin:0 0 6px;font-size:24px;color:#f4f9ff}
+    .section-meta p{margin:0;color:#b8c4e8;font-size:13px}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .matrix{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card,.mini,.risk{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));box-shadow:0 8px 18px rgba(0,0,0,.24)}
+    .risk[data-accent="red"]{border-color:rgba(244,84,84,.36);background:linear-gradient(180deg, rgba(244,84,84,.14), rgba(255,255,255,.02))}
+    .risk[data-accent="blue"]{border-color:rgba(88,195,255,.36);background:linear-gradient(180deg, rgba(74,120,255,.16), rgba(255,255,255,.02))}
+    .risk[data-accent="dark"]{border-color:rgba(132,89,255,.36);background:linear-gradient(180deg, rgba(132,89,255,.16), rgba(255,255,255,.02))}
+    .risk[data-accent="green"]{border-color:rgba(45,179,106,.36);background:linear-gradient(180deg, rgba(45,179,106,.16), rgba(255,255,255,.02))}
+    .card h3,.risk h4,.mini h4{margin:6px 0 8px;font-size:16px;color:#f4f9ff}
+    .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+    .tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#cfd9f5;background:rgba(255,255,255,.05)}
+    .tag.red{border-color:rgba(244,84,84,.45);color:#ffd1d1;background:rgba(244,84,84,.12)}
+    .tag.blue{border-color:rgba(88,195,255,.45);color:#d8f4ff;background:rgba(88,195,255,.12)}
+    .tag.dark{border-color:rgba(132,89,255,.45);color:#ede3ff;background:rgba(132,89,255,.14)}
+    .tag.green{border-color:rgba(45,179,106,.45);color:#ddffe8;background:rgba(45,179,106,.12)}
+    .tag.yellow{border-color:rgba(244,200,76,.45);color:#fff0bf;background:rgba(244,200,76,.12)}
+    .lead{font-size:11px;letter-spacing:.08em;color:#9fb0e0;margin-bottom:4px}
+    .lead.red{color:#ffd1d1}.lead.blue{color:#d8f4ff}.lead.dark{color:#ede3ff}.lead.green{color:#ddffe8}
+    .quote-line{margin:0;color:#cfd9f5;font-size:13px;line-height:1.5}
+    .rule{height:1px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);margin:18px 0}
+    .source-note{margin:0;color:#9fb0e0;font-size:12px;line-height:1.7}
+    .flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .flow-item{padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+    .flow-item .t{font-weight:700;color:#f4f9ff;font-size:13px}
+    .flow-item .c{color:#9fb0e0;font-size:12px;margin-top:2px}
+    .flow-item.red{border-color:rgba(244,84,84,.4);background:rgba(244,84,84,.10)}
+    .flow-item.blue{border-color:rgba(88,195,255,.4);background:rgba(88,195,255,.10)}
+    .flow-item.dark{border-color:rgba(132,89,255,.4);background:rgba(132,89,255,.10)}
+    .flow-item.green{border-color:rgba(45,179,106,.4);background:rgba(45,179,106,.10)}
+    @media(max-width:1080px){.hero,.shell{grid-template-columns:1fr}.feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:720px){.page{width:min(100% - 16px,1180px);padding:10px 0 58px}.hero{gap:12px}.title{font-size:clamp(34px,13vw,54px)}.subtitle{font-size:14px}.subcn{font-size:13px}.shell{padding:10px;gap:10px}.feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}.download-btn{width:100%;justify-content:center;text-align:center;font-size:16px;padding:14px 16px;border-radius:16px}.footer{font-size:11.5px}.visual-grid{grid-template-columns:1fr}.source{text-align:left;max-width:none}.visual-top{flex-direction:column;align-items:flex-start}.visual-meta{text-align:left;justify-items:start}.grid-2,.grid-3,.risk-grid,.matrix{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <div class="hero-bar"></div>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">RUST · DOWNLOAD MANAGER · FREE &amp; OPEN SOURCE</div>
+        <div class="source">推荐人 @grgerwcwetwet · 408 赞</div>
+      </div>
+      <h1 class="title">FluxDown</h1>
+      <p class="subtitle">Rust 驱动的多协议下载管理器 · 免费开源 IDM 平替</p>
+      <p class="subcn">Rust + Tokio 引擎、动态分段加速、BT / eD2K / HLS / DASH 全协议、浏览器扩展、MCP Server 让 AI Agent 直接接管下载任务。IDM 要钱且仅 Windows；FluxDown 全平台免费开源。</p>
+      <div class="pill-row">
+        <span class="pill cyan">Rust + Tokio</span>
+        <span class="pill green">BT / eD2K / HLS / DASH</span>
+        <span class="pill yellow">MCP Server · AI Agent</span>
+        <span class="pill purple">浏览器扩展</span>
+      </div>
+      <div class="hero-note">
+        <strong>为什么选 FluxDown 而非 IDM？</strong>
+        <p>IDM 收费 $24.95 且仅 Windows；FluxDown 完全免费开源，支持 BT 磁力、eD2K 电驴、HLS/DASH 流媒体，还能让 Claude / Cursor 直接通过 MCP 添加和管理下载任务。</p>
+      </div>
+    </div>
+
+    <aside class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">F</div>
+        <div class="visual-meta">
+          <div class="big">Download Control</div>
+          <div class="small">PROTOCOLS · SEGMENTS · QUEUE</div>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <article class="mini-card">
+          <div class="mini-icon cyan" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+          </div>
+          <div class="label">Speed</div>
+          <div class="value">10x 加速</div>
+          <div class="desc">动态分段，空闲线程自动接管慢分段</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 4a8 8 0 0 1 0 16 8 8 0 0 1 0-16z"></path><path d="M12 8v4l3 3"></path></svg>
+          </div>
+          <div class="label">Resume</div>
+          <div class="value">SQLite 持久化</div>
+          <div class="desc">WAL 模式，断电重启不丢字节</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon green" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"></path><path d="M16 3h-5l-2 2-2-2H4"></path></svg>
+          </div>
+          <div class="label">Plugins</div>
+          <div class="value">JS 沙箱插件</div>
+          <div class="desc">托管 ffmpeg / yt-dlp，沙箱隔离执行</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon blue" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"></path></svg>
+          </div>
+          <div class="label">MCP</div>
+          <div class="value">AI Agent 控制</div>
+          <div class="desc">12 个 MCP 工具，Claude / Cursor 直接调用</div>
+        </article>
+      </div>
+      <div class="visual-strip"></div>
+    </aside>
+  </section>
+
+  <section class="shell">
+    <aside class="panel">
+      <div class="panel-head"><h3>Download Queue</h3><span class="badge">3 Active</span></div>
+      <div class="panel-body">
+        <div class="search">🔎 搜索任务 / 设置</div>
+        <article class="task">
+          <div class="task-top">
+            <div><div class="task-name">blender-4.2.dmg</div><div style="font-size:11px;color:#9db0de">HTTP · 847 MB · macOS</div></div>
+            <div class="status">DOWNLOADING</div>
+          </div>
+          <div class="progress"><span style="width:67%"></span></div>
+          <p>67.3% · 21.7 MB/s · 约 13s</p>
+          <div class="task-meta"><span class="chip">8 分段</span><span class="chip">动态加速</span></div>
+        </article>
+        <article class="task">
+          <div class="task-top">
+            <div><div class="task-name">sintel-4k.blend</div><div style="font-size:11px;color:#9db0de">BT 磁力 · 2.1 GB</div></div>
+            <div class="status" style="background:rgba(132,89,255,.14);color:#b89fff;border-color:rgba(132,89,255,.32)">SEEDING</div>
+          </div>
+          <div class="progress"><span style="width:100%;background:linear-gradient(90deg,var(--purple),var(--green))"></span></div>
+          <p>100% · 做种中 · 上传 3.2 GB</p>
+          <div class="task-meta"><span class="chip">DHT 连通</span><span class="chip">UPnP</span></div>
+        </article>
+        <article class="task">
+          <div class="task-top">
+            <div><div class="task-name">archlinux-2026.iso</div><div style="font-size:11px;color:#9db0de">HTTP · 312 MB · FTP</div></div>
+            <div class="status" style="background:rgba(244,200,76,.14);color:#fff0bf;border-color:rgba(244,200,76,.32)">PAUSED</div>
+          </div>
+          <div class="progress"><span style="width:45%"></span></div>
+          <p>45.1% · 已暂停 · 限速 50 MB/s</p>
+          <div class="task-meta"><span class="chip">令牌桶限速</span><span class="chip">断点续传</span></div>
+        </article>
+      </div>
+    </aside>
+
+    <section class="panel" style="background:transparent;border:none;box-shadow:none;display:grid;grid-template-rows:auto auto auto;gap:12px;padding:0">
+      <div class="panel">
+        <div class="panel-head"><h3>Speed Control</h3><span class="badge">Bandwidth Limited</span></div>
+        <div class="panel-body">
+          <div class="status-item"><div class="left"><span class="small">GLOBAL LIMIT</span><strong>50 MB/s</strong></div><span style="color:var(--yellow)">65%</span></div>
+          <div class="stat"><div class="label"><span>当前速度</span><strong>32.4 MB/s</strong></div><div class="bar"><span style="width:65%;background:linear-gradient(90deg,var(--cyan),var(--yellow))"></span></div></div>
+          <div class="stat"><div class="label"><span>BT 上传</span><strong>3.2 GB total</strong></div><div class="bar"><span style="width:30%;background:linear-gradient(90deg,var(--purple),var(--green))"></span></div></div>
+        </div>
+      </div>
+
+      <div class="term">
+        <div class="term-top"><span>MCP · Claude Desktop</span><span>JSON-RPC 2.0</span></div>
+        <div class="term-body">// 添加下载任务
+<span class="url">POST http://127.0.0.1:17800/mcp</span>
+Authorization: Bearer &lt;token&gt;
+
+{
+  <span class="kw">"jsonrpc"</span>: <span class="url">"2.0"</span>,
+  <span class="kw">"id"</span>: 1,
+  <span class="kw">"method"</span>: <span class="url">"tools/call"</span>,
+  <span class="kw">"params"</span>: {
+    <span class="kw">"name"</span>: <span class="url">"download_add"</span>,
+    <span class="kw">"arguments"</span>: {
+      <span class="kw">"url"</span>: <span class="url">"magnet:?xt=urn:btih:..."</span>
+    }
+  }
+}
+
+// 响应
+{ "result": { "task_id": <span class="url">"task_001"</span>, "status": <span class="url">"queued"</span> }}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="editor">
+          <div class="editor-top"><span class="tab">RSS Feeds</span><span style="font-size:11px;color:#9db0de">fluxdown</span></div>
+          <div class="code" style="font-size:11px">rss_list  → 查看所有订阅
+rss_add   → 添加 RSS 源
+rss_remove → 取消订阅
+
+<span class="kw">rss_add</span>({
+  url: <span class="url">"https://..."</span>,
+  schedule: <span class="url">"@hourly"</span>
+})</div>
+        </div>
+        <div class="diff">
+          <div class="diff-top">Community Network</div>
+          <div class="diff-body" style="font-size:11px"><span class="add">mirror-hk    6.8 MB/s ✓</span>
+<span class="add">mirror-sg    11.4 MB/s ✓</span>
+<span class="add">origin        1.2 MB/s</span>
+
+自动选择最快线路。
+下载者越多，所有人越快。</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head"><h3>Protocol Distribution</h3><span class="badge">Live</span></div>
+      <div class="panel-body">
+        <div class="donut"></div>
+        <div class="status-item"><div class="left"><span class="small">HTTP/HTTPS</span><strong>38%</strong></div></div>
+        <div class="status-item"><div class="left"><span class="small">BitTorrent</span><strong>24%</strong></div></div>
+        <div class="status-item"><div class="left"><span class="small">HLS/DASH</span><strong>18%</strong></div></div>
+        <div class="status-item"><div class="left"><span class="small">eD2K</span><strong>12%</strong></div></div>
+        <div class="status-item"><div class="left"><span class="small">FTP</span><strong>8%</strong></div></div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="feature-row">
+    <div class="feature">
+      <div class="icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+      </div>
+      <span>Rust 引擎</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"></path></svg>
+      </div>
+      <span>6 种协议</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+      <span>浏览器扩展</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+      </div>
+      <span>MCP Server</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+      </div>
+      <span>断点续传</span>
+    </div>
+    <div class="feature">
+      <div class="icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+      </div>
+      <span>零广告追踪</span>
+    </div>
+  </section>
+
+  <!-- Section 01: Core Engine -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">ENGINE · 核心引擎</div>
+        <h2>Rust + Tokio：零成本抽象的并发下载</h2>
+        <p>基于 Rust 和 Tokio 构建，内存安全与最大吞吐量兼得。零开销抽象让每一条连接都充分发挥带宽潜力。</p>
+      </div>
+    </div>
+    <div class="risk-grid">
+      <article class="risk" data-accent="blue">
+        <div class="tagrow"><span class="tag blue">HTTP/HTTPS</span><span class="tag blue">FTP</span></div>
+        <h4>HTTP 系列</h4>
+        <p style="font-size:12px;color:#d8f4ff;margin:0;line-height:1.6">支持 Range 请求断点续传，多线程分段并行下载，动态调整连接数榨取带宽。FTP 同协议支持。</p>
+      </article>
+      <article class="risk" data-accent="dark">
+        <div class="tagrow"><span class="tag dark">BitTorrent</span><span class="tag dark">DHT / Magnet</span></div>
+        <h4>BitTorrent</h4>
+        <p style="font-size:12px;color:#ede3ff;margin:0;line-height:1.6">内置 DHT、UPnP 端口映射、磁力链接解析。完整 BT 客户端能力，做种与下载并行。</p>
+      </article>
+      <article class="risk" data-accent="green">
+        <div class="tagrow"><span class="tag green">eD2K</span><span class="tag green">Kad DHT</span></div>
+        <h4>eD2K / 电驴</h4>
+        <p style="font-size:12px;color:#ddffe8;margin:0;line-height:1.6">支持 eD2K 服务器源 + Kad DHT 双源搜索，MD4 校验，自动选择最快来源。经典电驴链接复活。</p>
+      </article>
+      <article class="risk" data-accent="blue">
+        <div class="tagrow"><span class="tag blue">HLS</span><span class="tag blue">DASH</span><span class="tag blue">AES 解密</span></div>
+        <h4>HLS / DASH 流媒体</h4>
+        <p style="font-size:12px;color:#d8f4ff;margin:0;line-height:1.6">自动识别 .m3u8 / .mpd 流媒体清单，分段下载并解密（AES），合并为完整视频文件后再也不怕网页过期。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Section 02: Dynamic Segmentation -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">02</div>
+      <div class="section-meta">
+        <div class="label">SEGMENTATION · 智能分段</div>
+        <h2>IDM 风格动态分段 — 比 IDM 更聪明</h2>
+        <p>空闲线程自动接管慢速分段，连接复用避免重建开销。运行时动态拆分，不预设分段数，榨取每一份带宽。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <h3>动态分段原理</h3>
+        <p style="font-size:12px;color:#cfd9f5;margin:0 0 10px;line-height:1.6">FluxDown 在运行时监测每条连接的真实吞吐，空闲线程自动抢接慢分段。当某个分段领先其他分段超过阈值时，超前部分会被拆分给落后线程。整个过程无需用户配置。</p>
+        <div class="tagrow">
+          <span class="tag green">空闲线程接管</span>
+          <span class="tag blue">连接复用</span>
+          <span class="tag yellow">运行时拆分</span>
+        </div>
+      </article>
+      <article class="card">
+        <h3>令牌桶限速</h3>
+        <p style="font-size:12px;color:#cfd9f5;margin:0 0 10px;line-height:1.6">基于令牌桶算法的全局带宽控制，精确限制上传/下载速度。即使跑满带宽，后台下载也不会影响浏览或游戏。</p>
+        <div class="tagrow">
+          <span class="tag blue">精确 MB/s 限制</span>
+          <span class="tag purple">上传独立控制</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Section 03: Browser Extension -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">03</div>
+      <div class="section-meta">
+        <div class="label">BROWSER EXTENSION · 浏览器扩展</div>
+        <h2>Chrome / Edge / Firefox 三层拦截引擎</h2>
+        <p>扩展自动捕获浏览器下载请求，支持流媒体资源嗅探（HLS/DASH），域名规则过滤，Alt+Click 绕过，完整的右键菜单集成。</p>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="flow-item blue">
+        <div class="t">① 页面资源嗅探</div>
+        <div class="c">拦截页面发出的所有网络请求，自动识别可下载资源（HLS 视频分段、压缩包、可执行文件）。</div>
+      </div>
+      <div class="flow-item dark">
+        <div class="t">② 三层拦截引擎</div>
+        <div class="c">第一层：自动拦截；第二层：按域名/扩展名过滤；第三层：用户手动 Alt+Click 绕过任意规则。</div>
+      </div>
+      <div class="flow-item green">
+        <div class="t">③ 流媒体嗅探</div>
+        <div class="c">自动检测 HLS .m3u8 和 DASH .mpd 清单，组装分段并解密 AES-128，返回完整视频文件。</div>
+      </div>
+      <div class="flow-item">
+        <div class="t">④ Native Messaging</div>
+        <div class="c">通过 NMH（Native Messaging Host）与 FluxDown 引擎通信，本地直连，无云端，数据不离本机。</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+      <span class="tag blue">Chrome 网上应用店</span>
+      <span class="tag blue">Firefox 官方商店</span>
+      <span class="tag blue">Edge 附加组件</span>
+    </div>
+  </section>
+
+  <!-- Section 04: MCP Server -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">04</div>
+      <div class="section-meta">
+        <div class="label">MCP SERVER · AI Agent 集成</div>
+        <h2>12 个 MCP 工具：Claude / Cursor 直接管理下载</h2>
+        <p>内置 Model Context Protocol 端点（Streamable HTTP + JSON-RPC 2.0），本地 127.0.0.1:17800，无需额外进程，让 AI 直接添加、查看、暂停、恢复、删除下载任务。</p>
+      </div>
+    </div>
+    <div class="term" style="margin-bottom:12px">
+      <div class="term-top"><span>MCP Client Config</span><span>Claude Desktop / Cursor / Cline</span></div>
+      <div class="term-body">{
+  <span class="kw">"mcpServers"</span>: {
+    <span class="kw">"fluxdown"</span>: {
+      <span class="kw">"url"</span>: <span class="url">"http://127.0.0.1:17800/mcp"</span>,
+      <span class="kw">"headers"</span>: {
+        <span class="kw">"Authorization"</span>: <span class="url">"Bearer &lt;your-token&gt;"</span>
+      }
+    }
+  }
+}</div>
+    </div>
+    <div class="grid-3" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <article class="card"><h3>download_add</h3><p style="font-size:11px;color:#cfd9f5;margin:0">HTTP/FTP/磁力/BT</p></article>
+      <article class="card"><h3>download_list</h3><p style="font-size:11px;color:#cfd9f5;margin:0">查看所有任务及进度</p></article>
+      <article class="card"><h3>download_get</h3><p style="font-size:11px;color:#cfd9f5;margin:0">查询单个任务详情</p></article>
+      <article class="card"><h3>download_pause</h3><p style="font-size:11px;color:#cfd9f5;margin:0">暂停一个任务</p></article>
+      <article class="card"><h3>download_resume</h3><p style="font-size:11px;color:#cfd9f5;margin:0">恢复一个任务</p></article>
+      <article class="card"><h3>pause_all / resume_all</h3><p style="font-size:11px;color:#cfd9f5;margin:0">全局暂停/恢复</p></article>
+      <article class="card"><h3>download_remove</h3><p style="font-size:11px;color:#cfd9f5;margin:0">删除任务及文件</p></article>
+      <article class="card"><h3>queue_list</h3><p style="font-size:11px;color:#cfd9f5;margin:0">查看命名队列</p></article>
+      <article class="card"><h3>rss_list / rss_add</h3><p style="font-size:11px;color:#cfd9f5;margin:0">RSS 订阅管理</p></article>
+      <article class="card"><h3>rss_remove</h3><p style="font-size:11px;color:#cfd9f5;margin:0">取消 RSS 订阅</p></article>
+    </div>
+  </section>
+
+  <!-- Section 05: Architecture -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">05</div>
+      <div class="section-meta">
+        <div class="label">ARCHITECTURE · 架构设计</div>
+        <h2>Flutter UI ↔ Rust 引擎：Rinf FFI 串联</h2>
+        <p>Flutter 渲染界面，Rust 做所有重活，两者通过 Rinf signals 通信；浏览器扩展通过 Native Messaging Host 直连引擎。</p>
+      </div>
+    </div>
+    <div class="diff">
+      <div class="diff-top">FluxDown Architecture</div>
+      <div class="diff-body" style="font-size:11.5px;min-height:auto;line-height:1.8">
+<span style="color:var(--cyan)">Flutter UI (shadcn_ui)</span>
+    ↕ Rinf signals
+<span style="color:var(--purple)">hub (FFI adapter)</span>
+    ↕ Native Messaging
+<span style="color:var(--yellow)">fluxdown_nmh (Browser Extension)</span>
+
+  ↓ Rust engine layer ↓
+<span style="color:var(--green)">fluxdown_engine</span>
+  ├─ HTTP/HTTPS Engine
+  ├─ FTP Engine
+  ├─ BitTorrent Engine (DHT/UPnP/Magnet)
+  ├─ eD2K Engine (Kad DHT)
+  └─ HLS/DASH Engine (AES 解密)
+
+  ↓ SQLite WAL ↓
+<span style="color:var(--blue)">持久化状态</span></div>
+    </div>
+  </section>
+
+  <!-- Section 06: Plugin System -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">06</div>
+      <div class="section-meta">
+        <div class="label">PLUGINS · 插件与托管</div>
+        <h2>JS 沙箱 + 外部工具托管</h2>
+        <p>可选的 JavaScript 插件层在沙箱中安全执行，链接解析器、通知钩子、命令式重试逻辑全部插件化。插件市场一键安装，内容寻址校验全程可验证。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <h3>托管组件</h3>
+        <p style="font-size:12px;color:#cfd9f5;margin:0 0 8px;line-height:1.6">按需下载并托管 <code style="font-size:11px;background:#eef4ff;color:#111;padding:1px 5px;border-radius:3px">ffmpeg</code>、<code style="font-size:11px;background:#eef4ff;color:#111;padding:1px 5px;border-radius:3px">yt-dlp</code> 等外部工具。插件在隔离沙箱中调用它们完成合并、转码、抽流，无需手动配置环境变量。</p>
+        <div class="tagrow">
+          <span class="tag green">ffmpeg 托管</span>
+          <span class="tag yellow">yt-dlp 托管</span>
+          <span class="tag blue">沙箱隔离</span>
+        </div>
+      </article>
+      <article class="card">
+        <h3>社区加速网络</h3>
+        <p style="font-size:12px;color:#cfd9f5;margin:0 0 8px;line-height:1.6">来自社区的匿名镜像测速结果汇聚成共享路由图，下载时自动选择最快线路。只记录「哪个地区哪个镜像更快」，不含链接、文件名或身份信息。</p>
+        <div class="tagrow">
+          <span class="tag purple">匿名测速</span>
+          <span class="tag blue">去中心化</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Section 07: IDM Comparison -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">07</div>
+      <div class="section-meta">
+        <div class="label">VS IDM · 对比 Internet Download Manager</div>
+        <h2>FluxDown vs IDM：免费开源多协议 vs 收费仅 Windows</h2>
+        <p>这不是功能对比，是换代的选择。</p>
+      </div>
+    </div>
+    <div class="status-list" style="gap:6px">
+      <div class="status-item" style="background:rgba(45,179,106,.10);border-color:rgba(45,179,106,.3)"><div class="left"><span class="small">价格</span><strong>免费开源（AGPL-3.0）</strong></div><span style="color:var(--green)">✓ FluxDown</span></div>
+      <div class="status-item" style="background:rgba(244,84,84,.08);border-color:rgba(244,84,84,.2)"><div class="left"><span class="small">价格</span><strong>$24.95 + 续费</strong></div><span style="color:var(--yellow)">IDM</span></div>
+      <div class="status-item" style="background:rgba(45,179,106,.10);border-color:rgba(45,179,106,.3)"><div class="left"><span class="small">平台</span><strong>Win / macOS / Linux / Android / NAS / Docker</strong></div><span style="color:var(--green)">✓ FluxDown</span></div>
+      <div class="status-item" style="background:rgba(244,84,84,.08);border-color:rgba(244,84,84,.2)"><div class="left"><span class="small">平台</span><strong>仅 Windows</strong></div><span style="color:var(--yellow)">IDM</span></div>
+      <div class="status-item" style="background:rgba(45,179,106,.10);border-color:rgba(45,179,106,.3)"><div class="left"><span class="small">协议</span><strong>HTTP / FTP / BT / eD2K / HLS / DASH</strong></div><span style="color:var(--green)">✓ FluxDown</span></div>
+      <div class="status-item" style="background:rgba(244,84,84,.08);border-color:rgba(244,84,84,.2)"><div class="left"><span class="small">协议</span><strong>HTTP / FTP（部分流媒体）</strong></div><span style="color:var(--yellow)">IDM</span></div>
+      <div class="status-item" style="background:rgba(45,179,106,.10);border-color:rgba(45,179,106,.3)"><div class="left"><span class="small">浏览器扩展</span><strong>Chrome / Edge / Firefox</strong></div><span style="color:var(--green)">✓ FluxDown</span></div>
+      <div class="status-item" style="background:rgba(244,84,84,.08);border-color:rgba(244,84,84,.2)"><div class="left"><span class="small">浏览器扩展</span><strong>IE / Chrome（仅 Windows）</strong></div><span style="color:var(--yellow)">IDM</span></div>
+      <div class="status-item" style="background:rgba(45,179,106,.10);border-color:rgba(45,179,106,.3)"><div class="left"><span class="small">AI Agent</span><strong>MCP Server，12 工具，Claude/Cursor 直控</strong></div><span style="color:var(--green)">✓ FluxDown</span></div>
+      <div class="status-item" style="background:rgba(244,84,84,.08);border-color:rgba(244,84,84,.2)"><div class="left"><span class="small">AI Agent</span><strong>不支持</strong></div><span style="color:var(--yellow)">IDM</span></div>
+      <div class="status-item" style="background:rgba(45,179,106,.10);border-color:rgba(45,179,106,.3)"><div class="left"><span class="small">广告与追踪</span><strong>零广告，零追踪，无需注册</strong></div><span style="color:var(--green)">✓ FluxDown</span></div>
+      <div class="status-item" style="background:rgba(244,84,84,.08);border-color:rgba(244,84,84,.2)"><div class="left"><span class="small">开源</span><strong>否</strong></div><span style="color:var(--yellow)">IDM</span></div>
+    </div>
+  </section>
+
+  <!-- Section 08: Installation -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">08</div>
+      <div class="section-meta">
+        <div class="label">INSTALLATION · 安装方式</div>
+        <h2>全平台覆盖：桌面、浏览器、移动端、NAS、Docker</h2>
+        <p>每个主流平台都有官方二进制，NAS 还有 Synology / QNAP / Unraid 专用包。</p>
+      </div>
+    </div>
+    <div class="grid-3" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">Windows</span></div>
+        <h3>桌面版</h3>
+        <p style="font-size:11px;color:#cfd9f5;margin:0">x64 / ARM64 · setup.exe 安装包 · 便携 .zip</p>
+        <p style="font-size:11px;color:#cfd9f5;margin:6px 0 0">Scoop：<code style="font-size:10px;background:#0f1424;color:#a8f59f;padding:1px 5px;border-radius:3px">scoop install fluxdown</code></p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">macOS</span></div>
+        <h3>桌面版</h3>
+        <p style="font-size:11px;color:#cfd9f5;margin:0">Intel / Apple Silicon · .dmg · 便携 .tar.gz</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">Linux</span></div>
+        <h3>桌面版</h3>
+        <p style="font-size:11px;color:#cfd9f5;margin:0">x64 · .AppImage · .deb · Arch .pkg.tar.zst · 便携 .tar.gz</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag green">Android</span></div>
+        <h3>移动版</h3>
+        <p style="font-size:11px;color:#cfd9f5;margin:0">arm64-v8a / armeabi-v7a / x86_64 · per-ABI .apk 或通用 .apk</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag dark">NAS</span></div>
+        <h3>无头服务</h3>
+        <p style="font-size:11px;color:#cfd9f5;margin:0">Docker (ghcr.io/zerx-lab/fluxdown-server) · Synology .spk · QNAP .qpkg · OpenWrt .ipk · Unraid CA</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag yellow">Browser</span></div>
+        <h3>浏览器扩展</h3>
+        <p style="font-size:11px;color:#cfd9f5;margin:0">Chrome 网上应用店 · Firefox 官方商店 · Edge 附加组件</p>
+      </article>
+    </div>
+  </section>
+
+  <div class="download">
+    <a class="download-btn" href="https://fluxdown.zerx.dev/zh/" target="_blank" rel="noopener">
+      ⬇ 下载 FluxDown
+      <small>全平台免费开源 · 立即体验</small>
+    </a>
+  </div>
+
+  <section class="footer">
+    <div>⭐ 3,648 Stars · AGPL-3.0 · Rust</div>
+    <div class="stars">★ zerx-lab / FluxDown</div>
+    <div><a href="https://github.com/zerx-lab/FluxDown" target="_blank" rel="noopener" style="color:#7ad9ff">GitHub</a> · <a href="https://fluxdown.zerx.dev/zh/" target="_blank" rel="noopener" style="color:#7ad9ff">官网</a></div>
+  </section>
+
+</main>
+</body>
+</html>
