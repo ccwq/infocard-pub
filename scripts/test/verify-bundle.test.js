@@ -109,6 +109,32 @@ test('html_path date prefix must be a real calendar date', () => {
   assert.equal(leapDay.valid, true);
 });
 
+test('existing legacy card retains its exact path only with matching regular sidecar', () => {
+  const { validateBundle } = require(MODULE_PATH);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'legacy-bundle-test-'));
+  fs.mkdirSync(path.join(dir, 'docs'));
+  const html = path.join(dir, 'docs/publish-bundle-validator.html');
+  const meta = html + '.meta.yaml';
+  const bundle = validBundle({ html_path: 'docs/publish-bundle-validator.html', meta_path: 'docs/publish-bundle-validator.html.meta.yaml' });
+  const check = () => validateBundle(bundle, { root: dir });
+  assert.equal(check().valid, false, 'new undated card must fail');
+  fs.writeFileSync(html, '<html></html>');
+  assert.equal(check().valid, false, 'missing sidecar must fail');
+  fs.writeFileSync(meta, 'path: docs/wrong.html\n');
+  assert.equal(check().valid, false, 'mismatched path must fail');
+  fs.writeFileSync(meta, 'path: docs/publish-bundle-validator.html\n');
+  assert.equal(check().valid, true, 'existing exact path must pass');
+  fs.unlinkSync(meta);
+  fs.symlinkSync(html, meta);
+  assert.equal(check().valid, false, 'symlink sidecar must fail');
+  fs.unlinkSync(meta);
+  fs.writeFileSync(meta, 'path: docs/publish-bundle-validator.html\n');
+  fs.unlinkSync(html);
+  fs.symlinkSync(meta, html);
+  assert.equal(check().valid, false, 'symlink html must fail');
+  assert.equal(validateBundle({ ...bundle, html_path: 'docs/../publish-bundle-validator.html' }, { root: dir }).valid, false);
+});
+
 test('bundleAllowlist contains only publish outputs from bundle', () => {
   const { bundleAllowlist } = require(MODULE_PATH);
   assert.deepEqual(bundleAllowlist(validBundle()), [

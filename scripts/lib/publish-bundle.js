@@ -35,7 +35,26 @@ function isCalendarDate(value) {
     && date.getUTCDate() === day;
 }
 
-function validateBundle(bundle) {
+function isExistingLegacyTarget(bundle, root) {
+  if (bundle.html_path !== `docs/${bundle.slug}.html`
+      || bundle.meta_path !== `${bundle.html_path}.meta.yaml`) return false;
+  try {
+    const base = fs.realpathSync(root);
+    const html = path.resolve(base, bundle.html_path);
+    const meta = path.resolve(base, bundle.meta_path);
+    for (const file of [html, meta]) {
+      const stat = fs.lstatSync(file);
+      if (!stat.isFile() || stat.isSymbolicLink() || fs.realpathSync(file) !== file) return false;
+    }
+    const yaml = require('../../assets/home/vendor/js-yaml.min.js');
+    const stored = yaml.load(fs.readFileSync(meta, 'utf8'));
+    return Boolean(stored && !Array.isArray(stored) && stored.path === bundle.html_path);
+  } catch (_) {
+    return false;
+  }
+}
+
+function validateBundle(bundle, { root = process.cwd() } = {}) {
   const errors = [];
   const add = (field, message) => errors.push({ field, message });
 
@@ -53,9 +72,10 @@ function validateBundle(bundle) {
   const expectedHtml = typeof slug === 'string'
     ? new RegExp(`^docs/\\d{8}-${slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.html$`)
     : null;
-  if (typeof bundle.html_path !== 'string' || !expectedHtml || !expectedHtml.test(bundle.html_path)) {
-    add('html_path', `must be docs/YYYYMMDD-${slug}.html`);
-  } else if (!isCalendarDate(bundle.html_path.slice(5, 13))) {
+  const datedPath = typeof bundle.html_path === 'string' && expectedHtml && expectedHtml.test(bundle.html_path);
+  if (!datedPath && !isExistingLegacyTarget(bundle, root)) {
+    add('html_path', `must be docs/YYYYMMDD-${slug}.html or an existing exact legacy target with matching sidecar`);
+  } else if (datedPath && !isCalendarDate(bundle.html_path.slice(5, 13))) {
     add('html_path', 'YYYYMMDD prefix must be a valid calendar date');
   }
   if (bundle.meta_path !== `${bundle.html_path}.meta.yaml`) {
