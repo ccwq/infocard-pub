@@ -19,9 +19,9 @@ const HIGH_RISK_PATTERNS = [
   {
     name: "个人邮箱",
     // 匹配常见个人邮箱格式，排除明显是占位符或示例的
-    regex: /[a-zA-Z0-9.\-_]{3,30}@[a-zA-Z0-9\-]+\.(com|org|net|io|me|info|cn|xyz|top|cc|pro|tk|ml|ga|cf|gq|ru|club|cc|edu|gov)\b/gi,
+    regex: /[a-zA-Z0-9.\-_+]{3,64}@[a-zA-Z0-9\-]+\.(com|org|net|io|me|info|cn|xyz|top|cc|pro|tk|ml|ga|cf|gq|ru|club|cc|edu|gov)\b/gi,
     // 排除这些关键字（常见占位符/示例）
-    exclude: /\b(example|test|demo|sample|placeholder|yourname|username|email|mail|xxx|aaa|bbb|foo|bar|baz|admin|support|noreply|no-reply|help|info|contact|hello|get|post|user\d*|name\d*|test\d*|demo\d*)@/i,
+    exclude: /^(example|test|demo|sample|placeholder|yourname|username|email|mail|xxx|aaa|bbb|foo|bar|baz|admin|support|noreply|no-reply|help|info|contact|hello|get|post|user\d*|name\d*|test\d*|demo\d*)(?:\+[a-zA-Z0-9._-]+)?@/i,
     severity: "HIGH",
   },
   {

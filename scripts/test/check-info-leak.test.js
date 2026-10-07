@@ -6,6 +6,22 @@ const test = require("node:test");
 
 const { scanFile } = require("../check-info-leak.js");
 
+test("plus-address fixture stays exempt but real plus-address stays HIGH", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "check-info-leak-"));
+  const file = path.join(dir, "card.html");
+  try {
+    fs.writeFileSync(file, "user+tag@domain.com");
+    assert.deepEqual(scanFile(file), []);
+    for (const value of ["alice+tag@company.com", "alice+user@company.com", "alice@company.com"]) {
+      fs.writeFileSync(file, value);
+      const issues = scanFile(file);
+      assert.equal(issues.length, 1);
+      assert.equal(issues[0].severity, "HIGH");
+      assert.equal(issues[0].value, value.slice(0, 3) + "***" + value.slice(-3));
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("X status ID is not misclassified as a phone number", () => {
   /**
    * Given：HTML contains a public X status URL whose long numeric ID includes an 11-digit phone-like substring
