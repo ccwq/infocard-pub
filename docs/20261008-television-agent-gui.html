@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Television — 给个人 Agent 一块可视化屏幕</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* ============ HERO ============ */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:.98;letter-spacing:-.05em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* ============ SECTIONS ============ */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.02;letter-spacing:-.05em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* ============ GRIDS ============ */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0}
+    .card,.mini{padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* ============ MATRIX ============ */
+    .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .matrix .mini{display:grid;gap:8px}
+    .mini h4{font-size:15px;line-height:1.2}
+    .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+    .mini .red{color:var(--red)}
+    .mini .blue{color:var(--blue)}
+    .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.58}
+
+    /* ============ CODE ============ */
+    .code-block{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto}
+    .code-block .code-label{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px}
+    pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.72;white-space:pre-wrap}
+
+    /* ============ RISK ============ */
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:14px;line-height:1.65;color:#222}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+
+    /* ============ ARCHITECTURE ============ */
+    .arch-diagram{border:2px solid var(--line);background:#fff;overflow:hidden}
+    .arch-header{background:var(--ink);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+    .arch-header span{font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+    .arch-body{padding:16px;display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:10px;align-items:center}
+    .arch-node{border:2px solid var(--line);padding:12px;text-align:center;background:var(--soft-ink)}
+    .arch-node h4{margin:0 0 4px;font-size:13px;letter-spacing:-.01em}
+    .arch-node p{margin:0;font-size:11px;color:var(--muted);line-height:1.5}
+    .arch-node.highlight{border-color:var(--blue);background:var(--soft-blue)}
+    .arch-node.highlight h4{color:var(--blue)}
+    .arch-node.green{border-color:#15803d;background:#dcfce7}
+    .arch-node.green h4{color:#15803d}
+    .arch-arrow{color:var(--blue);font-size:22px;font-weight:900;text-align:center}
+    .arch-footer{border-top:2px solid var(--line);padding:8px 14px;background:var(--soft-ink);font-size:11.5px;color:var(--muted);text-align:center}
+
+    /* ============ FOOTER ============ */
+    .footer-block{border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px}
+    .footer-block h3{font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em}
+    .footer-block p{font-size:14px;color:#222;line-height:1.66;margin:0}
+    .footer-block ul{margin:0;padding-left:16px;font-size:13.5px;color:#333;line-height:1.72}
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+
+    /* ============ Responsive ============ */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .arch-body{grid-template-columns:1fr;gap:8px}
+      .arch-arrow{transform:rotate(90deg);text-align:center}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- ============ HERO ============ -->
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">Agent 界面 · 开源工具</div>
+        <h1 class="demo-title">The Missing GUI<br>for Personal Agents</h1>
+        <p class="subtitle">Telepath (Unternet PBC) 开源项目 Television：给个人 Agent 装备一块可视化工作台，让文档、图表、网页从聊天流里"上屏"，成为可持久、可编辑、可交互的 Artifact。</p>
+        <div class="badge-row">
+          <span class="badge red">MIT License</span>
+          <span class="badge blue">TypeScript</span>
+          <span class="badge dark">Electron</span>
+          <span class="badge">Node.js 24</span>
+          <span class="badge">200+ ★ GitHub</span>
+        </div>
+        <div class="badge-row">
+          <span class="badge ink">artifact</span>
+          <span class="badge ink">channels</span>
+          <span class="badge ink">skills</span>
+          <span class="badge ink">server</span>
+          <span class="badge ink">client</span>
+        </div>
+        <div class="alert">
+          <strong>一句话定位</strong>
+          <p>Agent 能力已是 GUI 时代，交互却停在 MS-DOS。Television 把"一块屏幕"还给 Agent，用三件套让 artifact 持续可见、可持续修改、可持续回访。</p>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">ARCH · 三件套</div>
+          <h3>server + skills + client</h3>
+          <p>Agent 在同机跑轻量 server，skills bundle 教它建 artifact，Electron 客户端 / 浏览器渲染可视化界面。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>核心理念：</b>Telepath 认为每次个人计算的变革都伴随新界面隐喻。固定应用 → 可复用 Skills 按需生成界面。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1 · server</div><div class="c">轻量常驻服务，与 agent 同机</div></div>
+            <div class="flow-item dark"><div class="t">Step 2 · skills</div><div class="c">bundle 自动安装，教会 agent 建 artifact</div></div>
+            <div class="flow-item red"><div class="t">Step 3 · client</div><div class="c">Electron / 浏览器渲染可视化屏幕</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <!-- ============ SECTION 01: 为什么需要 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">为什么需要 Television</div>
+          <h2>Agent 能力已经是 GUI 时代，交互却停在 MS-DOS</h2>
+          <p>Claude Code 团队、Karpathy、Sam Altman、a16z 都在讨论：LLM 驱动的应用需要超越无限滚动文本流的界面。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag red">聊天流问题</span><span class="tag blue">界面断点</span></div>
+          <h3>聊天流淹没 artifact</h3>
+          <p>Agent 生成一份报告、一张图、一个网页——然后下一轮对话把它推到聊天深处再也找不回来。artifact 没有持久化，修改历史丢失。</p>
+          <ul>
+            <li>文档/图表/网页 → 一次过，不可持续</li>
+            <li>多轮修改 → 无法回溯版本</li>
+            <li>长期项目 → 信息碎片化</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">业界共识</span><span class="tag dark">新隐喻</span></div>
+          <h3>界面隐喻变革正在发生</h3>
+          <p>Claude Code 团队博客、Karpathy、Sam Altman、a16z 都在讨论：LLM 时代需要超越"无限滚动聊天"的可视化界面，让 AI 输出真正可操作、可协作。</p>
+          <ul>
+            <li>Claude Code 团队：GUI 化是 Agent 标配</li>
+            <li>Nous Research 已向 250+ 人 demo</li>
+            <li>固定应用 → Skills 按需生成界面</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 02: 三件套架构 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">三件套架构</div>
+          <h2>server + skills bundle + client</h2>
+          <p>三个组件协同工作：轻量 server 跑在 agent 同机，skills bundle 自动安装，Electron / 浏览器客户端渲染可视化界面。</p>
+        </div>
+      </div>
+
+      <div class="arch-diagram">
+        <div class="arch-header"><span>ARCHITECTURE · Television 三件套</span><span>television.run</span></div>
+        <div class="arch-body">
+          <div class="arch-node highlight">
+            <h4>Your Agent</h4>
+            <p>Hermes / OpenClaw<br>Claude Code / Codex</p>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node">
+            <h4>server</h4>
+            <p>轻量常驻<br>与 agent 同机</p>
+          </div>
+          <div class="arch-arrow">↔</div>
+          <div class="arch-node green">
+            <h4>skills bundle</h4>
+            <p>自动安装<br>教 agent 建 artifact</p>
+          </div>
+        </div>
+        <div class="arch-footer">Electron app（macOS） / 浏览器（任意平台）&nbsp;&nbsp;|&nbsp;&nbsp;client 与聊天界面 sidecar 并存</div>
+      </div>
+
+      <div class="risk-grid" style="margin-top:14px">
+        <article class="risk" data-accent="blue">
+          <div class="n">S</div>
+          <h4>server · 轻量常驻</h4>
+          <p>装在 agent 同机，处理 agent 与 TV 客户端之间的通信。`tv serve --persist` 常驻，Node.js 24 + npm 11。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">B</div>
+          <h4>skills bundle · 指令集</h4>
+          <p>安装时自动安装，教 agent 怎么创建和修改 artifact。agent 常会主动上屏，也可手动说「put that on my TV」。</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">C</div>
+          <h4>client · 可视化界面</h4>
+          <p>macOS 有 Electron 应用；任意平台可浏览器访问。Electron 版可加载外部网页（iframe），与 Web 应用交互。</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 03: Artifact 与 Channels ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">03</div>
+        <div class="section-meta">
+          <div class="label">Artifact 与 Channels</div>
+          <h2>持久 · 可塑 · 可交互</h2>
+          <p>Artifact 从静态可视化到可编辑文档到完整 vibe-coded web app；Channels 提供持久空间来收集、排列和回访。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <article class="mini">
+          <div class="lead">持久</div>
+          <h4>不像聊天记录</h4>
+          <p class="quote-line">artifact 独立存在，不被后续对话淹没，持久化保存。</p>
+          <p>dashboard / 在线研究 / 长周期项目 / 文档协作</p>
+        </article>
+        <article class="mini">
+          <div class="lead blue">可塑</div>
+          <h4>可持续修改</h4>
+          <p class="quote-line">同一 artifact 可以在多轮对话中持续更新和迭代。</p>
+          <p>Agent 主动修改，或用户指令触发更新</p>
+        </article>
+        <article class="mini">
+          <div class="lead red">可交互</div>
+          <h4>不只是展示</h4>
+          <p class="quote-line">形态从静态可视化到可编辑文档到完整 vibe-coded web app。</p>
+          <p>用户可以直接与 artifact 交互</p>
+        </article>
+        <article class="mini">
+          <div class="lead">Channels</div>
+          <h4>持久空间组织</h4>
+          <p class="quote-line">按 channels 组织 artifact：收集、排列、回访，形成持久工作空间。</p>
+          <p>类似标签页但不依赖聊天会话</p>
+        </article>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">适用场景</span></div>
+          <h3>凡是不适合无限滚动文本流的任务</h3>
+          <ul>
+            <li>Dashboard：多指标持续展示</li>
+            <li>Agentic Coding：代码结构持续可见</li>
+            <li>Online Research：网页/数据持续追踪</li>
+            <li>长周期项目：artifact 跨会话保持</li>
+            <li>文档协作：与 agent 共同编辑</li>
+            <li>与 Web App 交互：Electron 加载外部网页</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">不适合场景</span></div>
+          <h3>Television 不是聊天替代品</h3>
+          <ul>
+            <li>即时问答：直接聊天更高效</li>
+            <li>简单指令：无需可视化</li>
+            <li>Windows：暂不支持</li>
+            <li>无 skills 能力的 harness</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 04: 安装三路径 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">04</div>
+        <div class="section-meta">
+          <div class="label b">安装三路径</div>
+          <h2>macOS / 浏览器 / 源码</h2>
+          <p>三种安装方式覆盖主流场景：macOS 直接下载应用、非 Mac 用实验性浏览器界面、或从源码构建。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">路径 1 · macOS</span></div>
+          <h3>直接下载应用</h3>
+          <p>下载 macOS Electron 应用，安装后启动会引导连接 agent。最简单的方式。</p>
+          <ul>
+            <li>下载 macOS .dmg 安装包</li>
+            <li>启动后自动引导连接 agent</li>
+            <li>与聊天界面 sidecar 并存</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">路径 2 · 浏览器</span></div>
+          <h3>实验性浏览器界面</h3>
+          <p>非 macOS 用户的替代方案。贴下面这句话给 agent，它会帮你安装好并给出 URL。</p>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">路径 3 · 源码</span></div>
+          <h3>从源码构建</h3>
+          <p>需要 Node.js 24 + npm 11，git clone 后构建。</p>
+        </article>
+      </div>
+
+      <div class="code-block" style="margin-top:14px">
+        <div class="code-label">// 路径 2：给 agent 贴这句话，它会引导安装（非 macOS）
+        <div style="font-size:10px;color:#666;margin-top:2px">Read the entire Television admin guide at https://television.run/install.md and help me get Television installed.</div></div>
+        <pre>git clone https://github.com/telepath-computer/television.git
+<span style="color:#d80018"># 需要：Node.js 24 + npm >=11.5 &lt;12</span>
+cd television && npm install
+npm run build
+npm run link
+<span style="color:#1f63ff"># 常驻服务</span>
+tv serve --persist</pre>
+      </div>
+
+      <div class="risk-grid" style="margin-top:14px">
+        <article class="risk" data-accent="red">
+          <div class="n">⚠</div>
+          <h4>系统要求</h4>
+          <p>agent 必须跑在 Linux 或 macOS 上。Windows 暂不支持。</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">✓</div>
+          <h4>支持的 Harness</h4>
+          <p>官方推荐 Hermes / OpenClaw / Pi / Claude Code / Codex，任意支持 skills + 文件访问即可。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">i</div>
+          <h4>Electron 特殊能力</h4>
+          <p>Electron 版可加载外部网页（iframe），可直接与 Web 应用交互。</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SECTION 05: 官方 Skills 生态 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">05</div>
+        <div class="section-meta">
+          <div class="label">官方 Skills 生态</div>
+          <h2>可复用指令，按需生成界面</h2>
+          <p>Skills 是可复用的指令集（可分享），官方已内置多个开箱即用的 Skills，每个 Skill 自动生成对应的可视化 artifact。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">Calendar</span><span class="tag dark">官方 Skill</span></div>
+          <h3>周历 Calendar</h3>
+          <p>从事件、计划、deadline 自动生成周历视图，持续追踪时间线。</p>
+          <ul>
+            <li>自动排版周历格</li>
+            <li>事件时间线可视化</li>
+            <li>多轮对话持续更新</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">Tasks</span><span class="tag dark">官方 Skill</span></div>
+          <h3>可勾选 Tasks</h3>
+          <p>生成可勾选的任务列表 artifact，支持点击完成状态切换。</p>
+          <ul>
+            <li>可交互勾选框</li>
+            <li>Agent 持续更新进度</li>
+            <li>跨会话持久化</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">Table</span><span class="tag dark">官方 Skill</span></div>
+          <h3>Airtable 风格 Table</h3>
+          <p>生成 Airtable 风格的紧凑表格 artifact，适合结构化数据管理。</p>
+          <ul>
+            <li>多列数据表格</li>
+            <li>紧凑布局</li>
+            <li>支持多轮数据追加</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="quote-block" style="margin-top:14px">
+        <b>Skills 可分享：</b>Skills 是可复用的指令集合，用户可以创建自定义 Skills 并分享给他人。官方 Skills 只是起点，社区 Skills 生态正在生长。
+      </div>
+    </section>
+
+    <!-- ============ SECTION 06: 数据与理念 ============ -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">06</div>
+        <div class="section-meta">
+          <div class="label b">数据与理念</div>
+          <h2>界面隐喻论 · 数字 · 开源</h2>
+          <p>GitHub 建仓一周数据 + Telepath 的界面哲学 + 社区影响力。</p>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px">
+        <div style="border:2px solid var(--line);background:#fff;padding:12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">GitHub Stars</div>
+          <div style="font-size:22px;font-weight:900;color:var(--red);line-height:1">200+</div>
+          <div style="font-size:11px;color:var(--muted)">建仓 2026-10-01</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">npm 周下载</div>
+          <div style="font-size:22px;font-weight:900;color:var(--blue);line-height:1">4,417</div>
+          <div style="font-size:11px;color:var(--muted)">@telepath-computer/television</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Show HN</div>
+          <div style="font-size:22px;font-weight:900;color:#111;line-height:1">8</div>
+          <div style="font-size:11px;color:var(--muted)"> HackerNews 分数</div>
+        </div>
+        <div style="border:2px solid var(--line);background:#fff;padding:12px">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Forks</div>
+          <div style="font-size:22px;font-weight:900;color:#111;line-height:1">15+</div>
+          <div style="font-size:11px;color:var(--muted)">开源社区 Fork</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">哲学</span><span class="tag blue">界面隐喻</span></div>
+          <h3>每次个人计算变革都伴随新界面隐喻</h3>
+          <p>Telepath 认为：固定应用（固定隐喻）→ 可复用 Skills 按需生成界面（动态隐喻）。Television 是这一理念的第一个实现。</p>
+          <ul>
+            <li>个人计算已到 GUI 临界点</li>
+            <li>Skills 是可分享的动态界面</li>
+            <li>Artifact 是持久化的工作空间</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">社区</span><span class="tag red">反馈</span></div>
+          <h3>社区验证与影响力</h3>
+          <p>Nous Research 邀请 Telepath 向 Hermes 社区 250+ 人 demo Television，Show HN 8 分，开发者社区正在快速采纳。</p>
+          <ul>
+            <li>Spec-driven 开发流程</li>
+            <li>暂未开放外部贡献</li>
+            <li>Bug 反馈走 GitHub Issues</li>
+            <li>加入 Discord 参与讨论</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ FOOTER ============ -->
+    <div class="footer-block">
+      <h3>总结 · Television 适合谁？</h3>
+      <p>如果你用 Hermes / OpenClaw / Claude Code / Codex 跑需要可视化、持久化、可持续修改的任务——Dashboard、在线研究、长周期项目、文档协作、与 Web App 交互——Television 值得一试。</p>
+      <ul>
+        <li>想让 agent 的输出"上屏"而不是淹没在聊天流里</li>
+        <li>需要 artifact 在多轮对话中持久存在并可修改</li>
+        <li>想要一个界面让 agent 与 Web 应用直接交互</li>
+        <li>你的 harness 是 Linux/macOS + 支持 skills + 文件访问</li>
+      </ul>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+        <span class="badge dark">github.com/telepath-computer/television</span>
+        <span class="badge">MIT © 2026 Telepath (Unternet PBC)</span>
+        <span class="badge blue">npm: @telepath-computer/television</span>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+    <p class="source-note">Television · 给个人 Agent 一块可视化屏幕 · github.com/telepath-computer/television · MIT License · © 2026 Telepath (Unternet PBC)</p>
+  </main>
+</body>
+</html>
