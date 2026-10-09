@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="black">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>微软 LiteBox：Rust 写的安全沙箱库操作系统</title>
+  <style>
+    :root{
+      --bg:#f4f2ec; --paper:#fdfcf8; --ink:#111; --muted:#555; --border:#111;
+      --red:#c8102e; --blue:#0046c0; --green:#15803d; --orange:#d97706;
+      --soft-red:#fdf0f2; --soft-blue:#eff6ff; --soft-green:#f0fdf4;
+      --shadow:5px 5px 0 rgba(0,0,0,.13);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);line-height:1.6;background:var(--bg);
+      background-image:
+        linear-gradient(rgba(17,17,17,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(17,17,17,.03) 1px, transparent 1px);
+      background-size:28px 28px;
+    }
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    img{display:block;max-width:100%}
+
+    .page{width:min(1060px, calc(100% - 16px));margin:0 auto;padding:16px 0 80px}
+
+    /* ======= TOP BAR ======= */
+    .topbar{height:12px;background:var(--ink);border-bottom:3px solid var(--red);margin-bottom:16px}
+    .topbar::before{content:"";float:left;width:180px;height:100%;background:var(--red)}
+    .topbar::after{content:"";float:right;width:120px;height:100%;background:var(--blue)}
+
+    /* ======= HERO ======= */
+    .hero{display:grid;grid-template-columns:1fr 340px;gap:14px;border:3px solid var(--ink);background:var(--paper);box-shadow:var(--shadow)}
+    .hero-copy{padding:18px 18px 16px;border-right:3px solid var(--ink);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:6px;width:fit-content;border:2px solid var(--ink);background:#fff;padding:4px 10px;font-size:11px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10px}
+    .kicker.blue{border-color:var(--blue);color:var(--blue)}
+    .kicker.green{border-color:var(--green);color:var(--green)}
+    h1.hero-title{margin:0;font-size:clamp(22px,3.5vw,38px);line-height:1.05;letter-spacing:-.04em;font-weight:950}
+    .hero-subtitle{margin:0;font-size:13.5px;color:var(--muted);line-height:1.6}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border:2px solid var(--ink);background:#fff;font-size:11.5px;font-weight:800;white-space:nowrap}
+    .badge.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .badge.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .badge.green{background:var(--green);color:#fff;border-color:var(--green)}
+    .badge.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .alert-box{border:2px solid var(--ink);background:var(--ink);color:#fff;padding:10px 12px;display:grid;gap:6px}
+    .alert-box strong{display:block;font-size:13px;font-weight:800}
+    .alert-box p{margin:0;font-size:12px;color:#d4cfc0;line-height:1.55}
+    .hero-visual{background:#f7f5ee;padding:16px;display:grid;gap:10px;align-content:start}
+    .stat-block{border:2px solid var(--ink);background:#fff;padding:14px;text-align:center}
+    .stat-block .num{font-size:38px;font-weight:950;line-height:1;letter-spacing:-.05em;color:var(--ink)}
+    .stat-block .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:4px;font-weight:700}
+    .stat-block .sub{font-size:11px;color:var(--muted);margin-top:2px}
+    .mini-tags{display:flex;flex-wrap:wrap;gap:5px}
+    .mini-tag{display:inline-flex;border:1.5px solid var(--ink);padding:3px 8px;font-size:11px;font-weight:700;background:#fff}
+
+    /* ======= SECTIONS ======= */
+    .section{margin-top:20px;border:3px solid var(--ink);background:var(--paper);box-shadow:var(--shadow)}
+    .section-bar{height:10px;background:var(--ink);border-bottom:3px solid var(--ink)}
+    .section-bar.red{background:var(--red)}
+    .section-bar.blue{background:var(--blue)}
+    .section-bar.green{background:var(--green)}
+    .section-bar.orange{background:var(--orange)}
+    .section-bar.purple{background:#6b21a8}
+    .section-body{padding:16px 18px}
+
+    /* section header */
+    .s-head{display:grid;grid-template-columns:80px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .s-no{width:80px;height:80px;border:3px solid var(--ink);background:var(--ink);color:#fff;display:grid;place-items:center;font-size:30px;font-weight:950;line-height:1;flex-shrink:0}
+    .s-no.red{background:var(--red);border-color:var(--red)}
+    .s-no.blue{background:var(--blue);border-color:var(--blue)}
+    .s-no.green{background:var(--green);border-color:var(--green)}
+    .s-no.orange{background:var(--orange);border-color:var(--orange)}
+    .s-no.purple{background:#6b21a8;border-color:#6b21a8}
+    .s-meta{display:grid;gap:5px}
+    .s-meta .label{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);font-weight:900}
+    .s-meta .label.red{color:var(--red)}
+    .s-meta .label.blue{color:var(--blue)}
+    .s-meta .label.green{color:var(--green)}
+    .s-meta .label.orange{color:var(--orange)}
+    .s-meta h2{margin:0;font-size:clamp(18px,3vw,30px);line-height:1.1;letter-spacing:-.04em;font-weight:950}
+    .s-meta p{margin:0;color:var(--muted);font-size:13px;line-height:1.6;max-width:900px}
+
+    /* points list */
+    .points{display:grid;gap:10px}
+    .point{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;line-height:1.65}
+    .point .num{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;background:var(--ink);color:#fff;font-size:12px;font-weight:800;border-radius:50%;flex-shrink:0;margin-top:1px}
+    .point .num.red{background:var(--red)}
+    .point .num.blue{background:var(--blue)}
+    .point .num.green{background:var(--green)}
+    .point .num.orange{background:var(--orange)}
+    .point .text{flex:1}
+    .point .text strong{font-weight:800}
+    .point .text em{color:var(--muted);font-style:normal;font-size:12.5px}
+
+    /* grid cards */
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .card{border:2px solid var(--ink);background:#fff;padding:14px;display:grid;gap:7px}
+    .card h3{margin:0;font-size:15px;font-weight:800;letter-spacing:-.02em;line-height:1.25}
+    .card p{margin:0;font-size:12.5px;color:#333;line-height:1.65}
+    .card.green-card{border-color:var(--green)}
+    .card.green-card h3{color:var(--green)}
+    .card.blue-card{border-color:var(--blue)}
+    .card.blue-card h3{color:var(--blue)}
+    .card.red-card{border-color:var(--red)}
+    .card.red-card h3{color:var(--red)}
+    .card.orange-card{border-color:var(--orange)}
+    .card.orange-card h3{color:var(--orange)}
+    .card ul{margin:0;padding-left:16px}
+    .card li{margin:4px 0;font-size:12.5px;color:#333;line-height:1.6}
+
+    /* quote */
+    .quote{border-left:4px solid var(--blue);padding:10px 14px;background:var(--soft-blue);font-size:13.5px;font-weight:700;line-height:1.65;margin-bottom:12px}
+
+    /* table */
+    .tbl{width:100%;border-collapse:collapse;font-size:12.5px;border:2px solid var(--ink)}
+    .tbl th{background:var(--ink);color:#fff;padding:8px 10px;text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:800}
+    .tbl td{padding:8px 10px;border-bottom:1.5px solid #ddd;border-right:1.5px solid #ddd;vertical-align:top}
+    .tbl tr:last-child td{border-bottom:none}
+    .tbl td:last-child,.tbl th:last-child{border-right:none}
+    .tbl .highlight{background:var(--soft-blue);font-weight:700}
+    .tbl .warn{background:var(--soft-red);color:var(--red);font-weight:700}
+
+    /* chips */
+    .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+    .chip{display:inline-flex;border:1.5px solid var(--ink);padding:3px 9px;font-size:11.5px;font-weight:700;background:#fff}
+    .chip.red{border-color:var(--red);color:var(--red);background:var(--soft-red)}
+    .chip.blue{border-color:var(--blue);color:var(--blue);background:var(--soft-blue)}
+    .chip.green{border-color:var(--green);color:var(--green);background:var(--soft-green)}
+
+    /* callout */
+    .callout{border:2px solid var(--ink);padding:12px 14px;background:#fff;font-size:13px;line-height:1.65}
+    .callout strong{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink);margin-bottom:5px;font-weight:900}
+    .callout.green{border-color:var(--green);background:var(--soft-green)}
+    .callout.green strong{color:var(--green)}
+    .callout.red{border-color:var(--red);background:var(--soft-red)}
+    .callout.red strong{color:var(--red)}
+
+    /* divider */
+    hr{border:none;border-top:2px solid var(--ink);margin:12px 0}
+
+    /* scene row */
+    .scene{display:grid;grid-template-columns:60px 1fr;gap:12px;margin-bottom:12px}
+    .scene-num{width:60px;height:60px;border:2px solid var(--ink);background:var(--ink);color:#fff;display:grid;place-items:center;font-size:24px;font-weight:950}
+    .scene-info{border:2px solid var(--ink);background:#fff;padding:10px 12px;display:grid;gap:4px}
+    .scene-info h4{margin:0;font-size:13.5px;font-weight:800;letter-spacing:-.01em}
+    .scene-info p{margin:0;font-size:12px;color:#333;line-height:1.6}
+    .scene-info .tag{display:inline-flex;border:1.5px solid var(--ink);padding:2px 7px;font-size:10.5px;font-weight:700;margin-top:4px}
+
+    /* footer bar */
+    .footer-bar{height:10px;background:var(--ink);border-top:3px solid var(--red);margin-top:20px}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- TOP BAR -->
+  <div class="topbar"></div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="kicker">开源项目 · Microsoft</div>
+      <div class="badge-row">
+        <span class="badge dark">Rust</span>
+        <span class="badge red">MIT License</span>
+        <span class="badge blue">安全 / 沙箱</span>
+        <span class="badge">库操作系统</span>
+      </div>
+      <h1 class="hero-title">微软 LiteBox：Rust 写的安全沙箱库操作系统</h1>
+      <p class="hero-subtitle">
+        微软出品的专注安全隔离的库操作系统（Library OS）。用 Rust 构建，大幅削减应用程序与宿主之间的接口——接口越少，攻击面越小，安全性越高。支持在多种硬件平台和虚拟化环境上沙箱化运行程序。
+      </p>
+      <div class="alert-box">
+        <strong>⚠ 活跃演进中</strong>
+        <p>README 原文：「Project is actively evolving — API may change. If you need long-term stability, please wait for a stable release.」</p>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="stat-block">
+        <div class="num">2,862</div>
+        <div class="lbl">GitHub Stars</div>
+        <div class="sub">2026-10-09 快照</div>
+      </div>
+      <div class="stat-block" style="border-color:var(--red)">
+        <div class="num" style="font-size:28px">152</div>
+        <div class="lbl">Forks</div>
+      </div>
+      <div class="stat-block" style="border-color:var(--blue)">
+        <div class="num" style="font-size:28px">2024-12-11</div>
+        <div class="lbl">建仓时间</div>
+      </div>
+      <div class="badge-row" style="margin-top:4px">
+        <span class="mini-tag">kernel-mode</span>
+        <span class="mini-tag">user-mode</span>
+        <span class="mini-tag">沙箱化</span>
+        <span class="mini-tag">Platform</span>
+        <span class="mini-tag">Shim</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 01: WHY SANDOX -->
+  <div class="section">
+    <div class="section-bar red"></div>
+    <div class="section-body">
+      <div class="s-head">
+        <div class="s-no red">01</div>
+        <div class="s-meta">
+          <div class="label red">Beginner Introduction · 初学者引入</div>
+          <h2>为什么需要沙箱？先搞清楚「攻击面」</h2>
+          <p>传统程序直接运行在操作系统上，操作系统又直接跑在硬件上。层越多，可以被攻击的「接口」就越多。LiteBox 的思路是：把应用程序关进一个小笼子，让它只能看到被允许的东西。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>🕳 什么是攻击面？</h3>
+          <p>攻击面（Attack Surface）指的是一个系统所有可以被攻击者利用来发起攻击的「入口点」的总和。入口越多，危险越大。</p>
+          <ul>
+            <li>操作系统提供几百个系统调用（system calls）</li>
+            <li>普通应用只需其中 10~20 个就能正常工作</li>
+            <li>多余的调用就是浪费的攻击入口</li>
+          </ul>
+        </div>
+        <div class="card green-card">
+          <h3>🔒 什么是沙箱？</h3>
+          <p>沙箱（Sandbox）是一种安全隔离机制：把程序关在一个受控环境里运行，即使程序被恶意代码攻破，损失也限制在笼子里，不会波及宿主系统。</p>
+          <ul>
+            <li>浏览器：JS 沙箱，防止网页恶意代码访问本地文件</li>
+            <li>容器（Docker）：进程级隔离</li>
+            <li>LiteBox：库 OS 级隔离，粒度更细</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout green" style="margin-top:12px">
+        <strong>LiteBox 的核心思路</strong>
+        与其逐个堵漏洞，不如直接削减「程序与外界的接口」。接口少了，漏洞自然也少了——这是一条根本性的安全路线。
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 02: WHAT IS LIBRARY OS -->
+  <div class="section">
+    <div class="section-bar blue"></div>
+    <div class="section-body">
+      <div class="s-head">
+        <div class="s-no blue">02</div>
+        <div class="s-meta">
+          <div class="label blue">Core Concept · 核心概念</div>
+          <h2>什么是库操作系统（Library OS）？</h2>
+          <p>Library OS 的思路和传统操作系统完全不同：不是「程序调用系统」，而是「把操作系统功能打包成库，链接进程序」——程序自己「长出」一个精简的 OS，不需要依赖宿主操作系统内核。</p>
+        </div>
+      </div>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="width:30%">维度</th>
+            <th style="width:35%">传统操作系统（Monolithic Kernel）</th>
+            <th style="width:35%">库操作系统（Library OS）</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>架构</strong></td>
+            <td>Linux / Windows 内核是一个独立的大型软件，程序通过系统调用与内核通信</td>
+            <td>OS 功能作为库直接编译进应用程序，程序自带精简的运行时环境</td>
+          </tr>
+          <tr>
+            <td><strong>接口数量</strong></td>
+            <td class="highlight">Linux 有 400+ 系统调用，全部暴露给程序</td>
+            <td class="highlight">LiteBox 只暴露必要的少数接口，大幅减少攻击面</td>
+          </tr>
+          <tr>
+            <td><strong>与宿主关系</strong></td>
+            <td>程序直接依赖宿主内核，内核漏洞直接威胁程序</td>
+            <td>程序与宿主解耦，通过定义的 Platform 接口交互，不依赖内核细节</td>
+          </tr>
+          <tr>
+            <td><strong>隔离能力</strong></td>
+            <td>依赖进程/容器隔离</td>
+            <td>库 OS 本身提供语义层面的隔离，Platform 实现决定底层硬件隔离</td>
+          </tr>
+          <tr>
+            <td class="warn"><strong>缺点</strong></td>
+            <td>攻击面大，但生态成熟</td>
+            <td class="warn">需要针对不同平台实现 Platform 层，跨平台适配成本高</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote" style="margin-top:12px">
+        LiteBox 的 Library OS 不是要取代 Linux/Windows，而是为特定安全场景提供一个可信的、受控的执行环境——它可以跑在 Linux 上、Windows 上，甚至 TEE（可信执行环境）上。
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 03: ARCHITECTURE -->
+  <div class="section">
+    <div class="section-bar green"></div>
+    <div class="section-body">
+      <div class="s-head">
+        <div class="s-no green">03</div>
+        <div class="s-meta">
+          <div class="label green">Architecture · 架构设计</div>
+          <h2>LiteBox 架构：North × South 两层解耦</h2>
+          <p>LiteBox 的核心设计哲学是「接口解耦」：用 North（北向）Shim 层和 South（南向）Platform 层，把「应用」和「硬件平台」完全分开，两层都可以自由替换组合。</p>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:12px">
+        <div class="card green-card">
+          <h3>⬆ North：Shim 适配层（面向应用）</h3>
+          <p>应用不是直接调用系统调用，而是调用 LiteBox 提供的统一 API。这个 API 设计参考了 Rust 生态中的 <code>nix</code> 和 <code>rustix</code> 库风格——语义清晰、类型安全、纯 Rust。</p>
+          <ul>
+            <li>提供文件、网络、进程等基础 POSIX 语义</li>
+            <li>采用 Rust-y API 风格（类型驱动、安全）</li>
+            <li>应用代码可移植，不绑定具体 OS</li>
+          </ul>
+        </div>
+        <div class="card blue-card">
+          <h3>⬇ South：Platform 接口层（面向硬件）</h3>
+          <p>Platform 是抽象接口，注入具体实现。不同的 Platform 适配不同底层硬件或虚拟化环境，North Shim 完全不需要关心。</p>
+          <ul>
+            <li>Platform 负责与底层硬件交互</li>
+            <li>SEV SNP / OP-TEE / Linux / Windows 各自实现 Platform</li>
+            <li>任意 North × South 组合均可工作</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="background:#f7f5ee;border-color:var(--ink)">
+        <strong style="color:var(--ink)">📐 为什么这样设计？</strong>
+        <p style="margin-top:5px">传统方案换一个平台（比如从 Linux 迁移到 SEV）意味着重写大量代码。LiteBox 的两层分离让「换平台」只需要实现/替换 Platform 层，North Shim 完全复用——这是经典的分层架构思想在安全操作系统领域的应用。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 04: FIVE SCENARIOS -->
+  <div class="section">
+    <div class="section-bar orange"></div>
+    <div class="section-body">
+      <div class="s-head">
+        <div class="s-no orange">04</div>
+        <div class="s-meta">
+          <div class="label orange">Official Use Cases · 官方场景拆解</div>
+          <h2>五大官方场景：每个怎么用？为什么难？</h2>
+          <p>README 原文列举了五个官方支持的场景，从跨平台运行到可信执行环境，覆盖了从通用到高安全等级的不同需求。</p>
+        </div>
+      </div>
+
+      <div class="scene">
+        <div class="scene-num">①</div>
+        <div class="scene-info">
+          <h4>Windows 上运行未修改的 Linux 程序</h4>
+          <p>在 Windows 主机上，通过 LiteBox 的 North Shim + Linux Platform，让 Linux ELF 二进制文件不需要 Linux 内核就能运行。</p>
+          <div>
+            <span class="tag" style="border-color:var(--blue);color:var(--blue)">对谁有用：跨平台开发者 / Windows 用户需要 Linux 工具</span>
+            <span class="tag" style="border-color:var(--red);color:var(--red)">难点：二进制兼容与系统调用翻译</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene">
+        <div class="scene-num">②</div>
+        <div class="scene-info">
+          <h4>Linux 上沙箱化运行 Linux 应用</h4>
+          <p>在 Linux 上用 LiteBox 沙箱化运行普通 Linux 应用程序，降低其权限和攻击面，类似于轻量级容器化但粒度更细。</p>
+          <div>
+            <span class="tag" style="border-color:var(--green);color:var(--green)">对谁有用：安全敏感的应用 / 服务器加固</span>
+            <span class="tag" style="border-color:var(--red);color:var(--red)">难点：与宿主 Linux 的资源协调</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene">
+        <div class="scene-num">③</div>
+        <div class="scene-info">
+          <h4>AMD SEV SNP 上运行程序</h4>
+          <p>SEV SNP（Secure Nested Paging）是 AMD 的硬件级内存加密技术，LiteBox 在其上提供可信执行环境，保护程序免受物理攻击和虚拟机逃逸。</p>
+          <div>
+            <span class="tag" style="border-color:var(--red);color:var(--red)">对谁有用：云服务商 / 机密计算场景</span>
+            <span class="tag" style="border-color:var(--red);color:var(--red)">难点：硬件级安全 + 库 OS 内存布局需专门适配</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene">
+        <div class="scene-num">④</div>
+        <div class="scene-info">
+          <h4>Linux 上运行 OP-TEE 程序</h4>
+          <p>OP-TEE（Open Portable Trusted Execution Environment）是 ARM 的开源 TEE 实现。LiteBox 提供在 Linux 环境中运行 OP-TEE 安全小程序的能力。</p>
+          <div>
+            <span class="tag" style="border-color:var(--orange);color:var(--orange)">对谁有用：嵌入式 / IoT / 移动设备安全应用</span>
+            <span class="tag" style="border-color:var(--red);color:var(--red)">难点：TEE 环境资源受限，API 需极度精简</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene">
+        <div class="scene-num">⑤</div>
+        <div class="scene-info">
+          <h4>LVBS 上运行程序</h4>
+          <p>LVBS（Lightweight Virtualization Barrier System）是一个轻量级虚拟化隔离方案。LiteBox 通过其 Platform 接口在 LVBS 上运行。</p>
+          <div>
+            <span class="tag" style="border-color:var(--blue);color:var(--blue)">对谁有用：需要轻量隔离但不需要完整 VM 的场景</span>
+            <span class="tag" style="border-color:var(--muted)">难点：❓ LVBS 具体实现细节尚待官方进一步披露</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 05: SECURITY MODEL -->
+  <div class="section">
+    <div class="section-bar red"></div>
+    <div class="section-body">
+      <div class="s-head">
+        <div class="s-no red">05</div>
+        <div class="s-meta">
+          <div class="label red">Security Model · 安全模型</div>
+          <h2>安全模型：削减接口 = 削减攻击面</h2>
+          <p>LiteBox 的安全策略聚焦在一个核心主张：大幅削减应用程序与宿主之间的接口数量，从而从根本上压缩攻击面。这是一种「最小权限」思想的工程实现。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card red-card">
+          <h3>🔑 削减接口的安全意义</h3>
+          <ul>
+            <li><strong>减少暴露面：</strong>Linux 有 400+ 系统调用，LiteBox 只暴露应用真正需要的少数接口</li>
+            <li><strong>减少漏洞窗口：</strong>每减少一个系统调用绑定，就减少一类潜在的 CVE 路径</li>
+            <li><strong>可控性提升：</strong>通过 Platform 接口，宿主对应用可见资源有精确控制</li>
+          </ul>
+        </div>
+        <div class="card blue-card">
+          <h3>⚙ 双模式执行</h3>
+          <ul>
+            <li><strong>Kernel-mode：</strong>在内核态直接执行，安全检查更早，权限更大，⚠ 风险也更高</li>
+            <li><strong>User-mode：</strong>在用户态执行，轻量隔离，适合普通沙箱场景</li>
+            <li>两种模式由 Platform 实现决定，North Shim 无感知</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout red" style="margin-top:12px">
+        <strong>⚠ 重要限制</strong>
+        LiteBox 本身是安全工具，但并非银弹。其安全性依赖：① Rust 语言内存安全特性；② North Shim 实现是否完整；③ Platform 层是否正确配置。❓ 具体安全审计报告尚未公开发布（2026-10-09 状态）。
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 06: GETTING STARTED & LIMITATIONS -->
+  <div class="section">
+    <div class="section-bar"></div>
+    <div class="section-body">
+      <div class="s-head">
+        <div class="s-no">06</div>
+        <div class="s-meta">
+          <div class="label">Getting Started · 上手指南</div>
+          <h2>上手与边界：现在能用吗？</h2>
+          <p>项目处于活跃演进阶段，API 尚未稳定。适合技术评估和研究目的，生产环境使用需等待 stable release。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card green-card">
+          <h3>✅ 可用资源</h3>
+          <ul>
+            <li><strong>Rust + MIT License：</strong>开源，可自由使用和修改</li>
+            <li><strong>GitHub：</strong>github.com/microsoft/litebox，README 有基础示例</li>
+            <li><strong>五大官方场景：</strong>README 有场景说明（细节待补充）</li>
+            <li><strong>North Shim API：</strong>nix/rustix 风格，Rust 开发者友好</li>
+          </ul>
+        </div>
+        <div class="card red-card">
+          <h3>❌ 边界与未知</h3>
+          <ul>
+            <li><strong>API 未稳定：</strong>官方明确警告，不适合长期产品依赖</li>
+            <li><strong>具体 Shim 清单：❓</strong>README 未列出完整支持的系统调用列表</li>
+            <li><strong>性能数据：❓</strong>无公开 benchmark，内存开销、启动时间均未知</li>
+            <li><strong>安全审计：❓</strong>无公开 CVE 历史或第三方安全审计报告</li>
+            <li><strong>生产案例：❓</strong>尚无公开的生产级别部署案例</li>
+            <li><strong>LVBS Platform：❓</strong>LVBS 本身资料有限，具体集成方式待披露</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:12px;background:#f7f5ee">
+        <strong>🔗 项目链接</strong>
+        <p style="margin-top:5px">
+          GitHub：<a href="https://github.com/microsoft/litebox" style="color:var(--blue);text-decoration:underline">github.com/microsoft/litebox</a><br>
+          原始推文：<a href="https://x.com/huihoo/status/2108221951810683306" style="color:var(--blue);text-decoration:underline">@huihoo 2026-10-09</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 07: GLOSSARY -->
+  <div class="section">
+    <div class="section-bar purple"></div>
+    <div class="section-body">
+      <div class="s-head">
+        <div class="s-no purple">07</div>
+        <div class="s-meta">
+          <div class="label" style="color:#6b21a8">Glossary · 术语表</div>
+          <h2>术语表：LiteBox 相关的核心概念</h2>
+          <p>收录本文中出现的技术术语，方便初学者查阅。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Library OS / 库操作系统</h3>
+          <p>将操作系统功能打包为库，链接到应用程序中的架构范式。应用程序自带运行时 OS，不依赖宿主内核。</p>
+        </div>
+        <div class="card">
+          <h3>Attack Surface / 攻击面</h3>
+          <p>系统所有可被攻击者利用的入口点总和（系统调用、网络端口、API 接口等）。削减攻击面是安全加固的核心策略。</p>
+        </div>
+        <div class="card">
+          <h3>Sandbox / 沙箱</h3>
+          <p>安全隔离环境，将程序限制在受控资源集合内运行，防止恶意行为波及外部系统。</p>
+        </div>
+        <div class="card">
+          <h3>Shim（North Shim）</h3>
+          <p>适配层代码，将应用程序的标准调用翻译/代理为库 OS 内部接口。LiteBox 的 North Shim 采用 Rust-y nix/rustix 风格。</p>
+        </div>
+        <div class="card">
+          <h3>Platform（South Platform）</h3>
+          <p>LiteBox 的平台抽象层接口，由具体硬件/虚拟化环境实现。Platform 接口注入使 LiteBox 与硬件解耦。</p>
+        </div>
+        <div class="card">
+          <h3>SEV SNP</h3>
+          <p>AMD Secure Encrypted Virtualization with Secure Nested Paging，硬件级内存加密技术，保护虚拟机免受物理攻击和 VM 逃逸。</p>
+        </div>
+        <div class="card">
+          <h3>OP-TEE</h3>
+          <p>Open Portable Trusted Execution Environment，ARM 的开源 TEE 实现，提供安全隔离的「安全世界」运行环境。</p>
+        </div>
+        <div class="card">
+          <h3>LVBS</h3>
+          <p>Lightweight Virtualization Barrier System，轻量级虚拟化隔离方案。❓ 具体技术细节尚待官方披露。</p>
+        </div>
+        <div class="card">
+          <h3>nix / rustix</h3>
+          <p>Rust 生态的两个著名库，提供类型安全、符合人体工程学的 Unix 系统调用绑定。LiteBox North API 参考其风格。</p>
+        </div>
+        <div class="card">
+          <h3>Kernel-mode / User-mode</h3>
+          <p>CPU 特权级别。Kernel-mode 权限最高可直接访问硬件；User-mode 权限受限，受 OS 调度保护。LiteBox 支持两种执行模式。</p>
+        </div>
+      </div>
+      <div class="chips" style="margin-top:12px">
+        <span class="chip">library OS</span>
+        <span class="chip">攻击面</span>
+        <span class="chip">沙箱</span>
+        <span class="chip">Shim</span>
+        <span class="chip">Platform</span>
+        <span class="chip">SEV SNP</span>
+        <span class="chip">OP-TEE</span>
+        <span class="chip">LVBS</span>
+        <span class="chip">nix rustix</span>
+        <span class="chip">kernel-mode</span>
+        <span class="chip">user-mode</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-bar"></div>
+
+</div>
+</body>
+</html>
