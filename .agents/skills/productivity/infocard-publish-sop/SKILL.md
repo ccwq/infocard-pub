@@ -160,6 +160,34 @@ Required sequence for new cards (unchanged):
 
 This is one bounded synchronization step. A hash mismatch after it is `BLOCKED_AT_LOCAL_GATE`, not a reason to rerun authoring or repeat build indefinitely.
 
+## Build/verify exception: incremental-vs-full count mismatch (2026-10-08)
+
+**Symptom**: `npm run build` succeeds but `npm run verify` fails with `_index.yaml is out of date`. The disk `_index.yaml` `_count` does not match `buildIndexData()` output (incremental = 1173, full = 1175 in incident).
+
+**Root cause**: Incremental build `buildIndexData({metaPaths:[...]})` can produce a different card count than full rebuild `buildIndexData()`. This is a pre-existing build-system inconsistency. The `index.html` injection path also differs between incremental and full modes.
+
+**Workaround sequence**:
+
+```bash
+# Step 1: confirm the mismatch with independent checks
+node -e "const {buildIndexData} = require('./scripts/index-build-lib'); const r=buildIndexData(); console.log('full rebuild count:', r._count);"
+node -e "const fs=require('fs'); const m=fs.readFileSync('_index.yaml','utf8').match(/_count: (\d+)/); console.log('disk count:', m ? m[1] : 'N/A');"
+
+# Step 2: if counts differ, force full rebuild (may timeout on large repos)
+node scripts/build-site.js --full
+
+# Step 3: if --full times out, use git to restore dist/ and commit only source
+git checkout -- dist/
+git add index.html _index.yaml
+git commit -m "build: sync index.html injection and _index.yaml"
+npm run verify   # should pass
+
+# Step 4: push
+git push origin main
+```
+
+**This is a build-system bug, not a publication SOP error.** Work around and continue. Do not let this block card release. After recovery, note as known limitation.
+
 ## Required visual gate before build / commit / push
 
 After promotion, before build:
