@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sage-swiss">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>普通目录里的跨平台 Overlay 文件系统</title>
+<style>
+:root{
+  --bg:#F5F4EF;
+  --paper:#FAFAF7;
+  --ink:#1C1C1A;
+  --green:#5F7E62;
+  --green-deep:#3D5A42;
+  --green-soft:#E9EDE7;
+  --muted:#6B6B63;
+  --muted-2:#9E9E94;
+  --line:#D4D2C9;
+  --line-strong:#B8B6AB;
+  --fill:#ECEAE1;
+  --dark:#1E2620;
+  --amber:#9A6B2E;
+  --amber-soft:#F4EDDB;
+  --red:#B94040;
+  --red-soft:#F5E0E0;
+  --blue:#3A5A8A;
+  --blue-soft:#DCE8F5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{
+  font-family:Inter,"Helvetica Neue",Helvetica,system-ui,-apple-system,
+    "PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);
+  font-size:12.5px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre,.mono{
+  font-family:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+.page{width:min(1060px,calc(100% - 20px));margin:0 auto;padding:20px 0 0}
+
+/* HEADER */
+.header{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:16px;
+  padding-bottom:11px;
+  border-bottom:1px solid var(--line);
+}
+.header-brand{
+  font:700 10.5px/1.3 "JetBrains Mono",monospace;
+  letter-spacing:.05em;color:var(--ink);
+  white-space:nowrap;
+}
+.header-center{
+  text-align:center;
+  font:600 10.5px/1.3 "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+}
+.header-center .ref-id{
+  display:block;font-weight:400;color:var(--muted-2);margin-top:2px;letter-spacing:.04em;
+}
+.watch-badge{
+  display:flex;align-items:center;gap:5px;
+  font:700 11px/1 "JetBrains Mono",monospace;
+  letter-spacing:.08em;color:var(--green-deep);text-transform:uppercase;
+  border:1px solid var(--green-deep);padding:5px 12px;
+  cursor:default;white-space:nowrap;
+}
+
+/* HERO */
+.hero{
+  margin-top:18px;
+  border:1px solid var(--line);
+  background:var(--paper);
+}
+.hero-ref{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  border-bottom:1px solid var(--line-strong);
+}
+.hero-ref-cell{
+  padding:10px 14px;
+  font:500 10px/1.4 "JetBrains Mono",monospace;
+  color:var(--muted);
+}
+.hero-ref-cell:not(:last-child){border-right:1px solid var(--line)}
+.hero-ref-cell .lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);display:block}
+.hero-ref-cell .val{color:var(--ink);font-weight:600;margin-top:1px}
+
+.hero-body{
+  padding:14px 16px;
+  border-bottom:1px solid var(--line);
+}
+.hero-title{
+  font:800 22px/1.15 Inter,sans-serif;
+  letter-spacing:-.02em;color:var(--ink);margin-bottom:6px;
+}
+.hero-title em{font-style:normal;color:var(--green)}
+.hero-meta{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  font:500 10.5px/1 "JetBrains Mono",monospace;color:var(--muted);margin-bottom:10px;
+}
+.hero-meta .tag{
+  background:var(--green-soft);color:var(--green-deep);
+  padding:2px 7px;font-weight:600;letter-spacing:.04em;
+}
+.hero-meta .tag.amber{
+  background:var(--amber-soft);color:var(--amber);
+}
+.hero-summary{
+  font-size:12.5px;line-height:1.65;color:#333;
+  max-width:720px;
+}
+.hero-summary strong{color:var(--ink);font-weight:700}
+
+/* CONCLUSION BAND */
+.conclusion-band{
+  background:var(--dark);
+  padding:12px 16px;
+  display:flex;align-items:flex-start;gap:10px;
+}
+.conclusion-band .cb-icon{
+  font-size:18px;flex-shrink:0;margin-top:1px;
+}
+.conclusion-band .cb-text{
+  font-size:12px;line-height:1.6;color:#D4E0D0;
+}
+.conclusion-band .cb-text strong{color:#fff;font-weight:700}
+
+/* TWO-COL GRID */
+.two-col{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--bg);
+}
+.col-left,.col-right{
+  border-right:1px solid var(--line);
+}
+.col-right{border-right:none}
+
+/* SECTION HEADER */
+.sec-head{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;
+  background:var(--fill);
+  border-bottom:1px solid var(--line-strong);
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--green-deep);
+}
+.sec-head .num{
+  background:var(--green-deep);color:#fff;
+  width:18px;height:18px;display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:800;
+}
+.sec-head.blue{color:var(--blue)}
+.sec-head.blue .num{background:var(--blue)}
+.sec-head.amber{color:var(--amber)}
+.sec-head.amber .num{background:var(--amber)}
+.sec-head.red{color:var(--red)}
+.sec-head.red .num{background:var(--red)}
+
+/* SECTION BODY */
+.sec-body{
+  padding:10px 12px;
+  font-size:12px;line-height:1.65;color:#333;
+}
+
+/* REQ TABLE */
+.req-table{
+  border-collapse:collapse;width:100%;
+  font-size:11.5px;
+}
+.req-table th{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);background:var(--fill);
+  padding:7px 10px;border-bottom:1px solid var(--line-strong);
+  text-align:left;
+}
+.req-table td{
+  padding:8px 10px;border-bottom:1px solid var(--line);
+  vertical-align:top;line-height:1.5;
+}
+.req-table tr:last-child td{border-bottom:none}
+.req-table .req-name{font-weight:700;color:var(--ink)}
+.req-table .ok{color:var(--green-deep);font-weight:700}
+.req-table .warn{color:var(--amber);font-weight:700}
+.req-table .fail{color:var(--red);font-weight:700}
+
+/* NOTE BOX */
+.note-box{
+  border:1px solid var(--green);
+  background:var(--green-soft);
+  padding:10px 12px;
+  font-size:11.5px;line-height:1.6;color:#2a3a2e;
+  margin-top:8px;
+}
+.note-box p{margin-bottom:6px}
+.note-box p:last-child{margin-bottom:0}
+.note-box strong{color:var(--dark)}
+.note-box code{
+  font-size:10.5px;background:rgba(95,126,98,.15);
+  padding:1px 4px;border-radius:2px;
+}
+
+/* DIR TREE */
+.dir-tree{
+  font-family:"JetBrains Mono",monospace;
+  font-size:11px;line-height:1.8;
+  background:var(--fill);
+  border:1px solid var(--line);
+  padding:10px 14px;
+  margin:8px 0;
+  color:var(--ink);
+}
+.dir-tree .dt-dir{color:var(--green-deep);font-weight:700}
+.dir-tree .dt-comment{color:var(--muted);font-style:italic}
+.dir-tree .dt-label{color:var(--blue);font-weight:700}
+
+/* OP TABLE */
+.op-table{
+  border-collapse:collapse;width:100%;
+  font-size:11px;
+}
+.op-table th{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);background:var(--fill);
+  padding:6px 8px;border-bottom:1px solid var(--line-strong);
+  text-align:left;
+}
+.op-table td{
+  padding:7px 8px;border-bottom:1px solid var(--line);
+  vertical-align:top;
+}
+.op-table tr:last-child td{border-bottom:none}
+.op-table .op-action{font-weight:700;color:var(--ink)}
+.op-table .op-base{color:var(--muted)}
+.op-table .op-upper{color:var(--blue)}
+.op-table .op-result{color:var(--green-deep);font-weight:700}
+
+/* SCHEME MATRIX */
+.scheme-table{
+  border-collapse:collapse;width:100%;
+  font-size:11px;
+}
+.scheme-table th{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:#fff;background:var(--green-deep);
+  padding:7px 8px;border-right:1px solid rgba(255,255,255,.2);
+  text-align:left;
+}
+.scheme-table th:last-child{border-right:none}
+.scheme-table td{
+  padding:8px 8px;border-bottom:1px solid var(--line);
+  vertical-align:top;line-height:1.5;
+}
+.scheme-table tr:last-child td{border-bottom:none}
+.scheme-table .scheme-name{font-weight:700;color:var(--ink);white-space:nowrap}
+.scheme-table .sup{color:var(--green-deep);font-weight:700}
+.scheme-table .sup-no{color:var(--red);font-weight:700}
+.scheme-table .sup-partial{color:var(--amber);font-weight:700}
+.scheme-table .tag-cell{white-space:nowrap}
+.scheme-tag{
+  display:inline-block;
+  font:700 8.5px "JetBrains Mono",monospace;
+  letter-spacing:.04em;
+  padding:2px 6px;
+  border-radius:2px;margin-top:3px;
+}
+.scheme-tag.green{background:var(--green-soft);color:var(--green-deep)}
+.scheme-tag.blue{background:var(--blue-soft);color:var(--blue)}
+.scheme-tag.amber{background:var(--amber-soft);color:var(--amber)}
+.scheme-tag.red{background:var(--red-soft);color:var(--red)}
+
+/* CODE BLOCK */
+.code-block{
+  background:#1C1C1A;
+  border:1px solid var(--line);
+  padding:12px 14px;
+  margin:8px 0;
+  overflow-x:auto;
+}
+.code-block pre{
+  font-family:"JetBrains Mono","SF Mono",ui-monospace,monospace;
+  font-size:11px;line-height:1.7;
+  color:#D4E0CC;
+  white-space:pre;
+}
+.code-block .c-comment{color:#6B8E6B}
+.code-block .c-cmd{color:#A8C8A8}
+.code-block .c-param{color:#C8A8C8}
+.code-block .c-path{color:#E8D4A8}
+.code-block .c-label{color:#9AB8D4;font-weight:700}
+
+/* IMP TABLE */
+.imp-table{
+  border-collapse:collapse;width:100%;
+  font-size:11px;
+}
+.imp-table th{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);background:var(--fill);
+  padding:6px 8px;border-bottom:1px solid var(--line-strong);
+  text-align:left;
+}
+.imp-table td{
+  padding:7px 8px;border-bottom:1px solid var(--line);
+  vertical-align:top;
+}
+.imp-table tr:last-child td{border-bottom:none}
+.imp-table .op{font-weight:700;color:var(--ink)}
+.imp-table .rule{color:#333}
+.imp-table .pitfall{color:var(--amber);font-weight:600}
+
+/* CHECK TABLE */
+.check-table{
+  border-collapse:collapse;width:100%;
+  font-size:11px;
+}
+.check-table th{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);background:var(--fill);
+  padding:6px 8px;border-bottom:1px solid var(--line-strong);
+  text-align:left;
+}
+.check-table td{
+  padding:7px 8px;border-bottom:1px solid var(--line);
+  vertical-align:top;
+}
+.check-table tr:last-child td{border-bottom:none}
+.check-table .check-item{font-weight:700;color:var(--ink)}
+.check-table .check-result{color:var(--green-deep);font-weight:700}
+
+/* EVIDENCE TABLE */
+.evidence-table{
+  border-collapse:collapse;width:100%;
+  font-size:11px;
+}
+.evidence-table th{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:#fff;background:var(--green-deep);
+  padding:7px 8px;border-right:1px solid rgba(255,255,255,.2);
+  text-align:left;
+}
+.evidence-table th:last-child{border-right:none}
+.evidence-table td{
+  padding:7px 8px;border-bottom:1px solid var(--line);
+  vertical-align:top;line-height:1.5;
+}
+.evidence-table tr:last-child td{border-bottom:none}
+.evidence-table .ev-conclusion{font-weight:700;color:var(--ink)}
+.evidence-grade{
+  display:inline-block;font:700 9px "JetBrains Mono",monospace;
+  padding:2px 7px;border-radius:2px;
+}
+.evidence-grade.ok{background:var(--green-soft);color:var(--green-deep)}
+.evidence-grade.judge{background:var(--blue-soft);color:var(--blue)}
+.evidence-grade.doc{background:var(--amber-soft);color:var(--amber)}
+.evidence-grade.unknown{background:var(--fill);color:var(--muted)}
+.evidence-table .ev-gap{color:var(--muted);font-size:10.5px}
+
+/* SUGGESTION BOX */
+.suggestion-box{
+  background:var(--green-soft);
+  border:1px solid var(--green);
+  padding:11px 14px;
+}
+.suggestion-box .sg-title{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--green-deep);margin-bottom:8px;
+}
+.suggestion-box .sg-item{
+  display:flex;align-items:flex-start;gap:7px;
+  font-size:11.5px;line-height:1.55;color:#2a3a2e;
+  margin-bottom:7px;
+}
+.suggestion-box .sg-item:last-child{margin-bottom:0}
+.suggestion-box .sg-num{
+  background:var(--green-deep);color:#fff;
+  font:700 9.5px "JetBrains Mono",monospace;
+  width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+}
+.suggestion-box strong{color:var(--dark)}
+
+/* TODO BOX */
+.todo-box{
+  background:var(--amber-soft);
+  border:1px solid var(--amber);
+  padding:11px 14px;
+}
+.todo-box .td-title{
+  font:700 9.5px "JetBrains Mono",monospace;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--amber);margin-bottom:8px;
+}
+.todo-box .td-item{
+  display:flex;align-items:flex-start;gap:7px;
+  font-size:11.5px;line-height:1.55;color:#4A3518;
+  margin-bottom:7px;
+}
+.todo-box .td-item:last-child{margin-bottom:0}
+.todo-box .td-marker{
+  width:14px;height:14px;border:1.5px solid var(--amber);
+  flex-shrink:0;margin-top:2px;
+  display:flex;align-items:center;justify-content:center;
+}
+.todo-box strong{color:#2A1A08}
+
+/* GLOSSARY */
+.glossary{
+  display:flex;flex-wrap:wrap;gap:7px;
+}
+.gloss-item{
+  display:flex;align-items:baseline;gap:5px;
+  font-size:11px;
+}
+.gloss-term{
+  font:700 10px "JetBrains Mono",monospace;
+  color:var(--green-deep);background:var(--green-soft);
+  padding:1px 6px;border-radius:2px;
+  white-space:nowrap;
+}
+.gloss-def{color:#333}
+
+/* SOURCE BAR */
+.source-bar{
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--fill);
+  padding:8px 14px;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  font:500 9.5px "JetBrains Mono",monospace;color:var(--muted);
+}
+.source-bar .sb-item{display:flex;align-items:center;gap:4px}
+.source-bar .sb-lbl{color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase}
+.source-bar .sb-val{color:var(--ink);font-weight:600}
+.source-bar .sb-link{color:var(--green-deep);font-weight:600}
+.source-bar .sb-link:hover{text-decoration:underline}
+.source-bar .sb-sep{flex:1}
+
+/* FOOTER */
+.footer{
+  margin-top:10px;
+  padding:8px 0;
+  border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+  font:500 9.5px "JetBrains Mono",monospace;color:var(--muted-2);
+}
+.footer-l{letter-spacing:.04em}
+.footer-r a{color:var(--green-deep);font-weight:600}
+.footer-r a:hover{text-decoration:underline}
+
+/* SECTION DIVIDER */
+.divider{
+  border-top:1px solid var(--line);
+  background:var(--bg);
+}
+.divider:first-child{border-top:none}
+
+@media(max-width:720px){
+  .hero-ref{grid-template-columns:1fr 1fr}
+  .hero-ref-cell:nth-child(3),.hero-ref-cell:nth-child(4){display:none}
+  .two-col{grid-template-columns:1fr}
+  .col-left,.col-right{border-right:none;border-top:1px solid var(--line)}
+  .col-left{border-top:none}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-brand">INFOCARD · 技术调查</div>
+    <div class="header-center">
+      跨平台 Overlay 文件系统
+      <span class="ref-id">调查日期 2026-10-08 · 未在双系统实测</span>
+    </div>
+    <div class="watch-badge">
+      <svg viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/><line x1="5" y1="3" x2="5" y2="5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="5" y1="5.5" x2="7" y2="6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      OVL-DOC
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-ref">
+      <div class="hero-ref-cell">
+        <span class="lbl">平台</span>
+        <span class="val">Linux + Windows</span>
+      </div>
+      <div class="hero-ref-cell">
+        <span class="lbl">类型</span>
+        <span class="val">技术调查</span>
+      </div>
+      <div class="hero-ref-cell">
+        <span class="lbl">证据等级</span>
+        <span class="val">含文档推断项</span>
+      </div>
+      <div class="hero-ref-cell">
+        <span class="lbl">状态</span>
+        <span class="val">未双系统实测</span>
+      </div>
+    </div>
+    <div class="hero-body">
+      <div class="hero-title">普通目录里的<em>跨平台 Overlay 文件系统</em></div>
+      <div class="hero-meta">
+        <span class="tag">Windows + Linux</span>
+        <span class="tag">任意程序透明访问</span>
+        <span class="tag amber">⚠ 结论未经验证</span>
+      </div>
+      <div class="hero-summary">
+        可以用普通目录保存底层（lower）和修改层（upper），再将合并视图挂到目录路径。要兼容 Windows 与 Linux，建议共享叠加逻辑，分别接入 WinFsp 与 FUSE。<strong>本文是文档调查与设计建议，未在两套系统实测。</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONCLUSION BAND -->
+  <div class="conclusion-band">
+    <div class="cb-icon">⚡</div>
+    <div class="cb-text">
+      <strong>结论：</strong>Linux 即用 <code>OverlayFS</code> / <code>fuse-overlayfs</code>；跨平台产品路线是 <code>cgofuse + WinFsp</code> 建立原型 → 共享叠加核心 → 可移植元数据。两套系统若必须复用同一修改层，统一格式列为第一阶段要求。
+    </div>
+  </div>
+
+  <!-- A: THREE REQUIREMENTS -->
+  <div class="two-col">
+    <div class="col-left">
+      <div class="sec-head">
+        <span class="num">A</span>
+        先区分三个要求
+      </div>
+      <div class="sec-body">
+        <p>Overlay 包含三项核心语义：<strong>目录合并</strong>（同一路径显示上层版本）、<strong>copy-up</strong>（修改底层文件时复制到上层再写）、<strong>删除遮罩</strong>（删除只在上层留标记）。先确认这三个需求各自的实现条件。</p>
+
+        <table class="req-table" style="margin-top:10px">
+          <tr>
+            <th>要求</th>
+            <th>能否实现</th>
+            <th>条件</th>
+          </tr>
+          <tr>
+            <td class="req-name">lower、upper 都是普通目录</td>
+            <td><span class="ok">✓ 可以</span></td>
+            <td>不需要专门划分磁盘分区</td>
+          </tr>
+          <tr>
+            <td class="req-name">merged 看起来是普通目录路径</td>
+            <td><span class="ok">✓ 可以</span></td>
+            <td>实际由挂载提供文件系统视图</td>
+          </tr>
+          <tr>
+            <td class="req-name">任意程序透明访问且完全免系统组件</td>
+            <td><span class="fail">✗ 未找到完整方案</span></td>
+            <td>可考虑复制工作区，代价是失去透明叠加</td>
+          </tr>
+        </table>
+
+        <div class="note-box">
+          <p><strong>重要区别：</strong>挂到普通目录路径，<strong>不等于没有挂载</strong>。</p>
+          <p>操作系统需要将 <code>open</code>、<code>read</code>、<code>write</code> 等请求交给叠加实现。应用内 VFS 只能服务接入该接口的程序。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="sec-head">
+        <span class="num">B</span>
+        目录如何组织
+      </div>
+      <div class="sec-body">
+        <div class="dir-tree">
+<span class="dt-dir">workspace/</span>
+  <span class="dt-dir">base/</span>          <span class="dt-comment">← lower：原始文件，叠加服务不写入</span>
+  <span class="dt-dir">changes/</span>        <span class="dt-comment">← upper：新增文件和修改后的完整文件</span>
+  <span class="dt-dir">meta/</span>           <span class="dt-comment">← 自建方案的删除标记、事务与格式版本</span>
+  <span class="dt-dir">merged/</span>         <span class="dt-label">← 应用访问入口，由挂载呈现</span>
+        </div>
+        <p>Linux 内核 OverlayFS 另外需要 <code>work/</code>；自建方案是否需要临时工作目录由实现决定。不要把 base、changes 或元数据放进 merged，避免递归访问。</p>
+
+        <table class="op-table" style="margin-top:10px">
+          <tr><th>操作</th><th>base</th><th>changes / meta</th><th>merged 结果</th></tr>
+          <tr>
+            <td class="op-action">读取 a.txt</td>
+            <td class="op-base">原文件</td>
+            <td class="op-upper">无变化</td>
+            <td class="op-result">读取原文件</td>
+          </tr>
+          <tr>
+            <td class="op-action">修改 a.txt</td>
+            <td class="op-base">原文件不变</td>
+            <td class="op-upper">copy-up 后写修改版</td>
+            <td class="op-result">显示修改版</td>
+          </tr>
+          <tr>
+            <td class="op-action">新建 b.txt</td>
+            <td class="op-base">无变化</td>
+            <td class="op-upper">新文件</td>
+            <td class="op-result">显示新文件</td>
+          </tr>
+          <tr>
+            <td class="op-action">删除 a.txt</td>
+            <td class="op-base">原文件不变</td>
+            <td class="op-upper">删除遮罩</td>
+            <td class="op-result">不显示 a.txt</td>
+          </tr>
+        </table>
+
+        <div class="note-box">
+          <p><strong>常见遗漏：</strong>"只检查 upper 是否存在，否则读 lower"只能覆盖部分读取逻辑。真实实现还需检查祖先目录、类型冲突、删除遮罩与目录不透明标记。上层文件也应遮住底层同名目录及其后代。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: SCHEME MATRIX -->
+  <div class="two-col divider">
+    <div class="col-left">
+      <div class="sec-head blue">
+        <span class="num">C</span>
+        方案选择与证据
+      </div>
+      <div class="sec-body" style="padding:10px 14px">
+        <table class="scheme-table">
+          <tr>
+            <th>方案</th>
+            <th>Linux</th>
+            <th>Win 原生</th>
+            <th>定位</th>
+          </tr>
+          <tr>
+            <td class="scheme-name">Kernel OverlayFS</td>
+            <td><span class="sup">✓</span></td>
+            <td><span class="sup-no">✗</span></td>
+            <td class="tag-cell"><span class="scheme-tag green">Linux 即用</span></td>
+          </tr>
+          <tr>
+            <td class="scheme-name">fuse-overlayfs</td>
+            <td><span class="sup">✓</span></td>
+            <td><span class="sup-no">✗</span></td>
+            <td class="tag-cell"><span class="scheme-tag green">Linux 用户态</span></td>
+          </tr>
+          <tr>
+            <td class="scheme-name">cgofuse + 自建叠加核心</td>
+            <td><span class="sup">✓</span></td>
+            <td><span class="sup">✓</span></td>
+            <td class="tag-cell"><span class="scheme-tag blue">跨平台开发候选</span></td>
+          </tr>
+          <tr>
+            <td class="scheme-name">rclone union + mount</td>
+            <td><span class="sup">✓</span></td>
+            <td><span class="sup">✓</span></td>
+            <td class="tag-cell"><span class="scheme-tag amber">合并目录视图</span></td>
+          </tr>
+          <tr>
+            <td class="scheme-name">HUBFS</td>
+            <td><span class="sup">✓</span></td>
+            <td><span class="sup">✓</span></td>
+            <td class="tag-cell"><span class="scheme-tag amber">架构参考</span></td>
+          </tr>
+          <tr>
+            <td class="scheme-name">Windows ProjFS</td>
+            <td><span class="sup-no">✗</span></td>
+            <td><span class="sup">✓</span></td>
+            <td class="tag-cell"><span class="scheme-tag red">Win 专用</span></td>
+          </tr>
+        </table>
+
+        <div class="note-box" style="margin-top:10px">
+          <p><strong>证实事实：</strong><code>cgofuse</code> 提供 Windows 和 Linux 的 FUSE 接口。Windows 依赖 WinFsp，Linux 使用 libfuse。它不是开箱即用的 overlay 产品。其 Passthrough 示例明确排除 Windows，不能直接照搬。</p>
+          <p style="margin-top:6px"><strong>可行性证据：</strong>HUBFS 使用上述跨平台组合。它将本地可写层叠在只读 Git 内容上，允许编辑和构建。这证明架构可行，但不证明其接口可直接挂任意本地目录。</p>
+          <p style="margin-top:6px"><strong>设计判断：</strong>若两套系统要共用实现和修改层格式，优先考虑自建核心。若只要求功能类似，可使用 Linux 专用实现和独立 Windows 后端。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="sec-head blue">
+        <span class="num">D</span>
+        Linux 如何立即验证
+      </div>
+      <div class="sec-body">
+        <p>以下示例使用 ext4 等满足条件的本地底层文件系统。将 alice 换成实际用户名。</p>
+
+        <div class="code-block">
+<pre><span class="c-comment"># Linux 内核 OverlayFS · 示例命令，未执行</span>
+<span class="c-cmd">mkdir</span> -p /home/alice/ovl/<span class="dt-dir">{base,upper,work,merged}</span>
+<span class="c-cmd">sudo mount</span> -t overlay overlay \
+  <span class="c-param">-o</span> <span class="c-param">lowerdir</span>=<span class="c-path">/home/alice/ovl/base</span>,<span class="c-param">upperdir</span>=<span class="c-path">/home/alice/ovl/upper</span>,<span class="c-param">workdir</span>=<span class="c-path">/home/alice/ovl/work</span> \
+  <span class="c-path">/home/alice/ovl/merged</span>
+<span class="c-comment"># 之后只通过 merged 读写工作区</span>
+<span class="c-cmd">sudo umount</span> /home/alice/ovl/merged</pre>
+        </div>
+
+        <p>upper 与 work 必须位于同一底层文件系统；work 使用空目录。upper 需支持扩展属性与有效 d_type。挂载期间不要绕过 merged 修改 lower 或 upper。</p>
+
+        <div class="code-block">
+<pre><span class="c-comment"># fuse-overlayfs · 已安装并允许 FUSE 时</span>
+<span class="c-cmd">fuse-overlayfs</span> \
+  <span class="c-param">-o</span> <span class="c-param">lowerdir</span>=<span class="c-path">/home/alice/ovl/base</span>,<span class="c-param">upperdir</span>=<span class="c-path">/home/alice/ovl/upper</span>,<span class="c-param">workdir</span>=<span class="c-path">/home/alice/ovl/work</span> \
+  <span class="c-path">/home/alice/ovl/merged</span>
+<span class="c-cmd">fusermount3</span> <span class="c-param">-u</span> /home/alice/ovl/merged</pre>
+        </div>
+
+        <div class="note-box">
+          <p>这条路线仍是 Linux 方案，不能把同一个程序带到 Windows 原生使用。</p>
+          <p>能否运行取决于 <code>/dev/fuse</code>、挂载辅助程序与系统策略，不等于零安装。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- E: WINDOWS + F: SELF-BUILT -->
+  <div class="two-col divider">
+    <div class="col-left">
+      <div class="sec-head amber">
+        <span class="num">E</span>
+        Windows 怎样落地
+      </div>
+      <div class="sec-body">
+        <p>建议布局为 <code>C:\ovl\base</code>、<code>C:\ovl\changes</code>、<code>C:\ovl\meta</code>。入口为 <code>C:\ovl\merged</code>。安装 WinFsp 后，叠加服务负责挂载入口和处理文件请求。</p>
+
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px"><strong>数据流：</strong>任意应用 → merged 路径 → 平台适配层（FUSE/WinFsp）→ 共享叠加核心 → base 目录 / changes + meta</p>
+
+        <div class="note-box">
+          <p><strong>WinFsp 约束：</strong>它通过 NTFS mountpoint reparse point 挂载目录。不能覆盖已有非空目录，挂载目录由服务创建，卸载时删除。工程上应预留不存在的 merged 子路径，保留已存在的父目录。</p>
+          <p style="margin-top:6px">不要将正在存放 base 文件的目录直接当作入口。要保留原路径，可在停用后将原内容移到单独的 base，再把原路径留给挂载；需要先处理占用该目录的程序。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="sec-head amber">
+        <span class="num">F</span>
+        自建时必须实现什么
+      </div>
+      <div class="sec-body">
+        <p>以下是建议的可移植语义规格，不是对 cgofuse 已有能力的声明。</p>
+
+        <table class="imp-table" style="margin-top:8px">
+          <tr><th>操作</th><th>核心规则</th><th>最容易遗漏的情况</th></tr>
+          <tr>
+            <td class="op">路径查找</td>
+            <td class="rule">检查遮罩、祖先类型；上层优先</td>
+            <td class="pitfall">上层文件遮住下层目录</td>
+          </tr>
+          <tr>
+            <td class="op">目录枚举</td>
+            <td class="rule">合并子项，去重，排除遮罩</td>
+            <td class="pitfall">大小写冲突及 opaque 目录</td>
+          </tr>
+          <tr>
+            <td class="op">修改底层文件</td>
+            <td class="rule">copy-up 后只写上层</td>
+            <td class="pitfall">并发首写、权限、时间戳</td>
+          </tr>
+          <tr>
+            <td class="op">删除文件</td>
+            <td class="rule">删除上层副本；必要时遮住底层</td>
+            <td class="pitfall">上层移除后底层重新出现</td>
+          </tr>
+          <tr>
+            <td class="op">删除并重建目录</td>
+            <td class="rule">处理目录遮罩与 opaque 状态</td>
+            <td class="pitfall">重建后旧底层子项复活</td>
+          </tr>
+          <tr>
+            <td class="op">rename</td>
+            <td class="rule">同步处理源路径遮罩和目标覆盖</td>
+            <td class="pitfall">底层目录重命名、崩溃中断</td>
+          </tr>
+          <tr>
+            <td class="op">持久化</td>
+            <td class="rule">临时文件、提交顺序、恢复机制</td>
+            <td class="pitfall">数据与元数据只有一方提交</td>
+          </tr>
+          <tr>
+            <td class="op">文件句柄</td>
+            <td class="rule">定义 copy-up 前后句柄一致性</td>
+            <td class="pitfall">锁、mmap、删除中的打开文件</td>
+          </tr>
+        </table>
+
+        <div class="note-box" style="margin-top:8px">
+          <p>建议用独立 <code>meta</code> 目录记录 whiteout 与 opaque。记录逻辑路径、元数据版本和事务状态。元数据不可在 merged 中泄漏。</p>
+          <p style="margin-top:4px">若要 Windows 与 Linux 复用同一状态，不应直接把内核 OverlayFS upper 当通用格式。其删除状态依赖特殊节点或扩展属性。</p>
+          <p style="margin-top:4px"><strong>copy-up 通常以文件为单位。</strong>实现时应评估大文件首写的复制成本。文件级叠加不自动提供块级增量存储。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- G: VERIFICATION -->
+  <div class="two-col divider">
+    <div class="col-left">
+      <div class="sec-head red">
+        <span class="num">G</span>
+        兼容性如何验收
+      </div>
+      <div class="sec-body">
+        <p>"同一代码能编译"不能证明任意应用都正常。建议先选定目标应用，再按其操作验收。</p>
+
+        <table class="check-table" style="margin-top:8px">
+          <tr><th>检查项</th><th>预期结果</th></tr>
+          <tr><td class="check-item">修改 lower 文件后卸载</td><td class="check-result">base 哈希不变，修改在 upper</td></tr>
+          <tr><td class="check-item">删除 lower 文件后重挂</td><td class="check-result">文件仍被隐藏</td></tr>
+          <tr><td class="check-item">删除 upper 覆盖版本</td><td class="check-result">lower 版本不会意外复活</td></tr>
+          <tr><td class="check-item">删除并重建目录</td><td class="check-result">旧 lower 子项不自动出现</td></tr>
+          <tr><td class="check-item">编辑器临时文件替换保存</td><td class="check-result">内容完整，rename 行为正确</td></tr>
+          <tr><td class="check-item">两个进程首次写同一文件</td><td class="check-result">无丢失更新或半份副本</td></tr>
+          <tr><td class="check-item">copy-up 或 rename 时强制停止服务</td><td class="check-result">重启后恢复到定义好的状态</td></tr>
+          <tr><td class="check-item">文件名只差大小写</td><td class="check-result">按统一策略拒绝或正确区分</td></tr>
+          <tr><td class="check-item">Git、构建器、文件监听器</td><td class="check-result">权限、锁、通知符合实际需求</td></tr>
+        </table>
+
+        <div class="note-box" style="margin-top:8px">
+          <p>若源目录有 Windows 不接受的名称，应在挂载前检测并给出明确错误。大小写敏感性、可执行位、符号链接、ACL、硬链接、文件通知均需定义范围。<strong>不要宣传未经测试的完整 NTFS 或 POSIX 等价。</strong></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="sec-head">
+        <span class="num">H</span>
+        证据账本与最终建议
+      </div>
+      <div class="sec-body">
+        <p style="margin-bottom:8px;font-size:12px;color:var(--muted)">所有证据来自文档调查。WinFsp、cgofuse、HUBFS 同属相近生态，不能当作三个独立可靠性背书。未核实 HUBFS 内部源码语义，也未测性能。</p>
+
+        <table class="evidence-table">
+          <tr>
+            <th>结论</th>
+            <th>等级</th>
+            <th>原始材料与缺口</th>
+          </tr>
+          <tr>
+            <td class="ev-conclusion">Linux 普通目录可作 upper/lower</td>
+            <td><span class="evidence-grade ok">已证实</span></td>
+            <td class="ev-gap">Kernel 文档，未对用户磁盘实测</td>
+          </tr>
+          <tr>
+            <td class="ev-conclusion">Windows 可挂目录路径，不能覆盖非空目录</td>
+            <td><span class="evidence-grade ok">已证实</span></td>
+            <td class="ev-gap">WinFsp FAQ；具体部署仍需验证</td>
+          </tr>
+          <tr>
+            <td class="ev-conclusion">共享接口可覆盖 Win/Linux</td>
+            <td><span class="evidence-grade ok">已证实</span></td>
+            <td class="ev-gap">cgofuse 官方支持表</td>
+          </tr>
+          <tr>
+            <td class="ev-conclusion">跨平台可写覆盖架构已有实例</td>
+            <td><span class="evidence-grade ok">已证实</span></td>
+            <td class="ev-gap">HUBFS README；非任意本地目录 CLI</td>
+          </tr>
+          <tr>
+            <td class="ev-conclusion">自建核心 + 两平台适配可满足本需求</td>
+            <td><span class="evidence-grade judge">工程判断</span></td>
+            <td class="ev-gap">可行性有依据，需实现与双平台验收</td>
+          </tr>
+          <tr>
+            <td class="ev-conclusion">rclone union 不应直接当严格 CoW</td>
+            <td><span class="evidence-grade doc">文档推断</span></td>
+            <td class="ev-gap">依据 action 和 writeback 规则</td>
+          </tr>
+          <tr>
+            <td class="ev-conclusion">已有稳定的一键跨平台通用本地 CoW 工具</td>
+            <td><span class="evidence-grade unknown">当前未知</span></td>
+            <td class="ev-gap">本调查未找到足够官方证据，不代表不存在</td>
+          </tr>
+        </table>
+
+        <div class="suggestion-box" style="margin-top:10px">
+          <div class="sg-title">→ 建议</div>
+          <div class="sg-item">
+            <span class="sg-num">1</span>
+            <span>Linux 即用选 <strong>OverlayFS</strong> 或 <strong>fuse-overlayfs</strong></span>
+          </div>
+          <div class="sg-item">
+            <span class="sg-num">2</span>
+            <span>长期跨平台产品：<strong>cgofuse + WinFsp</strong> 建立原型 → 共享叠加核心 → 可移植元数据</span>
+          </div>
+          <div class="sg-item">
+            <span class="sg-num">3</span>
+            <span>若两套系统必须复用同一修改层，<strong>统一格式</strong>列为第一阶段要求</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- I: OPEN ITEMS -->
+  <div class="two-col divider">
+    <div class="col-left" style="border-right:none">
+      <div class="sec-head amber">
+        <span class="num">I</span>
+        实施前待定项
+      </div>
+      <div class="sec-body">
+        <div class="todo-box">
+          <div class="td-title">→ 实现前仍需确定</div>
+          <div class="td-item">
+            <div class="td-marker"></div>
+            <span><strong>是否允许安装 WinFsp？</strong> WinFsp 是 Windows 文件系统扩展的工程依赖。若不允许，Windows 路线需要另起方案（应用内 VFS 只能服务接入程序，或接受复制工作区）。</span>
+          </div>
+          <div class="td-item">
+            <div class="td-marker"></div>
+            <span><strong>是否跨系统复用同一修改层？</strong> 若同一 changes/meta 目录需要在 Linux 和 Windows 之间迁移或共享，统一格式设计是第一优先。不能直接复用内核 OverlayFS upper 格式。</span>
+          </div>
+          <div class="td-item">
+            <div class="td-marker"></div>
+            <span><strong>目标应用是否涉及数据库或大文件？</strong> 大文件首写复制成本、mmap 行为、数据库写粒度都会影响设计。copy-up 以文件为单位，不自动提供块级增量。</span>
+          </div>
+          <div class="td-item">
+            <div class="td-marker"></div>
+            <span><strong>base 在挂载周期内是否保持稳定？</strong> 同一状态默认只允许一个服务写入。允许外部修改时，需要额外的缓存失效与一致性协议。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-right" style="border-right:none">
+      <div class="sec-head">
+        <span class="num">术语表</span>
+      </div>
+      <div class="sec-body">
+        <div class="glossary">
+          <div class="gloss-item"><span class="gloss-term">lower</span><span class="gloss-def">底层，只读</span></div>
+          <div class="gloss-item"><span class="gloss-term">upper</span><span class="gloss-def">修改层，新增与变更</span></div>
+          <div class="gloss-item"><span class="gloss-term">merged</span><span class="gloss-def">合并视图，应用入口</span></div>
+          <div class="gloss-item"><span class="gloss-term">work</span><span class="gloss-def">OverlayFS 工作目录，需与 upper 同文件系统</span></div>
+          <div class="gloss-item"><span class="gloss-term">copy-up</span><span class="gloss-def">修改底层文件时，先复制到 upper 再写入</span></div>
+          <div class="gloss-item"><span class="gloss-term">whiteout</span><span class="gloss-def">删除遮罩标记</span></div>
+          <div class="gloss-item"><span class="gloss-term">opaque</span><span class="gloss-def">不透明标记，不展开下层内容</span></div>
+          <div class="gloss-item"><span class="gloss-term">CoW</span><span class="gloss-def">Copy-on-Write（文件级）</span></div>
+          <div class="gloss-item"><span class="gloss-term">WinFsp</span><span class="gloss-def">Windows FUSE 实现</span></div>
+          <div class="gloss-item"><span class="gloss-term">ProjFS</span><span class="gloss-def">Windows 投影文件系统</span></div>
+          <div class="gloss-item"><span class="gloss-term">d_type</span><span class="gloss-def">目录条目类型标识，overlay 对底层文件系统有此要求</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOURCE BAR -->
+  <div class="source-bar">
+    <div class="sb-item">
+      <span class="sb-lbl">来源</span>
+      <span class="sb-val">文档调查 · 一手文档</span>
+    </div>
+    <div class="sb-item">
+      <span class="sb-lbl">核验状态</span>
+      <span class="sb-val">未在双系统实测</span>
+    </div>
+    <div class="sb-item">
+      <span class="sb-lbl">调查日期</span>
+      <span class="sb-val">2026-10-08</span>
+    </div>
+    <div class="sb-item">
+      <span class="sb-lbl">主要参考</span>
+      <span class="sb-link">Kernel OverlayFS 文档 · WinFsp FAQ · cgofuse README · HUBFS README · rclone union 文档 · ProjFS 文档</span>
+    </div>
+    <div class="sb-sep"></div>
+    <div class="sb-item">
+      <span class="sb-lbl">主题</span>
+      <span class="sb-val">sage-swiss</span>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-l">INFOCARD · 技术调查 · 2026-10-10</div>
+    <div class="footer-r">
+      <a href="#">普通目录里的跨平台 Overlay 文件系统</a>
+    </div>
+  </div>
+
+</div><!-- /.page -->
+</body>
+</html>
