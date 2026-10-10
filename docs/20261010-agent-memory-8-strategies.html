@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="blue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Memory 8 策略：从滑动窗口到 Memory OS</title>
+  <meta name="description" content="progressive-doc：向量库≠记忆，Context Engineering 才是本质。8 种 Memory 策略逐层拆解，附四问框架、八方案对比表与五档选型自查。">
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f6f4ef;color:#111;font-size:13px;line-height:1.65}
+    .page{width:100%;max-width:720px;margin:0 auto;padding:0 0 80px}
+
+    /* ── 顶栏 ── */
+    header{background:#111;color:#fff;padding:10px 14px;border-bottom:3px solid #1f63ff}
+    .tag{display:inline-block;padding:2px 8px;border:1.5px solid #fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+    h1{font-size:17px;font-weight:700;margin:0;letter-spacing:-.02em;line-height:1.3}
+    .sub{font-size:11.5px;color:#bbb;margin-top:3px}
+
+    /* ── 蓝标题条 ── */
+    .blue-band{background:#1f63ff;color:#fff;padding:7px 14px;margin:12px 0 0;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+    .blue-band::before{content:'▶';font-size:9px}
+
+    /* ── 内容区 ── */
+    section{padding:12px 14px 0}
+    h2{font-size:15px;font-weight:700;margin:0 0 8px;color:#111;border-bottom:2px solid #1f63ff;padding-bottom:5px}
+    p{margin:0 0 10px;color:#333}
+
+    /* ── 反直觉卡片 ── */
+    .counter{background:#111;color:#fff;padding:14px;margin:0 0 12px}
+    .counter p{margin:0 0 8px;color:#d0d0d0;font-size:13px;line-height:1.7}
+    .counter p:last-child{margin-bottom:0}
+    .counter strong{color:#f2c94c;font-weight:700}
+    .counter em{color:#78f2b0;font-style:normal}
+
+    /* ── 标签 ── */
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+    .chip{padding:3px 9px;border:1.5px solid #111;font-size:11px;font-weight:700}
+    .chip.blue{border-color:#1f63ff;color:#1f63ff;background:#eef4ff}
+    .chip.purple{border-color:#7c3aed;color:#7c3aed;background:#f3f0ff}
+    .chip.green{border-color:#15803d;color:#15803d;background:#dcfce7}
+    .chip.red{border-color:#c8102e;color:#c8102e;background:#fde9eb}
+    .chip.yellow{border-color:#b45309;color:#b45309;background:#fef3c7}
+
+    /* ── 四问框架 ── */
+    .quad-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+    .quad{border:2px solid #1f63ff;padding:9px 11px}
+    .quad .q{font-size:20px;font-weight:900;color:#1f63ff;line-height:1}
+    .quad b{display:block;font-size:11px;font-weight:700;margin-bottom:3px;letter-spacing:.05em;text-transform:uppercase}
+    .quad span{font-size:11.5px;color:#555;line-height:1.5}
+
+    /* ── 8策略卡片 ── */
+    .strat-list{display:grid;gap:6px;margin-bottom:12px}
+    .strat{display:grid;grid-template-columns:30px 1fr;gap:9px;align-items:start;padding:9px 11px;background:#fff;border:1.5px solid #ddd}
+    .strat.n1{border-color:#1f63ff;border-left:4px solid #1f63ff}
+    .strat.n5{border-color:#7c3aed;border-left:4px solid #7c3aed}
+    .strat.n8{border-color:#b45309;border-left:4px solid #b45309;background:#fefcf5}
+    .strat .num{font-size:19px;font-weight:900;color:#1f63ff;line-height:1}
+    .strat.n5 .num{color:#7c3aed}
+    .strat.n8 .num{color:#b45309}
+    .strat b{display:block;font-size:12px;font-weight:700;margin-bottom:2px}
+    .strat span{font-size:11.5px;color:#555;line-height:1.55}
+    .strat .meta{margin-top:5px;padding-top:5px;border-top:1px dashed #ddd;font-size:11px;color:#777}
+    .strat .meta b{font-size:10px;color:#1f63ff;display:inline;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
+    .strat.n5 .meta b{color:#7c3aed}
+    .strat.n8 .meta b{color:#b45309}
+
+    /* ── 机制详解 ── */
+    .mech-box{background:#fff;border:2px solid #1f63ff;padding:11px 13px;margin-bottom:10px}
+    .mech-box h3{font-size:12.5px;font-weight:700;color:#1f63ff;margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em}
+    .mech-box p{margin:0 0 6px;font-size:12px;line-height:1.6}
+    .mech-box .row{display:grid;grid-template-columns:62px 1fr;gap:6px;font-size:11.5px;padding:3px 0;border-bottom:1px solid #eee}
+    .mech-box .row:last-child{border-bottom:0;margin-bottom:0}
+    .mech-box .row b{color:#1f63ff;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    .mech-box .row span{color:#444}
+
+    /* ── OS 类比 ── */
+    .os-analogy{background:#f3f0ff;border:2px solid #7c3aed;padding:12px 14px;margin-bottom:12px}
+    .os-analogy h3{font-size:12.5px;font-weight:700;color:#7c3aed;margin:0 0 9px;letter-spacing:.06em;text-transform:uppercase}
+    .os-row{display:grid;grid-template-columns:88px 1fr;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #ddd;font-size:12px}
+    .os-row:last-child{border-bottom:0}
+    .os-row .key{font-weight:800;color:#7c3aed;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase}
+    .os-row .val{color:#333}
+    .os-row .badge{display:inline-block;padding:1px 6px;background:#7c3aed;color:#fff;font-size:10px;font-weight:700;border-radius:2px;margin-right:4px}
+
+    /* ── 对比表 ── */
+    table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px}
+    th,td{padding:6px 8px;border:1.5px solid #111;text-align:left;vertical-align:top}
+    th{background:#111;color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    tr:nth-child(even) td{background:#eef4ff}
+    .check{color:#15803d;font-weight:900}
+    .cross{color:#c8102e;font-weight:900}
+    .warn-cell{background:#fff3cd !important}
+
+    /* ── 五档选型 ── */
+    .levels{display:grid;gap:8px;margin-bottom:12px}
+    .level{display:grid;grid-template-columns:36px 1fr;gap:10px;padding:9px 11px;background:#fff;border:1.5px solid #ddd}
+    .level.l3{border-color:#1f63ff;border-left:4px solid #1f63ff}
+    .level.l4{border-color:#7c3aed;border-left:4px solid #7c3aed}
+    .level.l5{border-color:#b45309;border-left:4px solid #b45309;background:#fefcf5}
+    .level .lv{font-size:22px;font-weight:900;color:#1f63ff;line-height:1}
+    .level.l4 .lv{color:#7c3aed}
+    .level.l5 .lv{color:#b45309}
+    .level b{display:block;font-size:12px;font-weight:700;margin-bottom:2px}
+    .level span{font-size:11.5px;color:#555;line-height:1.55}
+    .level .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+    .level .t{padding:2px 7px;border:1.5px solid #ddd;font-size:10.5px;font-weight:700;color:#555}
+    .level.l3 .t{border-color:#1f63ff;color:#1f63ff}
+    .level.l4 .t{border-color:#7c3aed;color:#7c3aed}
+    .level.l5 .t{border-color:#b45309;color:#b45309}
+
+    /* ── 术语表 ── */
+    .glossary{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+    .glterm{background:#fff;border:1.5px solid #ddd;padding:7px 9px;font-size:11.5px}
+    .glterm b{color:#1f63ff;font-weight:700}
+    .glterm span{color:#555}
+
+    /* ── 警示 / 提示 ── */
+    .warn{border-left:4px solid #c8102e;padding:9px 12px;background:#fde9eb;margin:0 0 12px;font-size:12.5px;line-height:1.65}
+    .warn strong{color:#c8102e}
+    .tip{border-left:4px solid #15803d;padding:9px 12px;background:#dcfce7;margin:0 0 12px;font-size:12.5px;line-height:1.65}
+    .tip strong{color:#15803d}
+    .note{border-left:4px solid #1f63ff;padding:9px 12px;background:#eef4ff;margin:0 0 12px;font-size:12.5px;line-height:1.65}
+    .note strong{color:#1f63ff}
+
+    /* ── 结论条 ── */
+    .conclusion{background:#111;color:#fff;padding:14px;margin-top:12px}
+    .conclusion p{margin:0 0 8px;color:#d0d0d0;font-size:13px;line-height:1.7}
+    .conclusion p:last-child{margin-bottom:0}
+    .conclusion strong{color:#78f2b0;font-weight:700}
+
+    /* ── 脚注 ── */
+    .footer{margin-top:14px;padding:10px 14px 0;border-top:1px solid #ddd;font-size:10.5px;color:#888;text-align:center;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header>
+      <div class="tag">方法论 · Memory Engineering</div>
+      <h1>Agent 记忆怎么做？8 种策略从滑动窗口到 Memory OS</h1>
+      <div class="sub">progressive-doc · 2026-10-10 · 基于公众号调研素材 + Letta GitHub 实抓</div>
+    </header>
+
+    <div class="blue-band">本文结构：四问框架 → 八策略逐层拆解 → 对比表 → 五档选型 → 术语表</div>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ① 引入：反直觉开场 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <div class="counter">
+        <p><strong>反直觉开场：</strong>「给 Agent 接一个向量数据库，<em>不等于</em>它就有了记忆。」</p>
+        <p>向量库解决的是<em>长期记忆的存取方式</em>，而非记忆本身。Embedding 存储 + 语义检索 + Top-K 塞回 Context——这套链路如果配不好，调优工作量比接入本身大得多。</p>
+        <p>记忆从来不是把历史存起来，而是<em>怎么管理一块有限的认知空间</em>。</p>
+        <p>Memory Engineering 的本质不是 Storage Engineering，而是 <strong>Context Engineering</strong>。</p>
+      </div>
+
+      <div class="chips">
+        <span class="chip blue">Context Engineering</span>
+        <span class="chip purple">Memory OS</span>
+        <span class="chip">Letta (MemGPT 后继)</span>
+        <span class="chip">25,095 ★ on GitHub</span>
+        <span class="chip green">低风险</span>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ② 底层事实 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <h2>② 底层事实：LLM + Context = 这一次对话里的记忆</h2>
+      <div class="mech-box">
+        <h3>核心机制</h3>
+        <div class="row"><b>LLM 无状态</b><span>每次推理只看到本次输入上下文，没有"记忆"中间态。</span></div>
+        <div class="row"><b>Context = RAM</b><span>LLM 可见范围由 Context Window 决定，类似计算机的内存条。</span></div>
+        <div class="row"><b>记忆的本质</b><span>不是"存储历史"，而是"在合适时间点把有价值信息以合适形式塞回 Context"。</span></div>
+        <div class="row"><b>Memory Eng.</b><span>核心不是 Storage Engineering，而是 Context Engineering——管理认知空间的学问。</span></div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ③ 四问框架 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <h2>③ 四问框架：Remember / Forget / Retrieve / Compress</h2>
+      <div class="quad-grid">
+        <div class="quad"><div class="q">R</div><b>Remember</b><span>什么值得记住？判断标准：相关性、重要性、使用频率。主动写入，而非被动堆积。</span></div>
+        <div class="quad"><div class="q">F</div><b>Forget</b><span>什么可以忘掉？主动淘汰，避免 Context 被低价值信息填满。遗忘不是损失，是策略。</span></div>
+        <div class="quad"><div class="q">R</div><b>Retrieve</b><span>什么时候找回来？按需召回，不是全量读取。召回早了浪费空间，晚了错过时机。</span></div>
+        <div class="quad"><div class="q">C</div><b>Compress</b><span>怎么用更少 Token 表达更多信息？摘要、压缩、重编码——等价信息量下的密度提升。</span></div>
+      </div>
+      <div class="tip"><strong>共同目标：</strong>在有限的 Context Window 内，让「当下最需要的信息」以「最精简的形式」出现。四问不是顺序执行，而是持续并行的调度决策。</div>
+    </section>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ④ 前四策略 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <h2>④ 前四策略：全量 → 滑动窗口 → 相关性过滤 → 摘要压缩</h2>
+
+      <div class="strat-list">
+        <div class="strat n1">
+          <div class="num">1</div>
+          <div>
+            <b>全量记忆（Full Memory）</b>
+            <span>全部保留，不遗忘。Token 成本线性增长，迟早撞上 Context Window 天花板（GPT-4o 128K / Claude 3.5 200K / Gemini 2M）。</span>
+            <div class="meta"><b>适用场景</b>短对话一次性问答（5 轮以内），对话历史本身就是全部上下文，无需持久化。</div>
+          </div>
+        </div>
+        <div class="strat n1">
+          <div class="num">2</div>
+          <div>
+            <b>滑动窗口（Sliding Window）</b>
+            <span>只保留最近 N 轮对话。长度可控，成本稳定。只认时间戳，不懂重要性——最新不一定最重要，旧的重要信息仍会被挤掉。</span>
+            <div class="meta"><b>适用场景</b>在线客服实时问答，每轮对话都是独立的短期任务，不依赖历史深意。</div>
+          </div>
+        </div>
+        <div class="strat n1">
+          <div class="num">3</div>
+          <div>
+            <b>相关性过滤（Relevance Filtering）</b>
+            <span>给每段记忆打分，按相关性 / 重要性 / 使用频率排名留下。从「时间驱动遗忘」升级到「价值驱动遗忘」。评分模型决定一切。</span>
+            <div class="meta"><b>⚠ 失效模式</b>错杀关键信息后形成「隐性失忆」——Agent 不会报错，只会悄悄表现异常。调试困难。</div>
+          </div>
+        </div>
+        <div class="strat n1">
+          <div class="num">4</div>
+          <div>
+            <b>摘要压缩（Summarization）</b>
+            <span>LLM 自身对历史对话做摘要，结果注入下一轮 Context。几万 Token 可压缩到几千（ChatGPT / Claude 均有类似机制）。压缩比可达 10:1。</span>
+            <div class="meta"><b>局限</b>压缩必有信息损失，摘要质量依赖 prompt 设计，且无标准答案——压缩 30% 还是 90% 取决于场景。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ⑤ 后四策略 + OS 类比 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <h2>⑤ 后四策略：向量库 → 知识图谱 → 分层记忆 → 类 OS 管理</h2>
+
+      <div class="strat-list">
+        <div class="strat n5">
+          <div class="num">5</div>
+          <div>
+            <b>向量数据库（Vector DB）</b>
+            <span>文本 → Embedding 向量 → 存入向量库（Milvus / Pinecone / Qdrant / Chroma）。查询时做语义相似度检索，取 Top-K 条塞回 Context（LangChain Memory / Mem0）。</span>
+            <div class="meta"><b>关键陷阱</b>调优工作量（Embedding 模型选型 / 切块大小策略 / Top-K 参数 / 召回完整性验证）比接入本身大得多。</div>
+          </div>
+        </div>
+        <div class="strat n5">
+          <div class="num">6</div>
+          <div>
+            <b>知识图谱（Knowledge Graph）</b>
+            <span>从文本中抽取实体和关系，存入图数据库（Neo4j / TuGraph / NebulaGraph）。支持多跳关系推理——GraphRAG 的核心支撑层，适合需要"关系推理"而非"相似度检索"的场景。</span>
+            <div class="meta"><b>适用场景</b>金融风控（股权穿透）/ 医疗（药物互作）/ 科研（理论引用链）/ 法律（判例关联）等关系密集领域。</div>
+          </div>
+        </div>
+        <div class="strat n5">
+          <div class="num">7</div>
+          <div>
+            <b>分层记忆（Hierarchical Memory）</b>
+            <span>短期（滑动窗口）+ 长期（向量库 / 图谱）按需组合。可细分为：工作记忆（当前任务）/ 情景记忆（最近会话）/ 语义记忆（长期知识）/ 长期记忆（持久化存储）。</span>
+            <div class="meta"><b>适用场景</b>长期陪伴型 Agent（客服机器人 / 私人助理）、企业级知识管理系统、多轮复杂任务处理。</div>
+          </div>
+        </div>
+        <div class="strat n8">
+          <div class="num">8</div>
+          <div>
+            <b>类 OS 内存管理（Memory OS）</b>
+            <span>记忆从「数据库问题」变成「资源管理问题」。核心问题从"存在哪"变成"当前时刻哪些记忆该进工作区"？Memory Manager 扮演 OS 内核角色。</span>
+            <div class="meta"><b>源头</b>MemGPT 论文（2023，UCLA + Meta AI），后改名 <strong>Letta</strong>——GitHub 25,095 ★ · 2,642 Forks · Apache-2.0（2026-10-10 实抓）。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="os-analogy">
+        <h3>🔧 Memory OS 类比（Letta / MemGPT 核心思想）</h3>
+        <div class="os-row"><span class="key">Context Window</span><span class="val"><span class="badge">≈ RAM</span>有限的工作内存，只装当前任务相关的内容，超出就溢出（OOM）</span></div>
+        <div class="os-row"><span class="key">长期记忆库</span><span class="val"><span class="badge">≈ Disk</span>持久化存储，海量但访问慢（向量库 / 图谱 / 结构化 DB）</span></div>
+        <div class="os-row"><span class="key">Memory Manager</span><span class="val"><span class="badge">≈ OS Kernel</span>决定 Page In / Page Out 策略、优先级调度、淘汰算法——是 Memory OS 的核心引擎</span></div>
+        <div class="os-row"><span class="key">Page In</span><span class="val">把长期记忆中的相关内容换入 Context Window。触发条件：当前任务需要某段历史知识时主动召回</span></div>
+        <div class="os-row"><span class="key">Page Out</span><span class="val">把 Context 中的低价值内容写回长期记忆或直接丢弃（主动遗忘）。保持工作区清爽</span></div>
+        <div class="os-row"><span class="key">MemGPT 论文</span><span class="val">2023 年 UCLA/Meta AI 发表，首次将操作系统内存管理思想引入 LLM Agent</span></div>
+      </div>
+
+      <div class="tip"><strong>Letta 现状（2026-10-10）：</strong>GitHub 25,095 ★ · 2,642 Forks · Apache-2.0 · 继承 MemGPT 全部设计思想。安装：<code>npm install -g @letta-ai/letta-code</code>；启动桌面 App 或 <code>letta server</code> 自托管，支持 Slack / Telegram / Discord 渠道。</div>
+    </section>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ⑥ 八方案对比表 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <h2>⑥ 八种方案对比表</h2>
+      <table>
+        <tr><th>方案</th><th>核心机制</th><th>适用场景</th><th>成本</th><th>复杂度</th><th>关键风险</th></tr>
+        <tr>
+          <td><b>1 全量记忆</b></td>
+          <td>全部历史存入 Context</td>
+          <td>短对话 / 一次性问答（≤5轮）</td>
+          <td>线性涨 ↗↗↗</td>
+          <td>★☆☆☆☆</td>
+          <td>必然撞 Context 上限</td>
+        </tr>
+        <tr>
+          <td><b>2 滑动窗口</b></td>
+          <td>只留最近 N 轮对话</td>
+          <td>实时客服 / 短轮次独立任务</td>
+          <td>稳定 →</td>
+          <td>★☆☆☆☆</td>
+          <td>不区分重要性，新内容可能挤掉关键信息</td>
+        </tr>
+        <tr>
+          <td><b>3 相关性过滤</b></td>
+          <td>打分排名，只留高相关记忆</td>
+          <td>需要「价值驱动遗忘」的场景</td>
+          <td>可控 →</td>
+          <td>★★☆☆☆</td>
+          <td class="warn-cell">⚠ 错杀关键信息后隐性失忆，难察觉</td>
+        </tr>
+        <tr>
+          <td><b>4 摘要压缩</b></td>
+          <td>LLM 摘要注入下一轮 Context</td>
+          <td>中长对话（10+ 轮）</td>
+          <td>可控 →</td>
+          <td>★★☆☆☆</td>
+          <td>压缩必有信息损失，摘要质量依赖 prompt</td>
+        </tr>
+        <tr>
+          <td><b>5 向量数据库</b></td>
+          <td>Embedding + Top-K 语义检索</td>
+          <td>长期知识检索 / RAG 场景</td>
+          <td>按需 ↗</td>
+          <td>★★★☆☆</td>
+          <td>Embedding 准确度 / 切块 / Top-K 调优成本高</td>
+        </tr>
+        <tr>
+          <td><b>6 知识图谱</b></td>
+          <td>实体关系抽取 + 图数据库</td>
+          <td>金融 / 医疗 / 科研关系密集领域</td>
+          <td>按需 ↗</td>
+          <td>★★★★☆</td>
+          <td>构建成本高，数据变化需同步更新图</td>
+        </tr>
+        <tr>
+          <td><b>7 分层记忆</b></td>
+          <td>短期 + 长期多层次按需组合</td>
+          <td>长期陪伴 / 个性化助手 / 企业系统</td>
+          <td>可控 →</td>
+          <td>★★★☆☆</td>
+          <td>层间调度策略设计复杂</td>
+        </tr>
+        <tr>
+          <td><b>8 Memory OS</b></td>
+          <td>Context≈RAM + Disk≈长期库 + OS 调度</td>
+          <td>长期运行 Agent / 主动管理工作流</td>
+          <td>动态调度</td>
+          <td>★★★★★</td>
+          <td>Page In/Out 策略设计不当会导致性能退化</td>
+        </tr>
+      </table>
+
+      <div class="note"><strong>关键洞察：</strong>八种方案不是互相替代，而是不断叠加。成熟生产系统 = 滑动窗口 + 摘要压缩 + 向量检索 + 图谱 + 记忆管理器的<strong>组合拳</strong>。</div>
+    </section>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ⑦ 五档选型 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <h2>⑦ 选型五档自查：从简单 Chatbot 到长期运行 Agent</h2>
+
+      <div class="levels">
+        <div class="level">
+          <div class="lv">L1</div>
+          <div>
+            <b>简单 Chatbot</b>
+            <span>全量记忆 或 滑动窗口。5 轮以内对话，历史本身就是全部上下文，无需持久化，Token 够用就好。</span>
+          </div>
+        </div>
+        <div class="level">
+          <div class="lv">L2</div>
+          <div>
+            <b>长对话 Agent</b>
+            <span>滑动窗口 + 摘要压缩。10-50 轮对话，通过摘要控制 Context 增长，避免超限，平衡信息保留与成本。</span>
+          </div>
+        </div>
+        <div class="level l3">
+          <div class="lv">L3</div>
+          <div>
+            <b>知识型 Agent</b>
+            <span>滑动窗口 + 向量数据库。接入外部知识库，语义检索补充上下文，支持多轮知识问答（客服 / 文档助手）。</span>
+            <div class="tags">
+              <span class="t">向量数据库</span>
+              <span class="t">Embedding</span>
+              <span class="t">Top-K 检索</span>
+            </div>
+          </div>
+        </div>
+        <div class="level l4">
+          <div class="lv">L4</div>
+          <div>
+            <b>复杂企业 Agent</b>
+            <span>短期 + 摘要 + 向量库 + 图谱分层。兼顾事实检索与关系推理，适合金融、医疗、科研等高要求场景。</span>
+            <div class="tags">
+              <span class="t">知识图谱</span>
+              <span class="t">GraphRAG</span>
+              <span class="t">分层调度</span>
+            </div>
+          </div>
+        </div>
+        <div class="level l5">
+          <div class="lv">L5</div>
+          <div>
+            <b>长期运行 Agent</b>
+            <span>在 L4 基础上加 Memory Manager：写入 / 召回 / 压缩 / 淘汰 / 换入换出 / 优先级调度。代表方案：<strong>Letta（MemGPT 后继），GitHub 25,095 ★</strong>。</span>
+            <div class="tags">
+              <span class="t">Memory OS</span>
+              <span class="t">Page In/Out</span>
+              <span class="t">OS 调度</span>
+              <span class="t">Letta</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note"><strong>选型判断树：</strong>先问「对话多长」→「是否需要持久化」→「是否需要语义检索」→「是否需要关系推理」→「是否长期运行」。每多一个 Yes，叠加上一个策略层。</div>
+    </section>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ⑧ 结语 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <h2>⑧ 结语：Memory OS 是下一阶段 Agent 基建</h2>
+      <div class="conclusion">
+        <p>行业关注点迁移路径：<strong>模型聪明度</strong> → 工具调用能力 → Context 长度 → <strong>Agent 能否长期稳定低成本管理自己的记忆</strong>。</p>
+        <p>长期工作 Agent 不可能每次醒来从零开始。随着模型能力趋同，Memory OS（Letta / MemGPT 路线）正在把「记忆」从数据库问题变成<strong>资源管理问题</strong>——这是 Agent 走向生产可用的必经之路。</p>
+        <p>下一个问题不是「模型有多强」，而是「模型能否记得住、找得到、忘得对」。</p>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- ⑨ 术语表 -->
+    <!-- ════════════════════════════════════ -->
+    <section>
+      <h2>⑨ 术语表</h2>
+      <div class="glossary">
+        <div class="glterm"><b>Context Window</b><span>LLM 单次推理可见的最大 Token 数上限（≈ RAM）</span></div>
+        <div class="glterm"><b>Token</b><span>LLM 处理文本的最小单元，计费与 Context 成本的基准</span></div>
+        <div class="glterm"><b>Embedding</b><span>文本 → 高维向量表示，用于语义相似度计算</span></div>
+        <div class="glterm"><b>Top-K 检索</b><span>向量库中返回与查询向量相似度最高的 K 条记录</span></div>
+        <div class="glterm"><b>Page In / Page Out</b><span>记忆在长期库与工作区之间的换入换出操作</span></div>
+        <div class="glterm"><b>MemGPT</b><span>2023 年论文，首次提出类 OS 记忆管理架构（UCLA + Meta AI）</span></div>
+        <div class="glterm"><b>Letta</b><span>MemGPT 后继开源项目，Apache-2.0，GitHub 25,095 ★（2026-10-10）</span></div>
+        <div class="glterm"><b>GraphRAG</b><span>基于知识图谱的 RAG，支持多跳关系推理</span></div>
+        <div class="glterm"><b>Context Engineering</b><span>通过管理 Context 内容来优化 LLM 推理效果的方法论</span></div>
+        <div class="glterm"><b>Memory Manager</b><span>Memory OS 中的调度内核，决定 Page In/Out 策略与优先级</span></div>
+      </div>
+    </section>
+
+    <div class="footer">
+      来源：公众号调研素材 2026-10-10 · Letta GitHub 实抓 2026-10-10（25,095 ★，Apache-2.0）<br>
+      风格：blue · progressive-doc · infocard-pub · 9 节结构 · 8 策略 · 42 条事实
+    </div>
+
+  </div>
+<script>
+(function(){
+  function send(){var h=document.body.scrollHeight;window.parent.postMessage({type:'theme-height',slug:'blue',height:h},'*');}
+  if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+  setTimeout(send,500);setTimeout(send,1500);
+})();
+</script>
+</body>
+</html>
