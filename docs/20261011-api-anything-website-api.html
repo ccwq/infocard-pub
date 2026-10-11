@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="ivy-architecture">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Anything — 把任意网站变成 Agent 可调用的 API</title>
+<style>
+:root{
+  --bg:#eef1f9;--paper:#ffffff;--ink:#0f1b2d;--muted:#54657e;--muted-strong:#3f4f68;--line:#c9d3e4;
+  --blue:#2563eb;--blue-soft:#dbe7fd;--blue-tint:#eaf1fe;
+  --purple:#7c3aed;--purple-soft:#e9e0fc;--purple-tint:#f2ecfe;--purple-hero:#6d28d9;
+  --green:#059669;--green-soft:#d7f0e6;--green-tint:#e6f6f0;
+  --red:#dc2626;--red-soft:#fbdcdc;--red-tint:#fdeaea;
+  --orange:#d97706;--orange-soft:#fce8cc;--orange-tint:#fdf1df;
+  --code:#0f1b2d;--code-ink:#e8eefb;--solid:#ffffff;--purple-wash:#f4ecff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7;overflow-x:hidden}
+.page{max-width:900px;margin:0 auto;padding:28px 20px 120px}
+
+/* ── Header ── */
+.arch-header{border:1px solid var(--line);background:var(--paper);padding:22px 26px 18px;margin-bottom:20px}
+.kicker{font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.16em;color:var(--purple)}
+h1{margin:8px 0 6px;font-size:clamp(26px,4vw,44px);line-height:1.1;letter-spacing:-.03em;word-break:keep-all;overflow-wrap:anywhere;text-wrap:balance}
+.summary{margin:0;max-width:70ch;color:var(--muted-strong);font-size:14.5px}
+.legend{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.legend span{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);padding:5px 10px;font:700 11px ui-monospace,Menlo,monospace;color:var(--muted-strong);border-radius:999px}
+.legend span:nth-child(1){background:var(--blue-soft)}.legend span:nth-child(2){background:var(--purple-soft)}.legend span:nth-child(3){background:var(--green-soft)}.legend span:nth-child(4){background:var(--red-soft)}.legend span:nth-child(5){background:var(--orange-soft)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.blue{background:var(--blue)}.dot.purple{background:var(--purple)}.dot.green{background:var(--green)}.dot.red{background:var(--red)}.dot.orange{background:var(--orange)}
+
+/* ── Section layers ── */
+.layer-stack{display:grid;gap:0;margin-top:0}
+.layer{display:grid;grid-template-columns:168px 1fr;gap:0;border:1px solid var(--line);border-top:0;background:var(--paper)}
+.layer:first-child{border-top:1px solid var(--line)}
+.layer-label{padding:13px 14px;border-right:1px solid var(--line);background:var(--bg)}
+.layer-label b{display:block;font:700 12px ui-monospace,Menlo,monospace;letter-spacing:.1em}
+.layer-label i{display:block;font-style:normal;font-size:11px;color:var(--muted-strong);margin-top:5px;line-height:1.5}
+.layer-panel{padding:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-width:0}
+
+.node-card{border:1px solid var(--line);border-left:4px solid var(--blue);background:var(--paper);padding:11px 12px;min-width:0;box-shadow:0 1px 0 rgba(15,27,45,.05)}
+.node-card.purple{border-left-color:var(--purple)}.node-card.green{border-left-color:var(--green)}.node-card.red{border-left-color:var(--red)}.node-card.orange{border-left-color:var(--orange)}
+.node-card b{display:flex;align-items:center;gap:7px;font-size:15px}
+.node-card p{margin:6px 0 0;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+
+/* ── Prose sections ── */
+.section{border:1px solid var(--line);border-top:0;background:var(--paper)}
+.section:first-of-type{border-top:1px solid var(--line);margin-top:20px}
+.section-header{padding:14px 20px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+.section-header h2{font-size:15px;font-weight:700;margin:0;color:var(--ink);letter-spacing:.02em}
+.section-header .tag{display:inline-block;background:var(--purple-soft);color:var(--purple);font:700 10px ui-monospace,Menlo,monospace;padding:2px 8px;border-radius:999px;margin-right:8px;vertical-align:middle}
+.section-body{padding:18px 22px;max-width:80ch}
+.section-body h3{font-size:14px;font-weight:700;margin:18px 0 8px;color:var(--ink)}
+.section-body h3:first-child{margin-top:0}
+.section-body p{margin:0 0 12px;font-size:13.5px;color:var(--ink)}
+.section-body ul{margin:0 0 14px;padding-left:20px}
+.section-body li{margin-bottom:6px;font-size:13.5px}
+
+/* ── Code blocks ── */
+pre{background:var(--code);color:var(--code-ink);padding:14px 18px;border-radius:8px;overflow-x:auto;font-size:12.5px;line-height:1.65;margin:10px 0 14px}
+code{font-family:ui-monospace,Menlo,Monaco,"Cascadia Code","Segoe UI Mono","Source Han Mono",monospace;font-size:.9em;background:var(--blue-tint);color:var(--blue);padding:1px 5px;border-radius:4px}
+pre code{background:none;color:inherit;padding:0;font-size:inherit}
+
+/* ── Benchmark table ── */
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0 14px}
+th{background:var(--bg);border:1px solid var(--line);padding:9px 12px;text-align:left;font-weight:700}
+td{border:1px solid var(--line);padding:8px 12px}
+tr:nth-child(even) td{background:#f7f9fc}
+.highlight{color:var(--green);font-weight:700}
+
+/* ── Callout boxes ── */
+.callout{padding:12px 16px;border-radius:8px;margin:10px 0 14px;font-size:13px}
+.callout.blue{background:var(--blue-tint);border-left:3px solid var(--blue)}
+.callout.green{background:var(--green-tint);border-left:3px solid var(--green)}
+.callout.orange{background:var(--orange-tint);border-left:3px solid var(--orange)}
+.callout.red{background:var(--red-tint);border-left:3px solid var(--red)}
+.callout.purple{background:var(--purple-tint);border-left:3px solid var(--purple)}
+.callout strong{display:block;margin-bottom:4px;font-size:12px;letter-spacing:.05em}
+
+/* ── Divider within section ── */
+.divider{border:none;border-top:1px solid var(--line);margin:16px 0}
+
+/* ── Footnote ── */
+.footnote{border:1px solid var(--line);border-top:0;background:var(--paper)}
+.footnote-body{padding:14px 20px;font-size:12px;color:var(--muted)}
+
+/* ── Layer coloring by depth ── */
+.layer:nth-child(3) .layer-panel{background:linear-gradient(135deg,#eef2fb,#ffffff)}
+.layer:nth-child(5) .layer-panel{background:linear-gradient(135deg,var(--purple-hero),var(--purple));padding:12px}
+.layer:nth-child(5) .layer-label{background:linear-gradient(180deg,#5b21b6,var(--purple-hero));border-right:0}
+.layer:nth-child(5) .layer-label b,.layer:nth-child(5) .layer-label i{color:var(--solid)}
+.layer:nth-child(7) .layer-panel{background:var(--green-tint)}
+.layer:nth-child(9) .layer-panel{background:var(--red-tint)}
+.layer:nth-child(11) .layer-panel{background:var(--orange-tint)}
+.layer:nth-child(5) .node-card{background:rgba(255,255,255,.94);border-left-width:5px}
+
+@media(max-width:520px){
+  .layer{grid-template-columns:1fr}
+  .layer-label{border-right:0;border-bottom:1px solid var(--line)}
+  .layer-panel{grid-template-columns:1fr}
+  h1{font-size:24px}
+  .arch-header{padding:16px 16px 14px}
+  .section-body{padding:14px 16px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<div class="arch-header">
+  <div class="kicker">TOOL · AGENT FRAMEWORK · TYPE SCRIPT</div>
+  <h1>API Anything — 把任意网站变成 Agent 可调用的 API</h1>
+  <p class="summary">用 headless Chrome 学两遍，把真实请求提炼成带槽位模板，Agent 直接打 HTTP 拿 JSON，不再驱动浏览器跑完整个页面。</p>
+  <div class="legend">
+    <span><span class="dot blue"></span>TypeScript / MIT</span>
+    <span><span class="dot purple"></span>MCP Server</span>
+    <span><span class="dot green"></span>自修复 / Replay</span>
+    <span><span class="dot red"></span>本地凭证存储</span>
+    <span><span class="dot orange"></span>基准 1.5–2× 更快</span>
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 1: 痛点引入 ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">①</span>Agent 拿网站数据，为什么要「爬浏览器」？</h2>
+  </div>
+  <div class="section-body">
+    <p>现在 Agent 要从网站提取数据，标准做法是挂一个 Playwright MCP，让浏览器一点点打开页面、点击按钮、等待渲染，再从 DOM 里读内容。这种方式有三个根本问题：</p>
+
+    <ul>
+      <li><strong>慢</strong>：每次操作都要等页面完整渲染，Google Flights 任务 Playwright MCP 平均 12.9 秒，5 个日期参数直接拉到 41.6 秒。</li>
+      <li><strong>贵</strong>：页面渲染占用大量 token，成本 $0.166（单次）→ $0.154（5次），而且 token 消耗还在随页面复杂度线性增长。</li>
+      <li><strong>不稳定</strong>：网站改一次 UI，CSS selector 失效，整个流程就断了，需要人重新配一遍。</li>
+    </ul>
+
+    <div class="callout blue">
+      <strong>核心矛盾</strong>
+      Agent 实际上只需要网站返回的数据（JSON / 结构化文本），但我们却让它把整个浏览器渲染流水线跑完——这是巨大的浪费。
+    </div>
+
+    <h3>API Anything 的解题思路</h3>
+    <p>把网站学下来，存成可复用的 HTTP 操作集。下次 Agent 要数据，填参数直接打请求，跳过浏览器渲染，拿到的就是干净的 JSON。整个过程不需要 LLM 生成任何请求逻辑。</p>
+
+    <h3>为什么不用 LLM 生成请求？</h3>
+    <p>传统的 AI 驱动爬虫让 LLM「看」页面截图或 DOM 后「想象」请求该长什么样——LLM 生成的是猜测，与网站实际接口可能存在偏差（header 缺失、参数名错误、URL 格式不对）。API Anything 的 Learn 阶段直接抓真实流量：它观察的是用户真实发出去的 HTTP 请求，是网站实际在处理的请求，零猜测。</p>
+
+    <div class="callout blue">
+      <strong>两个输入的魔法</strong>
+      Learn 阶段需要两个示例输入（如 <code>query=sqlite</code> 和 <code>query=javascript</code>），系统通过对比两个请求的差异，自动识别出「跟着输入变的参数」和「不变的固定部分」，从而提炼出带槽位的模板。这一步完全不依赖 LLM。
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 2: 是什么 ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">②</span>API Anything 是什么</h2>
+  </div>
+  <div class="section-body">
+    <p>一句话定位：<strong>把网站当 API 调，不再叫浏览器。</strong></p>
+
+    <p>API Anything（goodnight000/api-anything，502★ / MIT / TypeScript）是本地 CLI + MCP Server，核心能力是「教 Agent 认识一个网站」，之后 Agent 可以像调用 REST API 一样直接发 HTTP 请求拿到结构化数据，不再需要 Playwright 或任何浏览器驱动。</p>
+
+    <div class="callout purple">
+      <strong>GitHub README 原文</strong>
+      "Turn any website into an API your agent can call. Learns from the site's own frontend, heals itself when the site changes."
+    </div>
+
+    <h3>项目基本信息</h3>
+    <table>
+      <tr><th>字段</th><th>值</th></tr>
+      <tr><td>仓库</td><td>goodnight000/api-anything</td></tr>
+      <tr><td>语言</td><td>TypeScript</td></tr>
+      <tr><td>协议</td><td>MIT</td></tr>
+      <tr><td>Star</td><td>502</td></tr>
+      <tr><td>Fork</td><td>38</td></tr>
+      <tr><td>创建时间</td><td>2026-09-27</td></tr>
+      <tr><td>npm 包</td><td>尚未发布（需从 GitHub 安装）</td></tr>
+    </table>
+
+    <h3>与 Playwright MCP 的根本区别</h3>
+    <table>
+      <tr><th>维度</th><th>Playwright MCP</th><th>API Anything</th></tr>
+      <tr><td>数据获取方式</td><td>驱动浏览器跑完页面，读 DOM</td><td>直接发 HTTP 请求，读 JSON</td></tr>
+      <tr><td>请求生成</td><td>靠 LLM 理解页面，生成操作序列</td><td>从真实流量中提取模板，零 LLM 生成</td></tr>
+      <tr><td>登录态</td><td>每次重新认证</td><td>cookie/token 本地持久化，跨会话复用</td></tr>
+      <tr><td>失效处理</td><td>需人工修复 selector</td><td>自动 re-learn + replay 验证</td></tr>
+      <tr><td>适用场景</td><td>复杂交互 / 无 API 站</td><td>结构化数据查询 / 有请求可学的站</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 3: 核心工作流 ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">③</span>核心工作流：Learn → Call → Repair</h2>
+  </div>
+  <div class="section-body">
+
+    <h3>Step 1 · Learn（学）</h3>
+    <p>用 headless Chrome 对两个示例输入各跑一遍，记录其中「跟着输入变化」的请求段，自动提炼成带槽位的 HTTP 模板。全程不调用 LLM。</p>
+    <div class="callout blue">
+      <strong>关键点：「不叫 LLM 生成」</strong>
+      传统方案让 LLM 看页面后「想象」请求长什么样。API Anything 直接抓真实流量——它观察的是用户真正发出去的 HTTP 请求，不是猜测。这确保了学到的模板与网站实际接口完全一致。
+    </div>
+
+    <pre><code># 添加一个站点 operation
+api-anything add hn-demo links \
+  --trigger 'https://news.ycombinator.com/from?site={domain}' \
+  --example domain=github.com \
+  --example2 domain=github.io
+
+# 添加 Goodreads 搜索（无公开 API，自 2020 年起）
+api-anything add goodreads searchBooks \
+  --trigger 'https://www.goodreads.com/search?q={q}' \
+  --example q=piranesi \
+  --example2 q=harry+potter</code></pre>
+
+    <h3>Step 2 · Call（调）</h3>
+    <p>填槽位发 fetch。如果被目标站 block（403 / captcha），退回 Chrome 页面内发请求。最后手段才是跑页面本身读响应。</p>
+
+    <pre><code># 直接打 HTTP 拿 JSON（示例）
+api-anything call hacker-news search query=sqlite
+
+# 读 Goodreads 书评
+api-anything call goodreads searchBooks q=piranesi
+
+# MCP 调用（Claude Code / Codex）
+# 安装命令直接粘贴给 agent：
+# Set up API Anything for me: &lt;url&gt;</code></pre>
+
+    <h3>Step 3 · Repair（修）</h3>
+    <p>当请求失效时，自动 re-learn（重新跑一遍页面流程），replay（重放验证），通过才保存新版本。防止「修坏了」——错误的新模板不会被保存。</p>
+
+    <div class="callout orange">
+      <strong>Repair 的局限</strong>
+      Repair 无法解 CAPTCHA。如果 re-learn 过程中遇到人机验证，流程会中断，需要人工介入。
+    </div>
+
+    <h3>Map from Intent（全自动流程）</h3>
+    <p>通过 skill 驱动，Agent 可自动完成「问用户意图 → 提议操作等审批 → scout 各页面 → 构建并验证 operation」全流程，无需手动编写触发条件。</p>
+
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 4: 基准数据 ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">④</span>基准实测：Google Flights 任务对比</h2>
+  </div>
+  <div class="section-body">
+    <p>同 agent（Claude Opus 5.5）、同 prompt，分别用 API Anything 和 Playwright MCP 完成 Google Flights 查询任务：</p>
+
+    <table>
+      <tr><th>任务</th><th>指标</th><th>API Anything</th><th>Playwright MCP</th><th>胜出</th></tr>
+      <tr>
+        <td rowspan="2">1 个日期查询</td>
+        <td>耗时</td><td class="highlight">8.4s</td><td>12.9s</td><td class="highlight">快 35%</td>
+      </tr>
+      <tr>
+        <td>成本</td><td class="highlight">$0.074</td><td>$0.166</td><td class="highlight">省 55%</td>
+      </tr>
+      <tr>
+        <td rowspan="2">5 个日期查询</td>
+        <td>耗时</td><td class="highlight">21.1s</td><td>41.6s</td><td class="highlight">快 49%</td>
+      </tr>
+      <tr>
+        <td>成本</td><td class="highlight">$0.152</td><td>$0.154</td><td>持平</td>
+      </tr>
+    </table>
+
+    <ul>
+      <li>5 次任务全部答对（0 幻觉率）</li>
+      <li>token 消耗：API Anything 比 Playwright MCP 减少约 50%</li>
+      <li>多参数场景优势更明显（49% vs 35% 提速）</li>
+    </ul>
+
+    <div class="callout green">
+      <strong>❓ 待验证数据（README 单次示例，非平均数）</strong>
+      Goodreads 场景「6.3 分钟 / $1.19」为单次操作示例，不代表平均成本；尚未有大样本基准数据支撑。
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 5: MCP 接入 ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">⑤</span>MCP 接入：Claude Code / Codex 一条命令安装</h2>
+  </div>
+  <div class="section-body">
+    <p>Claude Code 和 Codex 支持直接接入 MCP Server。API Anything 提供 MCP 接入能力，把下面这条命令粘贴给 agent 即可完成安装：</p>
+
+    <pre><code># 直接发给 agent 的安装指令
+Set up API Anything for me: &lt;mcp-server-url&gt;
+
+# 之后 agent 即可直接调用：
+api-anything call &lt;operation-name&gt; &lt;param1&gt;=&lt;value1&gt; &lt;param2&gt;=&lt;value2&gt;</code></pre>
+
+    <h3>CLI 命令速查</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th></tr>
+      <tr><td><code>api-anything add &lt;name&gt; &lt;op&gt;</code></td><td>添加站点 operation（触发 Learn 流程）</td></tr>
+      <tr><td><code>api-anything call &lt;name&gt; &lt;op&gt;</code></td><td>调用已有 operation，填参数发请求</td></tr>
+      <tr><td><code>api-anything map</code></td><td>Map from Intent：自动扫描页面构建 operation</td></tr>
+    </table>
+
+    <div class="callout purple">
+      <strong>MCP 协议</strong>
+      MCP（Model Context Protocol）是 Anthropic 推出的 Agent 与工具之间的通信协议，Claude Code / Codex 原生支持。API Anything 作为 MCP Server 接入后，Agent 无需额外配置即可调用。
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 6: Sessions & Logins ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">⑥</span>Sessions &amp; Logins：跨会话复用登录态</h2>
+  </div>
+  <div class="section-body">
+    <p>很多网站需要登录才能访问数据。API Anything 支持 cookie / token 本地持久化，存在 <code>~/.api-anything/</code> 目录，跨会话复用登录态。</p>
+
+    <div class="callout green">
+      <strong>凭证存储机制</strong>
+      凭证以引用方式存储在 spec 中（不直接存明文值），后续请求自动带上 Cookie / Authorization header，无需每次重新登录。
+    </div>
+
+    <h3>与 Playwright MCP 的对比</h3>
+    <ul>
+      <li>Playwright MCP：每次任务都要重新走登录流程（或维护复杂 session 状态）</li>
+      <li>API Anything：学一次登录态，全局复用；新增 operation 时自动继承已有 session</li>
+    </ul>
+
+    <h3>已测试支持场景</h3>
+    <ul>
+      <li>Goodreads 搜索 / 书籍详情 / 作者 / 书评（4 个 operation）</li>
+      <li>Hacker News 搜索</li>
+      <li>Google Flights 查询</li>
+    </ul>
+
+    <h3>使用流程示例：Goodreads 搜索书籍</h3>
+    <pre><code># 一次性学习（Learn）
+api-anything add goodreads searchBooks \
+  --trigger 'https://www.goodreads.com/search?q={q}' \
+  --example q=piranesi \
+  --example2 q=harry+potter
+
+# 之后直接调用（Call），无需再开浏览器
+api-anything call goodreads searchBooks q=piranesi
+# → 返回 JSON：{hits: [{title, author, rating, ...}], nbHits: 12}</code></pre>
+
+    <div class="callout red">
+      <strong>安全注意</strong>
+      凭证存于本地 <code>~/.api-anything/</code>，请在使用前阅读各目标网站的服务条款。使用前读各站点服务条款。
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 7: 局限 ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">⑦</span>诚实清单：已知局限</h2>
+  </div>
+  <div class="section-body">
+    <p>README 自述的局限性，评估是否影响你的使用场景：</p>
+
+    <table>
+      <tr><th>局限项</th><th>说明</th><th>影响评估</th></tr>
+      <tr>
+        <td>Repair 可能失败</td>
+        <td>re-learn 遇到 CAPTCHA 时无法自动解算，需人工介入</td>
+        <td>高（频繁改版的站点维护成本高）</td>
+      </tr>
+      <tr>
+        <td>无 CAPTCHA 解算</td>
+        <td>人机验证场景无法自动绕过</td>
+        <td>中（大多数数据查询站影响小）</td>
+      </tr>
+      <tr>
+        <td>写操作需 --allow-writes</td>
+        <td>LinkedIn messaging 等写操作未充分测试，需显式开启</td>
+        <td>中（读操作不受影响）</td>
+      </tr>
+      <tr>
+        <td>HTTP 2xx ≠ 送达</td>
+        <td>请求返回 200 不代表消息真的送到了（如 LinkedIn 发送成功确认）</td>
+        <td>高（写操作需额外验证）</td>
+      </tr>
+      <tr>
+        <td>本地工具，非托管 API</td>
+        <td>使用你的机器/网络/会话，无第三方保障</td>
+        <td>低（纯本地使用无影响）</td>
+      </tr>
+      <tr>
+        <td>只知道你教过的 operation</td>
+        <td>不支持站点的所有功能，只能调用学过的那些</td>
+        <td>低（按需学习，按需使用）</td>
+      </tr>
+      <tr>
+        <td>凭证本地存储</td>
+        <td>~/.api-anything 目录，需注意权限和备份</td>
+        <td>低（本地工具正常风险）</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 8: 上手指南 ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">⑧</span>上手路径：从安装到第一个调用</h2>
+  </div>
+  <div class="section-body">
+
+    <h3>环境要求</h3>
+    <ul>
+      <li><strong>Node.js 22.13+</strong>（不支持 npm 11 全局安装 <code>github:</code> 格式）</li>
+      <li>包尚未发布 npm registry，需从 GitHub 安装</li>
+    </ul>
+
+    <h3>安装步骤</h3>
+    <pre><code># 方式一：手动安装
+git clone https://github.com/goodnight000/api-anything.git
+cd api-anything
+npm ci
+npm install -g
+
+# 方式二：直接发给 Claude Code / Codex（推荐）
+# Set up API Anything for me: &lt;mcp-server-url&gt;</code></pre>
+
+    <h3>第一个调用示例</h3>
+    <pre><code># 学习 Hacker News 站点
+api-anything add hacker-news search \
+  --trigger 'https://hn.algolia.com/?q={query}' \
+  --example query=sqlite \
+  --example2 query=javascript
+
+# 调用（返回 JSON）
+api-anything call hacker-news search query=sqlite
+
+# 预期返回格式示例：
+# {"hits":[{"title":"...","url":"...","author":"..."}],"nbHits":42}</code></pre>
+
+    <h3>快速上手清单</h3>
+    <ul>
+      <li>✅ 安装 Node 22.13+</li>
+      <li>✅ <code>git clone</code> → <code>npm ci</code> → <code>npm install -g</code></li>
+      <li>✅ 跑 <code>api-anything add</code> 学一个你常用的网站</li>
+      <li>✅ 跑 <code>api-anything call</code> 验证返回 JSON</li>
+      <li>✅ 如果 Claude Code / Codex 可用，直接发 MCP 安装指令</li>
+    </ul>
+
+    <h3>适用场景判断</h3>
+    <table>
+      <tr><th>场景</th><th>推荐工具</th><th>原因</th></tr>
+      <tr>
+        <td>网站有公开 API / JSON endpoint</td>
+        <td>直接调 API</td>
+        <td>最简单稳定，无需额外工具</td>
+      </tr>
+      <tr>
+        <td>网站无 API 但有可学习的 HTTP 请求</td>
+        <td><strong>API Anything</strong></td>
+        <td>Learn → Call，零 LLM 生成，速度快</td>
+      </tr>
+      <tr>
+        <td>需要处理复杂 JS 渲染 / CAPTCHA</td>
+        <td>Playwright MCP</td>
+        <td>完整浏览器环境，可解 CAPTCHA（需额外方案）</td>
+      </tr>
+      <tr>
+        <td>需要截图 / PDF 生成 / 表单交互</td>
+        <td>Playwright MCP</td>
+        <td>完整渲染流水线，API Anything 不支持</td>
+      </tr>
+    </table>
+
+  </div>
+</div>
+
+<!-- ═══════════════ SECTION 9: 术语表 ═══════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2><span class="tag">⑨</span>术语表</h2>
+  </div>
+  <div class="section-body">
+    <table>
+      <tr><th>术语</th><th>含义</th></tr>
+      <tr>
+        <td><strong>MCP</strong></td>
+        <td>Model Context Protocol，Anthropic 推出的 Agent 与工具之间的通信协议，让 Agent 可以调用外部工具（类似 Tool Use / Function Calling，但更标准化）</td>
+      </tr>
+      <tr>
+        <td><strong>Learn</strong></td>
+        <td>API Anything 的第一步：用 headless Chrome 对两个示例输入各跑一遍，观察实际发出的 HTTP 请求，提炼出带槽位的模板</td>
+      </tr>
+      <tr>
+        <td><strong>Template（模板）</strong></td>
+        <td>从真实请求中提取的 HTTP 骨架，包含固定部分（URL 前缀、header）和可变部分（槽位）。模板是网站实际接口的忠实复制，不是 LLM 生成的猜测</td>
+      </tr>
+      <tr>
+        <td><strong>Slot（槽位）</strong></td>
+        <td>模板中用 <code>{参数名}</code> 表示的可变占位符。Call 时填入具体值，生成最终请求。如 <code>--trigger 'https://hn.algolia.com/?q={query}'</code> 中 <code>{query}</code> 即为槽位</td>
+      </tr>
+      <tr>
+        <td><strong>Call</strong></td>
+        <td>API Anything 的第二步：填槽位发 fetch 请求，拿到 JSON 数据。被 block 时退回 Chrome 页面内发</td>
+      </tr>
+      <tr>
+        <td><strong>Repair</strong></td>
+        <td>API Anything 的第三步：请求失效时自动 re-learn + replay 验证，通过才保存新模板，防止修坏</td>
+      </tr>
+      <tr>
+        <td><strong>replay（重放）</strong></td>
+        <td>用新学到的模板重新跑一遍请求，验证返回值是否正确。只有 replay 通过才保存，防止返回他人数据或空响应</td>
+      </tr>
+      <tr>
+        <td><strong>headless Chrome</strong></td>
+        <td>无头浏览器：没有可视化界面的 Chrome，可编程控制页面行为、捕获网络请求。API Anything 用 headless Chrome 来执行 Learn 流程中的页面操作</td>
+      </tr>
+      <tr>
+        <td><strong>Sessions 本地存储</strong></td>
+        <td>cookie / token 等会话凭证存于 <code>~/.api-anything/</code> 目录，跨会话复用登录态。以引用方式存储 spec，不直接存明文值</td>
+      </tr>
+      <tr>
+        <td><strong>Map from Intent</strong></td>
+        <td>skill 驱动的全自动流程：Agent 问用户意图 → 提议操作等审批 → scout 各页面 → 构建并验证 operation，无需手动编写触发条件</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<div class="footnote">
+  <div class="footnote-body">
+    <strong>来源</strong>
+    X 推文 @QingQ77（Geek Lite，25,588 followers），<a href="https://x.com/QingQ77/status/2109167110488227860" style="color:inherit;text-decoration:none">推文原文</a>，2026-10-11 · GitHub 实抓 goodnight000/api-anything，502★/MIT/TypeScript，创建 2026-09-27，2026-10-11
+    <br>基准数据来源：GitHub README（Google Flights 任务，同 Claude Opus 5.5）
+    <br>❓ 标记数据为未充分验证的单次示例，不代表平均值。
+  </div>
+</div>
+
+</div>
+</body>
+</html>
