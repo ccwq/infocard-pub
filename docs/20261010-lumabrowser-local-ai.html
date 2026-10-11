@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="codex-notebook">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f1e8">
+  <title>LumaBrowser — 本地 AI 全家桶 + agent 专用标签页的浏览器</title>
+  <style>
+    :root{
+      --bg:#f5f1e8;--paper:#fffaf0;--paper-2:#fff2d6;--ink:#1f1a16;--muted:#6d645a;--line:#2a241f;
+      --red:#e24b3b;--green:#77bf52;--yellow:#f4d35e;--blue:#9fc7ef;--pink:#f5b7cd;--orange:#f2a65a;
+      --shadow:5px 5px 0 rgba(42,36,31,.95);
+      --max:1180px;
+    }
+    *{box-sizing:border-box} html,body{margin:0;padding:0;overflow-x:hidden}
+    body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.72;text-rendering:optimizeLegibility}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.22;background-image:repeating-linear-gradient(0deg, rgba(42,36,31,.08) 0 1px, transparent 1px 28px),repeating-linear-gradient(90deg, rgba(42,36,31,.05) 0 1px, transparent 1px 28px);mix-blend-mode:multiply}
+    a{color:inherit;text-decoration:none}
+    code,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;background:#f1f0e8;padding:1px 5px;border:1px solid #d5d0c6}
+    .page{width:min(var(--max),calc(100% - 24px));margin:0 auto;padding:18px 0 54px;position:relative;z-index:1}
+    .card{background:var(--paper);border:2.5px solid var(--line);box-shadow:var(--shadow)}
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:14px;padding:16px;margin-bottom:14px;background:linear-gradient(180deg,#fff7e7 0%, #fff0d8 100%)}
+    .title{font:900 clamp(24px,3.8vw,48px)/.98 Georgia,"PingFang SC","Microsoft YaHei",serif;margin:0 0 8px;letter-spacing:-.03em}
+    .title .red{color:var(--red)}
+    .banner{display:inline-block;padding:6px 10px;background:#222;color:#fff;box-shadow:4px 4px 0 var(--line);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;margin:4px 0 10px}
+    .lead{margin:0 0 12px;font-size:13.5px;line-height:1.8;color:var(--muted);max-width:58ch}
+    .sticker-row{display:flex;flex-wrap:wrap;gap:8px}
+    .sticker{padding:5px 9px;border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff;white-space:nowrap}
+    .sticker.red{background:#ffe1dc}.sticker.green{background:#e5f6d8}.sticker.yellow{background:#fff0a8}.sticker.blue{background:#d8ecff}.sticker.pink{background:#f8d6e7}
+    .spiral{position:relative;background:var(--paper);border:2.5px solid var(--line);box-shadow:var(--shadow);padding:14px 14px 16px;overflow:hidden}
+    .spiral::before{content:"";position:absolute;left:-1px;top:-1px;bottom:-1px;width:20px;background:linear-gradient(180deg,#d9d2c6 0 100%);border-right:2px solid var(--line);background-image:radial-gradient(circle at 50% 18px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 42px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 66px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 90px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 114px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 138px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 162px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 186px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 210px, #fff 0 4px, transparent 4px),radial-gradient(circle at 50% 234px, #fff 0 4px, transparent 4px);background-size:20px 24px}
+    .spiral-content{margin-left:30px}
+    .pin{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);background:#f5ffd5;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+    .pin::before{content:"📎"}
+    .section-grid{display:grid;grid-template-columns:1fr 1.12fr;gap:14px;margin-bottom:14px}
+    .stack{display:grid;gap:10px}
+    .note{position:relative;padding:12px 12px 12px 13px;border:2px solid var(--line);box-shadow:4px 4px 0 var(--line)}
+    .note::after{content:"";position:absolute;right:10px;top:10px;width:12px;height:12px;border-radius:50%;background:rgba(42,36,31,.12)}
+    .note h3{margin:0 0 6px;font:900 14px/1.18 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .note p{margin:0;font-size:12.8px;line-height:1.6;color:#463f36}
+    .note .ico{font-size:22px;line-height:1;margin-bottom:6px}
+    .note.yellow{background:#fff0a8}.note.green{background:#e8f5cc}.note.pink{background:#f9d9e6}.note.blue{background:#d8ecff}.note.orange{background:#ffe1c3}
+    .preview{display:grid;gap:10px;padding:14px;background:var(--paper)}
+    .preview-head{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .preview-head b{font:900 18px/1.1 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .preview-head span{padding:5px 8px;border:2px solid var(--line);background:#fff;box-shadow:3px 3px 0 var(--line);font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
+    .preview-box{padding:12px;border:2px solid var(--line);background:#fff;box-shadow:3px 3px 0 var(--line)}
+    .preview-box h4{margin:0 0 8px;font-size:13.5px;line-height:1.2}.preview-box p,.preview-box li{margin:0;font-size:12.4px;line-height:1.6;color:#403832}.preview-box ul{margin:0;padding-left:18px}
+    .preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .mini b{display:block;margin-bottom:5px;font-size:12.4px}.mini code{display:block;margin-top:6px;padding:6px 8px;background:#f1f3f5;border:1px solid #d5d8df;white-space:pre-wrap;font-size:11.5px}
+    .benefits{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;background:#fff8ea;margin-bottom:14px}
+    .benefit{padding:10px 11px;border:2px dashed var(--line);background:#fff}
+    .benefit b{color:var(--green)}
+    .benefit p{margin:4px 0 0;font-size:12.5px;line-height:1.6;color:#463f36}
+    .footer{padding:12px 14px;background:#de3a31;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;box-shadow:var(--shadow)}
+    .footer strong{font:900 18px/1.1 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .footer .tag{padding:4px 8px;border:2px solid rgba(255,255,255,.9);font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
+    .doodles{position:absolute;inset:auto 14px 14px auto;font-size:26px;opacity:.9}
+    .hero-side{display:grid;gap:10px;align-content:start}
+    .hero-side .chip{justify-self:end}
+    .chips-row{display:flex;flex-wrap:wrap;gap:8px}
+    .chips-row span{padding:5px 8px;border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff}
+    .quote{margin-top:10px;padding:10px 12px;border:2px solid var(--line);background:#fffef7;box-shadow:3px 3px 0 var(--line);font:700 13px/1.65 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .quote em{font-style:normal;color:var(--red)}
+
+    /* progressive-doc sections */
+    .prog-section{margin-bottom:14px}
+    .prog-section .section-header{padding:10px 14px;background:#2a241f;color:#fff;font:900 15px/1.2 Georgia,"PingFang SC","Microsoft YaHei",serif;display:flex;align-items:center;gap:8px}
+    .prog-section .section-header span{font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:rgba(255,255,255,.2);padding:2px 7px;border:1px solid rgba(255,255,255,.5)}
+    .prog-section .section-body{padding:14px;background:var(--paper);border:2.5px solid var(--line);border-top:none;box-shadow:5px 5px 0 rgba(42,36,31,.95)}
+    .prog-section .section-body h4{margin:0 0 8px;font:900 13px/1.3 Georgia,"PingFang SC","Microsoft YaHei",serif;color:var(--ink);border-bottom:2px solid var(--yellow);padding-bottom:4px;display:inline-block}
+    .prog-section .section-body p{margin:0 0 10px;font-size:13px;line-height:1.75;color:#3a3328}
+    .cmd{display:block;background:#1e1b16;color:#f0ede4;padding:8px 12px;margin:6px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.6;border-left:3px solid var(--yellow);overflow-x:auto}
+    .cmd::before{content:"$ ";color:#f4d35e;font-weight:700}
+    .cmd-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;align-items:center}
+    .cmd-row code{background:#1e1b16;color:#f0ede4;border:none;padding:3px 8px;font-size:12px;border-left:3px solid var(--yellow)}
+    .tip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:#e8f5cc;border:2px solid #77bf52;font-size:12px;line-height:1.5;color:#2d4a1e;font-weight:700}
+    .warn{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:#fff0a8;border:2px solid #e8a800;font-size:12px;line-height:1.5;color:#5a3d00;font-weight:700}
+    .fact{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;background:#d8ecff;border:2px solid #4a9eda;font-size:12px;color:#1a3a5c;font-weight:700}
+    .unknown{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#ffe1dc;border:2px solid #e24b3b;font-size:12px;color:#7a1a0e;font-weight:700}
+    table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.8px}
+    th{background:#2a241f;color:#fff;padding:7px 10px;text-align:left;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+    td{padding:7px 10px;border-bottom:1px solid #e8e0d0;vertical-align:top}
+    tr:nth-child(even) td{background:#fdf9f0}
+    ul{margin:6px 0;padding-left:20px}
+    ul li{margin-bottom:4px;font-size:12.8px;line-height:1.65;color:#3a3328}
+    .tag-inline{display:inline-block;padding:3px 7px;background:#f1f0e8;border:1px solid #c8c0b0;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:2px}
+    .badge{display:inline-block;padding:2px 7px;font-size:11px;font-weight:800;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em;border:1.5px solid var(--line);box-shadow:2px 2px 0 var(--line)}
+    .badge.green{background:#e5f6d8}.badge.yellow{background:#fff0a8}.badge.blue{background:#d8ecff}.badge.red{background:#ffe1dc}.badge.orange{background:#ffe1c3}.badge.pink{background:#f8d6e7}
+    .src-row{padding:10px 14px;background:#f8f5ef;border-top:2px solid var(--line);font-size:12px;color:#6d645a;line-height:1.6}
+    .src-row a{color:#2a5fa8;text-decoration:underline}
+
+    @media (max-width:1080px){.hero,.section-grid,.benefits,.preview-grid{grid-template-columns:1fr}.hero-side .chip{justify-self:start}}
+    @media (max-width:720px){.page{width:min(100% - 14px,var(--max));padding:10px 0 28px}.hero{padding:12px}.spiral-content{margin-left:24px}.spiral::before{width:16px}.note,.preview,.benefit,.preview-box,.prog-section .section-body{box-shadow:3px 3px 0 var(--line)}.benefits{grid-template-columns:1fr}.footer{flex-direction:column;align-items:flex-start}.footer strong{font-size:16px}.prog-section .section-body{padding:10px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- HERO -->
+    <section class="hero card">
+      <div>
+        <div class="banner">LumaBrowser · AGPL-3.0 · 86★ on GitHub</div>
+        <h1 class="title">本地 AI 全家桶，<span class="red">一个浏览器装完</span></h1>
+        <p class="lead">把 ollama / llama.cpp / 聊天页 / 语音栈 / agent 无头浏览器全部收进一个桌面应用。先读显卡，下载前告诉你每个模型能不能跑、大概多快。Agent 开自己的标签页读网页，你的标签页不受影响。</p>
+        <div class="sticker-row">
+          <span class="sticker yellow">免费 · 本机运行 · AGPL-3.0</span>
+          <span class="sticker green">macOS Apple Silicon / Windows / Linux</span>
+          <span class="sticker red">GPU 感知模型管理</span>
+          <span class="sticker blue">MCP / WebDriver / CDP 三路接入</span>
+        </div>
+      </div>
+      <div class="hero-side">
+        <div class="pin chip">核心差异化</div>
+        <div class="quote">外部 agent 永远看不到你的标签页。<br>显存智能分配，多卡多机拆分。</div>
+        <div class="chips-row">
+          <span>llama.cpp 运行时</span><span>显存 KV cache 定尺寸</span><span>MoE 专家移 CPU</span><span>本地 API 双格式</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEC 01: 引入 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 01<span>引入</span></div>
+      <div class="section-body">
+        <h4>本地 AI 零碎一堆，折腾到崩溃？</h4>
+        <p>跑本地 AI 通常要装一堆独立工具：模型服务器（ollama / llama.cpp）、聊天 UI、图像生成器、语音栈、agent 无头浏览器。每个工具配一套配置，互相之间没有关联，显存也不知道怎么分配。</p>
+        <p>LumaBrowser 想做的是：<strong>用一个 Chromium 系浏览器，把上面所有东西打包进来，统一管理，统一调度。</strong></p>
+        <div class="cmd-row">
+          <code>npx lumabrowser start</code>
+          <span class="badge yellow">Node 18+ 即可，无需手动安装依赖</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEC 02: 是什么 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 02<span>LumaBrowser 是什么</span></div>
+      <div class="section-body">
+        <h4>浏览器 + 本地 AI 栈一体化应用</h4>
+        <p>一个跑在你机器上的 Chromium 系浏览器，内置 GPU 感知的 LLM 运行时、聊天与 agent 界面、本地图像/视频/音乐/语音生成，以及浏览器自动化接口，供 Claude Code / Codex / Cline / OpenCode 直接驱动。</p>
+        <table>
+          <tr><th>维度</th><th>内容</th></tr>
+          <tr><td>开源协议</td><td>AGPL-3.0（修改需开源，商业许可可单独购买）</td></tr>
+          <tr><td>GitHub</td><td>amurgola/LumaBrowser，86★（实抓 2026-10-11）</td></tr>
+          <tr><td>费用</td><td>免费，本机运行，无云端依赖</td></tr>
+          <tr><td>支持平台</td><td>macOS Apple Silicon · Windows x64 · Linux AppImage</td></tr>
+          <tr><td>浏览器核心</td><td>Chromium（标签页/历史/书签/Ghostery 广告拦截/支持未打包 Chrome 扩展）</td></tr>
+          <tr><td>启动方式</td><td>下载安装包，或 <code style="background:#f1f0e8;padding:1px 5px">npx lumabrowser start</code>（Node 18+）</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- SEC 03: GPU 感知模型管理 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 03<span>GPU 感知模型管理</span></div>
+      <div class="section-body">
+        <h4>下载前知道能不能跑 · 直挂已有缓存不重下</h4>
+        <p>Models 页面读取你的硬件配置，在每个模型前显示 <span class="badge green">✓ FIT</span> 或 <span class="badge red">✗ NO</span> 徽章，同时预测 token/s 速度。不用猜显存够不够，下载之前就告诉你。</p>
+        <ul>
+          <li><strong>fit 徽章 + 预测速度</strong>：下载前预判能否运行、跑多快</li>
+          <li><strong>直挂已有模型</strong>：LM Studio / Ollama / Hugging Face 缓存直接链接，不用重新下载</li>
+          <li><strong>llama.cpp 多运行时</strong>：CPU / CUDA 12 / CUDA 13 / Vulkan / Apple Silicon MLX</li>
+          <li><strong>显存智能分配</strong>：按显存定 KV cache 尺寸；选 full / partial / CPU offload；MoE 专家更快时移 CPU</li>
+          <li><strong>多 GPU / 多机拆分</strong>：单模型跨多 GPU，或经 llama.cpp RPC 跨机器拆分（❓多机延迟数据未实证）</li>
+        </ul>
+        <div class="cmd">npx lumabrowser start
+# → 打开 Models 页面
+# → 搜索 Hugging Face 模型或链接 LM Studio/Ollama/HF 缓存
+# → 每个模型显示 fit 徽章 + 预测 token/s</div>
+      </div>
+    </div>
+
+    <!-- SEC 04: agent 标签页隔离 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 04<span>agent 标签页隔离</span></div>
+      <div class="section-body">
+        <h4>agent 开自己的标签页读网页 · 你的标签页不受影响</h4>
+        <p>当 agent（Claude Code / Codex / Cline / OpenCode）通过 MCP 驱动浏览器时，它只能看到自己创建的标签页，<strong>永远看不到用户的标签页</strong>。这是安全设计，不是 bug。</p>
+        <div class="tip">✅ 你的登录态、Cookie、书签——外部 agent 一律不可见</div>
+        <p>示例任务：</p>
+        <div class="cmd">搜 llama.cpp 最新 release 告诉我改了什么</div>
+        <p>→ agent 开自己的标签页读取网页，解析内容，回答你的问题。操作过程对你的标签页零干扰。</p>
+        <ul>
+          <li><strong>用户标签页隔离</strong>：MCP/WebDriver/CDP 客户端只见自动化创建的标签页</li>
+          <li><strong>选择器容错</strong>：页面元素变化导致选择器失配时，可让 LLM 重新解析（❓具体 prompt 格式未实抓）</li>
+          <li><strong>Dashboard</strong>：聊天与扩展的实时 widget 网格，可同时观察 agent 行为</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SEC 05: 三路接入 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 05<span>MCP / WebDriver / CDP 三路接入</span></div>
+      <div class="section-body">
+        <h4>MCP（Settings 自动写入）/ WebDriver 9515 / CDP 9222 / REST 3000</h4>
+        <p>本地 API 同时说 OpenAI 和 Anthropic 两种格式，无需来回切换适配器。</p>
+        <table>
+          <tr><th>接口</th><th>端口</th><th>默认</th><th>说明</th></tr>
+          <tr><td>MCP</td><td>3000</td><td>需开启</td><td>Settings 一键写入 Claude Code / Cline / Codex / OpenCode 配置</td></tr>
+          <tr><td>WebDriver</td><td>9515</td><td>关</td><td>Selenium 驱动，W3C 协议</td></tr>
+          <tr><td>CDP</td><td>9222</td><td>关</td><td>Puppeteer / Playwright 原生协议</td></tr>
+          <tr><td>REST API</td><td>3000</td><td>无 key</td><td>默认无认证，暴露前须设 key</td></tr>
+          <tr><td>本地模型 API</td><td>8317</td><td>可选</td><td>OpenAI + Anthropic 双格式，同时兼容 LM Studio / Ollama / vLLM</td></tr>
+        </table>
+        <p>MCP 配置示例（Settings 自动写入，也可手动配置）：</p>
+        <div class="cmd">{
+  "mcpServers": {
+    "luma-browser": {
+      "command": "node",
+      "args": ["&lt;install dir&gt;/resources/app.asar.unpacked/mcp-server.js"],
+      "env": { "LUMA_API_PORT": "3000" }
+    }
+  }
+}</div>
+        <p>WebDriver 示例（Selenium）：</p>
+        <div class="cmd">driver = webdriver.Remote("http://127.0.0.1:9515", options=options)</div>
+        <p>CDP 示例（Puppeteer）：</p>
+        <div class="cmd">const browser = await puppeteer.connect({ browserURL: 'http://127.0.0.1:9222' });</div>
+        <div class="warn">⚠️ REST API 默认无 key：暴露到局域网/互联网前务必在 Settings 中设置 API key</div>
+      </div>
+    </div>
+
+    <!-- SEC 06: 硬件分档表 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 06<span>硬件分档表</span></div>
+      <div class="section-body">
+        <h4>&lt;8GB / 8–24GB / 24GB+ · 多卡不叠加（LLM 例外）</h4>
+        <table>
+          <tr><th>档位</th><th>显存</th><th>能跑什么</th><th>说明</th></tr>
+          <tr><td><span class="badge yellow">笔记本档</span></td><td>&lt;8GB 或无 GPU</td><td>小模型 + 语音识别 + TTS</td><td>图像生成需 8GB，CPU 构建可用所有运行时</td></tr>
+          <tr><td><span class="badge orange">游戏档</span></td><td>8–24 GB</td><td>中模型 + 图像生成（SDXL/FLUX 等）</td><td>涵盖 RTX 3060–4090 区间</td></tr>
+          <tr><td><span class="badge green">高端档</span></td><td>24GB+ 或 Mac 32GB+</td><td>大模型 + 视频生成</td><td>音乐生成约需 34GB 显存</td></tr>
+        </table>
+        <p>档位取最大单卡显存（多卡不叠加，LLM 例外可跨卡拆分）。</p>
+        <h4>GPU 矩阵</h4>
+        <table>
+          <tr><th>GPU</th><th>支持情况</th><th>备注</th></tr>
+          <tr><td>NVIDIA CUDA 12</td><td><span class="badge green">✅ 支持</span></td><td>Windows/Linux，RTX 50 推荐 CUDA 13</td></tr>
+          <tr><td>NVIDIA CUDA 13</td><td><span class="badge green">✅ 支持</span></td><td>RTX 50 系列推荐</td></tr>
+          <tr><td>NVIDIA Vulkan</td><td><span class="badge green">✅ 支持</span></td><td>Linux 备选</td></tr>
+          <tr><td>AMD / Intel</td><td><span class="badge yellow">⚡ Vulkan</span></td><td>Windows + Linux；暂无 ROCm 后端</td></tr>
+          <tr><td>Apple Silicon MLX</td><td><span class="badge blue">🍎 MLX</span></td><td>LLM 用 MLX；图像生成走 CPU</td></tr>
+          <tr><td>无 GPU</td><td><span class="badge yellow">💻 CPU</span></td><td>所有运行时均有 CPU 构建</td></tr>
+        </table>
+        <div class="tip">💡 显存估算技巧：LLM 每 1B 参数约需 2GB（量化后），图像生成 SDXL 约 8GB，FLUX.1 Schnell 约 12GB，音乐 MiniMax-Music3 约 34GB</div>
+      </div>
+    </div>
+
+    <!-- SEC 07: 进阶全家桶 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 07<span>进阶全家桶</span></div>
+      <div class="section-body">
+        <h4>语音克隆 / 子 agent / Code mode / Tool Forge / 自动化触发 / 设备共享 / 扩展体系</h4>
+        <table>
+          <tr><th>功能模块</th><th>详情</th></tr>
+          <tr><td><strong>语音</strong></td><td>Kokoro / Pocket TTS / Piper 音色 + Chatterbox 声音克隆；Parakeet / Qwen3-ASR / whisper.cpp 语音识别</td></tr>
+          <tr><td><strong>图像</strong></td><td>FLUX.1 Schnell / FLUX.2 klein / Qwen-Image / Qwen-Image-Edit / Z-Image Turbo / Chroma / SDXL / SD 1.5（支持 LoRA）</td></tr>
+          <tr><td><strong>视频</strong></td><td>Wan 2.2（文生视频/图生视频）/ LTX-Video / AniSora / MiniMax-H3</td></tr>
+          <tr><td><strong>音乐</strong></td><td>MiniMax-Music3（CUDA/Linux/WSL2，约 34GB 显存）</td></tr>
+          <tr><td><strong>命名子 agent</strong></td><td>各自 prompt / 工具 / 模型 / 知识，可从聊天 / API / MCP 调用</td></tr>
+          <tr><td><strong>Code mode</strong></td><td>coding agent，驱动 luma CLI 与 IDE 插件（VS Code / Cursor / Windsurf / VSCodium / JetBrains），可写并热装 LumaBrowser 扩展</td></tr>
+          <tr><td><strong>Tool Forge</strong></td><td>agent 自己写 / 测 / 发布沙箱化工具（只拿声明了的网络权限）</td></tr>
+          <tr><td><strong>PDF 知识库</strong></td><td>BM25 + 可选 embeddings 检索（❓具体 embedding 模型未标注）</td></tr>
+          <tr><td><strong>自动化触发</strong></td><td>网页通知→webhook；监视页面/元素变化→通知；URL 模式捕获网络响应；定时 AI 任务（响应 schema + 结果 webhook）；ntfy 推手机</td></tr>
+          <tr><td><strong>设备共享</strong></td><td>模型/图像语音生成/agents/(可选)GPU 分享给其他设备（PIN 配对/mDNS/固定 TLS）；局域网 PWA；标签页直播分享链接（可观看或接管）</td></tr>
+          <tr><td><strong>扩展体系</strong></td><td>核心以上皆扩展，manifest.js + main.js 自写，可加路由/MCP 工具/UI</td></tr>
+        </table>
+        <p>MCP 外部接入：stdio / streamable HTTP / SSE 三种协议均支持。</p>
+        <div class="cmd">LUMA_VNC_PASSWORD=change-me docker compose up -d
+# → http://localhost:6080  noVNC 桌面
+# → http://localhost:3000  REST API + MCP 代理
+# GPU 加速在容器内不可用（❓vGPU 方案未实抓）</div>
+      </div>
+    </div>
+
+    <!-- SEC 08: 隐私与安全 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 08<span>隐私与安全实账</span></div>
+      <div class="section-body">
+        <h4>什么数据离开你的机器 · 怎么关</h4>
+        <table>
+          <tr><th>离开机器的内容</th><th>发往</th><th>默认</th><th>关闭方式</th></tr>
+          <tr><td>用量 ping（版本/平台/机器 ID）</td><td>lumabyte.com</td><td><span class="badge red">开</span></td><td>Settings → About → Privacy</td></tr>
+          <tr><td>更新检查</td><td>lumabyte.com</td><td><span class="badge red">开</span></td><td>Settings：关闭自动更新检查</td></tr>
+          <tr><td>扩展目录</td><td>lumabyte.com</td><td>仅打开 Extensions 时</td><td>—</td></tr>
+          <tr><td>广告拦截列表</td><td>Ghostery</td><td>按需</td><td>—</td></tr>
+          <tr><td>运行时 / 模型下载</td><td>GitHub / Hugging Face / 模型托管站</td><td>按需</td><td>—</td></tr>
+        </table>
+        <div class="tip">✅ 浏览 / 聊天 / 模型 / 生成媒体 / 文件：100% 本机，零外传</div>
+        <div class="warn">⚠️ 自动化风险：浏览器自动化 = 把浏览器交给 agent。MCP/WebDriver/CDP 客户端能看到的模型数据，背后的 agent 都能看到。只连信任的 agent，保持 API / WebDriver / CDP 端口在 localhost（默认）。</div>
+        <div class="warn">⚠️ 3000 端口 REST API 默认无 key：暴露到不信任的网络前，必须在 Settings 中设 API key。</div>
+        <p>无 feature 依赖用量 ping，关闭后功能完全不受影响。</p>
+      </div>
+    </div>
+
+    <!-- SEC 09: 上手指南 -->
+    <div class="prog-section">
+      <div class="section-header">SEC 09<span>三步上手</span></div>
+      <div class="section-body">
+        <h4>Windows / Linux / macOS / npx · Get started in 10 min</h4>
+        <p><strong>第一步：安装</strong></p>
+        <table>
+          <tr><th>平台</th><th>方式一（安装包）</th><th>方式二（终端）</th></tr>
+          <tr><td>Windows x64</td><td>.exe 安装器 / 便携版</td><td rowspan="3"><code>npx lumabrowser start</code><br>（Node 18+）</td></tr>
+          <tr><td>Linux x64</td><td>AppImage</td></tr>
+          <tr><td>macOS Apple Silicon</td><td>.dmg</td></tr>
+        </table>
+        <p style="margin-top:12px"><strong>第二步：选模型</strong></p>
+        <p>打开 Models 页面 → 系统读取你的 GPU → 每个模型显示 fit 徽章 + 预测 token/s → 搜索 Hugging Face 或链接 LM Studio / Ollama / HF 缓存。</p>
+        <div class="cmd"># 直挂已有模型（不重下）
+# LM Studio → 模型路径填入 LumaBrowser Models 页面
+# Ollama → 自动识别已下载模型
+# Hugging Face 缓存 → 扫描 ~/.cache/huggingface/</div>
+        <p><strong>第三步：给任务</strong></p>
+        <div class="cmd">搜 llama.cpp 最新 release 告诉我改了什么</div>
+        <p>→ agent 开自己的标签页读网页，解析，回答。你的标签页不受影响。</p>
+        <p><strong>Docker noVNC（服务器 / headless）</strong></p>
+        <div class="cmd">LUMA_VNC_PASSWORD=change-me docker compose up -d
+# http://localhost:6080  → 桌面通过浏览器访问
+# http://localhost:3000  → REST API + MCP</div>
+        <div class="fact">❓ Docker 内 GPU 加速：README 明确说明容器内不使用 GPU加速，vGPU 直通方案未在文档中出现</div>
+      </div>
+    </div>
+
+    <!-- SECTION GRID: summary cards -->
+    <section class="section-grid">
+      <aside class="spiral card">
+        <div class="spiral-content">
+          <div class="pin" style="background:#fff0a8;margin-bottom:10px">核心要点速查</div>
+          <div class="stack">
+            <article class="note yellow"><div class="ico">🧠</div><h3>GPU 感知模型管理</h3><p>下载前显示 fit 徽章 + 预测速度，显存智能分配，MoE 专家移 CPU 加速。</p></article>
+            <article class="note green"><div class="ico">🔒</div><h3>agent 标签页隔离</h3><p>外部 agent 永远看不到用户标签页，客户端只见自己创建的标签页。</p></article>
+            <article class="note pink"><div class="ico">🔌</div><h3>三路 agent 接入</h3><p>MCP（Settings 一键配置）/ WebDriver 9515 / CDP 9222；本地 API 8317 双格式。</p></article>
+            <article class="note orange"><div class="ico">📊</div><h3>硬件分档清晰</h3><p>&lt;8GB 语音/小模型；8–24GB 中模型+图像；24GB+ 大模型+视频；多卡不叠加（LLM 例外）。</p></article>
+            <article class="note blue"><div class="ico">🎛️</div><h3>隐私可关闭</h3><p>用量 ping 每 5 分钟（默认开），Settings → About → Privacy 可关闭；无 feature 依赖。</p></article>
+          </div>
+        </div>
+      </aside>
+
+      <section class="preview card">
+        <div class="preview-head"><b>工具定位速查表</b><span>which part</span></div>
+        <div class="preview-box">
+          <h4>按需求选入口</h4>
+          <ul>
+            <li>本地模型聊天 / 图像生成 / 带助手浏览 → <strong>桌面 App</strong></li>
+            <li>Claude Code / Codex / Cline / OpenCode 驱动浏览器 → <strong>MCP</strong></li>
+            <li>Selenium / Puppeteer / Playwright 自动化 → <strong>WebDriver 或 CDP</strong></li>
+            <li>终端 coding agent → <strong>luma CLI</strong></li>
+            <li>编辑器内 coding agent → <strong>VS Code / JetBrains 插件</strong></li>
+            <li>服务器 / headless 运行 → <strong>Docker + noVNC</strong></li>
+          </ul>
+        </div>
+        <div class="preview-box">
+          <h4>硬件速查</h4>
+          <ul>
+            <li>RTX 3060（12GB）→ 游戏档，中模型 + SDXL 图像</li>
+            <li>RTX 4090（24GB）→ 高端档，大模型 + 视频生成</li>
+            <li>M1/M2 Mac（16–24GB）→ MLX 跑 LLM，图像走 CPU</li>
+            <li>无独显 → CPU 构建所有运行时，小模型 + 语音</li>
+            <li>多卡 LLM 加速 → 唯一支持跨卡拆分的场景</li>
+          </ul>
+        </div>
+        <div class="preview-grid">
+          <div class="mini"><b>本地 API 双格式</b><span>127.0.0.1:8317 同时说 OpenAI + Anthropic</span><code>openai base: http://127.0.0.1:8317</code></div>
+          <div class="mini"><b>启动方式</b><span>安装包 / npx / Docker</span><code>npx lumabrowser start</code></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="benefits card">
+      <div class="benefit"><b>零配置开局</b><p>npx lumabrowser start，Node 18+ 即可，无需手动装 ollama / llama.cpp。</p></div>
+      <div class="benefit"><b>显存不浪费</b><p>下载前告诉你能跑多快，KV cache 按显存定尺寸，MoE 专家智能移 CPU。</p></div>
+      <div class="benefit"><b>隐私自己掌控</b><p>用量 ping 默认开，一键关；聊天/模型/生成物 100% 本机。</p></div>
+      <div class="benefit"><b>主流 agent 全支持</b><p>MCP 一键写入 Claude Code / Cline / Codex / OpenCode 配置。</p></div>
+    </section>
+
+    <div class="src-row">
+      <strong>来源：</strong>
+      X @yibie（5,869 followers）status/2109065631320650057，2026-10-10 ·
+      GitHub amurgola/LumaBrowser 86★ / AGPL-3.0，实抓 2026-10-11 ·
+      <a href="https://github.com/amurgola/LumaBrowser">github.com/amurgola/LumaBrowser</a> ·
+      README 12KB 全量实抓
+    </div>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">9</span><h2>术语表</h2></div>
+      <table>
+        <tr><th>术语</th><th>含义</th></tr>
+        <tr><td>webview</td><td>操作系统自带的浏览器渲染组件（WKWebView/WebKitGTK/WebView2），web 前端方案的基础</td></tr>
+        <tr><td>llama.cpp</td><td>本地运行 LLM 的主流推理引擎，支持 CPU/CUDA/Vulkan 等多种后端</td></tr>
+        <tr><td>MLX</td><td>Apple Silicon 专用的机器学习框架，Mac 上跑 LLM 的高效路径</td></tr>
+        <tr><td>KV cache</td><td>LLM 推理时缓存的键值张量，显存占用的主要变数之一，需按显存定尺寸</td></tr>
+        <tr><td>offload（full/partial）</td><td>模型层放到 GPU 还是部分/全部回落 CPU 运行的策略</td></tr>
+        <tr><td>MoE 专家</td><td>混合专家模型中的子网络，可单独调度到 CPU 以省显存</td></tr>
+        <tr><td>MCP</td><td>Model Context Protocol，Claude Code/Codex 等外部 agent 驱动工具的标准协议</td></tr>
+        <tr><td>CDP / WebDriver</td><td>浏览器自动化协议；CDP 是 Chrome DevTools 协议（Puppeteer/Playwright 用），WebDriver 是 W3C 标准（Selenium 用）</td></tr>
+        <tr><td>AGPL-3.0</td><td>强 copyleft 开源协议，修改后提供网络服务也需开源</td></tr>
+        <tr><td>noVNC</td><td>浏览器里的 VNC 客户端，Docker 部署时用它访问远程桌面</td></tr>
+      </table>
+    </section>
+
+    <section class="footer card">
+      <strong>本地 AI 全家桶，一个 LumaBrowser 装完 ♡</strong>
+      <span class="tag">codex-notebook</span>
+    </section>
+    <div class="doodles">✦ ☁︎ ✎</div>
+  </main>
+</body>
+</html>
