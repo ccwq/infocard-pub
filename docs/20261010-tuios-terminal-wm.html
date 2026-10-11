@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="white-purple">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tuios · 终端 AI agent 舰队管理器</title>
+  <style>
+    :root {
+      --bg: #faf9fb;
+      --surface: #ffffff;
+      --ink: #1a1625;
+      --ink-body: #2d2840;
+      --muted: #7c7490;
+      --accent: #6c5ce7;
+      --accent-light: #ede9ff;
+      --accent-warm: #e17055;
+      --accent-green: #00b894;
+      --accent-blue: #0984e3;
+      --border: #e4e0f0;
+      --shadow: 0 4px 16px rgba(108,92,231,.09);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { font-family: Inter, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--ink); font-size: 13px; line-height: 1.65; overflow-x: hidden; }
+    a { color: var(--accent); text-decoration: none; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; background: var(--accent-light); padding: 1px 5px; border-radius: 4px; }
+
+    .page { width: min(1060px, calc(100% - 28px)); margin: 0 auto; padding: 14px 0 70px; }
+
+    /* ── masthead ── */
+    .masthead { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 2px solid var(--ink); margin-bottom: 14px; }
+    .masthead-brand { font: 800 11px/1.3 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+    .masthead-meta { font-size: 11.5px; color: var(--muted); }
+    .masthead-meta span { margin-left: 12px; }
+
+    /* ── hero ── */
+    .hero { display: grid; grid-template-columns: 1fr 320px; gap: 16px; margin-bottom: 12px; }
+    .hero-main { background: var(--surface); border: 2px solid var(--ink); border-radius: 12px; padding: 18px 20px 16px; box-shadow: var(--shadow); }
+    .hero-badge { display: inline-flex; align-items: center; gap: 6px; font: 700 10.5px/1 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); padding: 4px 10px; border-radius: 20px; border: 1.5px solid var(--accent); margin-bottom: 10px; }
+    .hero-title { font: 800 clamp(2.4rem, 5vw, 4.2rem)/.92 Inter, system-ui, sans-serif; letter-spacing: -.04em; color: var(--ink); margin-bottom: 10px; }
+    .hero-subtitle { font-size: 13.5px; line-height: 1.6; color: var(--ink-body); max-width: 520px; margin-bottom: 12px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+    .stat { background: var(--ink); color: #fff; padding: 5px 12px; border-radius: 8px; font: 700 11.5px/1 ui-monospace, monospace; }
+    .stat.green { background: var(--accent-green); }
+    .stat.blue { background: var(--accent-blue); }
+    .stat.warm { background: var(--accent-warm); }
+
+    .hero-aside { display: flex; flex-direction: column; gap: 8px; }
+    .quote-card { background: var(--surface); border: 2px solid var(--ink); border-left: 5px solid var(--accent-warm); border-radius: 10px; padding: 13px 14px; box-shadow: var(--shadow); flex: 1; }
+    .quote-card .q-label { font: 700 9.5px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-warm); margin-bottom: 6px; }
+    .quote-card blockquote { font: 700 13.5px/1.45 Georgia, serif; color: var(--ink); font-style: normal; margin-bottom: 7px; }
+    .quote-card .q-src { font-size: 10.5px; color: var(--muted); }
+    .install-card { background: var(--ink); color: #f0eeff; border-radius: 10px; padding: 13px 15px; }
+    .install-card .i-label { font: 700 9.5px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-light); margin-bottom: 8px; }
+    .install-card code { background: rgba(255,255,255,.15); color: #e8e6ff; padding: 2px 7px; border-radius: 4px; font-size: 11px; }
+
+    /* ── section cards ── */
+    .sections { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+    .section-card { background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; padding: 14px 15px; box-shadow: var(--shadow); }
+    .section-kicker { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; padding-bottom: 7px; border-bottom: 2px solid var(--border); }
+    .section-cn { font: 800 14px/1.1 system-ui, sans-serif; color: var(--ink); }
+    .section-en { font: 700 9.5px/1 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); }
+
+    .feature-list { list-style: none; display: grid; gap: 7px; }
+    .feature-list li { font-size: 12.2px; line-height: 1.5; color: var(--ink-body); padding-left: 14px; position: relative; }
+    .feature-list li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); font-size: 10px; top: 2px; }
+    .feature-list b { color: var(--ink); font-weight: 700; }
+
+    .key-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+    .key-item { background: var(--accent-light); border-radius: 7px; padding: 7px 9px; }
+    .key-item kbd { display: inline-block; background: var(--ink); color: #fff; font-family: ui-monospace, monospace; font-size: 9.5px; padding: 2px 5px; border-radius: 4px; margin-right: 4px; }
+    .key-item span { font-size: 11px; color: var(--ink-body); }
+
+    .agent-states { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .state-badge { text-align: center; padding: 7px 5px; border-radius: 8px; border: 1.5px solid var(--border); }
+    .state-badge .state-icon { font-size: 16px; margin-bottom: 3px; }
+    .state-badge .state-name { font: 700 9px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; }
+    .state-badge.working { background: #e8f5e9; border-color: var(--accent-green); }
+    .state-badge.working .state-name { color: var(--accent-green); }
+    .state-badge.waiting { background: #fff8e1; border-color: #f9a825; }
+    .state-badge.waiting .state-name { color: #f9a825; }
+    .state-badge.done { background: #e3f2fd; border-color: var(--accent-blue); }
+    .state-badge.done .state-name { color: var(--accent-blue); }
+    .state-badge.errored { background: #fce4ec; border-color: var(--accent-warm); }
+    .state-badge.errored .state-name { color: var(--accent-warm); }
+
+    .inbox-flow { display: flex; flex-direction: column; gap: 6px; }
+    .flow-step { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-body); }
+    .flow-step .f-num { width: 22px; height: 22px; background: var(--accent); color: #fff; border-radius: 50%; display: grid; place-items: center; font: 700 10px/1 ui-monospace, monospace; flex-shrink: 0; }
+    .flow-step .f-arrow { color: var(--accent); font-size: 14px; }
+
+    /* ── wide sections ── */
+    .wide-section { background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); margin-bottom: 10px; }
+    .wide-section .section-kicker { margin-bottom: 10px; }
+
+    /* ── three-col grid ── */
+    .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .mini-card { background: var(--accent-light); border-radius: 8px; padding: 10px 11px; }
+    .mini-card h4 { font: 700 11.5px/1.2 system-ui, sans-serif; color: var(--ink); margin-bottom: 4px; }
+    .mini-card p, .mini-card li { font-size: 11.2px; color: var(--ink-body); line-height: 1.5; }
+    .mini-card ul { margin: 5px 0 0 13px; }
+
+    /* ── install block ── */
+    .install-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .install-method { background: var(--accent-light); border-radius: 8px; padding: 10px 12px; }
+    .install-method h4 { font: 700 11px/1.2 system-ui, sans-serif; color: var(--accent); margin-bottom: 5px; }
+    .install-method code { display: block; font-size: 10.5px; line-height: 1.55; margin-top: 4px; }
+
+    /* ── glossary ── */
+    .glossary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .gloss-item { display: flex; gap: 7px; font-size: 11.5px; line-height: 1.5; color: var(--ink-body); padding: 6px 9px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); }
+    .gloss-item b { color: var(--ink); font-weight: 700; min-width: 72px; flex-shrink: 0; }
+
+    /* ── footer ── */
+    .footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 0; border-top: 2px solid var(--ink); margin-top: 4px; }
+    .footer-brand { font: 700 11px/1.3 ui-monospace, monospace; color: var(--accent); }
+    .footer-links { display: flex; gap: 10px; }
+    .footer-links a { font-size: 11px; color: var(--muted); }
+    .footer-note { font-size: 10.5px; color: var(--muted); text-align: right; }
+
+    /* ── source note ── */
+    .source-note { background: #f0eeff; border: 1.5px dashed var(--accent); border-radius: 8px; padding: 9px 12px; margin-top: 10px; font-size: 11px; color: var(--ink-body); line-height: 1.55; }
+    .source-note b { color: var(--accent); }
+
+    /* ── progressive label ── */
+    .prog-label { display: inline-block; background: var(--accent); color: #fff; font: 700 9px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; padding: 3px 8px; border-radius: 0 0 6px 6px; margin-bottom: 2px; }
+
+    @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .sections { grid-template-columns: 1fr; } .three-col { grid-template-columns: 1fr; } .install-grid { grid-template-columns: 1fr; } .glossary { grid-template-columns: 1fr; } .agent-states { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .page { width: calc(100% - 18px); padding: 10px 0 40px; } .footer { flex-direction: column; align-items: flex-start; } }
+  </style>
+</head>
+<body>
+<main class="page" id="card">
+
+  <!-- ═══ MASTHEAD ═══ -->
+  <header class="masthead">
+    <div class="masthead-brand">⬡ tuios · Terminal UI Operating System</div>
+    <div class="masthead-meta">
+      <span>⭐ 5,135</span><span>🔱 MIT / Go</span><span>progressive-doc · 入门向</span><span>2026-10-11 实抓</span>
+    </div>
+  </header>
+
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <div class="hero-main">
+      <div class="prog-label">progressive-doc · 9 节结构</div>
+      <div class="hero-badge">🖥 CLI 工具 · Go 语言 · MIT 协议</div>
+      <h1 class="hero-title">tuios</h1>
+      <p class="hero-subtitle">把终端变成 <b>AI agent 舰队管理器</b>。平铺面板、自动识别 agent 状态、一个 Inbox 汇总所有会话所有机器等你处理的事——「以前是人盯终端干活，现在是终端帮你盯 agent 干活」。</p>
+      <div class="hero-stats">
+        <span class="stat green">⭐ 5,135 ★</span>
+        <span class="stat">🍴 235 forks</span>
+        <span class="stat blue">🐹 Go 语言</span>
+        <span class="stat warm">📅 持续更新中</span>
+      </div>
+    </div>
+    <div class="hero-aside">
+      <div class="quote-card">
+        <div class="q-label">推文金句 · @Ryrenz</div>
+        <blockquote>「以前是人盯终端干活，现在是终端帮你盯着一群 agent 干活」</blockquote>
+        <div class="q-src">X @Ryrenz · 2026-10-11 · 2,165 views</div>
+      </div>
+      <div class="install-card">
+        <div class="i-label">快速安装</div>
+        <code>brew install tuios</code><br>
+        <code>curl -fsSL https://raw.githubusercontent.com/&nbsp;Gaurav-Gosain/tuios/main/install.sh | bash</code><br>
+        <code>go install github.com/Gaurav-Gosain/tuios/cmd/tuios@latest</code>
+        <div style="margin-top:8px;font-size:10.5px;color:#b8b0e0">→ tuios.dev/learn 有 WebAssembly 在线练习场</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SECTION ① 引入 ═══ -->
+  <div class="sections">
+    <div class="section-card">
+      <div class="section-kicker"><span class="section-cn">① 引入：多 agent 并行的痛点</span><span class="section-en">§01</span></div>
+      <ul class="feature-list">
+        <li>三四个 AI 编程 agent 并行跑，各自开一个终端窗口</li>
+        <li>切来切去看「谁卡住了」「谁在等你审批」「谁跑完了」</li>
+        <li>一个任务要等另一个 agent 完成才能继续，窗口切换变成瓶颈</li>
+        <li>远程机器上的 agent 怎么管？用 tmux 记 session ID？</li>
+      </ul>
+    </div>
+
+    <!-- ═══ SECTION ② tuios 是什么 ═══ -->
+    <div class="section-card">
+      <div class="section-kicker"><span class="section-cn">② tuios 是什么</span><span class="section-en">§02</span></div>
+      <ul class="feature-list">
+        <li>终端里的窗口管理器（tiling WM），内置 daemon 持久化会话</li>
+        <li>内置 agent 感知层：识别面板里跑的 agent 并报告状态</li>
+        <li><b>一个 Inbox 汇总</b>所有会话 + 所有机器上等你处理的事</li>
+        <li>支持 19 个 harness（Claude Code、Codex、Gemini CLI、opencode 等）</li>
+        <li>GitHub 实抓：<b>5,135★ / 235 forks</b> · MIT 协议 · Go 1.26.6+</li>
+        <li>创建于 2025-09-06，持续活跃更新</li>
+      </ul>
+    </div>
+
+    <!-- ═══ SECTION ③ 核心能力 ═══ -->
+    <div class="section-card">
+      <div class="section-kicker"><span class="section-cn">③ 核心能力一览</span><span class="section-en">§03</span></div>
+      <ul class="feature-list">
+        <li><b>平铺面板</b>：BSP 自动平铺 + master-stack / scrolling 模式</li>
+        <li><b>9 个工作区</b>：独立隔离，瞬时切换</li>
+        <li><b>vim 模态</b>：WM 模式 / Terminal 模式 / Copy 模式</li>
+        <li><b>命令面板</b>：<kbd>Ctrl</kbd>+<kbd>P</kbd> 模糊搜索所有动作</li>
+        <li><b>Session Rail</b>：侧栏显示会话 + 终端 + 文件 + git + agent 状态</li>
+        <li><b>面板缩放</b>：<kbd>z</kbd> 默认占 95% 屏，<code>zoom_size=100</code> 全屏</li>
+        <li><b>应用启动器</b>：<kbd>Alt</kbd>+<kbd>Space</kbd> 搜索 <code>$PATH</code> 及桌面应用</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION ④ agent 状态感知 ═══ -->
+  <div class="wide-section">
+    <div class="section-kicker"><span class="section-cn">④ agent 状态感知：面板里跑的 agent 状态一目了然</span><span class="section-en">§04</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div>
+        <p style="font-size:12.5px;color:var(--ink-body);margin-bottom:10px">运行 agent 的面板标题会显示形状，Session Rail 也有一行状态：</p>
+        <div class="agent-states">
+          <div class="state-badge working"><div class="state-icon">⚡</div><div class="state-name">working</div><div style="font-size:9.5px;color:var(--ink-body);margin-top:2px">正在干活</div></div>
+          <div class="state-badge waiting"><div class="state-icon">⏳</div><div class="state-name">waiting</div><div style="font-size:9.5px;color:var(--ink-body);margin-top:2px">等你输入</div></div>
+          <div class="state-badge done"><div class="state-icon">✅</div><div class="state-name">done</div><div style="font-size:9.5px;color:var(--ink-body);margin-top:2px">已完成</div></div>
+          <div class="state-badge errored"><div class="state-icon">❌</div><div class="state-name">errored</div><div style="font-size:9.5px;color:var(--ink-body);margin-top:2px">出错</div></div>
+        </div>
+      </div>
+      <div>
+        <ul class="feature-list">
+          <li><b>tuios integration install</b>：接入 19 个 harness（Claude Code、Codex、Gemini CLI、opencode 等）</li>
+          <li><b>检测 24 个 agent CLI</b>：按进程名 + 屏幕内容自动识别 ❓</li>
+          <li><b>OSC 7501 协议</b>：任意程序可报告状态（如构建 40%），出现在 rail 和 Inbox</li>
+          <li><b>tuios status working --app build --progress 40</b>：手动上报进度</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION ⑤ Inbox ═══ -->
+  <div class="wide-section">
+    <div class="section-kicker"><span class="section-cn">⑤ Inbox：所有会话所有机器等你处理的事，一处汇总</span><span class="section-en">§05</span></div>
+    <div class="inbox-flow">
+      <div class="flow-step"><span class="f-num">1</span><span><kbd>Prefix</kbd>+<kbd>i</kbd> 打开 Inbox，列出所有会话 + 所有机器上的审批/提问/错误/完成事件</span></div>
+      <div class="flow-step"><span class="f-arrow">↓</span><span><kbd>Prefix</kbd>+<kbd>o</kbd> 直接跳转到最老的待处理项</span></div>
+      <div class="flow-step"><span class="f-num">2</span><span>在 Inbox 里直接回答 prompt，无需切换到那个面板</span></div>
+      <div class="flow-step"><span class="f-arrow">↓</span><span>回复被标记为 <b>verified</b>，agent 知道你本人确认过</span></div>
+      <div class="flow-step"><span class="f-num">3</span><span><code>[agents.approvals]</code> 配置节：一键批准 Claude Code / opencode / Kilo / Qwen Code 的权限请求</span></div>
+    </div>
+    <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:var(--accent-light);border-radius:8px;padding:9px 11px">
+        <div style="font:700 11px/1 ui-monospace,monospace;color:var(--accent);margin-bottom:4px">agent 间通信</div>
+        <ul class="feature-list">
+          <li><b>tuios ask-human</b>：向 Inbox 提固定选项问题</li>
+          <li><b>tuios send-agent-message</b>：agent 之间互发消息</li>
+          <li><b>tuios ask-agent</b>：向指定 agent 提问并等待回答</li>
+        </ul>
+      </div>
+      <div style="background:#e8f5e9;border-radius:8px;padding:9px 11px">
+        <div style="font:700 11px/1 ui-monospace,monospace;color:#2d7a4f;margin-bottom:4px">Pane Grants 权限分层</div>
+        <ul class="feature-list">
+          <li><b>read / write / fan / respond / admin</b>：细粒度控制 agent 面板能做什么</li>
+          <li><code>--grants</code>：给助手更少的权限</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION ⑥ Fleets 与多机 ═══ -->
+  <div class="wide-section">
+    <div class="section-kicker"><span class="section-cn">⑥ Fleets 与多机管理：一个 prompt 发给多个 agent / 远程 SSH 会话</span><span class="section-en">§06</span></div>
+    <div class="three-col">
+      <div class="mini-card">
+        <h4>🚀 tuios fan · 并行舰队</h4>
+        <ul>
+          <li>一个 prompt 同时发给多个 agent（可混 harness）</li>
+          <li>每个 agent 在独立 <b>git worktree</b> 里运行</li>
+          <li><code>tuios start-agent</code> 启动单个助手（TUI 或 headless ACP）</li>
+          <li>选择器如 <code>group:fan/retry needs:you</code> 可对整组操作</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>🖥 Machines · SSH 远程会话</h4>
+        <ul>
+          <li><code>tuios hosts add &lt;name&gt;</code> 添加远程机器（SSH）</li>
+          <li><code>tuios hosts tailnet</code> 列出 Tailscale 网络上的机器</li>
+          <li><code>tuios attach --host build api</code> 把远程会话拉到本地显示</li>
+          <li><b>Global Sessions</b>：一个会话跨多台机器</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>🔗 跨机 agent 操作</h4>
+        <ul>
+          <li><code>tuios fan --host build</code> 在远程机器上启动舰队</li>
+          <li><code>tuios start-agent -s build:api</code> 远程启动单个 agent</li>
+          <li>远程 Inbox 项会出现在本地 Inbox</li>
+          <li><code>tuios worktree pull</code> 把远程 worktree 拉回本地</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION ⑦ 会话存活 / 布局 ═══ -->
+  <div class="wide-section">
+    <div class="section-kicker"><span class="section-cn">⑦ 会话存活与布局模板</span><span class="section-en">§07</span></div>
+    <div class="install-grid">
+      <div class="install-method">
+        <h4>🛡️ daemon 模式</h4>
+        <p style="font-size:11.5px;color:var(--ink-body)"><code>tuios</code> 默认 attach 到 daemon 会话，断开终端窗口会话依然存活。<code>tuios new mysession</code> 创建命名会话。</p>
+        <code>tuios attach mysession</code><br>
+        <code>tuios ls</code> · <code>tuios kill-session mysession</code>
+      </div>
+      <div class="install-method">
+        <h4>🔄 重启复活</h4>
+        <p style="font-size:11.5px;color:var(--ink-body)">daemon 重启或机器重启后，会话带着结构和工作目录复活。Inbox 会提示恢复正在运行的 agent 对话。</p>
+      </div>
+      <div class="install-method">
+        <h4>📐 布局模板</h4>
+        <p style="font-size:11.5px;color:var(--ink-body)"><code>Ctrl</code>+<kbd>B</kbd>, <kbd>L</kbd>, <kbd>s</kbd> 保存当前窗口布局（含工作目录和启动命令）。</p>
+        <code>Ctrl+B, L, l</code> 加载<br>
+        <code>tuios layout list</code><br>
+        <code>tuios layout export mysetup</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION ⑧ 上手指南 ═══ -->
+  <div class="wide-section">
+    <div class="section-kicker"><span class="section-cn">⑧ 上手指南：三步跑起来</span><span class="section-en">§08</span></div>
+    <div class="three-col" style="margin-bottom:10px">
+      <div class="mini-card" style="background:#e8f5e9">
+        <h4 style="color:#2d7a4f">① 安装（三选一）</h4>
+        <ul>
+          <li><code>brew install tuios</code> — macOS/Linux</li>
+          <li><code>yay -S tuios-bin</code> — Arch AUR</li>
+          <li><code>nix run github:Gaurav-Gosain/tuios</code></li>
+          <li>一键脚本 / GitHub Releases / Docker</li>
+          <li>源码：Go 1.26.6+，<code>go install</code></li>
+        </ul>
+      </div>
+      <div class="mini-card" style="background:#e3f2fd">
+        <h4 style="color:#0d5fa8">② Quick Start 三个命令</h4>
+        <ul>
+          <li><code>tuios</code> — 启动，attach daemon 会话</li>
+          <li><code>tuios --show-keys</code> — 启动，显示键位浮层</li>
+          <li><code>tuios --standalone</code> — 不带 daemon，单次运行</li>
+        </ul>
+      </div>
+      <div class="mini-card" style="background:#fff8e1">
+        <h4 style="color:#7a5a00">③ 学习资源</h4>
+        <ul>
+          <li><b>tuios.dev/learn</b>：WebAssembly 在线练习场，不用安装</li>
+          <li><code>tuios --skill</code>：打印 agent 驱动 tuios 的指南</li>
+          <li><code>tuios keybinds explain &lt;key&gt;</code>：解释单个键位</li>
+          <li><code>tuios config edit</code>：编辑配置</li>
+        </ul>
+      </div>
+    </div>
+    <div style="background:var(--accent-light);border-radius:8px;padding:11px 13px">
+      <div style="font:700 11px/1 ui-monospace,monospace;color:var(--accent);margin-bottom:8px">核心键位速查</div>
+      <div class="key-grid">
+        <div class="key-item"><kbd>Ctrl</kbd>+<kbd>P</kbd> <span>命令面板（搜索动作）</span></div>
+        <div class="key-item"><kbd>Alt</kbd>+<kbd>Space</kbd> <span>应用启动器</span></div>
+        <div class="key-item"><kbd>Prefix</kbd>+<kbd>i</kbd> <span>打开 Inbox</span></div>
+        <div class="key-item"><kbd>Prefix</kbd>+<kbd>o</kbd> <span>跳转最老待处理项</span></div>
+        <div class="key-item"><kbd>n</kbd>（WM 模式）<span>新建面板</span></div>
+        <div class="key-item"><kbd>z</kbd>（WM）/ <kbd>Prefix</kbd>+<kbd>z</kbd> <span>缩放面板</span></div>
+        <div class="key-item"><kbd>Prefix</kbd>+<kbd>Space</kbd> <span>切换 BSP 平铺</span></div>
+        <div class="key-item"><kbd>Prefix</kbd>+<kbd>d</kbd> <span>detach（daemon 模式）</span></div>
+        <div class="key-item"><kbd>Prefix</kbd>+<kbd>L</kbd>, <kbd>l/s</kbd> <span>加载/保存布局</span></div>
+        <div class="key-item"><kbd>Prefix</kbd>+<kbd>S</kbd> <span>会话切换器</span></div>
+        <div class="key-item"><kbd>Prefix</kbd>+<kbd>[</kbd> <span>Copy 模式（vim 滚动）</span></div>
+        <div class="key-item"><kbd>Prefix</kbd>+<kbd>?</kbd> <span>帮助浮层</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION ⑨ 术语表 ═══ -->
+  <div class="wide-section">
+    <div class="section-kicker"><span class="section-cn">⑨ 术语表</span><span class="section-en">§09 · glossary</span></div>
+    <div class="glossary">
+      <div class="gloss-item"><b>平铺 WM</b>自动分割屏幕，不重叠。tuios 默认 BSP（Binary Space Partitioning）。</div>
+      <div class="gloss-item"><b>daemon</b>后台守护进程，终端窗口关闭后会话继续存活。</div>
+      <div class="gloss-item"><b>PTY</b>Pseudo-Terminal，tuios 为每个面板创建的虚拟终端。</div>
+      <div class="gloss-item"><b>BSP</b>Binary Space Partitioning，二叉树结构递归划分屏幕区域的平铺算法。</div>
+      <div class="gloss-item"><b>harness</b>agent 的执行框架（如 Claude Code、Codex），tuios 通过 integration 与之对接。</div>
+      <div class="gloss-item"><b>worktree</b>Git 概念，tuios fan 让每个 agent 在独立 worktree 里隔离开发。</div>
+      <div class="gloss-item"><b>OSC 7501</b>程序状态报告协议，任意程序可向终端/tuios 广播自身进度。</div>
+      <div class="gloss-item"><b>ACP</b>Agent Communication Protocol，agent 间通信协议（tuios ask-agent/send-agent-message）。</div>
+      <div class="gloss-item"><b>Prefix</b>组合键前缀，默认 <kbd>Ctrl</kbd>+<kbd>B</kbd>（可自定义）。</div>
+      <div class="gloss-item"><b>Session Rail</b>tuios 侧栏，汇总会话/终端/文件/git/agent 状态。</div>
+    </div>
+  </div>
+
+  <!-- ═══ MORE FEATURES ═══ -->
+  <div class="wide-section">
+    <div class="section-kicker"><span class="section-cn">⑩ 延伸能力速览</span><span class="section-en">§10</span></div>
+    <div class="three-col">
+      <div class="mini-card">
+        <h4>🖼️ 图形与终端协议</h4>
+        <ul>
+          <li>Kitty Graphics Protocol：支持 mpv --vo=kitty 视频播放（flicker-free）</li>
+          <li>Sixel 图形：实验性支持</li>
+          <li>Kitty Keyboard Protocol（CSI u）：渐进增强</li>
+          <li>OSC 133：命令/输出块导航</li>
+          <li>Mode 2026：防止屏幕撕裂</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>⚡ 自动化与脚本</h4>
+        <ul>
+          <li><b>Tape Scripting</b>：录制回放终端工作流 DSL</li>
+          <li><code>Prefix+T r</code> 录制当前会话</li>
+          <li><code>tuios tape exec</code> 对 daemon 会话执行 tape</li>
+          <li>Layout Export：把布局导出为 tape 脚本分享</li>
+          <li>Hooks：窗口/工作区/agent 状态变化时触发 shell 命令</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>🛠️ 配置与扩展</h4>
+        <ul>
+          <li><code>tuios config edit</code>：在 $EDITOR 里编辑 TOML 配置</li>
+          <li><code>tuios keybinds list</code>：查看所有键位</li>
+          <li><code>tuios keybinds doctor</code>：诊断键位冲突</li>
+          <li>Bundle 主题 + 自定义 JSON 主题</li>
+          <li>10 个 Hook 事件（attach/detach/agent state...）</li>
+          <li>Dock Components：自定义命令画在 dock 上</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SOURCES ═══ -->
+  <div class="source-note">
+    <b>来源：</b>X 推文 @Ryrenz（2026-10-11，2,165 views）· GitHub 实抓 Gaurav-Gosain/tuios（2026-10-11，5,135★/235 forks/MIT/Go）· README.md（23,999B）· tuios.dev/docs · tuios.dev/learn
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="footer">
+    <div class="footer-brand">⬡ tuios · github.com/Gaurav-Gosain/tuios</div>
+    <div class="footer-links">
+      <a href="https://tuios.dev">tuios.dev</a>
+      <a href="https://tuios.dev/learn">tuios.dev/learn</a>
+      <a href="https://github.com/Gaurav-Gosain/tuios">GitHub</a>
+    </div>
+    <div class="footer-note">progressive-doc · 2026-10-11<br>tags: CLI工具 / AI Agent / 终端 / 平铺WM</div>
+  </footer>
+
+</main>
+</body>
+</html>
