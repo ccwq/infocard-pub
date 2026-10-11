@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="editorial-system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 开发工作流方法论：强模型时代的 Prompt 工程新思路</title>
+<style>
+:root{
+  --paper:#f5f2eb;--surface:#fffdf8;--ink:#171717;--muted:#6b665e;--line:#1d1d1b;--soft:#d8d2c8;
+  --navy:#17324d;--navy-soft:#dfe9f2;--mint:#e4eee8;--sky:#e5eef4;--shadow:0 8px 22px rgba(23,23,23,.08);
+  --red:#c0392b;--red-soft:#fde8e6;--green:#2d7d46;--green-soft:#e4f2e9;--amber:#b07d1a;--amber-soft:#fef3dc;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.65;overflow-x:hidden}
+a{color:inherit}
+.page{width:min(1120px,calc(100% - 28px));margin:0 auto;padding:20px 0 60px}
+.kicker{font:700 11px/1.2 ui-monospace,monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--navy);margin-bottom:10px}
+.kicker span{color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+
+/* Masthead */
+.masthead{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:10px 0;border-top:2px solid var(--line);border-bottom:1px solid var(--line);font:700 11px/1.2 ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase}
+.masthead .right{color:var(--muted);text-align:right}
+
+/* Hero */
+.hero{display:grid;grid-template-columns:1fr 1.1fr;gap:28px;padding:28px 0 22px;border-bottom:1px solid var(--line)}
+.hero-left{padding-right:20px;border-right:1px solid var(--soft)}
+.hero-left h1{font:700 clamp(2.2rem,5vw,4rem)/.94 Georgia,"Times New Roman","Songti SC",serif;letter-spacing:-.025em;margin:10px 0 12px}
+.hero-left .lede{margin:0;color:var(--muted);font-size:clamp(.95rem,1.4vw,1.08rem);max-width:44ch;line-height:1.7}
+.hero-right{display:flex;flex-direction:column;justify-content:center;gap:10px}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat-card{border:1px solid var(--line);border-radius:5px;background:var(--surface);padding:12px 14px;text-align:center;box-shadow:0 2px 8px rgba(23,23,23,.05)}
+.stat-card .num{font:900 clamp(1.6rem,3vw,2.2rem)/1 ui-monospace,monospace;color:var(--navy);display:block}
+.stat-card .label{font:700 10px/1.2 ui-monospace,monospace;color:var(--muted);letter-spacing:.06em;display:block;margin-top:2px}
+.tag-row{display:flex;flex-wrap:wrap;gap:7px}
+.tag-pill{padding:5px 11px;border:1.5px solid var(--line);border-radius:999px;font:700 11px/1 ui-monospace,monospace;background:var(--surface);letter-spacing:.03em}
+.tag-pill.navy{background:var(--navy-soft);color:var(--navy);border-color:transparent}
+.tag-pill.mint{background:var(--mint);color:var(--green);border-color:transparent}
+.tag-pill.sky{background:var(--sky);color:var(--navy);border-color:transparent}
+.tag-pill.amber{background:var(--amber-soft);color:var(--amber);border-color:transparent}
+.tag-pill.red{background:var(--red-soft);color:var(--red);border-color:transparent}
+
+/* Section layout */
+.sections{padding:24px 0}
+.sig-bar{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);font:700 13px/1.35 Georgia,serif}
+.sig-bar i{display:block;width:38px;height:3.5px;background:var(--navy);flex:none;border-radius:2px}
+
+/* Section card */
+.section-card{margin:18px 0;border:1px solid rgba(29,29,27,.13);border-radius:6px;background:var(--surface);box-shadow:0 3px 12px rgba(23,23,23,.05);overflow:hidden}
+.section-head{display:flex;align-items:baseline;gap:12px;padding:14px 18px 12px;border-bottom:1px solid var(--soft);background:linear-gradient(135deg,var(--paper),var(--surface))}
+.sec-num{font:900 clamp(3rem,7vw,4.5rem)/.8 Georgia,serif;color:transparent;-webkit-text-stroke:1.5px var(--navy);flex:none;opacity:.35}
+.sec-title{font:700 clamp(1.1rem,2.5vw,1.4rem)/1.15 Georgia,"Songti SC",serif}
+.sec-subtitle{font:600 11px/1.2 ui-monospace,monospace;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.section-body{padding:16px 18px 18px}
+
+/* Two column grid */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+
+/* Method card (五法) */
+.method-card{border:1px solid var(--line);border-radius:6px;padding:13px 14px;position:relative;overflow:hidden}
+.method-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+.method-card.red::before{background:#c0392b}.method-card.blue::before{background:#17324d}
+.method-card.green::before{background:#2d7d46}.method-card.amber::before{background:#b07d1a}
+.method-card.purple::before{background:#6b3fa0}
+.method-card h4{font:700 13.5px/1.2 Georgia,"Songti SC",serif;margin:0 0 5px;padding-left:10px}
+.method-card .m-en{font:700 10px/1 ui-monospace,monospace;color:var(--muted);letter-spacing:.07em;padding-left:10px;margin-bottom:8px}
+.method-card .m-prompt{border:1px solid var(--soft);background:var(--paper);padding:8px 10px;border-radius:4px;font:12px/1.55 ui-monospace,Menlo,monospace;color:var(--ink);margin-bottom:8px}
+.method-card .m-example{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0;padding-left:10px}
+.method-card .m-scene{font-size:11.5px;color:var(--navy);font-weight:600;padding-left:10px;margin:6px 0 0}
+
+/* Tool card */
+.tool-card{border:1px solid var(--soft);border-radius:5px;padding:11px 13px;background:var(--surface)}
+.tool-card .tool-name{font:700 13px/1.2 ui-monospace,monospace;color:var(--navy);margin-bottom:4px}
+.tool-card .tool-desc{font-size:12px;color:var(--muted);line-height:1.55;margin:0}
+
+/* Skill card */
+.skill-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px dashed var(--soft)}
+.skill-item:last-child{border-bottom:0}
+.skill-badge{flex:none;padding:3px 8px;border-radius:4px;background:var(--navy-soft);color:var(--navy);font:700 11px/1 ui-monospace,monospace;letter-spacing:.04em}
+.skill-info .skill-name{font:700 13px/1.2 Georgia,serif;margin-bottom:2px}
+.skill-info .skill-desc{font-size:12px;color:var(--muted);line-height:1.55;margin:0}
+
+/* Workflow steps */
+.wf-step{display:grid;grid-template-columns:36px 1fr;gap:12px;padding:11px 0;border-bottom:1px solid var(--soft);align-items:start}
+.wf-step:last-child{border-bottom:0}
+.wf-num{width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font:900 14px/1 ui-monospace,monospace;flex:none}
+.wf-content .wf-title{font:700 13.5px/1.2 Georgia,serif;margin-bottom:3px}
+.wf-content .wf-desc{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0}
+.wf-content .wf-cmd{display:inline-block;margin-top:5px;padding:4px 9px;background:#1d2b3b;color:#e8f0f8;font:11px/1.55 ui-monospace,Menlo,monospace;border-radius:3px}
+
+/* Test card */
+.test-item{border:1px solid var(--soft);border-radius:5px;padding:11px 13px;background:var(--surface)}
+.test-item .test-n{font:700 11px/1 ui-monospace,monospace;color:var(--navy);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+.test-item h4{font:700 13px/1.2 Georgia,serif;margin:0 0 5px}
+.test-item p{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0}
+
+/* Review card */
+.rev-card{border:1px solid var(--soft);border-radius:5px;padding:11px 13px}
+.rev-card h4{font:700 13px/1.2 Georgia,serif;margin:0 0 5px}
+.rev-card p{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0 0 6px}
+.rev-card .rev-tip{border:1px solid var(--mint);background:var(--mint);padding:5px 9px;border-radius:4px;font-size:11.5px;color:var(--green);font-weight:600}
+
+/* Quote block */
+.quote-block{border-left:3px solid var(--navy);padding:10px 14px;background:var(--navy-soft);border-radius:0 5px 5px 0;margin:12px 0}
+.quote-block p{margin:0;font-size:13px;line-height:1.7;color:var(--ink);font-style:italic}
+
+/* Callout */
+.callout{border:1px solid var(--line);border-radius:6px;padding:13px 16px;margin:12px 0}
+.callout.warning{background:var(--amber-soft);border-color:var(--amber)}
+.callout.info{background:var(--navy-soft);border-color:var(--navy)}
+.callout h4{font:700 13px/1.2 ui-monospace,monospace;margin:0 0 5px;letter-spacing:.06em;text-transform:uppercase}
+.callout p{margin:0;font-size:12.5px;line-height:1.6;color:var(--ink)}
+
+/* Terminology table */
+.term-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.term-table th{background:var(--ink);color:#fff;padding:8px 12px;text-align:left;font:700 11px/1.2 ui-monospace,monospace;letter-spacing:.07em}
+.term-table td{padding:8px 12px;border-bottom:1px solid var(--soft);vertical-align:top}
+.term-table tr:nth-child(even) td{background:var(--paper)}
+.term-table td:first-child{font-weight:700;white-space:nowrap;color:var(--navy);font-family:ui-monospace,Menlo,monospace;font-size:12px}
+
+/* Insight strip */
+.insight-strip{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(90deg,var(--navy-soft),var(--surface));border:1px solid var(--soft);border-radius:6px;margin:14px 0;font-size:12.5px}
+.insight-strip strong{color:var(--navy);font-weight:700}
+.insight-strip span{color:var(--muted)}
+
+/* Footer */
+.footer-strip{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 0;border-top:1px solid var(--line);margin-top:24px;font:10.5px/1.4 ui-monospace,Menlo,monospace;color:var(--muted)}
+.footer-strip a{color:var(--navy);text-decoration:underline}
+.footer-strip .src{font-weight:700}
+
+/* Responsive */
+@media(max-width:760px){
+  .page{padding:14px 0 40px}
+  .hero{grid-template-columns:1fr;gap:20px}
+  .hero-left{padding-right:0;border-right:0;border-bottom:1px solid var(--soft);padding-bottom:20px}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .stat-row{grid-template-columns:repeat(3,1fr);gap:8px}
+  .section-head{flex-direction:column;gap:4px}
+  .masthead{flex-direction:column;gap:7px;align-items:flex-start}
+  .masthead .right{text-align:left}
+}
+@media(max-width:420px){
+  .stat-row{grid-template-columns:1fr 1fr}
+  .page{width:calc(100% - 20px)}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <!-- Masthead -->
+  <header class="masthead">
+    <span>AI 开发工作流方法论 · 方法论卡</span>
+    <span class="right">infocard · editorial-system · 2026-10-11</span>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-left">
+      <div class="kicker">方法论 · 最佳实践 · 来源：X @huangtongxueh</div>
+      <h1>强模型时代的工作流重设计</h1>
+      <p class="lede">重 Workflow 正在变成噪声——用「方法论名称」替代手写大段流程，几十个字指定五种认知动作，告诉模型「以什么方式思考」。</p>
+      <div class="tag-row" style="margin-top:14px">
+        <span class="tag-pill navy">五法思维快捷键</span>
+        <span class="tag-pill mint">Skill 自沉淀</span>
+        <span class="tag-pill sky">Agent E2E 测试</span>
+        <span class="tag-pill amber">对抗性 Review</span>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="stat-row">
+        <div class="stat-card">
+          <span class="num">2,314</span>
+          <span class="label">X 点赞</span>
+        </div>
+        <div class="stat-card">
+          <span class="num">157K</span>
+          <span class="label">浏览量</span>
+        </div>
+        <div class="stat-card">
+          <span class="num">5</span>
+          <span class="label">思维快捷键</span>
+        </div>
+      </div>
+      <div class="callout info" style="margin:0">
+        <h4>核心洞察</h4>
+        <p>上下文窗口已够大，但仍走既定流程是浪费——新 Prompt Engineering = 用方法论名称指定认知动作，而非写死步骤。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="sig-bar"><i></i><span>本文作者入职大厂两个月，Agent 开发 + 后端业务，从 1on1 老板对 AI 工作流的兴趣出发整理。</span></div>
+
+  <div class="sections">
+
+    <!-- §1 为什么重 Workflow 正在失效 -->
+    <article class="section-card">
+      <div class="section-head">
+        <span class="sec-num">1</span>
+        <div>
+          <div class="sec-title">重 Workflow 为什么正在失效</div>
+          <div class="sec-subtitle">Token 消耗 · 流程惯性 · 模型能力溢出</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <p style="margin:0 0 12px;font-size:13.5px;line-height:1.75">传统 AI 开发依赖「超级英雄式」Workflow：Superpowers 围绕 Spec → TDD → Review 建约束流，要求每步都走完。但强模型时代（上下文 200K+、推理能力强），这套做法正在变成噪声。</p>
+        <div class="grid-2">
+          <div class="callout warning" style="margin:0">
+            <h4 style="color:var(--amber)">❌ 旧范式的问题</h4>
+            <p>Token 消耗快 · 上下文已够仍走既定流程 · Prompt 膨胀 · 维护成本高 · Agent 行为僵化</p>
+          </div>
+          <div class="callout info" style="margin:0">
+            <h4 style="color:var(--navy)">✓ 新范式核心</h4>
+            <p>用「方法论名称」替代手写大段 Workflow——几十个字指定五种认知动作，告诉模型「以什么方式思考」</p>
+          </div>
+        </div>
+        <div class="quote-block">
+          <p>OpenAI 发布 Astra 时专门写博客教大家清理不必要的 Skill 和系统提示词——「工具越多，模型越乱」。</p>
+        </div>
+        <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">本质变化：<strong style="color:var(--ink)">从「告诉模型做什么步骤」到「告诉模型以什么心智模型思考」</strong>。方法论名称 = 压缩了多年的工程经验。</p>
+      </div>
+    </article>
+
+    <!-- §2 工具分工表 -->
+    <article class="section-card">
+      <div class="section-head">
+        <span class="sec-num">2</span>
+        <div>
+          <div class="sec-title">作者的工具分工表</div>
+          <div class="sec-subtitle">按任务特性分配模型，而非全押一个</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div>
+            <div class="tool-card" style="margin-bottom:10px;background:var(--navy-soft);border-color:var(--navy)">
+              <div class="tool-name">🧠 Codex + GPT-5.6 Sol</div>
+              <p class="tool-desc" style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">主力编码 Agent。复杂业务逻辑、多文件改动、测试编写——执行层主力。</p>
+            </div>
+            <div class="tool-card" style="margin-bottom:10px">
+              <div class="tool-name">📐 Astra</div>
+              <p class="tool-desc" style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">规划 Agent。需求分析、任务拆解、工作流编排——先用它对齐方向再开工。</p>
+            </div>
+            <div class="tool-card" style="margin-bottom:10px">
+              <div class="tool-name">⚡ pi + DeepSeek V4 Flash</div>
+              <p class="tool-desc" style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">简单需求快速处理。重复 CRUD、格式调整、小修小补——不上主 Agent。</p>
+            </div>
+          </div>
+          <div>
+            <div class="tool-card" style="margin-bottom:10px">
+              <div class="tool-name">🔍 Claude 5 Fable</div>
+              <p class="tool-desc" style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">对抗性审查 / Code Review。专门找漏洞、追假设、质疑方案正确性。</p>
+            </div>
+            <div class="tool-card" style="margin-bottom:10px">
+              <div class="tool-name">💡 GPT-6 Pro（网页端）</div>
+              <p class="tool-desc" style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">方案设计。架构选型、技术方案讨论、方案原型——在浏览器里快速推演。</p>
+            </div>
+            <div class="callout info" style="margin:0">
+              <h4>分工原则</h4>
+              <p>按「任务复杂度 × 所需模型特性」分配，不是全押 GPT，也不是一个模型干所有事。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- §3 Skill 实用清单 -->
+    <article class="section-card">
+      <div class="section-head">
+        <span class="sec-num">3</span>
+        <div>
+          <div class="sec-title">Skill 实用清单</div>
+          <div class="sec-subtitle">重复三次就沉淀成 Skill · 自建 SOP 体系</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="callout info" style="margin:0 0 14px">
+          <h4 style="color:var(--navy)">自沉淀原则</h4>
+          <p>一个流程重复超过三次就整理成 Skill。「重复三次就沉淀」是防止 Workflow 膨胀的反向约束。</p>
+        </div>
+        <div>
+          <div class="skill-item">
+            <span class="skill-badge">think</span>
+            <div class="skill-info">
+              <div class="skill-name">think（来源：tw93）</div>
+              <p class="skill-desc">方案对齐与头脑风暴。在动手前让模型把思路说出来，避免方向跑偏。</p>
+            </div>
+          </div>
+          <div class="skill-item">
+            <span class="skill-badge">grill me</span>
+            <div class="skill-info">
+              <div class="skill-name">grill me / grill with docs</div>
+              <p class="skill-desc">需求澄清连续追问。追问「为什么」直到隐性假设浮出水面 → 沉淀 ADR / CONTEXT.md。</p>
+            </div>
+          </div>
+          <div class="skill-item">
+            <span class="skill-badge">implement</span>
+            <div class="skill-info">
+              <div class="skill-name">implement（Matt Pocock 全家桶）</div>
+              <p class="skill-desc">实现 + 测试。配合 grill 使用，先把需求搞清楚再implement，避免改返工。</p>
+            </div>
+          </div>
+          <div class="skill-item">
+            <span class="skill-badge">ponytail</span>
+            <div class="skill-info">
+              <div class="skill-name">ponytail</div>
+              <p class="skill-desc">清理 AI 过度设计。砍掉「看起来很厉害但实际上不需要」的抽象层，降低人工 Review 难度。</p>
+            </div>
+          </div>
+          <div class="skill-item">
+            <span class="skill-badge">handoff</span>
+            <div class="skill-info">
+              <div class="skill-name">handoff</div>
+              <p class="skill-desc">上下文成文件跨会话交接。把当前状态写进文件，下一个 Agent 启动时直接读，不再靠记忆。</p>
+            </div>
+          </div>
+          <div class="skill-item">
+            <span class="skill-badge">check</span>
+            <div class="skill-info">
+              <div class="skill-name">check</div>
+              <p class="skill-desc">提 MR 审查。提交前触发质量门禁，跑测试、对照验收标准，确保 MR 足够小可被人工 Review。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- §4 五法思维快捷键 ★ 重点节 -->
+    <article class="section-card">
+      <div class="section-head" style="background:linear-gradient(135deg,var(--navy-soft),var(--surface))">
+        <span class="sec-num" style="-webkit-text-stroke-color:var(--navy)">4</span>
+        <div>
+          <div class="sec-title">五法思维快捷键 ⭐ 重点节</div>
+          <div class="sec-subtitle">第一性原理 · 对抗性审查 · 消融实验 · 奥卡姆剃刀 · 高内聚低耦合</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <p style="margin:0 0 14px;font-size:13.5px;line-height:1.75">每个方法三要素：是什么 / 真实 Prompt 例 / 模型反应 / 适用场景。「五法」可以单独使用，也可以组合——组合时按顺序执行效果最佳。</p>
+
+        <div class="grid-2">
+          <div class="method-card red">
+            <h4>① 第一性原理</h4>
+            <div class="m-en">FIRST PRINCIPLES</div>
+            <div class="m-prompt">不要基于「加 Redis 缓存」继续设计。重新分析接口为什么慢——瓶颈到底在 SQL / 网络 / 序列化 / 锁竞争 / 重复计算？</div>
+            <p class="m-example">模型会从「我想到的解法」退回到「真正的问题是什么」，找到根因而非症状。</p>
+            <div class="m-scene">适用：性能优化 · 技术方案评审 · 接手遗留代码</div>
+          </div>
+          <div class="method-card blue">
+            <h4>② 对抗性审查</h4>
+            <div class="m-en">ADVERSARIAL REVIEW</div>
+            <div class="m-prompt">不要帮方案找理由，想办法证明它是错的。追问：幂等吗？锁服务挂了怎么办？过期业务没完怎么处理？</div>
+            <p class="m-example">模型从「辩护者」切换到「攻击者」，主动暴露风险而非等 Review 提出来。</p>
+            <div class="m-scene">适用：方案设计 · PR Review · 架构选型</div>
+          </div>
+          <div class="method-card green">
+            <h4>③ 消融实验</h4>
+            <div class="m-en">ABLATION STUDY</div>
+            <div class="m-prompt">三个优化接口 800ms→100ms，设计消融实验判断真正收益。可能只加索引就 800→120ms，其余是幻觉。</div>
+            <p class="m-example">拆解组合收益，分离真实贡献与噪声干扰，防止把「优化了但没效果」的改动合入。</p>
+            <div class="m-scene">适用：性能调优 · 算法改进 · 多方案对比</div>
+          </div>
+          <div class="method-card amber">
+            <h4>④ 奥卡姆剃刀</h4>
+            <div class="m-en">OCCAM'S RAZOR</div>
+            <div class="m-prompt">Kafka + Redis + 锁 + 状态机 + 补偿——删除非必要机制。单库写入 + 一个事务 + 唯一索引就够。</div>
+            <p class="m-example">每次引入新机制时追问「去掉它会怎样」，保持方案精简，降低后续维护成本。</p>
+            <div class="m-scene">适用：架构设计 · 新增抽象层 · 依赖引入</div>
+          </div>
+          <div class="method-card purple" style="grid-column:1/-1">
+            <h4>⑤ 高内聚低耦合</h4>
+            <div class="m-en">COHESION &amp; COUPLING</div>
+            <div class="m-prompt">审查 OrderService 2000 行——职责边界清晰吗？不要为拆而拆。激活模块化 / 信息隐藏 / 依赖方向判断。</div>
+            <p class="m-example">追问「这个模块只因一个原因改变吗」「依赖方向是否自顶向下」，防止假分层真耦合。</p>
+            <div class="m-scene">适用：代码重构 · 服务拆分 · 大文件拆分 · 新增抽象层</div>
+          </div>
+        </div>
+
+        <div class="insight-strip">
+          <strong>新 Prompt Engineering 的本质：</strong>
+          <span>几十个字指定五种认知动作——重新定义问题 → 攻击假设 → 验证贡献 → 删除复杂度 → 整理边界。告诉模型「以什么方式思考」而非写死流程。</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- §5 日常开发全流程 -->
+    <article class="section-card">
+      <div class="section-head">
+        <span class="sec-num">5</span>
+        <div>
+          <div class="sec-title">日常开发全流程</div>
+          <div class="sec-subtitle">需求对齐 → 沉淀 Spec → 分派 → 交叉对抗 → E2E → 小 MR Review</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <div class="wf-step">
+              <div class="wf-num">①</div>
+              <div class="wf-content">
+                <div class="wf-title">需求对齐（grill + 控制尺度）</div>
+                <p class="wf-desc">PRD / 会议纪要 / 聊天记录 / 用户反馈全部给 Agent + grill 追问。控制尺度：剩下问题不显著改变方向即可开工。</p>
+                <code class="wf-cmd">grill with docs &lt;需求文档&gt;</code>
+              </div>
+            </div>
+            <div class="wf-step">
+              <div class="wf-num">②</div>
+              <div class="wf-content">
+                <div class="wf-title">沉淀 Spec / CONTEXT.md</div>
+                <p class="wf-desc">grill 结论写成文件，包含：目标、约束、验收标准、已否决方案。下一轮开工直接读，不重复对齐。</p>
+              </div>
+            </div>
+            <div class="wf-step">
+              <div class="wf-num">③</div>
+              <div class="wf-content">
+                <div class="wf-title">按复杂度分派（subagent + worktree）</div>
+                <p class="wf-desc">简单直做；复杂拆独立验收 Issue，交 subagent 多 worktree 并行开发，主 Agent 负责集成。</p>
+                <code class="wf-cmd">subagent --task=issue-42 --worktree=feature/x</code>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="wf-step">
+              <div class="wf-num">④</div>
+              <div class="wf-content">
+                <div class="wf-title">交叉对抗审查</div>
+                <p class="wf-desc">引入其他 Agent（Claude Fable）做对抗性审查——不是找优点，是找漏洞。问题反馈主 Agent 修复后重验。</p>
+              </div>
+            </div>
+            <div class="wf-step">
+              <div class="wf-num">⑤</div>
+              <div class="wf-content">
+                <div class="wf-title">端到端测试</div>
+                <p class="wf-desc">浏览器自动化（ego-lite + pi + DeepSeek V4 Flash）或 API 链测试，验证真实业务路径。</p>
+              </div>
+            </div>
+            <div class="wf-step">
+              <div class="wf-num">⑥</div>
+              <div class="wf-content">
+                <div class="wf-title">小 MR 人工 Review</div>
+                <p class="wf-desc">不逐行读，看测试结果 + 核心业务逻辑。前提：MR 足够小（建议 &lt;400 行）。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- §6 Agent 友好端到端测试 -->
+    <article class="section-card">
+      <div class="section-head">
+        <span class="sec-num">6</span>
+        <div>
+          <div class="sec-title">Agent 友好端到端测试四件事</div>
+          <div class="sec-subtitle">环境 · 操作 · 查证 · 复用 · 统一 CLI</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div class="test-item" style="background:var(--navy-soft);border-color:var(--navy)">
+            <div class="test-n">① 熟悉环境</div>
+            <h4>一键启动 / 测试数据 / 版本账号权限 / 清理重置</h4>
+            <p>Agent 需要可复现的环境描述。提供：启动命令、测试账号、数据 fixture、权限说明、清理脚本。</p>
+          </div>
+          <div class="test-item">
+            <div class="test-n">② 操作业务系统</div>
+            <h4>浏览器 / API / CLI 真实流程</h4>
+            <p>不只是单元测试，要能在真实系统里跑完端到端路径。推荐 ego-lite + pi + DeepSeek V4 Flash。</p>
+          </div>
+          <div class="test-item">
+            <div class="test-n">③ 查库表日志</div>
+            <h4>只读 DB MCP + 日志 Skill + Trace</h4>
+            <p>给 Agent 提供查数据库、日志、Trace 的工具，让它自己验证结果而非靠「感觉对了」。</p>
+          </div>
+          <div class="test-item">
+            <div class="test-n">④ 稳定流程复用</div>
+            <h4>操作写脚本 + 入口排障成 Skill</h4>
+            <p>把常用操作固化脚本，把故障排查路径沉淀成 Skill，下次遇到同类问题直接调用。</p>
+          </div>
+        </div>
+
+        <div class="callout info" style="margin:14px 0 0">
+          <h4 style="color:var(--navy)">统一测试 CLI 框架</h4>
+          <p>环境检查 → 数据准备 → 场景执行 → 结果查询 → 清理。一条命令覆盖完整生命周期。</p>
+        </div>
+
+        <div class="quote-block">
+          <p><strong>核心原则：工具帮拿证据，不替定正确答案。</strong>预期结果必须来自业务契约，「不能让 Agent 看到系统返回了什么就认为什么是正确的」。产品本身是 Agent 时加 Agent Eval。</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- §7 Review 四实践 -->
+    <article class="section-card">
+      <div class="section-head">
+        <span class="sec-num">7</span>
+        <div>
+          <div class="sec-title">Review 四实践</div>
+          <div class="sec-subtitle">先标准后结果 · 沿业务路径 · 奥卡姆再审 · Review Bot</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div class="rev-card">
+            <h4>① 先验收标准再对照结果</h4>
+            <p>Review 前先确认「这 MR 要解决什么问题」，再看测试结果是否符合验收口径，而不是直接看代码对不对。</p>
+            <div class="rev-tip">✓ 先问：需求是什么？验收标准是什么？</div>
+          </div>
+          <div class="rev-card">
+            <h4>② 沿业务路径看高风险</h4>
+            <p>权限变化、状态流转、并发、重试、数据一致性、迁移回滚——沿真实业务路径追高风险点。稳定 CRUD 少看甚至不看。</p>
+            <div class="rev-tip">✓ 看业务链路，不看代码语法</div>
+          </div>
+          <div class="rev-card">
+            <h4>③ 新增抽象用奥卡姆再审</h4>
+            <p>每个新增的类/模块/服务，用奥卡姆剃刀追问：去掉它会怎样？现有的能合并吗？防止为抽象而抽象。</p>
+            <div class="rev-tip">✓ 每层抽象必须有不可替代的理由</div>
+          </div>
+          <div class="rev-card">
+            <h4>④ MR 多则建 Review Bot</h4>
+            <p>当 MR 量大时，建 Review Bot 结合 Git 变更 + 预设审查流程，自动过滤低风险 PR，让人专注高风险路径。</p>
+            <div class="rev-tip">✓ 人做判断，Bot 做过滤</div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- §8 瓶颈反思 -->
+    <article class="section-card">
+      <div class="section-head">
+        <span class="sec-num">8</span>
+        <div>
+          <div class="sec-title">瓶颈反思与行动建议</div>
+          <div class="sec-subtitle">Review 速度 · Harness 三要素 · 定期做减法 · 验收标准仍需人给</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div>
+            <div class="callout warning" style="margin:0 0 12px">
+              <h4 style="color:var(--amber)">⚠ 当前瓶颈</h4>
+              <p>Agent 可以并行推进，但人的判断不成倍增加。Review 速度是人肉瓶颈。</p>
+            </div>
+            <div class="callout info" style="margin:0">
+              <h4 style="color:var(--navy)">Harness 三要素</h4>
+              <p>正确上下文（CONTEXT.md / Spec）+ 可执行环境（一键启动）+ 判断结果依据（验收标准 / 业务契约）。三者缺一，Agent 在黑暗里跑。</p>
+            </div>
+          </div>
+          <div>
+            <div class="callout info" style="margin:0 0 12px;background:var(--mint);border-color:var(--green)">
+              <h4 style="color:var(--green)">✓ 工作流定期做减法</h4>
+              <p>OpenAI Astra 更新后主动删 AGENTS.md 的过严约束。工作流会随工具进化变臃肿，需要定期清理。</p>
+            </div>
+            <div class="callout warning" style="margin:0">
+              <h4 style="color:var(--amber)">✓ 验收标准仍需人给</h4>
+              <p>代码和测试互相对得上也可能一起误解需求。人是最终的需求契约方，AI 只是执行器。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="insight-strip">
+          <strong>行动建议：</strong>
+          <span>挑一条最常做的自测路径，让 Agent 独立跑通、保留证据、沉淀步骤。从「跑通一条路」开始，不是建一整套体系。</span>
+        </div>
+
+        <div class="quote-block">
+          <p>AI 减少踩坑机会，留出时间学习复盘。关键不是用更多工具，而是用对方法——每次问自己：这个流程重复三次了吗？要不要沉淀成 Skill？</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- §9 术语表 -->
+    <article class="section-card">
+      <div class="section-head">
+        <span class="sec-num">9</span>
+        <div>
+          <div class="sec-title">术语表</div>
+          <div class="sec-subtitle">Harness · Spec · ADR · CONTEXT.md · subagent · worktree · 消融实验 · 对抗性审查 · Agent Eval</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <table class="term-table">
+          <thead>
+            <tr>
+              <th style="width:150px">术语</th>
+              <th>解释</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Harness</td>
+              <td>测试脚手架。指让 Agent 在「正确上下文 + 可执行环境 + 判断依据」里跑通验证的完整体系。</td>
+            </tr>
+            <tr>
+              <td>Spec</td>
+              <td>技术规格说明文档。包含目标、约束、技术选型、验收标准——在开工前与 Agent 对齐。</td>
+            </tr>
+            <tr>
+              <td>ADR</td>
+              <td>Architecture Decision Record。记录架构决策的背景、选项、结论与后果，供后续查阅。</td>
+            </tr>
+            <tr>
+              <td>CONTEXT.md</td>
+              <td>跨会话上下文文件。grill 结论沉淀在此，下一个 Agent 启动时直接读，不再重复对齐。</td>
+            </tr>
+            <tr>
+              <td>subagent</td>
+              <td>子 Agent。复杂任务拆成独立 Issue，分配给 subagent 并行处理，主 Agent 负责集成与 Review。</td>
+            </tr>
+            <tr>
+              <td>worktree</td>
+              <td>Git worktree。在同一仓库的不同目录并行开发不同分支，适合 subagent 并行时隔离工作区。</td>
+            </tr>
+            <tr>
+              <td>消融实验</td>
+              <td>Ablation Study。逐步移除/单独启用各个优化项，分离真实贡献与噪声干扰，判断真正收益。</td>
+            </tr>
+            <tr>
+              <td>对抗性审查</td>
+              <td>Adversarial Review。不是帮方案找理由，而是想办法证明它是错的——主动暴露风险而非被动等待 Review。</td>
+            </tr>
+            <tr>
+              <td>Agent Eval</td>
+              <td>Agent 评测。当产品本身就是 Agent 时，用自动化方法评估 Agent 输出质量，而非传统 UI 验收。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+  </div><!-- /.sections -->
+
+  <!-- Footer -->
+  <div style="font-size:12px;opacity:.75;margin:8px 0">注：文中模型版本（GPT-5.6 Sol/Claude 5 Fable 等）与作者身份均为原文自述，❓ 未经独立核实；方法论内容以原文引述为准。</div>
+<footer class="footer-strip">
+    <span class="src">来源：<a href="https://x.com/huangtongxueh/status/2108577165306687938" style="color:inherit;text-decoration:none">X @huangtongxueh · 文章原文</a> · 2026-10-09</span>
+    <span>点赞 2,314 · 浏览 157,847 · 2026-10-11 实抓</span>
+  </footer>
+
+</main>
+<script>
+(function(){
+  function send(){var h=document.body.scrollHeight;window.parent.postMessage({type:'theme-height',slug:'editorial-system',height:h},'*');}
+  if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+  setTimeout(send,500);setTimeout(send,1200);
+})();
+</script>
+</body>
+</html>
