@@ -254,6 +254,61 @@ open(path, 'w').write(raw)
 
 ---
 
+## H-11 · 子智能体委派超时导致 card.html 未写出
+
+**症状**：子智能体委派完成（owner exit）但 `.docs/<run-id>/<slug>/card.html` 不存在或 size = 0；日志显示 `write_file` 超时或 execute_code 超时。
+
+**根因**：`write_file` 工具有 25s 超时硬限制；大文件（25KB+）在慢 I/O 下无法在时限内写入。子智能体改用 `execute_code` 后，kernel write 同样受 25s 限制。子智能体 owner exit 时写入操作被中断，文件未落盘。
+
+**主线程兜底流程**：
+
+```bash
+# 步骤1：检查子智能体是否写出了文件
+ls -la .docs/<run-id>/<slug>/card.html
+
+# 步骤2：若文件不存在或 size < 1KB → 主线程直接创作
+# 用 execute_code 在主线程写入，不走子智能体委派
+# 主线程 execute_code 无子智能体 25s 内核限制，文件可写成功
+
+# 步骤3：verify 后按 H-9 流程发布（copy HTML → copy meta → build）
+```
+
+**关键教训**：子智能体 `write_file` 超时后，该委派的 HTML 不可信；主线程直接创作是最高效的兜底方案，不要反复重委派。委派超时 ≠ 素材丢失——主线程持有完整素材上下文。
+
+---
+
+## H-12 · 子智能体输出 size 不足 27KB
+
+**症状**：子智能体产出的 `card.html` 通过 info-leak 但 size < 27KB（软下限），`wc -c` 显示 20-26KB。
+
+**根因**：子智能体受 token 预算限制或主题模板结构不熟悉，创作时截断内容节。27KB 软下限是信息密度的经验阈值：低于此值的卡视觉单薄、读者体验差。
+
+**主线程补强流程**：
+
+```bash
+# 步骤1：检查 size
+wc -c .docs/<run-id>/<slug>/card.html
+
+# 步骤2：若 < 27KB，主线 patch 补节（不要重委派）：
+# 典型补节类型：
+#   - 竞品横向对比表（+1.5-2KB）
+#   - 技术细节深入节（+1-2KB）
+#   - 快速上手 / 代码示例节（+1-2KB）
+#   - Pipeline 示例节（+1-2KB）
+#   - R-SWA 数学分析节（+1-2KB）
+
+# 示例 patch：
+# patch .docs/<run-id>/<slug>/card.html \
+#   '<\/section>\s*<section class="dark-closing">' \
+#   '<h2 class="section-title">N · 补充节标题</h2>...内容...<\/section>\n\n    <section class="dark-closing">'
+
+# 步骤3：verify 后 publish
+```
+
+**规则**：主线程是最终的 size 把关人；子智能体输出只作骨架和 facts 来源，补节是主线的标准操作，不算绕过子智能体。
+
+---
+
 ## H-6 · 移动端布局溢出
 
 **症状**：桌面双栏 hero（`grid-template-columns: 1fr 340px`）在移动端（≤640px）水平溢出，右侧 stat-block 被切，左侧文字与图标重叠。
