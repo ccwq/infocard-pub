@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkgreen">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Strata 本地大模型推理引擎 — 在游戏显卡上跑 Qwen3.8-Flash-Next</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:#07120d;
+      color:#eaf7ef;
+      font-size:13px
+    }
+    .page{width:100%;max-width:720px;margin:0 auto;padding:16px 14px 80px}
+
+    /* === 顶部状态条 === */
+    .status-bar{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 14px;
+      background:#0b1711;
+      border-bottom:1px solid rgba(180,255,210,.12);
+      font-size:11px;color:#9fbeab;
+      margin-bottom:16px
+    }
+    .status-bar .dot{
+      width:8px;height:8px;border-radius:50%;
+      background:#33d17a;
+      box-shadow:0 0 6px #33d17a;
+      flex-shrink:0
+    }
+    .status-bar .label{color:#33d17a;font-weight:700}
+
+    /* === kicker === */
+    .kicker{
+      border-left:3px solid #33d17a;
+      padding-left:10px;
+      font-size:11px;font-weight:700;
+      text-transform:uppercase;letter-spacing:.08em;
+      color:#33d17a;margin-bottom:10px
+    }
+    h2{font-size:20px;font-weight:700;margin:0 0 10px;color:#eaf7ef;letter-spacing:-.02em}
+
+    /* === Hero === */
+    .hero-title{
+      font-size:clamp(28px,7vw,44px);
+      font-weight:900;
+      color:#eaf7ef;
+      line-height:1.05;
+      letter-spacing:-.04em;
+      margin:0 0 8px
+    }
+    .hero-sub{
+      font-size:14px;color:#78f2b0;margin:0 0 14px;line-height:1.5
+    }
+    .hero-links{
+      display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px
+    }
+    .hero-links a{
+      display:inline-block;
+      padding:4px 10px;
+      border:1.5px solid #33d17a;
+      border-radius:20px;
+      font-size:11px;font-weight:700;
+      color:#33d17a;
+      text-decoration:none;
+      background:rgba(51,209,122,.08)
+    }
+    .hero-links a.primary{
+      background:#33d17a;color:#07120d
+    }
+
+    /* === Hero 数据行 === */
+    .hero-stats{
+      display:grid;grid-template-columns:repeat(4,1fr);
+      gap:8px;margin-bottom:14px
+    }
+    .stat-card{
+      background:#102018;
+      border:1px solid rgba(180,255,210,.12);
+      border-radius:8px;padding:10px 8px;text-align:center
+    }
+    .stat-card strong{
+      display:block;font-size:20px;font-weight:700;
+      color:#33d17a;margin-bottom:3px
+    }
+    .stat-card span{font-size:10px;color:#9fbeab;font-weight:600;display:block}
+
+    /* === Hero Note === */
+    .hero-note{
+      background:linear-gradient(135deg,rgba(51,209,122,.14),rgba(51,209,122,.06));
+      border:1px solid rgba(51,209,122,.28);
+      border-radius:8px;padding:10px 12px;
+      font-size:12px;line-height:1.65;color:#9fbeab;
+      margin-bottom:14px
+    }
+    .hero-note strong{color:#78f2b0}
+
+    /* === 面板 === */
+    .panel{
+      background:#102018;
+      border:1px solid rgba(180,255,210,.12);
+      border-radius:8px;padding:12px;
+      margin-bottom:12px
+    }
+    .panel-title{
+      font-size:11px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.08em;color:#33d17a;
+      border-bottom:1px solid rgba(180,255,210,.08);
+      padding-bottom:8px;margin-bottom:10px
+    }
+    .panel-row{
+      display:flex;justify-content:space-between;
+      align-items:center;padding:6px 0;
+      font-size:12px;border-bottom:1px solid rgba(180,255,210,.06)
+    }
+    .panel-row:last-child{border-bottom:none}
+    .panel-row .key{color:#9fbeab}
+    .panel-row .val{color:#78f2b0;font-weight:700}
+
+    /* === 分布图 === */
+    .dist-grid{
+      display:grid;grid-template-columns:repeat(2,1fr);
+      gap:8px;margin-bottom:12px
+    }
+    .dist-item{
+      background:#0b1711;
+      border:1px solid rgba(180,255,210,.12);
+      border-radius:8px;padding:10px;
+      display:grid;gap:4px
+    }
+    .dist-item .icon{
+      font-size:18px;margin-bottom:2px
+    }
+    .dist-item .tier{
+      font-size:12px;font-weight:700;color:#eaf7ef
+    }
+    .dist-item .desc{
+      font-size:11px;color:#9fbeab;line-height:1.4
+    }
+    .dist-item .chip{
+      display:inline-block;
+      padding:2px 7px;
+      border-radius:999px;font-size:10px;font-weight:700;
+      background:rgba(51,209,122,.12);color:#33d17a;
+      border:1px solid rgba(51,209,122,.3);
+      margin-top:4px
+    }
+
+    /* === 表格 === */
+    .perf-table{
+      width:100%;border-collapse:collapse;
+      margin-bottom:12px;font-size:12px
+    }
+    .perf-table th{
+      background:#0b1711;color:#33d17a;font-weight:700;
+      text-align:left;padding:7px 10px;
+      border-bottom:1px solid rgba(51,209,122,.2);
+      font-size:11px;text-transform:uppercase;letter-spacing:.06em
+    }
+    .perf-table td{
+      padding:7px 10px;border-bottom:1px solid rgba(180,255,210,.06);
+      color:#9fbeab
+    }
+    .perf-table td:nth-child(2){color:#78f2b0;font-weight:700}
+    .perf-table td:nth-child(3){color:#57d7c0;font-weight:700}
+    .perf-table tr:last-child td{border-bottom:none}
+    .perf-table .highlight td{background:rgba(51,209,122,.08)}
+
+    /* === 硬件推荐表 === */
+    .hw-table{
+      width:100%;border-collapse:collapse;
+      margin-bottom:12px;font-size:12px
+    }
+    .hw-table th{
+      background:#0b1711;color:#33d17a;font-weight:700;
+      text-align:left;padding:7px 10px;
+      border-bottom:1px solid rgba(51,209,122,.2);
+      font-size:11px;text-transform:uppercase;letter-spacing:.06em
+    }
+    .hw-table td{
+      padding:7px 10px;border-bottom:1px solid rgba(180,255,210,.06);
+      color:#9fbeab
+    }
+    .hw-table td:nth-child(1){color:#eaf7ef;font-weight:700}
+    .hw-table td:nth-child(2){color:#78f2b0}
+    .hw-table tr:last-child td{border-bottom:none}
+    .hw-table .rec td{background:rgba(51,209,122,.10)}
+
+    /* === chips === */
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+    .chip{
+      padding:3px 9px;
+      border:1.5px solid #33d17a;
+      border-radius:20px;font-size:11px;font-weight:700;
+      color:#33d17a;background:rgba(51,209,122,.08)
+    }
+    .chip.fill{background:#33d17a;color:#07120d}
+    .chip.cyan{border-color:#57d7c0;color:#57d7c0;background:rgba(87,215,192,.08)}
+    .chip.yellow{border-color:#f2d45c;color:#f2d45c;background:rgba(242,212,92,.08)}
+
+    /* === 终端代码块 === */
+    .term{
+      background:#0b1711;
+      border:1px solid rgba(180,255,210,.12);
+      border-radius:6px;padding:10px 12px;
+      font-family:monospace;font-size:12px;
+      line-height:1.8;margin-bottom:12px;
+      color:#9fbeab
+    }
+    .term .cmd{color:#78f2b0}
+    .term .url{color:#57d7c0}
+    .term .comment{color:#4a6050}
+    .term .dim{color:#6a7f70}
+
+    /* === 步骤 === */
+    .steps{display:grid;gap:10px;margin-bottom:12px}
+    .step{
+      display:grid;grid-template-columns:32px 1fr;
+      gap:10px;align-items:start
+    }
+    .step-no{
+      width:32px;height:32px;border-radius:50%;
+      background:#33d17a;color:#07120d;
+      font-weight:900;font-size:14px;
+      display:grid;place-items:center;
+      flex-shrink:0
+    }
+    .step-body{display:grid;gap:3px;padding-top:5px}
+    .step-body .t{font-size:13px;font-weight:700;color:#eaf7ef}
+    .step-body .c{font-size:12px;color:#9fbeab;line-height:1.5}
+
+    /* === 警告 / 告警 === */
+    .alert{
+      border-radius:6px;padding:10px 12px;
+      font-size:12px;margin-bottom:10px;
+      border-left:3px solid
+    }
+    .alert.ok{background:rgba(51,209,122,.1);border-color:#33d17a;color:#78f2b0}
+    .alert.warn{background:rgba(242,212,92,.1);border-color:#f2d45c;color:#f2d45c}
+    .alert.err{background:rgba(255,116,116,.1);border-color:#ff7474;color:#ff7474}
+
+    /* === 术语表 === */
+    .glossary{display:grid;gap:8px;margin-bottom:12px}
+    .gloss-item{
+      background:#0b1711;
+      border:1px solid rgba(180,255,210,.1);
+      border-radius:6px;padding:8px 10px;
+      display:grid;grid-template-columns:120px 1fr;
+      gap:8px;align-items:start;font-size:12px
+    }
+    .gloss-item .term{color:#78f2b0;font-weight:700;font-family:monospace;margin:0;padding:0;border:none;background:none}
+    .gloss-item .def{color:#9fbeab;line-height:1.5;padding-top:1px}
+
+    /* === 按钮 === */
+    .btn{
+      display:inline-block;padding:7px 16px;
+      border:2px solid #33d17a;
+      border-radius:6px;
+      background:#33d17a;color:#07120d;
+      font-size:12px;font-weight:700;text-decoration:none;
+      margin-right:8px
+    }
+    .btn.outline{background:transparent;color:#33d17a}
+
+    /* === 备注 === */
+    .note{
+      border-left:3px solid #33d17a;
+      padding:10px 12px;
+      background:#102018;
+      border-radius:0 6px 6px 0;
+      font-size:12px;line-height:1.65;color:#9fbeab;
+      margin-bottom:12px
+    }
+
+    /* === 分割线 === */
+    hr{
+      border:none;border-top:1px solid rgba(180,255,210,.1);
+      margin:14px 0
+    }
+
+    /* === 来源 === */
+    .source-block{
+      background:#0b1711;
+      border:1px solid rgba(180,255,210,.1);
+      border-radius:6px;padding:10px 12px;
+      font-size:11px;color:#6a7f70;line-height:1.8;
+      margin-bottom:10px
+    }
+    .source-block a{color:#57d7c0}
+
+    p{font-size:13px;line-height:1.7;color:#9fbeab;margin:0 0 12px}
+
+    /* === Mobile === */
+    @media(max-width:600px){
+      .hero-stats{grid-template-columns:repeat(2,1fr)}
+      .dist-grid{grid-template-columns:1fr}
+      h2{font-size:17px}
+      .gloss-item{grid-template-columns:90px 1fr}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- 状态条 -->
+    <div class="status-bar">
+      <span class="dot"></span>
+      <span class="label">● STRATA ENGINE</span>
+      <span>· Qwen3.8-Flash-Next · 1250亿参数 · MoE · 2026-10-12</span>
+    </div>
+
+    <!-- Hero -->
+    <div class="kicker">LOCAL LLM INFERENCE ENGINE · CONSUMER GPU</div>
+    <div class="hero-title">Strata</div>
+    <div class="hero-sub">在游戏显卡上跑 1250 亿参数大模型 —— 无需服务器级 GPU，无需 API Token</div>
+    <div class="hero-links">
+      <a href="https://github.com/Niko1221/Strata" class="primary" target="_blank">★ GitHub 22k+</a>
+      <a href="https://www.xgdn.com/90.html" target="_blank">📝 博客教程原文</a>
+      <a href="https://github.com/Niko1221/Strata/releases" target="_blank">⬇ 下载 (~70GB)</a>
+    </div>
+
+    <!-- 核心数据 -->
+    <div class="hero-stats">
+      <div class="stat-card"><strong>1250亿</strong><span>参数总量</span></div>
+      <div class="stat-card"><strong>24,576</strong><span>MoE 专家总数</span></div>
+      <div class="stat-card"><strong>262K</strong><span>上下文窗口</span></div>
+      <div class="stat-card"><strong>94</strong><span>tokens/s (Q2_0)</span></div>
+    </div>
+
+    <div class="hero-note">
+      <strong>⚡ MTP 加速 + 分布式推理</strong><br>
+      MTP（Guess-Then-Check）1.6–1.8× 加速；每词仅激活 10 个专家（24,576 总量）。一行命令启动，浏览器打开 http://127.0.0.1:8080 即用。
+    </div>
+
+    <!-- 第①节：引入 -->
+    <div class="kicker">① 引入</div>
+    <h2>博客首发：无审查版来了！</h2>
+    <p>X超哥博客（xgdn.com/90.html，2026-10-03，1004 阅读）详细解读了 Strata + Qwen3.8-Flash-Next 的本地部署方案：MTP 加速、262K 上下文、图片输入、无需 API Token，8GB 显存可跑。博主实测环境：RTX 4080 SUPER 16GB / AMD R9 7900X / 64GB DDR5。</p>
+    <div class="chips">
+      <span class="chip fill">无审查版</span>
+      <span class="chip cyan">MTP 加速</span>
+      <span class="chip">262K 上下文</span>
+      <span class="chip yellow">⚠ 合规用户自判</span>
+    </div>
+
+    <hr>
+
+    <!-- 第②节：痛点 -->
+    <div class="kicker">② 痛点</div>
+    <h2>大模型落地的四座大山</h2>
+    <div class="dist-grid">
+      <div class="dist-item">
+        <div class="icon">🎮</div>
+        <div class="tier">显存门槛极高</div>
+        <div class="desc">1250 亿参数全精度需 ~250GB，普通消费显卡（12–24GB）完全跑不动。</div>
+      </div>
+      <div class="dist-item">
+        <div class="icon">💸</div>
+        <div class="tier">API Token 成本</div>
+        <div class="desc">云端调用按 token 付费，长上下文任务成本迅速膨胀。</div>
+      </div>
+      <div class="dist-item">
+        <div class="icon">🔒</div>
+        <div class="tier">数据隐私风险</div>
+        <div class="desc">代码、商业数据上传云端，隐私合规需额外处理。</div>
+      </div>
+      <div class="dist-item">
+        <div class="icon">⏳</div>
+        <div class="tier">上下文窗口短</div>
+        <div class="desc">许多开源方案仅支持 8K–32K，无法处理长文档分析。</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- 第③节：Strata 是什么 -->
+    <div class="kicker">③ Strata 是什么</div>
+    <h2>Niko1221 / Strata — 消费级显卡推理引擎</h2>
+    <div class="panel">
+      <div class="panel-row"><span class="key">GitHub</span><span class="val">Niko1221 / Strata</span></div>
+      <div class="panel-row"><span class="key">Stars / Forks</span><span class="val">22,062 ★ / 2,117</span></div>
+      <div class="panel-row"><span class="key">许可证</span><span class="val">MIT</span></div>
+      <div class="panel-row"><span class="key">创建时间</span><span class="val">2026-09-24（仅约 18 天）</span></div>
+      <div class="panel-row"><span class="key">语言</span><span class="val">C++</span></div>
+      <div class="panel-row"><span class="key">支持模型</span><span class="val">Qwen3.8-Flash-Next GGUF</span></div>
+    </div>
+    <p>一行总结：<strong style="color:#78f2b0">在自己游戏显卡上跑 1250 亿参数 AI 模型</strong>，OpenAI / Anthropic 协议兼容，零云费用，隐私完全自主。</p>
+
+    <hr>
+
+    <!-- 第④节：分布式推理原理解读 -->
+    <div class="kicker">④ 核心原理：分布式推理</div>
+    <h2>24,576 个专家如何分配到你的硬件</h2>
+    <p>Strata 将 MoE 专家按访问频率分层调度，每生成一个词（Token）只需调用其中 10 个活跃专家：</p>
+    <div class="dist-grid">
+      <div class="dist-item">
+        <div class="icon">🟢</div>
+        <div class="tier">GPU — 高频专家</div>
+        <div class="desc">最频繁调用的专家常驻显存，延迟最低，每次推理必经。</div>
+        <span class="chip">最低延迟</span>
+      </div>
+      <div class="dist-item">
+        <div class="icon">🟡</div>
+        <div class="tier">RAM — 全量专家</div>
+        <div class="desc">所有专家镜像保存在内存，随时可交换到 GPU，64GB+ 内存推荐。</div>
+        <span class="chip">按需交换</span>
+      </div>
+      <div class="dist-item">
+        <div class="icon">🟠</div>
+        <div class="tier">CPU — 低频专家</div>
+        <div class="desc">访问频率低的专家下沉到 CPU，降低显存占用。</div>
+        <span class="chip">备用层</span>
+      </div>
+      <div class="dist-item">
+        <div class="icon">🔵</div>
+        <div class="tier">SSD — 查找表</div>
+        <div class="desc">极少访问的专家元数据存 SSD，内存溢出时的最终兜底层。</div>
+        <span class="chip cyan">查找表</span>
+      </div>
+    </div>
+    <div class="alert ok">
+      <strong>✅ 关键技术：每词仅需 10/24,576 专家</strong><br>
+      MoE 架构天然稀疏，Strata 精确调度让你用 12GB 显存跑了原来需要 250GB 才能放的模型。
+    </div>
+
+    <!-- MTP 加速说明 -->
+    <div class="note" style="margin-top:4px">
+      <strong style="color:#78f2b0">⚡ MTP 加速（Guess-Then-Check）</strong><br>
+      小模型"猜测"下一个词 → 大模型并行验证正确性 → 1.6–1.8× 生成速度提升。<br>
+      开启方式：下载 <code style="color:#78f2b0">mtp-q2_0.gguf</code>（~0.89GB）+ <code style="color:#78f2b0">strata/rt</code>（~824MB），Strata 自动启用。
+    </div>
+
+    <hr>
+
+    <!-- 第⑤节：性能数据 -->
+    <div class="kicker">⑤ 性能数据</div>
+    <h2>RTX 5070 (12GB) 量化版本实测</h2>
+    <table class="perf-table">
+      <thead>
+        <tr>
+          <th>量化版本</th>
+          <th>生成速度</th>
+          <th>读取速度</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="highlight">
+          <td>Q2_0</td>
+          <td>94 tokens/s</td>
+          <td>2,650 tokens/s</td>
+          <td>最快，8GB 显存可跑</td>
+        </tr>
+        <tr>
+          <td>IQ2_XS</td>
+          <td>79 tokens/s</td>
+          <td>2,090 tokens/s</td>
+          <td>显存友好，低显存推荐</td>
+        </tr>
+        <tr>
+          <td>IQ3_XXS</td>
+          <td>62 tokens/s</td>
+          <td>1,750 tokens/s</td>
+          <td>12GB 显存+</td>
+        </tr>
+        <tr>
+          <td>IQ3_S</td>
+          <td>53 tokens/s</td>
+          <td>1,620 tokens/s</td>
+          <td>16GB 显存+，高质量推荐</td>
+        </tr>
+        <tr>
+          <td>Coder</td>
+          <td>55 tokens/s</td>
+          <td>2,180 tokens/s</td>
+          <td>代码专用，SWE-bench 91%</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="panel" style="margin-top:-4px">
+      <div class="panel-title">其他显卡参考</div>
+      <div class="panel-row"><span class="key">RTX 3090 (24GB)</span><span class="val">100–140 tokens/s (Q2_0)</span></div>
+      <div class="panel-row"><span class="key">AMD RX 9070 XT (16GB)</span><span class="val">60 tokens/s (Q2_0)</span></div>
+      <div class="panel-row"><span class="key">RTX 5070 (12GB)</span><span class="val">94 tokens/s (Q2_0)</span></div>
+      <div class="panel-row"><span class="key">RTX 4080 SUPER (16GB)</span><span class="val">❓ 博主实测，待官方 benchmark</span></div>
+    </div>
+
+    <hr>
+
+    <!-- 第⑥节：选型指南 -->
+    <div class="kicker">⑥ 选型指南</div>
+    <h2>根据你的内存容量选量化版本</h2>
+    <table class="hw-table">
+      <thead>
+        <tr>
+          <th>可用内存</th>
+          <th>推荐量化版本</th>
+          <th>特点</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>32GB RAM</td>
+          <td>Coder 变体</td>
+          <td>移除了半数专家；SWE-bench 91%；中文/CJK 偏弱</td>
+        </tr>
+        <tr class="rec">
+          <td>48GB RAM</td>
+          <td>IQ2_XS / Q2_0</td>
+          <td>平衡速度与质量；Q2_0 最快</td>
+        </tr>
+        <tr class="rec">
+          <td>64GB RAM</td>
+          <td>IQ2_XS（推荐）/ IQ3</td>
+          <td>推荐 IQ2_XS；可选 IQ3_S 更高质量</td>
+        </tr>
+        <tr>
+          <td>96GB+ RAM</td>
+          <td>IQ3_S / UD-IQ4_XS</td>
+          <td>Unsloth UD-IQ4_XS（~4-bit，94GB，需 NVMe SSD）</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="alert warn">
+      ⚠ <strong>无审查版（Abliterated）说明：</strong>SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF（906,582 次下载）移除了模型的内容安全限制。用户需<strong style="color:#fff">自行判断使用场景的合规性</strong>，Strata 项目本身为 MIT 许可证。
+    </div>
+
+    <hr>
+
+    <!-- 第⑦节：安装与使用 -->
+    <div class="kicker">⑦ 安装与使用</div>
+    <h2>Windows 一键启动 · 浏览器即用</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-no">1</div>
+        <div class="step-body">
+          <div class="t">下载并解压</div>
+          <div class="c">从 GitHub Releases 下载 Strata zip 包（约 70GB），解压到任意目录。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-no">2</div>
+        <div class="step-body">
+          <div class="t">双击 START-HERE.bat</div>
+          <div class="c">一键下载所有模型文件（~70GB），支持断点续传。首次启动 PC 可能卡顿 1–3 分钟（35–55GB 加载到 RAM），正常现象。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-no">3</div>
+        <div class="step-body">
+          <div class="t">浏览器打开 http://127.0.0.1:8080</div>
+          <div class="c">Chat / Monitor / About 三个标签页，零配置直接使用。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">API 接口（OpenAI / Anthropic 兼容）</div>
+      <div class="panel-row"><span class="key">OpenAI 兼容</span><span class="val">http://127.0.0.1:8080/v1</span></div>
+      <div class="panel-row"><span class="key">Anthropic 兼容</span><span class="val">设置 ANTHROPIC_BASE_URL</span></div>
+      <div class="panel-row"><span class="key">API Key</span><span class="val">任意值即可（本地服务）</span></div>
+      <div class="panel-row"><span class="key">Codex Responses API</span><span class="val">/v1/responses</span></div>
+      <div class="panel-row"><span class="key">Claude Code 接入</span><span class="val">设置 ANTHROPIC_BASE_URL 指向本地</span></div>
+    </div>
+
+    <div class="term">
+<span class="comment"># 一键让 Claude Code 自动安装 Strata</span>
+<span class="dim"># 粘贴到 Claude Code / Cursor 等 AI 工具的输入框即可</span>
+<span class="cmd">Set up Strata on this PC for me:</span> <span class="url">https://github.com/Niko1221/Strata</span> <span class="dim">- follow docs/AI_SETUP.md</span>
+<span class="comment"># 或直接下载解压后双击 START-HERE.bat（Windows）</span>
+<span class="comment"># Linux: ./setup.sh</span>
+<span class="comment"># 更新: UPDATE.bat / ./update.sh</span>
+<span class="comment"># 基准测试: BENCH.bat（5-10 分钟，生成测速报告）</span>
+    </div>
+
+    <hr>
+
+    <!-- 第⑧节：注意事项 -->
+    <div class="kicker">⑧ 注意事项</div>
+    <h2>⚠️ 运行前必读</h2>
+    <div class="alert warn" style="margin-bottom:8px">
+      ⚠️ <strong>无审查版（Abliterated）：</strong>移除了内容安全限制，用户需自行判断使用场景的合规性与法律风险。下载量 906,582 次（SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF）。
+    </div>
+    <div class="alert err" style="margin-bottom:8px">
+      ⛔ <strong>首次启动 PC 卡顿（1–3 分钟）：</strong>首次运行需加载 35–55GB 数据到 RAM，Windows 可能完全无响应，属于正常预热行为。
+    </div>
+    <div class="alert warn" style="margin-bottom:8px">
+      ⚠️ <strong>显存不足表现：</strong>生成极慢 + 磁盘灯狂闪，出现"engine stopped unexpectedly"报错即显存溢出，换更低量化版本（Q2_0 / IQ2_XS）。
+    </div>
+    <div class="alert ok" style="margin-bottom:8px">
+      ✅ <strong>下载断点续传：</strong>中断后重新运行 START-HERE.bat 自动续传，无需重新下载。
+    </div>
+    <div class="alert warn" style="margin-bottom:8px">
+      ⚠️ <strong>AMD 显卡图片输入：</strong>Windows AMD 暂不支持图片输入功能；Linux 可通过 CPU 读取图片（性能略低）。
+    </div>
+    <div class="alert ok" style="margin-bottom:0">
+      ✅ <strong>内存锁定正常：</strong>Strata 锁定部分 RAM 供显卡访问，这是正常设计行为，不是内存泄漏。
+    </div>
+
+    <hr>
+
+    <!-- 第⑨节：术语表 -->
+    <div class="kicker">⑨ 术语表</div>
+    <h2>核心概念一览</h2>
+    <div class="glossary">
+      <div class="gloss-item">
+        <div class="term">MoE</div>
+        <div class="def">混合专家架构（Mixture of Experts）：1250 亿参数拆成 24,576 个"专家子网络"，每次推理只激活其中少量几个，大幅降低计算量。</div>
+      </div>
+      <div class="gloss-item">
+        <div class="term">MoE 专家</div>
+        <div class="def">每个专家是一个小型神经网络；路由器（Router）决定每个 Token 该调用哪些专家。Strata 中每词仅激活 10 个。</div>
+      </div>
+      <div class="gloss-item">
+        <div class="term">GGUF 量化</div>
+        <div class="def">将 FP16/BF16 权重压缩为低精度整数（Q2/Q3/Q4 等），体积缩小 2–4 倍，显存占用大幅降低，精度损失可控。IQ=Improved Quants，优于传统 Q 量化。</div>
+      </div>
+      <div class="gloss-item">
+        <div class="term">MTP 加速</div>
+        <div class="def">Multi-Token Prediction：先用小模型猜测下一个 Token，再用大模型并行验证，1.6–1.8× 加速。Strata 通过 mtp-q2_0.gguf + strata/rt 模块实现。</div>
+      </div>
+      <div class="gloss-item">
+        <div class="term">IQ2_XS / IQ3</div>
+        <div class="def">Improved Quant 量化级别：IQ2_XS ≈ 2.2-bit，IQ3_S ≈ 3.5-bit；比 Q2/Q3 精度更好，显存占用适中，主流推荐配置。</div>
+      </div>
+      <div class="gloss-item">
+        <div class="term">Abliterated</div>
+        <div class="def">移除了模型内置的内容安全过滤层（即"审查"机制）；用户需自行承担合规责任。</div>
+      </div>
+      <div class="gloss-item">
+        <div class="term">Distributed Inference</div>
+        <div class="def">分布式推理：GPU/RAM/CPU/SSD 各层按访问频率存储专家，减少显存需求，实现消费级硬件跑大模型。</div>
+      </div>
+      <div class="gloss-item">
+        <div class="term">SWE-bench</div>
+        <div class="def">软件工程基准测试，衡量 AI 模型解决真实 GitHub Issue 的能力。Coder 变体达原版 91%。</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- 扩展：硬件需求总览 -->
+    <div class="kicker">📋 硬件需求速查</div>
+    <h2>你的机器能跑哪个版本？</h2>
+    <div class="dist-grid" style="margin-bottom:12px">
+      <div class="dist-item">
+        <div class="icon">🟢</div>
+        <div class="tier">NVIDIA RTX 20/30/40/50 系列</div>
+        <div class="desc">GTX 16 系列不支持。驱动版本建议 535+。CUDA 非必须（Strata 自带运行时）。</div>
+        <span class="chip">推荐 NVIDIA</span>
+      </div>
+      <div class="dist-item">
+        <div class="icon">🟡</div>
+        <div class="tier">AMD RX 7900/XT, 7800/XT, 9060 XT, 9070/XT, AI PRO R9700, RX 6800/6900</div>
+        <div class="desc">ROCm 支持中；Windows AMD 图片输入暂不支持。需安装 AMD 显卡驱动。</div>
+        <span class="chip yellow">部分功能受限</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">存储与内存</div>
+      <div class="panel-row"><span class="key">可用磁盘空间</span><span class="val">≥ 80GB，SSD 推荐（首次启动更快）</span></div>
+      <div class="panel-row"><span class="key">推荐内存</span><span class="val">64GB（可跑所有量化版本）</span></div>
+      <div class="panel-row"><span class="key">最低内存</span><span class="val">32GB（Coder 变体）</span></div>
+      <div class="panel-row"><span class="key">显存最低要求</span><span class="val">12GB（Q2_0 / IQ2_XS）</span></div>
+      <div class="panel-row"><span class="key">系统</span><span class="val">Windows 10/11 或 Linux</span></div>
+    </div>
+
+    <!-- 扩展：Coder 变体详解 -->
+    <div class="note">
+      <strong style="color:#78f2b0">💡 Coder 变体：代码专用版</strong><br>
+      Coder 是 Qwen3.8-Flash-Next 的特化版本，移除了半数 MoE 专家（12,288 个），32GB 内存即可运行。<br>
+      在 SWE-bench Verified 基准测试中达到原版 91% 的分数，适合代码补全、GitHub Issue 解决等软件工程任务。<br>
+      ⚠ 注意：Coder 变体在中文/CJK 语言能力上偏弱（GitHub Issue #438 报告），日常中文对话建议使用 IQ2_XS/IQ3_S 等全量版本。
+    </div>
+
+    <!-- 扩展：思考强度 -->
+    <div class="panel">
+      <div class="panel-title">思考强度可调</div>
+      <div class="panel-row"><span class="key">off</span><span class="val">无思考层，直接输出回答，延迟最低</span></div>
+      <div class="panel-row"><span class="key">low</span><span class="val">轻量思考，短问题快速响应</span></div>
+      <div class="panel-row"><span class="key">medium</span><span class="val">中等思考，复杂问题平衡速度与质量</span></div>
+      <div class="panel-row"><span class="key">high</span><span class="val">深度思考，复杂推理任务，最高延迟</span></div>
+    </div>
+
+    <hr>
+
+    <!-- 来源 -->
+    <div class="source-block">
+      <strong style="color:#9fbeab">来源</strong><br>
+      <a href="https://www.xgdn.com/90.html" target="_blank">X超哥博客 — 无审查版来了！Qwen3.8-Flash-Next Strata版本地部署教程</a>（2026-10-03）<br>
+      <a href="https://github.com/Niko1221/Strata" target="_blank">Niko1221/Strata — GitHub README</a>（MIT，2026-09-24）<br>
+      <a href="https://huggingface.co/SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF" target="_blank">HuggingFace — SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF</a><br>
+      最后更新：2026-10-12
+    </div>
+
+  </main>
+<script>
+(function(){
+  function send(){var h=document.body.scrollHeight;window.parent.postMessage({type:'theme-height',slug:'darkgreen',height:h},'*');}if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}setTimeout(send,500);})();
+</script>
+</body>
+</html>
