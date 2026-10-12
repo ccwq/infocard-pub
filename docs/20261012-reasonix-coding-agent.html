@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="pixelstack">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FFF5E6">
+  <title>Reasonix · 本地 DeepSeek-native Coding Agent</title>
+  <style>
+    :root{
+      --bg:#FFF5E6;
+      --paper:#FBF1DA;
+      --ink:#2D1B00;
+      --ink-soft:#3a2a14;
+      --muted:#7a6747;
+      --line:#2D1B00;
+      --orange:#E65100;
+      --orange-soft:#FFB066;
+      --blue-mid:#81D4FA;
+      --blue-pale:#B3E5FC;
+      --blue-deep:#1E5CB5;
+      --paper-tile:#FAF9F6;
+      --note:#FFE9C9;
+      --max:1180px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+      font-size:13.6px;line-height:1.7;
+      text-rendering:optimizeLegibility;
+    }
+    body::before{
+      content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.22;
+      background-image:repeating-linear-gradient(0deg, rgba(45,27,0,.04) 0 1px, transparent 1px 4px),
+                       repeating-linear-gradient(90deg, rgba(45,27,0,.025) 0 1px, transparent 1px 5px);
+      mix-blend-mode:multiply;
+    }
+    a{color:inherit;text-decoration:none}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+    .page{width:min(var(--max),calc(100% - 28px));margin:0 auto;padding:18px 0 72px;position:relative;z-index:1}
+
+    .pix{
+      border:3px solid var(--line);
+      border-radius:0;
+      box-shadow:4px 4px 0 0 var(--line);
+      background-color:var(--paper);
+      background-image:
+        linear-gradient(var(--line),var(--line)),
+        linear-gradient(var(--line),var(--line)),
+        linear-gradient(var(--line),var(--line)),
+        linear-gradient(var(--line),var(--line)),
+        linear-gradient(var(--line),var(--line)),
+        linear-gradient(var(--line),var(--line)),
+        linear-gradient(var(--line),var(--line)),
+        linear-gradient(var(--line),var(--line));
+      background-repeat:no-repeat;
+      background-size:10px 3px,3px 10px,10px 3px,3px 10px,10px 3px,3px 10px,10px 3px,3px 10px;
+      background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom;
+    }
+
+    .topbar{
+      display:flex;justify-content:space-between;gap:14px;align-items:center;
+      font:800 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;
+      letter-spacing:.08em;text-transform:uppercase;color:var(--blue-deep);
+      padding:10px 14px;margin-bottom:16px;
+      background:var(--paper);
+    }
+    .topbar-line{display:grid;grid-template-columns:30px minmax(0,1fr);align-items:center;column-gap:14px;min-width:0;flex:1}
+    .topbar-title{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:clip}
+    .topbar-date{white-space:nowrap}
+    .topbar .pixel-dot{
+      display:inline-block;width:10px;height:10px;background:var(--orange);
+      box-shadow:10px 0 0 var(--blue-deep), 20px 0 0 var(--blue-mid);
+      margin-right:18px;vertical-align:middle;
+    }
+
+    /* ── hero ── */
+    .hero{
+      display:grid;grid-template-columns:380px minmax(0,1fr);gap:20px;
+      align-items:stretch;
+      padding:22px;margin-bottom:18px;
+      background:linear-gradient(180deg,#FFF8EA 0%,#FBEFD2 100%);
+    }
+    .hero-title{
+      font-family:Georgia,serif;
+      font-weight:900;
+      font-size:clamp(28px,4.2vw,48px);
+      line-height:1.02;letter-spacing:-.02em;
+      color:var(--ink);margin:8px 0 12px;
+    }
+    .hero-subtitle{
+      font-size:13px;line-height:1.6;color:var(--ink-soft);
+      margin:0 0 12px;
+    }
+    .hero-subtitle b{color:var(--blue-deep);font-weight:700}
+    .hero-lead{
+      font-size:14px;line-height:1.78;color:var(--ink-soft);
+      max-width:640px;margin:0 0 14px;
+    }
+    .hero-lead b{color:var(--ink)}
+    .hero-meta{
+      display:flex;flex-wrap:wrap;gap:8px;font-size:11.5px;
+      color:var(--muted);
+    }
+    .hero-meta span{
+      padding:4px 8px;background:#fff;border:2px solid var(--line);box-shadow:2px 2px 0 0 var(--line);
+      font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+      letter-spacing:.06em;text-transform:uppercase;color:var(--ink);
+    }
+    .recall-strip{margin-top:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .recall-strip article{background:#fff;border:2px solid var(--line);box-shadow:2px 2px 0 0 var(--line);padding:10px 12px 11px}
+    .recall-strip .k{display:block;margin-bottom:4px;font:900 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-deep)}
+    .recall-strip b{display:block;margin-bottom:4px;font-size:14px;line-height:1.2;color:var(--ink)}
+    .recall-strip p{margin:0;font-size:12px;line-height:1.55;color:var(--ink-soft)}
+    .recall-strip article.recall .k,.recall-strip article.recall b{color:var(--orange)}
+
+    /* ── pyramid ── */
+    .stage{
+      position:relative;
+      background:#FFF1D7;
+      border:3px solid var(--line);
+      box-shadow:4px 4px 0 0 var(--line);
+      min-height:400px;
+      padding:20px 16px 24px;
+      overflow:hidden;
+    }
+    .stage::before{
+      content:"";position:absolute;inset:10px 10px 14px;pointer-events:none;opacity:.24;
+      background-image:
+        linear-gradient(rgba(45,27,0,.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45,27,0,.12) 1px, transparent 1px),
+        radial-gradient(circle at 50% 50%, rgba(230,81,0,.22) 0 1px, transparent 1px);
+      background-size:10px 10px,10px 10px,20px 20px;
+      mix-blend-mode:multiply;
+    }
+    .pyramid{
+      position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+      display:flex;flex-direction:column;align-items:center;gap:0;
+    }
+    .block{
+      position:relative;
+      border:3px solid var(--line);
+      box-shadow:4px 4px 0 0 var(--line);
+      font-weight:900;letter-spacing:.04em;
+      display:flex;align-items:center;justify-content:center;
+      color:var(--ink);margin-top:3px;
+    }
+    .block.l1{width:280px;height:60px;background:var(--blue-pale);font-size:18px}
+    .block.l2{width:240px;height:54px;background:var(--paper-tile);font-size:17px}
+    .block.l3{width:200px;height:50px;background:var(--blue-mid);font-size:16px}
+    .block.l4{width:160px;height:46px;background:var(--orange);color:#fff;font-size:15px;text-shadow:1px 1px 0 #7a2900}
+    .block .corner{position:absolute;right:6px;top:6px;width:10px;height:10px;background:rgba(45,27,0,.18)}
+    .block .lbl{font-size:10px;opacity:.7;margin-left:6px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+
+    /* ── character ── */
+    .character{
+      position:absolute;left:50%;bottom:calc(18px + 60px + 54px + 50px + 46px);
+      transform:translateX(-50%);
+      width:18px;height:24px;
+    }
+    .character::before{
+      content:"";position:absolute;left:0;top:0;width:2px;height:2px;
+      box-shadow:
+        4px 0 0 #5a3a1c, 6px 0 0 #5a3a1c, 8px 0 0 #5a3a1c, 10px 0 0 #5a3a1c, 12px 0 0 #5a3a1c,
+        4px 2px 0 #5a3a1c, 12px 2px 0 #5a3a1c,
+        6px 2px 0 #f3c7a1, 8px 2px 0 #f3c7a1, 10px 2px 0 #f3c7a1,
+        6px 4px 0 #f3c7a1, 10px 4px 0 #f3c7a1, 12px 4px 0 #f3c7a1,
+        8px 4px 0 #2D1B00,
+        2px 4px 0 #f3c7a1, 4px 4px 0 #f3c7a1,
+        4px 6px 0 var(--blue-deep), 6px 6px 0 var(--blue-deep), 8px 6px 0 var(--blue-deep), 10px 6px 0 var(--blue-deep), 12px 6px 0 var(--blue-deep), 14px 6px 0 var(--blue-deep),
+        2px 8px 0 var(--blue-deep), 4px 8px 0 var(--blue-deep), 6px 8px 0 var(--blue-deep), 8px 8px 0 #fff, 10px 8px 0 var(--blue-deep), 12px 8px 0 var(--blue-deep), 14px 8px 0 var(--blue-deep),
+        4px 10px 0 var(--blue-deep), 6px 10px 0 var(--blue-deep), 8px 10px 0 #fff, 10px 10px 0 var(--blue-deep), 12px 10px 0 var(--blue-deep),
+        4px 12px 0 var(--blue-deep), 6px 12px 0 var(--blue-deep), 8px 12px 0 var(--blue-deep), 10px 12px 0 var(--blue-deep), 12px 12px 0 var(--blue-deep),
+        4px 14px 0 #1a3a78, 6px 14px 0 #1a3a78, 10px 14px 0 #1a3a78, 12px 14px 0 #1a3a78,
+        4px 16px 0 #1a3a78, 6px 16px 0 #1a3a78, 10px 16px 0 #1a3a78, 12px 16px 0 #1a3a78,
+        4px 18px 0 #111, 6px 18px 0 #111, 10px 18px 0 #111, 12px 18px 0 #111;
+    }
+
+    /* ── arrow + quote ── */
+    .arrow{
+      position:absolute;left:24px;top:30px;
+      width:64px;height:280px;
+    }
+    .arrow::before{
+      content:"";position:absolute;left:24px;top:0;width:6px;height:6px;background:var(--blue-deep);
+      box-shadow:
+        -18px 18px 0 var(--blue-deep), -12px 12px 0 var(--blue-deep), -6px 6px 0 var(--blue-deep),
+        18px 18px 0 var(--blue-deep), 12px 12px 0 var(--blue-deep), 6px 6px 0 var(--blue-deep),
+        -12px 24px 0 var(--blue-deep), -6px 24px 0 var(--blue-deep), 0 24px 0 var(--blue-deep), 6px 24px 0 var(--blue-deep), 12px 24px 0 var(--blue-deep),
+        0 36px 0 var(--blue-deep),
+        0 48px 0 var(--blue-deep),
+        0 60px 0 var(--blue-deep),
+        0 72px 0 var(--blue-deep),
+        0 84px 0 var(--blue-deep),
+        0 102px 0 var(--blue-deep),
+        0 124px 0 var(--blue-deep),
+        0 150px 0 var(--blue-deep),
+        0 180px 0 var(--blue-deep),
+        0 216px 0 var(--blue-deep),
+        0 256px 0 var(--blue-deep);
+    }
+    .arrow-quote{
+      position:absolute;left:96px;top:100px;
+      max-width:180px;
+      font-weight:900;font-size:13.5px;line-height:1.55;color:var(--blue-deep);
+    }
+    .arrow-quote em{font-style:normal;color:var(--orange);}
+
+    /* ── section cards ── */
+    .sections{
+      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;
+      margin-bottom:16px;
+    }
+    .section{padding:16px 18px}
+    .section h2{
+      margin:0 0 10px;font-size:14.5px;line-height:1.3;color:var(--ink);
+      border-bottom:2px solid var(--line);padding-bottom:6px;
+      font-weight:900;letter-spacing:.02em;
+    }
+    .section h2 span{color:var(--orange);margin-right:6px}
+    .section p{margin:0 0 8px;font-size:12.6px;line-height:1.65;color:var(--ink-soft)}
+    .section p:last-child{margin-bottom:0}
+    .section ul{margin:0;padding-left:18px}
+    .section li{margin-bottom:4px;font-size:12.6px;line-height:1.6;color:var(--ink-soft)}
+    .section li strong{color:var(--ink)}
+
+    .callout{
+      background:var(--note);padding:12px 16px;margin-top:10px;
+      font-size:12.6px;line-height:1.65;color:var(--ink);
+      transform:rotate(-.3deg);
+      border:2px solid var(--line);box-shadow:2px 2px 0 0 var(--line);
+    }
+    .callout b{color:var(--orange);font-weight:900}
+
+    /* ── comparison table ── */
+    .comparison{margin-top:16px;overflow-x:auto}
+    .comparison table{width:100%;border-collapse:collapse;font-size:12.6px}
+    .comparison th{
+      background:var(--blue-deep);color:#fff;
+      padding:8px 10px;text-align:left;font-weight:700;
+      border:2px solid var(--line);
+    }
+    .comparison td{
+      padding:7px 10px;border:2px solid var(--line);
+      background:var(--paper);color:var(--ink-soft);
+      vertical-align:top;
+    }
+    .comparison tr:nth-child(even) td{background:#FFF9EE}
+    .comparison td:first-child{font-weight:700;color:var(--ink);background:#FBF1DA}
+    .highlight td{background:var(--blue-pale) !important;font-weight:700;color:var(--ink) !important}
+
+    /* ── glossary ── */
+    .glossary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+    .glossary-item{
+      background:#fff;border:2px solid var(--line);box-shadow:2px 2px 0 0 var(--line);
+      padding:8px 12px;
+    }
+    .glossary-item dt{
+      font:900 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+      letter-spacing:.06em;text-transform:uppercase;color:var(--blue-deep);
+      margin-bottom:4px;
+    }
+    .glossary-item dd{margin:0;font-size:12px;line-height:1.55;color:var(--ink-soft)}
+
+    /* ── footer ── */
+    .footer{
+      margin-top:16px;padding:12px 14px;background:var(--paper);
+      display:flex;justify-content:space-between;gap:12px;align-items:center;
+      font-size:12px;color:var(--muted);
+    }
+    .footer code{color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+    /* ── responsive ── */
+    @media(max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .sections{grid-template-columns:1fr}
+      .glossary{grid-template-columns:1fr}
+    }
+    @media(max-width:720px){
+      .page{width:min(100% - 16px,var(--max));padding:12px 0 32px}
+      .topbar{flex-direction:column;align-items:flex-start;gap:4px;padding:9px 10px;font-size:8.8px;line-height:1.15}
+      .topbar-line{width:100%;grid-template-columns:30px minmax(0,1fr);column-gap:12px}
+      .topbar .pixel-dot{margin-right:0}
+      .hero{padding:14px}
+      .stage{min-height:360px}
+      .arrow,.arrow-quote{display:none}
+      .block.l1{width:210px;height:52px;font-size:14px}
+      .block.l2{width:174px;height:48px;font-size:13px}
+      .block.l3{width:140px;height:44px;font-size:13px}
+      .block.l4{width:110px;height:40px;font-size:13px}
+      .character{bottom:calc(18px + 52px + 48px + 44px + 40px)}
+      .recall-strip{grid-template-columns:1fr}
+      .comparison{font-size:11.5px}
+      .footer{flex-direction:column;align-items:flex-start}
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <!-- topbar -->
+  <div class="topbar pix">
+  <div class="topbar-line"><span class="pixel-dot"></span><span class="topbar-title">Reasonix · DeepSeek-native Coding Agent</span></div>
+  <div class="topbar-date">2026-10-12 · v0.x (TS) / main-v2 (Go)</div>
+  </div>
+
+  <!-- hero -->
+  <section class="hero pix">
+    <div class="stage">
+      <div class="arrow"></div>
+      <div class="arrow-quote">把模型选择权<br>和代码都<em>留在自己手里</em>，<br>这事越来越值钱。</div>
+      <div class="character" aria-hidden="true"></div>
+      <div class="pyramid">
+        <div class="block l4">MIT · 本地运行<span class="lbl">L4</span></div>
+        <div class="block l3">三支柱架构<span class="lbl">L3</span></div>
+        <div class="block l2">四形态入口<span class="lbl">L2</span></div>
+        <div class="block l1">本地 AI 编程 Agent<span class="lbl">L1</span></div>
+      </div>
+    </div>
+    <div>
+      <h1 class="hero-title">Reasonix</h1>
+      <p class="hero-subtitle">
+        <b>esengine / DeepSeek-Reasonix</b> · 35,769 ★ · MIT · Go 重写进行中
+      </p>
+      <p class="hero-lead">
+        完全跑在<strong>本机</strong>的 DeepSeek-native AI 编程 Agent。
+        代码不动云端，模型自己配，权限自己定，改坏了还能回退——
+        把对「云端编程助手」的别扭感全部卸掉。
+      </p>
+      <div class="hero-meta">
+        <span>MIT</span>
+        <span>35K★</span>
+        <span>本地运行</span>
+        <span>DeepSeek</span>
+        <span>Tauri</span>
+        <span>Go / TypeScript</span>
+      </div>
+      <div class="recall-strip" aria-label="核心卖点">
+        <article>
+          <span class="k">core value</span>
+          <b>代码不动云端，模型自己配</b>
+          <p>全程本地运行，DeepSeek 预设 + OpenAI 兼容接口随便接，模型选择权完全在你自己。</p>
+        </article>
+        <article class="recall">
+          <span class="k">recall</span>
+          <b>权限分级 + 文件回退</b>
+          <p>哪些文件可直接改、哪些要先问；改坏了不用靠 git 救命，内置回退机制。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- intro / sec1 -->
+  <div class="sections">
+    <article class="section pix">
+      <h2><span>①</span>为什么关注这个工具</h2>
+      <p>
+        用云端编程助手最别扭的两件事：<strong>代码得交出去</strong>，<strong>模型和价格还不由你定</strong>。
+      </p>
+      <p>
+        @Ryrenz（10,969 followers）2026-10-11 发推：
+      </p>
+      <div class="callout">
+        <b>「把模型选择权和代码都留在自己手里，这事越来越值钱。」</b>
+        <br><a href="https://x.com/Ryrenz/status/2109239841711894801" style="font-size:11px;color:var(--blue-deep);text-decoration:underline">→ 推文原文</a>
+      </div>
+      <p>
+        Reasonix 把这两个别扭全部卸掉：本地运行，代码不动云端；DeepSeek 预设开箱即用，OpenAI 接口也兼容；权限分级，想让 Agent 直接动还是先问你，完全自己定。
+      </p>
+    </article>
+
+    <article class="section pix">
+      <h2><span>②</span>Reasonix 是什么</h2>
+      <p>
+        <strong>esengine / DeepSeek-Reasonix</strong>，35,769 ★，MIT 协议，一个本地运行的 DeepSeek-native AI 编程 Agent。
+      </p>
+      <p>
+        主开发语言已从 TypeScript 迁移到 <strong>Go（main-v2 分支为新默认）</strong>，
+        TypeScript 版（main 分支）仅维护模式，不再新增功能。
+      </p>
+      <ul>
+        <li><strong>正经 agent 干活</strong>：读项目代码、改文件、跑命令和测试</li>
+        <li><strong>权限分级</strong>：可直接动 / 先问两类，可按工作区配置</li>
+        <li><strong>文件改动回退</strong>：改坏了不用 git 救命</li>
+        <li><strong>四种使用形态</strong>：桌面 Studio / 终端 / 浏览器 / VS Code</li>
+      </ul>
+      <div class="callout">
+        <b>⚠️ 注意</b>：main-v2（Go 重写）是当前开发主线，TypeScript 版（main 分支）仅维护，不建议在新项目使用 TS 版。
+      </div>
+    </article>
+
+    <article class="section pix">
+      <h2><span>③</span>四种使用形态</h2>
+      <p>Reasonix 提供了从终端到桌面的多个入口，选择哪个取决于你的工作流：</p>
+      <ul>
+        <li><strong>Reasonix Studio（桌面应用）</strong>：Tauri 原生 GUI，多 tab，右侧面板显示本会话读/编辑的文件，底部有 cost/cache/token 仪表板。GitHub Releases 下载中（prerelease）。macOS 需 <code>xattr -dr com.apple.quarantine</code> 放行。</li>
+        <li><strong>reasonix code（终端命令）</strong>：最核心用法，<code>reasonix code [dir]</code> 启动，带完整 agent 能力。另有 <code>reasonix chat</code>（纯聊天）、<code>reasonix run "task"</code>（一次性任务，流式输出）、<code>dsnix</code> 别名。</li>
+        <li><strong>浏览器 Dashboard</strong>：嵌入式 web 界面，随时查看当前会话上下文和状态。</li>
+        <li><strong>VS Code + ACP 协议插件</strong>：在 VS Code 内通过 ACP 协议接入 Reasonix，适合不想离开编辑器的开发者。</li>
+      </ul>
+      <div class="callout">
+        <b>选型建议</b>：日常主力用 <code>reasonix code</code>；需要 GUI 盯状态用 Studio prerelease；VS Code 用户装插件；需要远程协作开 QQ Channel。
+      </div>
+    </article>
+
+    <article class="section pix">
+      <h2><span>④</span>三支柱架构</h2>
+      <p>Reasonix 能在本地稳定高效运行，靠的是三个核心工程支柱：</p>
+      <ul>
+        <li><strong>Pillar 1 · 前缀缓存优先循环（Cache-first Loop）</strong>：DeepSeek 原生 prefix-cache 工程实现，而非偶发缓存。实测 435M input tokens，<strong>99.82% 缓存命中率</strong>，费用约 <strong>$12</strong>（DeepSeek v4-flash），对比无缓存约 $61。Claude Code / Cursor / Aider 均不适用此架构。</li>
+        <li><strong>Pillar 2 · 工具调用修复（Tool-call Repair）</strong>：Agent 调用工具失败时自动修复重试，提升循环稳定性。</li>
+        <li><strong>Pillar 3 · 成本控制（Cost Control）</strong>：<code>/effort</code> 旋钮调节投入力度，按需控制成本。</li>
+      </ul>
+      <div class="callout">
+        <b>实测数据</b>：435M tokens · 99.82% cache hit · ~$12 vs 无缓存 ~$61（DeepSeek v4-flash）。成本约为 Claude Code 的零头。
+      </div>
+    </article>
+
+    <article class="section pix">
+      <h2><span>⑤</span>安装与快速上手</h2>
+      <p><strong>前提</strong>：Node ≥ 22。跨平台：macOS · Linux · Windows（PowerShell / Git Bash / Windows Terminal）</p>
+      <ul>
+        <li><code>npm install -g reasonix</code> · 安装主体（TypeScript 版）</li>
+        <li><code>dsnix</code> · 与 <code>reasonix</code> 完全等效的别名，方便高频输入</li>
+        <li><code>reasonix doctor</code> · 健康检查，诊断配置问题</li>
+        <li><code>reasonix update</code> · 升级自身</li>
+        <li><code>reasonix replay</code> · 回放历史会话 transcript</li>
+        <li><code>reasonix diff</code> · 查看 agent 改动差异</li>
+        <li><code>reasonix events</code> · 查看事件流</li>
+        <li><code>reasonix stats</code> · 会话统计（token / cost / cache）</li>
+        <li><code>reasonix index</code> · 重建语义索引</li>
+        <li><code>reasonix mcp</code> · MCP 服务管理</li>
+        <li><code>reasonix prune-sessions</code> · 清理过期会话</li>
+      </ul>
+      <p>
+        <strong>配置文件位置</strong>：<br>
+        · 全局：<code>~/.reasonix/config.json</code><br>
+        · 项目级：<code>&lt;project&gt;/.reasonix/</code>（优先级更高）<br>
+        · 全量双语配置指南：<a href="https://esengine.github.io/DeepSeek-Reasonix/configuration.html" style="color:var(--blue-deep);text-decoration:underline">官方配置文档</a>
+      </p>
+      <p>
+        <strong>桌面客户端（Tauri prerelease）</strong>：<br>
+        · macOS：下载后执行 <code>xattr -dr com.apple.quarantine /Applications/Reasonix.app</code> 放行 Gatekeeper<br>
+        · Windows：SmartScreen 弹窗 → More info → Run anyway<br>
+        · Linux：<code>.deb</code> 或 <code>.AppImage</code> 格式，GitHub Releases 下载
+      </p>
+    </article>
+
+    <article class="section pix">
+      <h2><span>⑥</span>核心配置选项</h2>
+      <ul>
+        <li><strong>MCP Servers</strong>：支持 stdio / SSE / Streamable HTTP 三种传输方式，可接入各种 MCP 工具。</li>
+        <li><strong>Skills</strong>：Markdown playbook，inline 模式（直接在对话中执行）或 subagent 模式（子 agent 独立运行）。兼容 Claude-format skills（<code>.claude/skills/</code>）。</li>
+        <li><strong>Memory</strong>：project memory（项目级）+ global memory（全局）。类型：user / feedback / project / reference。</li>
+        <li><strong>Hooks</strong>：PreToolUse / PostToolUse / UserPromptSubmit / Stop，精细控制 agent 行为时机。</li>
+        <li><strong>Web Search</strong>：Bing 默认，可切换 Baidu AI / SearXNG / Metaso / Tavily / Perplexity / Exa / Brave / Ollama。</li>
+        <li><strong>语义索引</strong>：支持 local Ollama 或 OpenAI-compatible embedding 模型。</li>
+        <li><strong>Checkpoint</strong>：自动 checkpoint，文件安全有保障。</li>
+      </ul>
+    </article>
+
+    <article class="section pix">
+      <h2><span>⑦</span>权限与安全机制</h2>
+      <p>Reasonix 内置多层安全设计，防止 Agent 失控：</p>
+      <ul>
+        <li><strong>Shell Allowlist</strong>：per-workspace 白名单，Agent 只能在允许的目录和命令范围内执行 shell 操作。</li>
+        <li><strong>文件回退机制</strong>：改动自动 checkpoint，改坏了直接回退，不用靠 git 救场。</li>
+        <li><strong>权限分级</strong>：可设置哪些文件/目录可以直接改，哪些必须先问。</li>
+        <li><strong>非 git 救命的改动恢复</strong>：checkpoint 系统兜底，即使不在 git 管理下的文件也能恢复。</li>
+      </ul>
+      <div class="callout">
+        <b>设计哲学</b>：DeepSeek-only 是有意为之，不是缺陷——专注单一后端才能把 prefix-cache、权限、checkpoint 全部做深。
+      </div>
+    </article>
+
+    <article class="section pix">
+      <h2><span>⑧</span>同类工具对比</h2>
+      <div class="comparison">
+        <table>
+          <thead>
+            <tr>
+              <th>特性</th>
+              <th>Reasonix</th>
+              <th>Claude Code</th>
+              <th>Cursor</th>
+              <th>Aider</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>后端</td>
+              <td>DeepSeek</td>
+              <td>Anthropic</td>
+              <td>OpenAI / Anthropic</td>
+              <td>any (OpenRouter)</td>
+            </tr>
+            <tr>
+              <td>许可证</td>
+              <td><strong>MIT ⭐</strong></td>
+              <td>闭源</td>
+              <td>闭源</td>
+              <td>Apache 2</td>
+            </tr>
+            <tr>
+              <td>成本</td>
+              <td><strong>低 ⭐</strong></td>
+              <td>高</td>
+              <td>订阅+用量</td>
+              <td>不等</td>
+            </tr>
+            <tr>
+              <td>DeepSeek prefix-cache</td>
+              <td><strong>工程实现 ⭐</strong></td>
+              <td>不适用</td>
+              <td>不适用</td>
+              <td>偶发</td>
+            </tr>
+            <tr>
+              <td>持久化 per-workspace sessions</td>
+              <td><strong>是 ⭐</strong></td>
+              <td>部分</td>
+              <td>n/a</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td>计划·MCP·hooks·skills</td>
+              <td><strong>是 ⭐</strong></td>
+              <td>是</td>
+              <td>是</td>
+              <td>部分</td>
+            </tr>
+            <tr>
+              <td>Web search</td>
+              <td><strong>是（多引擎）⭐</strong></td>
+              <td>是</td>
+              <td>是</td>
+              <td>是</td>
+            </tr>
+            <tr>
+              <td>开源社区开发</td>
+              <td><strong>是 ⭐</strong></td>
+              <td>—</td>
+              <td>—</td>
+              <td>是</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </div>
+
+  <!-- section 9: glossary -->
+  <article class="section pix" style="margin-top:0">
+    <h2><span>⑨</span>术语表</h2>
+    <dl class="glossary">
+      <div class="glossary-item">
+        <dt>Prefix-cache</dt>
+        <dd>DeepSeek 原生 KV-cache 优化，相同前缀的上下文复用，降低重复 token 费用。Reasonix 工程实现（非偶发），实测 99.82% 命中率。</dd>
+      </div>
+      <div class="glossary-item">
+        <dt>Tool-call Repair</dt>
+        <dd>Pillar 2 支柱：Agent 调用工具失败后自动诊断并修复重试，提升 agent 循环稳定性。</dd>
+      </div>
+      <div class="glossary-item">
+        <dt>ACP 协议</dt>
+        <dd>Anthropic Code Protocol，Reasonix VS Code 插件使用的通信协议，让 Reasonix 与 VS Code 无缝集成。</dd>
+      </div>
+      <div class="glossary-item">
+        <dt>Tauri</dt>
+        <dd>Reasonix Studio 桌面应用使用的跨平台 GUI 框架，Rust 后端 + Web 前端，体积小、启动快。</dd>
+      </div>
+      <div class="glossary-item">
+        <dt>reasonix code vs chat vs run</dt>
+        <dd><code>code</code> = 完整编程 agent；<code>chat</code> = 纯聊天，无文件系统/shell 工具；<code>run</code> = 一次性任务，流式输出。</dd>
+      </div>
+      <div class="glossary-item">
+        <dt>dsnix 别名</dt>
+        <dd><code>dsnix</code> 与 <code>reasonix</code> 完全等效的短命令别名，方便终端高频输入。</dd>
+      </div>
+      <div class="glossary-item">
+        <dt>MCP Servers</dt>
+        <dd>Model Context Protocol 服务端，支持 stdio / SSE / Streamable HTTP 三种传输方式扩展 Agent 能力。</dd>
+      </div>
+      <div class="glossary-item">
+        <dt>Checkpoint</dt>
+        <dd>文件改动自动快照机制，改坏了可直接回退，无需 git 救场，适合非版本管理文件。</dd>
+      </div>
+    </dl>
+  </article>
+
+  <!-- footer -->
+  <div class="footer pix">
+    <div>sources · <a href="https://x.com/Ryrenz/status/2109239841711894801" style="color:var(--blue-deep)">X @Ryrenz 推文</a> · <a href="https://github.com/esengine/DeepSeek-Reasonix" style="color:var(--blue-deep)">GitHub README</a></div>
+    <div>infocard · Reasonix Coding Agent · 2026-10-12</div>
+  </div>
+
+</main>
+</body>
+</html>
