@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkgreen">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Termany：Agent 原生终端，十几个会话并行管理</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:#07120d;
+      color:#eaf7ef;
+      font-size:13px
+    }
+    .page{width:100%;max-width:720px;margin:0 auto;padding:16px 14px 80px}
+
+    /* === 顶部状态条 === */
+    .status-bar{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 14px;
+      background:#0b1711;
+      border-bottom:1px solid rgba(180,255,210,.12);
+      font-size:11px;color:#9fbeab;
+      margin-bottom:16px
+    }
+    .status-bar .dot{width:8px;height:8px;border-radius:50%;background:#33d17a;box-shadow:0 0 6px #33d17a;flex-shrink:0}
+    .status-bar .label{color:#78f2b0;font-weight:700}
+
+    /* === kicker === */
+    .kicker{border-left:3px solid #33d17a;padding-left:10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#33d17a;margin-bottom:10px}
+
+    /* === Hero 标题 === */
+    h1{font-size:22px;font-weight:700;margin:0 0 4px;color:#eaf7ef;letter-spacing:-.02em;line-height:1.3}
+    .subtitle{font-size:13px;color:#9fbeab;margin:0 0 14px;line-height:1.6}
+
+    /* === Hero 数据行 === */
+    .hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+    .stat-card{background:#102018;border:1px solid rgba(180,255,210,.12);border-radius:8px;padding:12px 10px;text-align:center}
+    .stat-card strong{display:block;font-size:22px;font-weight:700;color:#33d17a;margin-bottom:3px}
+    .stat-card span{font-size:11px;color:#9fbeab;font-weight:600}
+
+    /* === 引用块 === */
+    .quote-block{
+      background:#102018;
+      border:1px solid rgba(180,255,210,.12);
+      border-left:3px solid #33d17a;
+      border-radius:0 8px 8px 0;
+      padding:14px 16px;
+      margin-bottom:14px
+    }
+    .quote-block .quote{
+      font-size:14px;line-height:1.7;color:#eaf7ef;
+      font-style:italic;margin:0 0 8px
+    }
+    .quote-block .quote-source{font-size:11px;color:#9fbeab}
+    .quote-block .quote-source a{color:#33d17a;text-decoration:none}
+    .quote-block .quote-stats{font-size:11px;color:#57d7c0;margin-top:4px}
+
+    /* === 分节标题 === */
+    h2{font-size:18px;font-weight:700;margin:20px 0 10px;color:#eaf7ef;letter-spacing:-.02em;border-bottom:1px solid rgba(180,255,210,.1);padding-bottom:8px}
+    h3{font-size:14px;font-weight:700;margin:14px 0 6px;color:#78f2b0}
+
+    p{font-size:13px;line-height:1.7;color:#9fbeab;margin:0 0 12px}
+
+    /* === 面板 === */
+    .panel{background:#102018;border:1px solid rgba(180,255,210,.12);border-radius:8px;padding:12px;margin-bottom:12px}
+    .panel-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#33d17a;border-bottom:1px solid rgba(180,255,210,.08);padding-bottom:8px;margin-bottom:8px}
+    .panel-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:12px;border-bottom:1px solid rgba(180,255,210,.06)}
+    .panel-row:last-child{border-bottom:none}
+    .panel-row .key{color:#9fbeab}
+    .panel-row .val{color:#78f2b0;font-weight:700}
+
+    /* === 层级流程 === */
+    .hierarchy{margin-bottom:12px}
+    .hierarchy-row{display:flex;align-items:center;gap:0;margin-bottom:4px}
+    .hierarchy-level{
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:6px 14px;border-radius:6px;
+      font-size:12px;font-weight:700;
+      color:#07120d
+    }
+    .hierarchy-arrow{color:#4a6050;font-size:14px;padding:0 4px}
+    .level-workspace{background:#33d17a}
+    .level-page{background:#57d7c0;color:#07120d}
+    .level-tab{background:#78f2b0;color:#07120d}
+    .level-pane{background:#9fbeab;color:#07120d}
+    .hierarchy-desc{font-size:11px;color:#4a6050;padding-left:2px}
+
+    /* === 状态灯 === */
+    .traffic-lights{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+    .traffic-item{
+      display:flex;align-items:center;gap:6px;
+      background:#102018;border:1px solid rgba(180,255,210,.12);
+      border-radius:6px;padding:8px 12px;font-size:12px
+    }
+    .tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .tl-green{background:#33d17a;box-shadow:0 0 6px #33d17a}
+    .tl-yellow{background:#f2d45c;box-shadow:0 0 6px #f2d45c}
+    .tl-red{background:#ff7474;box-shadow:0 0 6px #ff7474}
+    .tl-label{color:#eaf7ef;font-weight:600}
+    .tl-desc{color:#9fbeab;font-size:11px}
+
+    /* === Agent 网格 === */
+    .agent-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+    .agent-chip{
+      background:#102018;border:1.5px solid rgba(180,255,210,.2);
+      border-radius:6px;padding:7px 6px;text-align:center;
+      font-size:11px;font-weight:700;color:#78f2b0;
+      line-height:1.3
+    }
+    .agent-chip.default{border-color:#33d17a;background:rgba(51,209,122,.1)}
+
+    /* === 快捷键 === */
+    .kbd-table{width:100%;border-collapse:collapse;margin-bottom:12px}
+    .kbd-table tr{border-bottom:1px solid rgba(180,255,210,.06)}
+    .kbd-table td{padding:7px 8px;font-size:12px}
+    .kbd-table .key-cell{color:#78f2b0;font-family:monospace;font-size:12px;white-space:nowrap;width:120px}
+    .kbd-table .desc-cell{color:#9fbeab}
+    kbd{
+      display:inline-block;padding:2px 6px;
+      background:#0b1711;border:1px solid rgba(180,255,210,.2);
+      border-radius:4px;font-size:11px;font-family:monospace;
+      color:#78f2b0
+    }
+
+    /* === 警告 / 告警 === */
+    .alert{border-radius:6px;padding:10px 12px;font-size:12px;margin-bottom:10px;border-left:3px solid}
+    .alert.ok{background:rgba(51,209,122,.1);border-color:#33d17a;color:#33d17a}
+    .alert.warn{background:rgba(242,212,92,.1);border-color:#f2d45c;color:#f2d45c}
+    .alert.err{background:rgba(255,116,116,.1);border-color:#ff7474;color:#ff7474}
+
+    /* === chips === */
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+    .chip{padding:3px 9px;border:1.5px solid #33d17a;border-radius:20px;font-size:11px;font-weight:700;color:#33d17a;background:rgba(51,209,122,.08)}
+    .chip.fill{background:#33d17a;color:#07120d}
+    .chip.cyan{border-color:#57d7c0;color:#57d7c0;background:rgba(87,215,192,.08)}
+    .chip.yellow{border-color:#f2d45c;color:#f2d45c;background:rgba(242,212,92,.08)}
+
+    /* === 终端代码块 === */
+    .term{background:#0b1711;border:1px solid rgba(180,255,210,.12);border-radius:6px;padding:10px 12px;font-family:monospace;font-size:12px;line-height:1.8;margin-bottom:12px;color:#9fbeab}
+    .term .cmd{color:#78f2b0}
+    .term .comment{color:#4a6050}
+
+    /* === 架构列 === */
+    .arch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+    .arch-card{background:#102018;border:1px solid rgba(180,255,210,.12);border-radius:8px;padding:10px;text-align:center}
+    .arch-card .layer{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#33d17a;margin-bottom:4px}
+    .arch-card .name{font-size:13px;font-weight:700;color:#eaf7ef;margin-bottom:2px}
+    .arch-card .tech{font-size:11px;color:#9fbeab}
+
+    /* === 视图切换 === */
+    .view-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+    .view-card{background:#102018;border:1px solid rgba(180,255,210,.12);border-radius:8px;padding:10px 12px}
+    .view-card .vname{font-size:12px;font-weight:700;color:#78f2b0;margin-bottom:3px}
+    .view-card .vdesc{font-size:11px;color:#9fbeab;line-height:1.5}
+
+    /* === Bot 协作 === */
+    .bot-features{margin-bottom:12px}
+    .bot-feat{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
+    .bot-feat-icon{width:20px;height:20px;border-radius:50%;background:#33d17a;color:#07120d;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px}
+    .bot-feat-text{font-size:12px;color:#9fbeab;line-height:1.5}
+    .bot-feat-text strong{color:#eaf7ef}
+
+    /* === 来源 === */
+    .sources{border-top:1px solid rgba(180,255,210,.1);padding-top:12px;margin-top:20px}
+    .sources-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4a6050;margin-bottom:8px}
+    .sources a{color:#33d17a;text-decoration:none;font-size:12px}
+    .sources li{font-size:12px;color:#4a6050;margin-bottom:4px;list-style:none}
+
+    /* === Mobile === */
+    @media(max-width:720px){
+      .hero-stats{grid-template-columns:repeat(3,1fr)}
+      .agent-grid{grid-template-columns:repeat(3,1fr)}
+      .arch-grid{grid-template-columns:1fr}
+      .view-grid{grid-template-columns:1fr}
+      h1{font-size:18px}
+      h2{font-size:15px}
+    }
+    @media(max-width:390px){
+      .hero-stats{grid-template-columns:1fr 1fr}
+      .stat-card strong{font-size:18px}
+      .agent-grid{grid-template-columns:repeat(2,1fr)}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- 状态条 -->
+    <div class="status-bar">
+      <span class="dot"></span>
+      <span class="label">● TERMANY</span>
+      <span>· AGPL-3.0 · thinkany-ai/termany · 470★</span>
+    </div>
+
+    <!-- kicker -->
+    <div class="kicker">AGENT-NATIVE TERMINAL · 多会话并行 · 本地优先</div>
+
+    <!-- 标题 -->
+    <h1>Termany：Agent 原生终端，十几个会话并行管理</h1>
+    <p class="subtitle">本地运行多个 coding agent（Claude / Codex / Gemini …）于统一界面，红绿灯感知状态，窗格视图切换文件 / Git / 对话 / 浏览器。</p>
+
+    <!-- Hero 数据行 -->
+    <div class="hero-stats">
+      <div class="stat-card"><strong>11</strong><span>内置 Agent</span></div>
+      <div class="stat-card"><strong>470★</strong><span>GitHub Stars</span></div>
+      <div class="stat-card"><strong>AGPL-3.0</strong><span>许可证</span></div>
+    </div>
+
+    <!-- chips -->
+    <div class="chips">
+      <span class="chip fill">Agent 原生</span>
+      <span class="chip">多会话并行</span>
+      <span class="chip cyan">红绿灯状态</span>
+      <span class="chip">窗格视图</span>
+      <span class="chip yellow">⚠ AGPL-3.0</span>
+    </div>
+
+    <!-- 引言 -->
+    <div class="quote-block">
+      <p class="quote">「我现在几乎很少打开 codex 了，每天十几个项目并行开发，Termany 帮大忙。」</p>
+      <p class="quote-source">— <a href="https://x.com/idoubicc/status/2109279537486000524" target="_blank">@idoubi（@idoubicc）</a>，28,941 followers</p>
+      <p class="quote-stats">● 29 赞 · 6 转发 · 4,036 浏览 · 2026-10-11</p>
+    </div>
+
+    <!-- ====== ① 引入 ====== -->
+    <h2>① 从这条推文说起</h2>
+    <p>开发者 @idoubi 每天同时跑十几个项目，靠 Termany 管理所有 coding agent 会话，不再频繁切换窗口找状态。他的 5 个核心感受：</p>
+    <div class="panel" style="margin-bottom:10px">
+      <div class="panel-title">@idoubi 自述：Termany 解决了什么</div>
+      <div class="panel-row"><span class="key">无限层级文件树</span><span class="val">按个人喜好组织项目结构</span></div>
+      <div class="panel-row"><span class="key">多窗格并行</span><span class="val">workspaces × pages × tabs × panes，多 agent 同时工作</span></div>
+      <div class="panel-row"><span class="key">红绿灯感知</span><span class="val">一眼看出哪个 agent 在 working / done / needs attention</span></div>
+      <div class="panel-row"><span class="key">⌘P 全局搜索</span><span class="val">快速在几十个窗格中定位目标 session</span></div>
+      <div class="panel-row"><span class="key">多套主题皮肤</span><span class="val">根据心情和场景切换界面风格</span></div>
+    </div>
+
+    <!-- ====== ② 痛点 ====== -->
+    <h2>② 传统终端的 5 个并发之痛</h2>
+    <p>当你在终端同时跑 5+ 个 agent 时，传统工具会暴露这些问题：</p>
+    <div class="alert warn" style="margin-bottom:8px">😰 找不到哪个需要关注 — 20 个 tab 全靠标题猜状态，agent 自绘界面根本不在 shell prompt 里显示</div>
+    <div class="alert warn" style="margin-bottom:8px">😰 端口冲突 — 不同 worktree 的 Claude/Codex 同时跑，抢占 localhost 端口，要么报错要么串会话</div>
+    <div class="alert warn" style="margin-bottom:8px">😰 agent 与 diff 分离 — agent 在终端里改代码，git diff 要么另开窗口要么在 IDE 里来回切换</div>
+    <div class="alert warn" style="margin-bottom:8px">😰 上下文丢失 — 切走再切回来，scrollback 还在但刚才在哪个 agent 里已经搞混了</div>
+    <div class="alert warn">😰 成本黑盒 — Claude/Codex 跑了多少次、消耗多少 tokens、哪个项目最费钱，一无所知</div>
+
+    <!-- ====== ③ Termany 是什么 ====== -->
+    <h2>③ Termany 是什么</h2>
+    <p>Termany 是 <strong style="color:#eaf7ef">Agent-Native Terminal</strong>：为运行多个 coding agent 而生的本地终端，核心理念是「让 agent 作为一等公民存在于终端里」，而不是把 agent 当作一条普通的 shell 命令。</p>
+
+    <div class="arch-grid">
+      <div class="arch-card">
+        <div class="layer">前端</div>
+        <div class="name">React + xterm.js</div>
+        <div class="tech">apps/web · TypeScript</div>
+      </div>
+      <div class="arch-card">
+        <div class="layer">后端 PTY</div>
+        <div class="name">Node.js Server</div>
+        <div class="tech">apps/server · port 5174</div>
+      </div>
+      <div class="arch-card">
+        <div class="layer">桌面壳</div>
+        <div class="name">Tauri / Rust</div>
+        <div class="tech">apps/desktop · 离线运行</div>
+      </div>
+    </div>
+
+    <p>开发模式 <span class="term" style="margin-bottom:0;font-size:11px;padding:6px 10px"><span class="cmd">pnpm dev:web</span>（web+server）| <span class="cmd">pnpm dev:desktop</span>（+Tauri）</span></p>
+    <p style="margin-top:8px">官网 <strong style="color:#eaf7ef">termany.sh</strong>（HTTP 200）· 仓库 <strong style="color:#eaf7ef">thinkany-ai/termany</strong>（470★/39 forks）· 创建于 2026-06-29 · 最近更新 2026-10-10</p>
+
+    <!-- ====== ④ 组织结构 ====== -->
+    <h2>④ 四级嵌套组织结构</h2>
+    <p>Termany 的会话管理遵循严格的层级关系，每一层都是持久化的：</p>
+
+    <div class="hierarchy">
+      <div class="hierarchy-row">
+        <span class="hierarchy-level level-workspace">Workspace</span>
+        <span class="hierarchy-arrow">→</span>
+        <span class="hierarchy-level level-page">Page</span>
+        <span class="hierarchy-arrow">→</span>
+        <span class="hierarchy-level level-tab">Tab</span>
+        <span class="hierarchy-arrow">→</span>
+        <span class="hierarchy-level level-pane">Pane</span>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:10px">
+      <div class="panel-title">层级说明</div>
+      <div class="panel-row"><span class="key">Workspace</span><span class="val">远左栏，一个业务上下文（如一个客户、一个产品线）</span></div>
+      <div class="panel-row"><span class="key">Page</span><span class="val">左栏边栏，一个项目（对应一个代码仓库）</span></div>
+      <div class="panel-row"><span class="key">Tab</span><span class="val">上栏，一个 shell 会话，背景保留 scrollback，切走不丢失</span></div>
+      <div class="panel-row"><span class="key">Pane</span><span class="val">可分割视图，支持 ⌘D 垂直 / ⇧⌘D 水平切分</span></div>
+    </div>
+
+    <div class="alert ok">✅ 每个 Tab 持久化，scrollback 在后台保留；每个 Pane 独立 SSH 目标（密码/key 认证）</div>
+
+    <!-- ====== ⑤ 状态感知 ====== -->
+    <h2>⑤ 红绿灯状态感知</h2>
+    <p>Termany 通过读取<strong style="color:#eaf7ef">前台任务输出和屏幕变化</strong>来判断 agent 状态，而非依赖 shell prompt。这对自绘界面的 agent（如 Claude Code 的 ANSI 渲染）同样有效。</p>
+
+    <div class="traffic-lights">
+      <div class="traffic-item">
+        <span class="tl-dot tl-green"></span>
+        <span class="tl-label">working</span>
+        <span class="tl-desc">正在执行任务</span>
+      </div>
+      <div class="traffic-item">
+        <span class="tl-dot tl-yellow"></span>
+        <span class="tl-label">needs attention</span>
+        <span class="tl-desc">等待输入或出错</span>
+      </div>
+      <div class="traffic-item">
+        <span class="tl-dot tl-green" style="background:#33d17a88"></span>
+        <span class="tl-label">done</span>
+        <span class="tl-desc">任务完成</span>
+      </div>
+    </div>
+
+    <div class="alert ok">✅ ACTIVE 栏置顶：需要关注的 session 自动上浮，无需在 20 个 Tab 里肉眼扫描</div>
+
+    <!-- ====== ⑥ 内置 Agent 生态 ====== -->
+    <h2>⑥ 内置 11 个 Coding Agent 生态</h2>
+    <p>Termany 内置支持以下 coding agent，Detect 功能自动探测本地已安装的版本：</p>
+
+    <div class="agent-grid">
+      <div class="agent-chip default">Claude<br><span style="font-weight:400;font-size:10px;color:#9fbeab">默认启用</span></div>
+      <div class="agent-chip default">Codex<br><span style="font-weight:400;font-size:10px;color:#9fbeab">默认启用</span></div>
+      <div class="agent-chip">Gemini</div>
+      <div class="agent-chip">Grok Build</div>
+      <div class="agent-chip default">OpenClaw<br><span style="font-weight:400;font-size:10px;color:#9fbeab">默认启用</span></div>
+      <div class="agent-chip">FastClaw</div>
+      <div class="agent-chip">Hermes</div>
+      <div class="agent-chip">OpenCode</div>
+      <div class="agent-chip">Cursor</div>
+      <div class="agent-chip">Kimi</div>
+      <div class="agent-chip">OMP</div>
+    </div>
+
+    <div class="alert warn">⚠️ Claude / Codex / OpenClaw 使用本地官方 CLI 认证（<strong style="color:#f2d45c">不是 API key</strong>），需要本地已安装并登录的 Claude Code / Codex CLI。</div>
+
+    <h3>Skill 管理</h3>
+    <p>自动发现并加载 <code style="color:#78f2b0;font-size:12px">~/.agents/skills</code>、<code style="color:#78f2b0;font-size:12px">~/.claude/skills</code>、Codex skills 目录。GitHub URL（tree/blob 格式）直接导入，公共 skill 下载到 <code style="color:#78f2b0;font-size:12px">~/.termany/skills</code>，SQLite 记录元数据。</p>
+
+    <!-- ====== ⑦ 窗格视图（⌘E）====== -->
+    <h2>⑦ ⌘E 窗格视图切换</h2>
+    <p>在任意 pane 内按 <kbd>⌘E</kbd> 循环切换视图模式：</p>
+
+    <div class="view-grid">
+      <div class="view-card">
+        <div class="vname">📁 Files</div>
+        <div class="vdesc">文件树 + CodeMirror 编辑器；支持预览 md / html / img / video / audio / pdf / docx / xlsx / pptx</div>
+      </div>
+      <div class="view-card">
+        <div class="vname">🔀 Git diff</div>
+        <div class="vdesc">staged / unstaged / untracked；跨 worktree 切换，⇧⌘H 保留 session history</div>
+      </div>
+      <div class="view-card">
+        <div class="vname">💬 Conversation</div>
+        <div class="vdesc">ACP（Agent Communication Protocol）chat 视图，直接在 pane 内查看与 agent 的对话记录</div>
+      </div>
+      <div class="view-card">
+        <div class="vname">🌐 Browser</div>
+        <div class="vdesc">内置 webview；当 pane 内启动了端口服务（localhost:xxxx），自动提示打开浏览器预览</div>
+      </div>
+    </div>
+
+    <p style="margin-top:4px">Activity Monitor（<kbd>⇧⌘M</kbd>）：CPU / 内存 / 交换 / 进程列表 / 端口占用 / 可终止进程，一站式系统资源监控。</p>
+
+    <!-- ====== ⑧ Bot 协作系统 ====== -->
+    <h2>⑧ Bot 组群协作系统</h2>
+    <p>Termany 支持定义可复用的 Bot 配置（名称/头像/角色/model/工作目录），并支持组群协作：</p>
+
+    <div class="bot-features">
+      <div class="bot-feat">
+        <span class="bot-feat-icon">L</span>
+        <div class="bot-feat-text"><strong>Lead 协调者</strong>：Bot 组群中的主 agent，负责拆解任务、分派给其他 Bot</div>
+      </div>
+      <div class="bot-feat">
+        <span class="bot-feat-icon">@</span>
+        <div class="bot-feat-text"><strong>@mention 路由</strong>：在组群中 @mention 指定 Bot，将消息精确路由到目标 agent</div>
+      </div>
+      <div class="bot-feat">
+        <span class="bot-feat-icon">T</span>
+        <div class="bot-feat-text"><strong>Topic 隔离</strong>：不同 topic 的上下文相互隔离，避免多 agent 之间的信息污染</div>
+      </div>
+      <div class="bot-feat">
+        <span class="bot-feat-icon">$</span>
+        <div class="bot-feat-text"><strong>成本仪表盘</strong>（<kbd>⇧⌘U</kbd>）：读取 Claude 和 Codex transcript，估算成本 / input+output+cache tokens / 日趋势 / 按 model 和 project 分类。⚠️ 其他 agent 暂不支持</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">ACP Bridge</div>
+      <div class="panel-row"><span class="key">内置集成</span><span class="val">✅ ACP bridge 无需单独安装 node/npx</span></div>
+      <div class="panel-row"><span class="key">协议</span><span class="val">Agent Communication Protocol（agent 间消息路由标准）</span></div>
+      <div class="panel-row"><span class="key">成本追踪</span><span class="val">仅 Claude + Codex transcript，其他 agent 待支持</span></div>
+    </div>
+
+    <!-- ====== ⑨ 上手与注意 ====== -->
+    <h2>⑨ 上手与重要注意事项</h2>
+
+    <h3>安装方式</h3>
+    <div class="term">
+      <span class="comment"># 一键安装（macOS / Windows / Linux）</span><br>
+      <span class="cmd">curl -fsSL</span> https://termany.sh/install.sh <span class="cmd">| sh</span><br><br>
+      <span class="comment"># 或访问官网下载 DMG / exe</span><br>
+      <span class="cmd">https://</span>termany.sh
+    </div>
+
+    <div class="alert err" style="margin-bottom:10px">⚠️ <strong>AGPL-3.0 许可证警告</strong><br>如果你把修改后的 Termany 作为<strong style="color:#ff7474">网络服务</strong>运行，必须向用户开源（法律上视为"分发"）。商业使用请联系 <span style="color:#ff7474">support@thinkany.ai</span> 申请商业授权。</div>
+
+    <div class="alert warn" style="margin-bottom:10px">⚠️ <strong>Claude / Codex 需本地 CLI 认证</strong><br>这两个 agent 集成依赖本地安装并认证的官方 CLI（<code style="color:#f2d45c">claude code</code> / <code style="color:#f2d45c">codex</code>），不是填 API key。如果本地没装 CLI，这些 agent 无法启动。</div>
+
+    <h3>快捷键速查</h3>
+    <table class="kbd-table">
+      <tr><td class="key-cell"><kbd>⌘P</kbd></td><td class="desc-cell">全局搜索（命令 / pages / tabs / panes）</td></tr>
+      <tr><td class="key-cell"><kbd>⌘M</kbd></td><td class="desc-cell">最大化当前 pane</td></tr>
+      <tr><td class="key-cell"><kbd>⌘E</kbd></td><td class="desc-cell">循环切换窗格视图（Files / Git diff / Conversation / Browser）</td></tr>
+      <tr><td class="key-cell"><kbd>⌘D</kbd></td><td class="desc-cell">垂直分割当前 pane</td></tr>
+      <tr><td class="key-cell"><kbd>⇧⌘D</kbd></td><td class="desc-cell">水平分割当前 pane</td></tr>
+      <tr><td class="key-cell"><kbd>⇧⌘H</kbd></td><td class="desc-cell">session history 跨 worktree 保留</td></tr>
+      <tr><td class="key-cell"><kbd>⇧⌘M</kbd></td><td class="desc-cell">Activity Monitor（CPU/内存/进程/端口）</td></tr>
+      <tr><td class="key-cell"><kbd>⇧⌘U</kbd></td><td class="desc-cell">成本仪表盘（Claude/Codex transcript 分析）</td></tr>
+      <tr><td class="key-cell"><kbd>⌥⌘N</kbd></td><td class="desc-cell">新建独立窗口</td></tr>
+    </table>
+
+    <h3>14 套内置主题</h3>
+    <p>Termany 提供 14 套内置主题，不只是 terminal 背景，而是重构整个 chrome 界面。约 60 个动作支持按键重绑定，21 种界面语言。</p>
+
+    <!-- 适合谁 -->
+    <h2>⑩ Termany 适合你吗？</h2>
+    <p>Termany 不是传统 terminal 的替代品，而是为多 agent 并行工作场景重新设计的专用工具。对号入座：</p>
+
+    <div class="panel" style="margin-bottom:10px">
+      <div class="panel-title">Termany 适合的场景</div>
+      <div class="panel-row"><span class="key">✅ 同时跑 3+ 个 coding agent</span><span class="val">Claude / Codex / Gemini 多项目并行开发</span></div>
+      <div class="panel-row"><span class="key">✅ 多 worktree 管理</span><span class="val">跨仓库并行开发，避免端口冲突和上下文串扰</span></div>
+      <div class="panel-row"><span class="key">✅ 需要实时感知 agent 状态</span><span class="val">一眼分辨哪个 session 需要关注，不需要逐个切换</span></div>
+      <div class="panel-row"><span class="key">✅ Bot 组群协作</span><span class="val">Lead 协调多 agent 分工，@mention 精确路由</span></div>
+      <div class="panel-row"><span class="key">✅ 成本管控</span><span class="val">追踪 Claude/Codex 的 tokens 消耗和日趋势</span></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:10px">
+      <div class="panel-title">传统终端更合适的场景</div>
+      <div class="panel-row"><span class="key">❌ 单 agent 偶尔使用</span><span class="val">直接开 Claude Code 终端即可，不需要额外抽象</span></div>
+      <div class="panel-row"><span class="key">❌ 完全在 IDE 内工作</span><span class="val">Cursor / VS Code 内置 agent 集成足够用</span></div>
+      <div class="panel-row"><span class="key">❌ 预算有限（AGPL 顾虑）</span><span class="val">商业 SaaS 改作需开源，或需申请商业授权</span></div>
+      <div class="panel-row"><span class="key">❌ 非 coding agent 场景</span><span class="val">Termany 当前生态以 coding agent 为主</span></div>
+    </div>
+
+    <!-- 快速对比 -->
+    <h3>与传统终端的快速对比</h3>
+    <table class="kbd-table" style="margin-bottom:14px">
+      <tr><td class="key-cell" style="color:#eaf7ef;font-weight:700">对比维度</td><td class="desc-cell" style="color:#eaf7ef;font-weight:700">传统终端</td><td class="desc-cell" style="color:#eaf7ef;font-weight:700">Termany</td></tr>
+      <tr><td class="key-cell">多 agent 并行</td><td class="desc-cell" style="color:#ff7474">❌ 各开各的，状态不可见</td><td class="desc-cell" style="color:#33d17a">✅ 统一界面，红绿灯感知</td></tr>
+      <tr><td class="key-cell">状态检测</td><td class="desc-cell" style="color:#ff7474">❌ 依赖 shell prompt，agent 自绘界面无效</td><td class="desc-cell" style="color:#33d17a">✅ 读取屏幕变化，自绘界面也适用</td></tr>
+      <tr><td class="key-cell">Git diff</td><td class="desc-cell" style="color:#f2d45c">⚠️ 另开窗口或 IDE</td><td class="desc-cell" style="color:#33d17a">✅ ⌘E 窗格视图，跨 worktree</td></tr>
+      <tr><td class="key-cell">文件预览</td><td class="desc-cell" style="color:#ff7474">❌ 需要外部工具</td><td class="desc-cell" style="color:#33d17a">✅ 内置 CodeMirror + 10+ 格式预览</td></tr>
+      <tr><td class="key-cell">成本追踪</td><td class="desc-cell" style="color:#ff7474">❌ 黑盒</td><td class="desc-cell" style="color:#33d17a">✅ Claude/Codex transcript 分析</td></tr>
+      <tr><td class="key-cell">Bot 协作</td><td class="desc-cell" style="color:#ff7474">❌ 不支持</td><td class="desc-cell" style="color:#33d17a">✅ Lead/@mention/Topic 隔离</td></tr>
+    </table>
+
+    <!-- 来源 -->
+    <div class="sources">
+      <div class="sources-title">📎 来源</div>
+      <ul style="padding:0;margin:0">
+        <li>X (Twitter) · <a href="https://x.com/idoubicc/status/2109279537486000524" target="_blank">@idoubi 推文</a> · 2026-10-11</li>
+        <li>GitHub · <a href="https://github.com/thinkany-ai/termany" target="_blank">thinkany-ai/termany README</a> · 470★/AGPL-3.0</li>
+        <li>官网 · <a href="https://termany.sh" target="_blank">termany.sh</a> · HTTP 200 · 2026-10-12</li>
+      </ul>
+    </div>
+
+  </div>
+<script>
+(function(){
+  function send(){var h=document.body.scrollHeight;window.parent.postMessage({type:'theme-height',slug:'darkgreen',height:h},'*');}
+  if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+  setTimeout(send,500);
+})();
+</script>
+</body>
+</html>
