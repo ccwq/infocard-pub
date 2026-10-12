@@ -274,12 +274,38 @@ Do not start Wiki automatically. Do not list, prune, remove, or otherwise operat
 - [ ] Public detail HTTP/fingerprint release state is separate from public visual evidence state
 - [ ] `.docs` evidence retained; no cleanup side effect occurred
 
+## Theme enforcement gate (2026-10-12)
+
+**Rule**: before delegating Author, `infocard-theme-assignment` MUST produce a frozen `theme-decision.json`. The delegation prompt MUST NOT contain `data-theme="<name>"`, `Theme: <name>`, `Create a <name> card`, or any equivalent preselection. It must reference only the decision record.
+
+**Pre-delegation check sequence**:
+```bash
+cd /home/ccwq/qbox/opendir/project/infocard-pub
+# 1. recent themes (last 6 published, grep actual data-theme values)
+grep -h 'data-theme=' docs/202610*.html | grep -o 'data-theme="[^"]*"' | tail -6
+# 2. check decision record exists
+ls .docs/<run-id>/<slug>/theme-decision.json
+# 3. verify prompt does not preselect theme
+grep -i 'data-theme\|Theme:\|Create a.*card' <delegation-prompt.txt>
+# → nonzero = VIOLATION, stop and regenerate prompt
+```
+
+**Post-delegation check**:
+```bash
+# After card.html is written, verify the theme used matches the decision
+grep -o 'data-theme="[^"]*"' .docs/<run-id>/<slug>/card.html
+# Compare to: jq -r '.selected_theme' .docs/<run-id>/<slug>/theme-decision.json
+# → mismatch = BLOCKED_AT_THEME_MISMATCH, return card to Author
+```
+
+**Known violations from 2026-10-12 session**: Termany and Strata delegations listed `darkgreen` in the "avoid list" but did not call `infocard-theme-assignment`, did not generate a decision record, and the delegation prompts contained `data-theme` preselection. Both cards were published anyway. This must not recur.
+
 ## Canonical references
 
 - `references/publish-protocol-v3.md` — detailed release fields, states, and ownership.
 - `../visual-verification-gate/SKILL.md` — screenshot, visual disposition, retry, and exception rules.
 - `../infocard/infocard-theme-assignment/SKILL.md` — theme selection and decision-record rules.
 - `scripts/sync-publish-metadata.js` — authoritative timestamp refresh for update cards; MUST be called before promotion for any existing (non-new) card to ensure `updated` reflects the current publish time.
-- `../infocard-subagent-delegation/SKILL.md` — filesystem-first timeout handoff, no-redelegation rule, and publisher takeover contract.
+- `../infocard-subagent-delegation/SKILL.md` — filesystem-first timeout handoff, no-redelegation rule, and publisher takeover contract. (Now superseded by `../delegated-infocard-publishing/SKILL.md`; that skill is the active reference for the delegation loop.)
 
 Historical worktree incident notes may be retained only for a separately authorized migration/cleanup investigation. They are not active publication instructions and must never be loaded to create, recover, publish, or clean a new information card.

@@ -1,12 +1,14 @@
 ---
 name: infocard-router
 description: 唯一用户可见入口；将信息卡请求路由到 Author 或 Publish，并按需加载契约和经验 references。
-version: 1.0.0
+version: 1.0.1
 ---
 
 # Infocard Router
 
 这是唯一用户可见的流程入口。用于 create、query、update、rebuild、repair 和 publish 请求；不用于无关网页或通用设计工作。
+
+作者语言、内容保真、主题决策及常驻记忆归属见 [内容约定](../infocard-core-contract/references/user-content-and-memory-routing.md)。路由创作或修订任务时加载该参考，不从全局旧Skill推导语言或发布授权。
 
 输入：用户请求、可选既有卡片、来源提示、明确主题和交付授权。输出：到 `infocard-author` 或 `infocard-publish` 的最小运行状态。只有当前任务需要时，才读取 `infocard-core-contract/contracts/architecture.json`、`infocard-core-contract/references/` 或各旧 Skill 的 `references/`；历史经验不是默认入口。
 

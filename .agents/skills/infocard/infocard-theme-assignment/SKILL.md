@@ -56,6 +56,8 @@ metadata:
 
 候选主题的权重应体现内容可读性和组件覆盖，不能把随机当作无约束抽签。最近重复主题、未注册主题和能力不足主题可排除，但每项都必须有稳定理由。若过滤后为空，返回 `THEME_BLOCKED`，不要降低能力门槛；用户可随后改变内容结构或明确授权主题重建。
 
+**Recent-6 rolling exclusion (confirmed 2026-10-12)**: exclude the last 6 published cards by grepping `docs/202610*.html` for actual `data-theme=` values. The window is count-based (6), not date-based — session boundary and date changes do not reset it. In-flight cards also count as excluded. Theme-family deduplication is by bare slug only; renaming a theme (e.g. `q` → `q-style`) does not produce a new excluded entry.
+
 ## 决策记录
 
 决策记录的最小结构见 [`references/theme-decision-schema.md`](references/theme-decision-schema.md)。实现位于 [`scripts/theme-decision.js`](scripts/theme-decision.js)，供 authoring/publish 读取和校验。至少包含：

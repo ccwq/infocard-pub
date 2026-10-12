@@ -1,69 +1,111 @@
 ---
 name: delegated-infocard-publishing
 description: Use when infocard-publish-sop routes a complex card to bounded research handoffs stored in .docs.
-version: 4.0.0
+version: 5.0.0
 ---
 
-# Delegated Infocard Research Handoffs
+# Delegated Infocard Publishing: Material → Author → Verify → Publish
 
 ## Purpose
 
-This skill supplies bounded Research A / Research B handoffs for the `.docs → promotion manifest → primary checkout` infocard-pub workflow. It does not create formal card files, Git worktrees, clones, commits, Pages releases, or Wiki content.
+This skill governs the practical delegation loop for infocard-pub: material gathering → subagent authoring → main-line verification → publish. It is a lightweight wrapper over the formal SOP and the theme gate. It does not replace either; it supplies the exact command sequence and decision rules for the common single-card case.
 
-## Authorization and source ambiguity
+## When to use
 
-When the user explicitly requests full-route publication, research may continue through the already authorized release path. Resolve object identity with first-party evidence and preserve uncertainty in the bundle. Never claim a social post named a project unless the post explicitly contains its name or URL.
+Every time the user says "publish infocard" or "发布信息卡" with a URL, GitHub repo, or social post — unless the request is query-only or preview-only.
 
-## Exact-count rule
+## Steps in order
 
-An explicit request such as “publish 7 cards” requires seven independently verifiable card artifacts, not a roundup. Each card gets its own `.docs/<run-id>/<slug>/` directory and frozen bundle.
+### Step 1 — Gather material (main agent)
 
-## Research scopes
+1. Fetch source facts via API (GitHub API, fxtwitter, HuggingFace API, web_extract).
+2. Write `/tmp/<slug>_material.txt` with all confirmed facts + unverified items marked ❓.
+3. Create authoring directory: `.docs/<run-id>/<slug>/`.
+4. **THEME DECISION BEFORE DELEGATION** (see Theme Gate below).
 
-### Research A — first-party facts
+### Step 2 — Delegate authoring
 
-Research A owns:
+Use `delegate_task()` with a context that:
+- Points to the material file.
+- Points to the authoring directory.
+- **Does NOT contain `data-theme`, `Theme:`, or any theme preselection**.
+- References only `theme-decision.json` for the selected theme.
 
-- official repository/API/README/docs/LICENSE evidence;
-- capabilities, installation and configuration facts;
-- one dynamic-data snapshot and `retrieved_at`;
-- source quotations and distinctions that prevent false equivalence.
+Response schema required. Await completion.
 
-### Research B — narrative and risk
+### Step 3 — Main-line verification (main agent)
 
-Use only for sensitive topics, unsupported strong/causal claims, conflicting sources, external distribution, or explicit fact/risk review. Research B owns claim verdicts, prohibited conflations, uncertainty, and wording boundaries. It does not duplicate Research A.
+After subagent returns:
 
-## Handoff location and contract
+1. **info-leak**: `node scripts/check-info-leak.js .docs/<run-id>/<slug>/card.html`
+2. **size gate**: `wc -c .docs/<run-id>/<slug>/card.html` → must be ≥ 28,000 bytes. Below 28K requires manual supplementation via `patch` targeting specific short sections, then recheck info-leak.
+3. **theme match**: `grep -o 'data-theme="[^"]*"' .docs/<run-id>/<slug>/card.html` → must match `theme-decision.json.selected_theme`. Mismatch = BLOCKED_AT_THEME_MISMATCH, return to subagent.
+4. **meta completeness**: check `.meta.yaml` has `category` field, no `---` YAML header, correct slug/path, correct double-suffix filename (`<slug>.html.meta.yaml`).
+5. **Fix known subagent failure modes**:
+   - Missing `data-theme` attribute → patch `<html>` tag directly
+   - Meta missing `category` → patch directly
+   - Filename without double suffix → rename `meta.yaml` → `<slug>.html.meta.yaml`
 
-Researchers write only their assigned JSON/Markdown sections inside:
+### Step 4 — Publish
 
-```text
-<repo>/.docs/<run-id>/<slug>/
+```bash
+cp .docs/<run-id>/<slug>/card.html docs/<slug>.html
+cp .docs/<run-id>/<slug>/<slug>.html.meta.yaml docs/<slug>.html.meta.yaml
+npm run build
+# verify → leak → commit → push → sleep 50s → curl public URL → Wiki sync
 ```
 
-The bundle is:
+## Theme Gate (mandatory before Step 2)
 
-```text
-.docs/<run-id>/<slug>/publish-bundle.json
+**This step was skipped in the 2026-10-12 session, resulting in two theme violations: Termany and Strata both preselected `darkgreen` without a decision record, and both were published anyway.** This must not recur.
+
+```
+cd /home/ccwq/qbox/opendir/project/infocard-pub
+
+# 1. Recent 6 themes (rolling window, not by date — count from most recent)
+grep -h 'data-theme=' docs/202610*.html | grep -o 'data-theme="[^"]*"' | tail -6
+
+# 2. Read themes.json to know available themes
+grep '"label"' theme/themes.json
+
+# 3. Call infocard-theme-assignment workflow:
+#    - Read content_type / content_shape from material
+#    - Filter themes.json candidates by capability
+#    - Exclude recent 6 + any in-flight
+#    - Generate theme-decision.json in .docs/<run-id>/<slug>/
+# If infocard-theme-assignment is unavailable: manually read themes.json,
+# apply capability filter, exclude recent 6, write theme-decision.json, proceed.
+# Never skip this step.
+
+# 4. Verify delegation prompt does not contain theme preselection
+grep -i 'data-theme\|Theme:\|Create a.*card' <delegation-prompt.txt>
+# nonzero = VIOLATION, rewrite prompt before dispatching
 ```
 
-Use `schema_version: 3`. The bundle must identify source evidence, claim status, dynamic timestamps, prohibited conflations, evidence gaps, author requirements, and the exact `.docs` consumer path.
+**Post-authoring theme verification**:
+```bash
+grep -o 'data-theme="[^"]*"' .docs/<run-id>/<slug>/card.html
+# Compare to: jq -r '.selected_theme' .docs/<run-id>/<slug>/theme-decision.json
+# → mismatch = BLOCKED_AT_THEME_MISMATCH, return card to Author
+```
 
-Researchers do not write candidate HTML/sidecars unless their assigned output explicitly says so. They never write `docs/`, `assets/`, indexes, Git state, or `/tmp` process files.
+## Known subagent failure modes
 
-## Failure and concurrency
+| Failure | Fix |
+|---|---|
+| Iteration cap hit → incomplete card (<28K bytes) | Main agent supplements via targeted `patch`, then recheck info-leak |
+| Unregistered theme invented (`q-style`, `q2`) | BLOCKED_AT_THEME_MISMATCH. Only `theme/*.html` bare slugs from `theme/themes.json` are valid |
+| Missing `category` in meta.yaml | `patch` to add `category:` field directly |
+| YAML header `---` in meta.yaml | `patch` to remove it; single-doc YAML starts with `slug:` |
+| Missing `data-theme` attribute | `patch` `<html>` tag to add `data-theme="<selected>"` |
+| Meta filename missing double suffix | `mv meta.yaml <slug>.html.meta.yaml` |
 
-- A timeout means inspect the declared `.docs` handoff, then complete only the bounded missing research or record an explicit research failure.
-- Parallel workers may collect independent facts but never edit the same `.docs` file concurrently.
-- A child summary is not evidence. The orchestrator verifies files, schema, and required facts before authoring starts.
-- Do not create an alternate checkout, worktree, clone, detached branch, or temporary repository as a recovery path.
+## What this skill does NOT cover
 
-## Boundaries
+- Batch parallel delegation (→ `infocard-publish-sop` full route)
+- Visual mobile verification gate (→ `visual-verification-gate`)
+- Update-card timestamp sync (→ `infocard-publish-sop`)
+- Theme rebuild or redesign (→ `infocard-style-man-skill`)
+- Research A / Research B handoffs (→ `delegated-infocard-publishing` prior v4 schema)
 
-- No HTML, formal sidecar, promotion manifest, index, Git commit, push, Pages release, Wiki write, dependency install, worktree, clone, or `/tmp/infocard*` directory.
-- No automatic retry that duplicates an existing research handoff.
-- No conversion of unresolved evidence into confirmed card copy.
-
-## Completion criterion
-
-Every handoff has an owner, `.docs` path, consumer, readiness check, and explicit evidence boundary. The next stage is `infocard-authoring-workflow`; formal release is exclusively `infocard-pub-publisher`.
+These are out-of-scope and must not be mixed into the delegation loop.
