@@ -11,7 +11,9 @@ tags: [infocard, build, screenshot, preflight, hardening]
 
 | ID | 症状 | 根因 | 修复 |
 |----|------|------|------|
-| H-1 | `npm run check-wiki-duplicate` 超时或权限拒绝 | 审批门禁拦截只读 npm 命令 | 改用 `grep` 手动查重，或申请命令白名单 |
+| H-8 | 子智能体写的 `card.html.meta.yaml` 缺少必要字段（`path`/`title`/`category`/`desc`/`tags`），build 失败 | 子智能体不掌握 build 索引的必需字段规范 | 主线自行写 docs/ 的 meta.yaml：slug / path / title / category / desc / tags / updated / date 八字段；子智能体产出只作 facts 来源参考，不作发布用 |
+| H-9 | incremental build 报 "target path missing" 后删掉了已有的 HTML 文件 | build 脚本在 meta.yaml 存在但 HTML 不存在时先触发 validate，validate 失败导致 HTML 被跳过但 meta 仍在 index，待 incremental snapshot 发现 HTML 不匹配就报错；再次 build 时 HTML 已被跳过只清掉 meta，反复查 | **写 meta.yaml → 立即 copy HTML 到 docs/ → 再 build**；不要先 copy HTML 再写 meta |
+| H-10 | info-leak 门禁误杀代码示例中的内网 IP（如 `192.168.1.100`）| check-info-leak.js 对 `192.168.x.x` 格式的私有 IP 也标记为 IP 地址泄露 | 代码示例中的内网 IP 改为公开示例域名，如 `server.example.com`、`bastion.example.com`、`192.168.1.100` → `server.example.com` |
 | H-2 | `python3 -m http.server` 被识别为长驻进程拦截 | 终端 guard 误杀 | **强制使用 `live-server`**（见下方正确操作） |
 | H-3 | `browser_cdp` desktop 截图 PNG/JPEG 文件损坏（broken chunk / 非 base64 字符） | persisted-output 对超长 base64 中间插入 `...` 截断 | **必须指定 `screenshot_path=绝对路径` 走文件落盘**，禁止 base64 返回 |
 | H-4 | vision_analyze 接收截图失败或误判 | 直接传 base64 字符串或 file:// URL | **始终用已落盘的绝对路径**传给 vision_analyze，禁止传 base64 |
@@ -19,6 +21,87 @@ tags: [infocard, build, screenshot, preflight, hardening]
 | H-7 | 子智能体选了禁用主题或虚构主题名（如 `q-style`），仍被发布 | 委派时未用 `infocard-theme-assignment`，成品未核验 `data-theme` 与 decision record 一致性 | 见 `infocard-publish-sop` Theme Enforcement Gate；发布前必须 `grep data-theme=` 与 `theme-decision.json.selected_theme` 比对；不符即 `BLOCKED_AT_THEME_MISMATCH` |
 
 | H-6 | 移动端布局翻车（hero 双栏 `1fr 340px` 在 ≤640px 溢出，右侧 stat-block 被切） | HTML 缺少 `@media (max-width: 640px)` 响应式规则 | 在 `</style>` 前插入响应式折叠 CSS（见 H-6 详细节）；同步 `.docs/` 副本后再 build |
+
+---
+
+## H-8 · 子智能体 meta.yaml 永远不完整
+
+**症状**：`build` 报错 "missing fields title" / "missing fields category" / "missing fields path"，子智能体产出的 `card.html.meta.yaml` 格式是 markdown 注释或缺少必要索引字段。
+
+**根因**：子智能体不知道 build-site.js 的 YAML 必需字段规范（slug / path / title / category / desc / tags / updated / date），也不掌握 `---` 头禁止规则。
+
+**修复路径**：
+
+主线自行写 `docs/<slug>.html.meta.yaml`，不依赖子智能体产出：
+
+```bash
+# ❌ 禁止：直接用子智能体写的 meta.yaml
+cp .docs/<run-id>/<slug>/card.html.meta.yaml docs/<slug>.html.meta.yaml
+
+# ✅ 正确：主线自行按规范写入
+cat > docs/<slug>.html.meta.yaml << 'META'
+slug: <slug>
+path: docs/<slug>.html
+title: <实际标题>
+category: <分类：开源工具/AI产品/设计产品/开发者资源>
+desc: <一句话描述，60-120字>
+tags:
+  - <标签1>
+  - <标签2>
+updated: "YYYY-MM-DD HH:MM:SS"
+date: "YYYY-MM-DD HH:MM:SS"
+META
+
+# copy HTML → build
+cp .docs/<run-id>/<slug>/card.html docs/<slug>.html
+node scripts/build-site.js
+```
+
+**子智能体 meta.yaml 只作 facts 来源参考**，不作发布用。发布前 preflight 必须确认 docs/ 下的 meta.yaml 格式正确。
+
+---
+
+## H-9 · incremental build "target path missing" 循环
+
+**症状**：第一次 build 报 "missing fields title"，修复后第二次报 "target path missing → docs/<slug>.html"，之后每次 build 都重复这两个错误。
+
+**根因**：incremental build 流程是：发现 docs/<slug>.html.meta.yaml → 检查 docs/<slug>.html 是否存在 → 若 HTML 不存在则报错并停止；此时 meta.yaml 已被 sync-build-timestamps 写入，但 HTML 未被 index 处理。下次 build 时：meta.yaml 存在但 HTML 仍不存在，validate 又失败，meta.yaml 被标记为 new 但 index 不更新。修复时若先写 meta 再 copy HTML，HTML 会因为 meta 的 path 字段指向它而被认可；若先 copy HTML 再写 meta，HTML 可能被 incremental snapshot 意外清理。
+
+**正确流程（H-8 的反面）**：
+
+```bash
+# 步骤1：写 meta.yaml 到 docs/（先确认所有字段）
+cat > docs/<slug>.html.meta.yaml << 'YAML'
+slug: <slug>
+path: docs/<slug>.html
+title: ...
+YAML
+
+# 步骤2：立即 copy HTML 到 docs/（meta 写完后立即跟上）
+cp .docs/<run-id>/<slug>/card.html docs/<slug>.html
+
+# 步骤3：build（此时 meta+HTML 原子存在）
+node scripts/build-site.js
+```
+
+**禁止**：先 copy HTML，再写 meta.yaml，再 build。
+
+---
+
+## H-10 · info-leak 误杀内网 IP
+
+**症状**：`check-info-leak.js` 报告 `[MEDIUM] IP地址` 在代码示例行，如 `sshrs forward --host jump-server --remote 192.168.1.100:80`。
+
+**根因**：check-info-leak.js 对 `192.168.x.x` / `10.x.x.x` / `172.16-31.x.x` 格式的私有 IP 地址均标记为泄露风险。
+
+**修复**：代码示例中的内网 IP 替换为公开示例域名：
+
+| 内网 IP | 替换为 |
+|---|---|
+| `192.168.1.100` | `server.example.com` |
+| `192.168.0.1` | `gateway.example.com` |
+| `10.0.0.1` | `internal.example.com` |
+| `172.16.0.1` | `bastion.example.com` |
 
 ---
 
