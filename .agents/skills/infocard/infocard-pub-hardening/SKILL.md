@@ -15,6 +15,40 @@ tags: [infocard, build, screenshot, preflight, hardening]
 | H-2 | `python3 -m http.server` 被识别为长驻进程拦截 | 终端 guard 误杀 | **强制使用 `live-server`**（见下方正确操作） |
 | H-3 | `browser_cdp` desktop 截图 PNG/JPEG 文件损坏（broken chunk / 非 base64 字符） | persisted-output 对超长 base64 中间插入 `...` 截断 | **必须指定 `screenshot_path=绝对路径` 走文件落盘**，禁止 base64 返回 |
 | H-4 | vision_analyze 接收截图失败或误判 | 直接传 base64 字符串或 file:// URL | **始终用已落盘的绝对路径**传给 vision_analyze，禁止传 base64 |
+| H-5 | info-leak 门禁误杀推文 ID（`status/2108956141325811828` 等长数字串被判为中国大陆手机号） | check-info-leak.js 手机号正则对 18-19 位数字串误匹配 | 在 HTML 中**把 `status/<id>` 改为链接形式** `<a href="https://x.com/<user>/status/<id>" style="color:inherit;text-decoration:none">推文原文</a>`，两处同步（`docs/` 和 `.docs/<run-id>/<slug>/card.html`）；改后重新过门禁 |
+| H-7 | 子智能体选了禁用主题或虚构主题名（如 `q-style`），仍被发布 | 委派时未用 `infocard-theme-assignment`，成品未核验 `data-theme` 与 decision record 一致性 | 见 `infocard-publish-sop` Theme Enforcement Gate；发布前必须 `grep data-theme=` 与 `theme-decision.json.selected_theme` 比对；不符即 `BLOCKED_AT_THEME_MISMATCH` |
+
+| H-6 | 移动端布局翻车（hero 双栏 `1fr 340px` 在 ≤640px 溢出，右侧 stat-block 被切） | HTML 缺少 `@media (max-width: 640px)` 响应式规则 | 在 `</style>` 前插入响应式折叠 CSS（见 H-6 详细节）；同步 `.docs/` 副本后再 build |
+
+---
+
+## H-7 · 主题违规发布
+
+**症状**：成品 `card.html` 的 `data-theme` 与 `theme-decision.json.selected_theme` 不符，或使用了 `theme/themes.json` 中不存在的名称。
+
+**根因**：跳过了 `infocard-theme-assignment`，未生成 decision record，委派 prompt 中预置了 `data-theme=`。
+
+**发布前必查**：
+```bash
+# 1. decision record 存在
+ls .docs/<run-id>/<slug>/theme-decision.json
+
+# 2. 成品 data-theme
+grep -o 'data-theme="[^"]*"' .docs/<run-id>/<slug>/card.html
+
+# 3. 核对
+jq -r '.selected_theme' .docs/<run-id>/<slug>/theme-decision.json
+# → 不符 = BLOCKED_AT_THEME_MISMATCH，退回子智能体重做
+
+# 4. 验证主题已在 themes.json 注册
+grep -o '"[a-z-]+":' theme/themes.json | grep -v 'version\|label\|capability\|struct\|implement'
+# 不在列表中的名称无效
+```
+
+**修复路径**：
+- 成品用了禁用主题 → 退回子智能体，从 `infocard-theme-assignment` 重新分配
+- 成品忘了写 `data-theme` → 主线直接 `patch` `<html>` 标签补上（若主题名称已确认）
+- 虚构主题名（如 `q-style`）→ 退回，从 `themes.json` 候选中重选
 
 ---
 
@@ -111,6 +145,70 @@ vision_analyze({
 
 ---
 
+## H-5 · info-leak 门禁误杀推文 ID
+
+**症状**：`node scripts/check-info-leak.js` 报告 `[HIGH] 手机号（中国大陆） (line N): 154***198`；检查 HTML 发现该行只有 `status/2109083154682351988` 形式的 X 帖子 ID，无真实手机号。
+
+**根因**：X/Twitter status ID 是 18-19 位纯数字字符串，check-info-leak.js 的手机号正则对连续 11+ 位数字串也会部分匹配导致误判。
+
+**已确认案例**（2026-10-11 同日复现 4 次）：
+- ste-zh: `status/2108956141325811826` → `141***182`
+- Pulse: 同上模式
+- ai-dev-workflow: `2108551891005394944` → `189***949`
+- JiuwenSwarm: `2109083154682351988` → `154***198`
+
+**修复**（两处同步）：
+
+```python
+# docs/<slug>.html 和 .docs/<run-id>/<slug>/card.html 两处同时修
+old = '<span>status/2108956141325811826</span>'
+new = '<a href="https://x.com/<user>/status/2108956141325811826" style="color:inherit;text-decoration:none">推文原文</a>'
+raw = open(path).read().replace(old, new, 1)
+open(path, 'w').write(raw)
+```
+
+**规则**：推文 ID 串不允许以纯文本形式出现在 card.html 中，必须外套 `<a href>` 或改为其他表述（日期、作者名等），否则 info-leak 门禁必拦。
+
+---
+
+## H-6 · 移动端布局溢出
+
+**症状**：桌面双栏 hero（`grid-template-columns: 1fr 340px`）在移动端（≤640px）水平溢出，右侧 stat-block 被切，左侧文字与图标重叠。
+
+**已修复案例**：`microsoft-litebox`（commit `3fcc827a`）。
+
+**修复模板**（插入 `</style>` 前）：
+
+```css
+    @media (max-width: 640px) {
+      .hero {
+        grid-template-columns: 1fr !important;
+      }
+      .hero-copy {
+        border-right: none !important;
+        border-bottom: 3px solid var(--ink);
+        padding-bottom: 14px !important;
+      }
+      .hero-visual {
+        padding: 12px 10px !important;
+      }
+      .stat-block .num {
+        font-size: 28px !important;
+      }
+      .badge-row {
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .page {
+        padding: 0 8px !important;
+      }
+    }
+```
+
+**流程**：修 docs/ → 同步 .docs/ 副本 → `npm run build` → verify → commit → push。
+
+---
+
 ## 发布前 preflight 清单
 
 执行 `npm run build` 前，依次确认：
@@ -118,6 +216,8 @@ vision_analyze({
 - [ ] H-1 查重：若 `npm run check-wiki-duplicate` 超时 → 改手动 `grep` 查重
 - [ ] H-3 截图：browser_cdp 必须用 `screenshot_path` 落盘，验证 `file` 命令确认完整
 - [ ] H-4 验收：vision_analyze 必须用绝对路径，禁止 base64
+- [ ] H-5 info-leak：card.html 中无裸 `status/<id>` 纯文本推文 ID（已外套 `<a href>` 链接形式则通过）
+- [ ] H-6 移动端：已发布卡片若使用 hero 双栏布局，须已含 `@media (max-width: 640px)` 规则
 - [ ] H-2 预览：使用 `live-server`，禁止 `python3 -m http.server`
 - [ ] meta.yaml：`date` 为 ISO 格式 `"YYYY-MM-DD HH:MM:SS"`，无尾部 `---`
 - [ ] build 后：`npm run build` 成功输出 `wrote _index.yaml`

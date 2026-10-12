@@ -19,6 +19,33 @@ tags: [infocard, authoring, light-route, python, template-clone]
 
 `project-brief.json` 固定使用 `hero`、`summary`、`core_capabilities`、`tech_stack`、`usage`、`use_cases`、`risk_boundary`、`sources` 槽位。契约失败时停止 authoring，不在 promotion 阶段补 schema。
 
+## Subagent delegation vs. light route decision
+
+Two authoring paths; choose by content readiness:
+
+| Condition | Path |
+|---|---|
+| facts.json gathered (推文 + GitHub API + README 全文)，theme known | Subagent delegation — parallel, faster |
+| Need multi-source research, ambiguous attribution | Subagent delegation |
+| Facts in hand + theme known + 1 card | Light route — no subagent overhead |
+| Token Plan 429 on subagent | Fallback to light route |
+
+**Subagent delegation advantages**: parallel research + HTML writing, good for 9-section progressive-doc.
+
+**Subagent delegation limits**: no preflight schema; info-leak check runs post-write; **synchronous return when `delegation.max_concurrent_children` is at capacity** — same output structure, no quality difference.
+
+**Theme pre-check 是硬约束**：每次派发生成前，主线程必须：
+1. 查 `docs/202610*.html` 最近 6 张卡的实际 `data-theme` 值
+2. 查在途委派已占用主题（当前会话 active children 的 theme-decision.json）
+3. 从 `theme/themes.json` 过滤合格候选
+4. 排除近 6 张 + 在途占用后，生成 `.docs/<run-id>/<slug>/theme-decision.json`
+5. 委派 prompt 中写入：`selected_theme` 字段值即 `data-theme` 取值，子智能体**不得自行选择或更改**
+6. 子智能体产出后，发布前校验 `data-theme` 是否与 decision record 一致；不符则退回重做
+
+**Subagent delegation pattern** (tested 2026-10-12): facts already gathered in `/tmp/<slug>_material.txt` → `mkdir .docs/<run-id>/<slug>/` → **主线程先执行 theme pre-check** → delegate with full inline facts + `theme-decision.json` path → subagent reads `theme-decision.json.selected_theme` and uses it as `data-theme` value, writes five files to its own directory.
+
+**主题家族去重规则**：`q-style` 是未注册虚构名称；`q` 和 `pixelstack` 是 bare slug；别名不重置占用窗口。`q` 与 `q-style` 视为同一家族（后者不能绕过占用约束）。
+
 ## When to use this skill
 
 Trigger: publishing a single infocard where you have full content and no multi-source cross-validation is needed. Specifically:
@@ -154,9 +181,21 @@ This keeps project-specific workflows separate from the global skill library and
 
 ### Theme decision input
 
-`infocard-theme-assignment` is the only owner of content-to-theme association. Before writing HTML, load `.docs/<run-id>/<slug>/theme-decision.json` and the assignment skill's schema. Authoring must not maintain a lookup table, recommend a concrete theme, or perform a second selection.
+`infocard-theme-assignment` is the only owner of content-to-theme association. **Before authoring (whether light-route or subagent delegation), the main thread must run the pre-check to generate `theme-decision.json`**; the authoring phase only consumes the frozen decision.
+
+Authoring must not maintain a lookup table, recommend a concrete theme, or perform a second selection.
 
 The record must already contain `content_type`, `content_shape`, `candidate_themes`, `excluded_themes`, `selection_weights`, `seed`, `selected_theme`, and `user_override`. Confirm that the selected theme is registered, the record is internally consistent, and the HTML `data-theme` plus sidecar `style` normalize to that selected bare slug. If missing or inconsistent, stop with `THEME_BLOCKED` and return to theme assignment.
+
+**Pre-check executed by main thread before any authoring (required for every card)**:
+```
+1. grep data-theme= docs/202610*.html (tail -6) → recent 6 occupied themes
+2. Check in-flight theme-decision.json from active delegate_task children
+3. Filter candidates from theme/themes.json by content capability requirements
+4. Exclude occupied → write .docs/<run-id>/<slug>/theme-decision.json
+5. Pass selected_theme into authoring context (subagent or light-route)
+6. After authoring: verify card.html data-theme == selected_theme; if mismatch → BLOCKED_AT_THEME_MISMATCH, return to authoring
+```
 
 Use the selected registered theme's skill and `theme/<selected_theme>.html` as skeleton input. User-selected themes remain preferred only when the assignment record marks them accepted after capability filtering; authoring never bypasses that check.
 
@@ -301,6 +340,27 @@ x_status_id: "2081932972559855907"
 style: infocard-hardblue-style
 path: "docs/20260729-agent-routing.html"
 ```
+
+### subagent 产出后主线程必做：meta.yaml 字段完整性检查
+
+subagent 产出的 meta.yaml 经常缺 `category` 字段（build-site.js 增量构建会报 `missing fields category` 而中断）。主线程接管后、build 前必须检查并补全。
+
+```bash
+# 主线程接管后立即检查
+grep "^category:" docs/<slug>.html.meta.yaml || echo "MISSING category!"
+```
+
+缺失时用 patch 补上（常见值：`工具介绍`）：
+```
+旧: desc: "..."
+新: desc: "..."
+category: 工具介绍
+date:
+```
+
+**实测案例**：GordenPPTSkill 卡（2026-10-11），subagent 产 category 缺失 → 主线程 patch 补上 → build-site 成功 → commit `39ad250c`
+
+---
 
 ### Build 后 meta.yaml 被 sync-build-timestamps 覆盖
 
