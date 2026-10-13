@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>God's Eye View · 开源 3D 地球情报终端</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+      --grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{min-width:0;display:grid;gap:10px;align-content:start;padding:12px 0 0}
+    .kicker-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;padding:5px 10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);color:#fff;font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;border-radius:999px}
+    .source{max-width:280px;text-align:right;font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b8c8f5;overflow-wrap:anywhere}
+    .title{margin:0;font-size:clamp(40px,7vw,88px);line-height:.92;letter-spacing:-.07em;font-weight:950}
+    .subtitle{margin:0;max-width:980px;font-size:clamp(15px,2vw,20px);line-height:1.55;color:#e8eefc}
+    .subcn{margin:0;max-width:980px;font-size:clamp(13px,1.6vw,16px);line-height:1.65;color:#c5d2f7}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:999px;color:#fff;font-size:12px;font-weight:850;letter-spacing:.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{display:grid;gap:8px;border:1.5px solid rgba(255,255,255,.16);background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));padding:14px 16px 12px;border-radius:18px;box-shadow:var(--shadow)}
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{min-width:0;background:rgba(10,12,22,.5);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:grid;gap:12px;align-content:start}
+    .visual-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .orb{width:66px;height:66px;border-radius:22px;background:radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:950;letter-spacing:-.08em}
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .mini-card{min-width:0;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1.5px solid rgba(255,255,255,.09);border-radius:16px;padding:10px 10px 9px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.2)}
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{height:12px;border-radius:999px;background:linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16)}
+    .section{margin:18px 0;padding:18px 20px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(20,28,52,.78), rgba(12,18,38,.82));box-shadow:0 14px 30px rgba(0,0,0,.34)}
+    .section-head{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .section-no{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#f4f9ff;background:linear-gradient(135deg,#3aa8ff,#4a78ff 60%,#8459ff);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 8px 18px rgba(74,120,255,.30)}
+    .section-no.b{background:linear-gradient(135deg,#8459ff,#4a78ff)}
+    .section-no.k{background:linear-gradient(135deg,#2db36a,#3aa8ff)}
+    .section-meta .label{font-size:12px;color:#9fb0e0;letter-spacing:.08em;margin-bottom:4px}
+    .section-meta h2{margin:0 0 6px;font-size:24px;color:#f4f9ff}
+    .section-meta p{margin:0;color:#b8c4e8;font-size:13px}
+    .layer-table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.55}
+    .layer-table th{text-align:left;padding:8px 10px;background:#11162a;border-bottom:1px solid rgba(255,255,255,.12);color:#9fb0e0;font-weight:900;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
+    .layer-table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);color:#d8e2ff;vertical-align:top}
+    .layer-table tr:last-child td{border-bottom:none}
+    .layer-table .name{font-weight:800;color:#f4f9ff;white-space:nowrap}
+    .layer-table .src{font-size:11px;color:#9fb0de}
+    .auth-g{color:#2db36a;font-weight:900}
+    .auth-y{color:#f4c84c;font-weight:900}
+    .auth-r{color:#f45454;font-weight:900}
+    .stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .stat-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:12px;text-align:center}
+    .stat-box .val{font-size:22px;font-weight:950;color:#f4f9ff;letter-spacing:-.04em}
+    .stat-box .lbl{font-size:11px;color:#9fb0de;margin-top:4px}
+    .basemap-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .basemap-card{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .basemap-card h4{margin:0 0 6px;font-size:14px;color:#f4f9ff}
+    .basemap-card p{margin:0;font-size:12px;color:#b8c4e8;line-height:1.55}
+    .basemap-card .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.06em;margin-bottom:8px}
+    .badge-g{border-color:rgba(45,179,106,.45);color:#ddffe8;background:rgba(45,179,106,.12);border:1px solid}
+    .badge-y{border-color:rgba(244,200,76,.45);color:#fff0bf;background:rgba(244,200,76,.12);border:1px solid}
+    .badge-r{border-color:rgba(244,84,84,.45);color:#ffd1d1;background:rgba(244,84,84,.12);border:1px solid}
+    .voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .voice-card{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+    .voice-card h4{margin:0 0 6px;font-size:13px;font-weight:900;color:#f4f9ff}
+    .voice-card p{margin:0;font-size:11.5px;color:#9fb0de;line-height:1.55}
+    .voice-card .cmd{margin-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:#7ad9ff;background:#0f1424;padding:4px 8px;border-radius:6px;display:block}
+    .detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .detail-card{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02))}
+    .detail-card h4{margin:0 0 6px;font-size:13px;font-weight:900;color:#f4f9ff}
+    .detail-card p{margin:0;font-size:11.5px;color:#b8c4e8;line-height:1.55}
+    .code-block{background:#0f1424;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.8px;line-height:1.7;color:#a8f59f;white-space:pre-wrap;overflow-x:auto}
+    .code-block .kw{color:#7ad9ff}
+    .code-block .cm{color:#9fb0de}
+    .warn-box{margin:0;padding:12px 14px;border-radius:14px;border:1px solid rgba(244,84,84,.36);background:rgba(244,84,84,.12);color:#ffd1d1;font-size:12.5px;line-height:1.6}
+    .warn-box strong{display:block;margin-bottom:6px;font-size:13px;color:#ff9999}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));box-shadow:0 8px 18px rgba(0,0,0,.24)}
+    .card h3{margin:6px 0 8px;font-size:15px;color:#f4f9ff}
+    .card p{margin:0;font-size:12px;color:#b8c4e8;line-height:1.55}
+    .footer{margin-top:14px;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#dfe8ff;font-size:12px;flex-wrap:wrap}
+    .footer .stars{font-weight:900}
+    .tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#cfd9f5;background:rgba(255,255,255,.05);margin:2px}
+    .tag.green{border-color:rgba(45,179,106,.45);color:#ddffe8;background:rgba(45,179,106,.12)}
+    .tag.cyan{border-color:rgba(88,195,255,.45);color:#d8f4ff;background:rgba(88,195,255,.12)}
+    .tag.yellow{border-color:rgba(244,200,76,.45);color:#fff0bf;background:rgba(244,200,76,.12)}
+    .tag.purple{border-color:rgba(132,89,255,.45);color:#ede3ff;background:rgba(132,89,255,.14)}
+    .source-note{margin:8px 0 0;font-size:12px;color:#9fb0e0;line-height:1.7}
+    @media(max-width:1080px){.hero{grid-template-columns:1fr}.stat-grid{grid-template-columns:repeat(2,1fr)}.basemap-row,.voice-grid,.detail-grid,.layer-table{grid-template-columns:1fr}.visual-grid{grid-template-columns:1fr}.section-head{grid-template-columns:48px 1fr}.section-no{width:48px;height:48px;font-size:18px}}
+    @media(max-width:720px){.page{width:min(100% - 16px,1180px);padding:10px 0 58px}.title{font-size:clamp(34px,13vw,54px)}.subtitle{font-size:14px}.subcn{font-size:13px}.footer{font-size:11.5px}.source{text-align:left;max-width:none}.visual-top{flex-direction:column;align-items:flex-start}.visual-meta{text-align:left;justify-items:start}.stat-grid{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+<main class="page">
+  <div class="hero-bar"></div>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="kicker-row">
+        <div class="kicker">Open Source · Real-time Spatial Intelligence</div>
+        <div class="source">Source: <a href="https://x.com/AISuperDomain/status/2109800865854881808">@AISuperDomain</a> · Trending #1</div>
+      </div>
+      <h1 class="title">God's Eye View</h1>
+      <p class="subtitle">A spy satellite simulator in your browser — except the data is real.</p>
+      <p class="subcn">把公开航班/船舶/卫星轨道/地震/摄像头数据汇到同一张写实 3D 地球，一句话变地图操作，开口指挥航班与城市。</p>
+      <div class="pill-row">
+        <span class="pill cyan">写实 3D 地球</span>
+        <span class="pill green">13 实时图层</span>
+        <span class="pill yellow">28 语音工具</span>
+        <span class="pill purple">免 Key 启动</span>
+      </div>
+      <div class="hero-note">
+        <strong>开源空间情报终端</strong>
+        <p>AI 接入一颗 3D 地球：看航班、追卫星，开口指挥。一句话飞东京、切图层、画步行路线、沿路线飞行，点选航班进驾驶舱视角。</p>
+      </div>
+    </div>
+
+    <aside class="hero-visual">
+      <div class="visual-top">
+        <div class="orb">G</div>
+        <div class="visual-meta">
+          <div class="big">Live Intelligence HUD</div>
+          <div class="small">CesiumJS · Vanilla JS · Vite</div>
+        </div>
+      </div>
+      <div class="visual-grid">
+        <article class="mini-card">
+          <div class="mini-icon cyan" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-3 3-3 15 0 18M12 3c3 3 3 15 0 18"/></svg>
+          </div>
+          <div class="label">3D Globe</div>
+          <div class="value">写实 3D 城市</div>
+          <div class="desc">Google Photorealistic 3D Tiles，Esri 卫星底图免 Key 即用。</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon yellow" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <div class="label">Flights</div>
+          <div class="value">11,000+ 实时飞机</div>
+          <div class="desc">OpenSky + adsb.lol，数据源完全免 Key，实时追踪历史轨迹。</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3v18M6 9l6-6 6 6M6 15l6 6 6-6"/></svg>
+          </div>
+          <div class="label">Satellites</div>
+          <div class="value">838 个天体</div>
+          <div class="desc">SGP4 + GMST 实时传播，DENSE 芯片可加载整个 Starlink 壳层。</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-icon green" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="label">Security</div>
+          <div class="value">SSRF 防护</div>
+          <div class="desc">所有私钥走服务端代理，OPENAI_API_KEY 永不进浏览器。</div>
+        </article>
+      </div>
+      <div class="visual-strip"></div>
+    </aside>
+  </section>
+
+  <!-- Section 1: 项目定位与 GitHub 实测数据 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">1</div>
+      <div class="section-meta">
+        <div class="label">GitHub 实测数据</div>
+        <h2>开源空间情报终端 · 项目定位</h2>
+        <p>bilawalsidhu/gods-eye-view — Trending 周榜 #1，YouTube 系列 5M+ 播放，全社媒 25M+ 曝光</p>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="val">16,957</div><div class="lbl">GitHub Stars</div></div>
+      <div class="stat-box"><div class="val">3,406</div><div class="lbl">Forks</div></div>
+      <div class="stat-box"><div class="val">426</div><div class="lbl">Watchers</div></div>
+      <div class="stat-box"><div class="val">118</div><div class="lbl">Open Issues</div></div>
+    </div>
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">
+      <span class="tag green">JavaScript</span>
+      <span class="tag cyan">MIT License</span>
+      <span class="tag yellow">CesiumJS</span>
+      <span class="tag purple">Vite</span>
+      <span class="tag">OSINT</span>
+      <span class="tag">WebGL</span>
+      <span class="tag">Flight Tracking</span>
+      <span class="tag">Satellite Tracking</span>
+      <span class="tag">Spatial Intelligence</span>
+    </div>
+    <p class="source-note">实测时间：2026-10-13 · 维护者：Bilawal Sidhu + Sameh Khamis @ Halfpixel · 仓库大小：84,624 KB · 最后推送：2026-09-02</p>
+  </section>
+
+  <!-- Section 2: 13 个实时数据图层 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">2</div>
+      <div class="section-meta">
+        <div class="label">Data Layers</div>
+        <h2>13 个实时数据图层</h2>
+        <p>11 层完全免 Key，2 层需免费 Key，1 层按量计费 · 另有内置静态数据 Datacenters 4,351 / Dams 704 / Submarine Cables 712</p>
+      </div>
+    </div>
+    <table class="layer-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>图层名</th>
+          <th>内容</th>
+          <th>数据源</th>
+          <th>认证</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td class="name">Map Stack</td>
+          <td>底图切换：Esri 卫星 / Google 3D / OSM / ion 托管栈</td>
+          <td class="src">Esri + OSM（🟢）/ Cesium ion（🟡）/ Google（🔴）</td>
+          <td><span class="auth-g">🟢🟡🔴</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td class="name">Live Flights</td>
+          <td>11,000+ 实时飞机 + 航线历史</td>
+          <td class="src">OpenSky + adsb.lol</td>
+          <td><span class="auth-g">🟢（adsb.lol 可加 🟡）</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td class="name">Military Flights</td>
+          <td>ADS-B 军事流量（琥珀色标注）</td>
+          <td class="src">adsb.lol</td>
+          <td><span class="auth-g">🟢</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td class="name">Live Vessels</td>
+          <td>全球数千艘实时船只</td>
+          <td class="src">AISStream</td>
+          <td><span class="auth-y">🟡</span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td class="name">Satellites</td>
+          <td>838 个天体目录，按类别着色；DENSE 芯片可加载完整 Starlink 壳层</td>
+          <td class="src">CelesTrak</td>
+          <td><span class="auth-g">🟢</span></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td class="name">Earthquakes</td>
+          <td>全球地震活动，近 24h</td>
+          <td class="src">USGS</td>
+          <td><span class="auth-g">🟢</span></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td class="name">Traffic</td>
+          <td>街道级别逐车流实时拥堵；低于约 8km 按真实堵点着色；免 Key 时为近似模拟</td>
+          <td class="src">TomTom + OSM（🟢模拟 / 🟡真实）</td>
+          <td><span class="auth-g">🟢（TomTom 让它变真实需 🟡）</span></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td class="name">CCTV Mesh</td>
+          <td>约 800 个公开摄像头投影进 3D 空间；位置公开，朝向为估计先验</td>
+          <td class="src">Austin / Caltrans / TfL London</td>
+          <td><span class="auth-g">🟢</span></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td class="name">Radio</td>
+          <td>地理定位世界广播 + 模拟调谐器，最多 750 个台，拖指针地球飞向播音台</td>
+          <td class="src">Radio Browser</td>
+          <td><span class="auth-g">🟢</span></td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td class="name">Bikeshare</td>
+          <td>实时站点可用性</td>
+          <td class="src">GBFS</td>
+          <td><span class="auth-g">🟢</span></td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td class="name">Active Fires</td>
+          <td>NASA FIRMS 实时火点，尾随 24h</td>
+          <td class="src">NASA FIRMS</td>
+          <td><span class="auth-y">🟡</span></td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td class="name">Space Missions</td>
+          <td>滚动 30 天发射，含载荷/级段/回收细节</td>
+          <td class="src">Launch Library 2（🟢 / token 提升额度 🟡）</td>
+          <td><span class="auth-g">🟢</span></td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td class="name">Mapped Installations</td>
+          <td>视口范围内军事站点背景信息（天然不完整，有明确标注）</td>
+          <td class="src">OpenStreetMap</td>
+          <td><span class="auth-g">🟢</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="source-note">静态内置数据：Datacenters 4,351 / Dams 704 / Submarine Cables 712 · 额外：社区叠加层，可选驾驶舱 WX 云效</p>
+  </section>
+
+  <!-- Section 3: 免 Key 启动机制 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">3</div>
+      <div class="section-meta">
+        <div class="label">Zero-Config Startup</div>
+        <h2>免 Key 启动机制</h2>
+        <p>两条路径：Pinokio 一键傻瓜式 / 终端 npm install 开发者式 · 冷启动中位数 1.86s（M5/Chrome 时点采样）</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <h3>🟢 Path 1：Pinokio 一键</h3>
+        <p>装 Pinokio → Discover → Download from URL → 粘贴仓库 URL → Install → Start<br><br>启动器自动验证运行时、安装锁定依赖、找空闲本地端口、打开应用。完全零终端操作。</p>
+      </div>
+      <div class="card">
+        <h3>🟢 Path 2：终端安装</h3>
+        <p><code style="font-family:ui-monospace;font-size:11px;color:#7ad9ff">npm install → npm run doctor → npm run dev</code><br><br>macOS 可用 <code style="font-family:ui-monospace;font-size:11px;color:#7ad9ff">./scripts/dev-fresh.sh</code> 清 Vite 缓存并从 Keychain 拉取已配置 Key，同样零 Key 启动。</p>
+      </div>
+      <div class="card">
+        <h3>🔒 密钥安全存放</h3>
+        <p>Pinokio → pinokio/ENVIRONMENT（应用忽略）<br>终端 clone → 仓库根 .env<br><br>写入前先设文件为 owner-only。密钥永不离开本机。服务端只绑定 localhost。</p>
+      </div>
+    </div>
+    <div style="margin-top:12px;background:#0f1424;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.7;color:#7ad9ff">
+      <span style="color:#9fb0de"># 冷启动中位数 1.86s（M5/Chrome 时点采样，比较基线非硬件要求）</span><br>
+      <span style="color:#2db36a">➜</span> npm run dev<br>
+      &nbsp;&nbsp;Local:&nbsp; <span style="color:#7ad9ff">http://localhost:4173</span><br>
+      &nbsp;&nbsp;Node:&nbsp; 24.14.x 或 26.x（25 可用但 EOL，仅警告）<br>
+      &nbsp;&nbsp;Stack: Vanilla JS + CesiumJS + Vite
+    </div>
+    <p class="source-note">注意：不要在 Pinokio 8.0.40 原生 Configure 面板输入凭据——该版本不正确保存嵌套应用文件且会记录提交值。</p>
+  </section>
+
+  <!-- Section 4: 底图阶梯 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">4</div>
+      <div class="section-meta">
+        <div class="label">Basemap Ladder</div>
+        <h2>底图阶梯三档</h2>
+        <p>从零配置 Esri+OSM 卫星底图，到免费 Cesium ion 出 Google Photorealistic 3D，再到 Google Maps key 计费路线</p>
+      </div>
+    </div>
+    <div class="basemap-row">
+      <div class="basemap-card">
+        <span class="badge badge-g">🟢 零配置</span>
+        <h4>Esri + OSM 卫星底图</h4>
+        <p>Esri World Imagery 卫星底图 + 免 Key 地形，2D。Esri 不可达时 OSM 自动接管。地形不可用时地球继续运行。</p>
+      </div>
+      <div class="basemap-card">
+        <span class="badge badge-y">🟡 免费 ion Token</span>
+        <h4>Google Photorealistic 3D 城市</h4>
+        <p>Cesium ion 免费 Token 出 Google Photorealistic 3D 城市 + 世界地形。符合资格的个人非商用用途，遵循 ion 现行条款与配额。</p>
+      </div>
+      <div class="basemap-card">
+        <span class="badge badge-r">🔴 Google Maps Key</span>
+        <h4>Google 直连 + 地点搜索</h4>
+        <p>同样 3D 但直连 Google + 应用内地点搜索。按量计费路线，所有 API Key 均通过服务端代理，浏览器不可见。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 5: 28 个语音工具 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">5</div>
+      <div class="section-meta">
+        <div class="label">Voice Interface · 需要 OpenAI Key</div>
+        <h2>28 个语音工具 · 四类命令</h2>
+        <p>点 GEV MIC 授权麦克风。它知道自己正在看什么——应答前拉取实时场景上下文，含坐标、路名、激活图层、视图比例</p>
+      </div>
+    </div>
+    <div class="voice-grid">
+      <div class="voice-card">
+        <h4>🎯 直接指挥</h4>
+        <p>像无人机操作员一样控制相机：飞往城市、环绕飞行、画步行路线、沿路线飞、缩小到全球视角</p>
+        <span class="cmd">"带我去东京" / "从国会大厦到 Zilker Park 画步行路线" → "沿刚才画的路线飞"</span>
+      </div>
+      <div class="voice-card">
+        <h4>✏️ 标注它（真实世界上白板）</h4>
+        <p>画真实边界多边形不是圆；标注建筑并量距；说完"clear the map"前一直保留</p>
+        <span class="cmd">"描出德州边界" / "标注德州议会大厦及周边" / "埃菲尔铁塔离卢浮宫多远"</span>
+      </div>
+      <div class="voice-card">
+        <h4>🔍 审问它（实时图层分析）</h4>
+        <p>对 13 个数据图层做分析查询：航班数量、船只方向、火点强度、ISS 过境时间</p>
+        <span class="cmd">"德州上空有多少航班" / "有没有飞机在四万英尺以上" / "ISS 下次何时过境"</span>
+      </div>
+      <div class="voice-card">
+        <h4>⚙️ 操作它（免手控制台）</h4>
+        <p>切换视觉风格、打开图层、播放新闻广播、追踪目标并一键进驾驶舱</p>
+        <span class="cmd">"切换夜视并打开航班图层" / "追踪那架飞机" → "进入驾驶舱"</span>
+      </div>
+    </div>
+    <div style="margin-top:12px;background:#0f1424;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px">
+      <p style="margin:0;font-size:12px;color:#b8c4e8;line-height:1.6">
+        <strong style="color:#f4f9ff">视觉接地：</strong>街道级读视口截图识别可读标识与建筑名，被明确指示<strong style="color:#ff9999">绝不幻觉标签</strong>。<br>
+        <strong style="color:#f4f9ff">安全设计：</strong>OPENAI_API_KEY 永不进浏览器，客户端只拿短期会话 token。<br>
+        <strong style="color:#f4f9ff">电影级构图：</strong>"show me the planes overhead" 会拉远、俯仰、像导演一样构图。
+      </p>
+    </div>
+  </section>
+
+  <!-- Section 6: 工程实现细节 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">6</div>
+      <div class="section-meta">
+        <div class="label">Under the Hood</div>
+        <h2>工程实现细节</h2>
+        <p>7 条关键技术决策：无框架 Vanilla JS + CesiumJS + Vite，卫星 SGP4，大地水准面感知，安全代理</p>
+      </div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-card">
+        <h4>🛰️ 世界稳定图标航向投影</h4>
+        <p>飞机和船只在每个相机角度都指向真实世界航向——逐帧屏幕空间航向投影。无旋转、无视口锁定。</p>
+      </div>
+      <div class="detail-card">
+        <h4>📡 平滑运动与航位推算</h4>
+        <p>实时数据每 15–30s 到达；地球渲染落后真实时间一个间隔并在已知定位点间插值；推算航位推算填补空隙。</p>
+      </div>
+      <div class="detail-card">
+        <h4>🌍 SGP4 + GMST 卫星轨道传播</h4>
+        <p>诚实的卫星：SGP4 传播 + 通过 GMST 实时校正锁定的轨道环。不漂移、不逐秒闪烁。</p>
+      </div>
+      <div class="detail-card">
+        <h4>🏔️ 大地水准面感知实体高度</h4>
+        <p>实体高度走真实垂直基准——对渲染地形网格采样，飞机停在停机坪、摄像头站在街角而非漂浮。</p>
+      </div>
+      <div class="detail-card">
+        <h4>💰 精打细算的配额预算代理</h4>
+        <p>付费数据源跑在缓存且预算受控的代理后——OpenSky 额度调节器、TomTom 每日瓦片预算、磁盘缓存 TLE。</p>
+      </div>
+      <div class="detail-card">
+        <h4>🔐 SSRF 防护服务端代理</h4>
+        <p>每个接触私钥的 API（OpenAI、AISStream、OpenSky OAuth、摄像头帧）都通过加固服务端代理，带 SSRF 防护、响应上限和净化错误。</p>
+      </div>
+    </div>
+    <div class="code-block" style="margin-top:12px">
+<span class="cm">// 技术栈：原生 JavaScript + CesiumJS + Vite + Google Photorealistic 3D Tiles + OpenAI Realtime API</span>
+<span class="kw">src/</span>
+├── main.js                 <span class="cm"># 引导：Google 3D tiles、图层注册</span>
+├── ui.js                   <span class="cm"># 运行时 UI — 面板、HUD、样式、控制门面</span>
+├── hud.js                  <span class="cm"># 情报 HUD + AI 场景摘要</span>
+├── keySetup.js             <span class="cm"># POWER UP 面板 — 应用内供应商 Key（仅 dev server）</span>
+├── mapStackController.js   <span class="cm"># 底图切换 — Google 3D / Esri / OSM / ion 栈</span>
+├── iconOrientation.js      <span class="cm"># 屏幕投影的世界空间航向 + 地平线剔除</span>
+├── voice/                  <span class="cm"># OpenAI Realtime 会话 + 28 个语音工具</span>
+├── data/                   <span class="cm"># 每图层一个模块 + 编排 + 上下文存储</span>
+│   └── local_data/         <span class="cm"># 内置数据集（按文件夹标注来源）</span>
+└── scenes/                 <span class="cm"># 电影感场景导演</span>
+<span class="cm">// 权威运行时参考：docs/CURRENT-STATE.md</span>
+    </div>
+  </section>
+
+  <!-- Section 7: 驾驶舱与实地任务 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">7</div>
+      <div class="section-meta">
+        <div class="label">Pilot Cockpit &amp; Field Missions</div>
+        <h2>驾驶舱视角与 11 个实地任务</h2>
+        <p>坐在被追踪的航班里，相机带着真实地形一路下降；250km 名册一键跳入驾驶舱；11 个探索性实地任务</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <h3>🛩️ 驾驶舱视角</h3>
+        <p>坐在被追踪的航班里，相机带着真实地形一路下降。Contacts 保持 250km 名册一键可跳。简报条：附近实时信号、区域头条、真实本地天气。</p>
+      </div>
+      <div class="card">
+        <h3>🎬 3D 机库与换皮现实</h3>
+        <p>真实分级机型模型 787/ATR-72/Citation/Bell 206/MQ-9，近距离时图标切 3D 模型。GLSL 传感器叠加：CRT/NVG/FLIR 热成像/Noir/Snow。</p>
+      </div>
+      <div class="card">
+        <h3>🎥 场景导演与分享链接</h3>
+        <p>拍摄电影感镜头巡游。分享链接序列化相机/风格/图层/追踪目标——实时目标是交接不是书签。</p>
+      </div>
+    </div>
+    <div style="margin-top:12px;background:#0f1424;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px">
+      <p style="margin:0 0 8px;font-size:12px;color:#9fb0de;font-weight:900;letter-spacing:.06em">11 个实地任务（Field Missions）</p>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px">
+        <div style="font-size:12px;color:#d8e2ff">① Ask the planet — 军用直升机盘旋原因</div>
+        <div style="font-size:12px;color:#d8e2ff">② Final approach — 跳进进近客机驾驶舱</div>
+        <div style="font-size:12px;color:#d8e2ff">③ Night watch — NVG + 检测网格读城市</div>
+        <div style="font-size:12px;color:#d8e2ff">④ Port call — 长滩港船只 + CCTV 面板</div>
+        <div style="font-size:12px;color:#d8e2ff">⑤ Tokyo FM — 涩谷 Radio 图层 + 调谐器</div>
+        <div style="font-size:12px;color:#d8e2ff">⑥ Fire line — 加州 FIRMS 火点 + CCTV</div>
+        <div style="font-size:12px;color:#d8e2ff">⑦ Walking route 🎙️ — 语音画路线并飞它</div>
+        <div style="font-size:12px;color:#d8e2ff">⑧ Measure LAX→DFW 🎙️ — 跨 country 箭头距离</div>
+        <div style="font-size:12px;color:#d8e2ff">⑨ Launch replay — 30 天内发射 0.25×–4×</div>
+        <div style="font-size:12px;color:#d8e2ff">⑩ Walk the boneyard — 退役飞机密集区</div>
+        <div style="font-size:12px;color:#d8e2ff">⑪ Orbit Three Gorges — 三峡大坝 + Dams 图层</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 8: 数据诚实性与使用边界 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">8</div>
+      <div class="section-meta">
+        <div class="label">Data Integrity &amp; Disclaimers</div>
+        <h2>数据诚实性与使用边界</h2>
+        <p>README 原文 IMPORTANT 声明必须保留；MIT License 但打包数据集各有条款</p>
+      </div>
+    </div>
+    <div class="warn-box">
+      <strong>⚠️ IMPORTANT — 不得用于安全攸关用途</strong>
+      这是对公开和第三方数据的探索性可视化。数据可能延迟、不完整、建模、推断或错误。<strong>不要用于飞行或海事导航、应急响应、医疗健康决策、投资决策或其他安全攸关或运营目的。</strong>重要信息请用权威来源核实。
+    </div>
+    <div style="margin-top:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+      <div class="card">
+        <h3>📊 数据精度说明</h3>
+        <p>Traffic 为沿真实道路用聚合位置数据模拟。<br><br>CCTV 摄像头朝向为估计先验。<br><br>火箭发射轨迹为粗略估计。<br><br>实时数据每 15–30s 刷新。</p>
+      </div>
+      <div class="card">
+        <h3>📋 许可证说明</h3>
+        <p>主仓库 MIT License。<br><br>打包的实时数据集各有自己的条款（DATA_SOURCES.md）。<br><br>演示 GIF 页面内标注归属，不授权独立复用。</p>
+      </div>
+      <div class="card">
+        <h3>🔧 状态声明</h3>
+        <p>一个用于探索与学习的演进中开源客户端——一个快速可改的基础，不是加固过的生产服务。</p>
+      </div>
+      <div class="card">
+        <h3>🗝️ 密钥可见性</h3>
+        <p>浏览器可见的 Key 仅 Google Maps 和 Cesium ion（须在供应商侧限制）。OPENAI_API_KEY 永不进浏览器。服务端只绑定 localhost。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 9: 商业化动向 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">9</div>
+      <div class="section-meta">
+        <div class="label">Commercialization &amp; Future</div>
+        <h2>商业化动向与下一步</h2>
+        <p>最初保持开源客户端另做专业产品；发布后最响的诉求是"直接给个链接"；官方托管版正在 Halfpixel 构建</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <h3>🌐 官方托管版进行中</h3>
+        <p>最初计划保持仓库为开源客户端另做专业产品。发布后最响的诉求不是新功能而是"直接给个链接"。因此官方托管版 God's Eye View 正在 Halfpixel 构建：无需安装，浏览器打开即可。</p>
+      </div>
+      <div class="card">
+        <h3>💸 作者提醒：数据变贵，算力变 brutal</h3>
+        <p>在这个领域做一周你会学到"当下是最便宜的部分"。想回到过去——以真实分辨率平铺、服务、回放"发生了什么"和"变了什么"——数据变贵，算力变 brutal。那是长期游戏。</p>
+      </div>
+      <div class="card">
+        <h3>🛠️ 键盘快捷键</h3>
+        <p>
+          <span class="tag" style="margin:2px 4px 2px 0">1–7</span> 视觉风格<br>
+          <span class="tag" style="margin:2px 4px 2px 0">H</span> HUD<br>
+          <span class="tag" style="margin:2px 4px 2px 0">D</span> 检测<br>
+          <span class="tag" style="margin:2px 4px 2px 0">C</span> 驾驶舱<br>
+          <span class="tag" style="margin:2px 4px 2px 0">Esc</span> 退出
+        </p>
+      </div>
+    </div>
+    <p class="source-note">Homepage: <a href="https://maptheworld.ai/" style="color:#7ad9ff">https://maptheworld.ai/</a> · Halfpixel: <a href="https://halfpixel.ai" style="color:#7ad9ff">https://halfpixel.ai</a></p>
+  </section>
+
+  <div class="footer">
+    <div>🛰️ bilawalsidhu/gods-eye-view</div>
+    <div class="stars">★ 16,957 · MIT License</div>
+    <div>来源：<a href="https://x.com/AISuperDomain/status/2109800865854881808">@AISuperDomain 原推文</a></div>
+  </div>
+</main>
+
+<script>
+(function(){
+  function send(){
+    var h=document.body.scrollHeight;
+    window.parent.postMessage({type:'theme-height',slug:'darkblue',height:h},'*');
+  }
+  if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+  setTimeout(send,500);
+})();
+</script>
+</body>
+</html>
