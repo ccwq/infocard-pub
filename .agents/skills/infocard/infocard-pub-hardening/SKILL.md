@@ -19,8 +19,14 @@ tags: [infocard, build, screenshot, preflight, hardening]
 | H-4 | vision_analyze 接收截图失败或误判 | 直接传 base64 字符串或 file:// URL | **始终用已落盘的绝对路径**传给 vision_analyze，禁止传 base64 |
 | H-5 | info-leak 门禁误杀推文 ID（`status/2108956141325811828` 等长数字串被判为中国大陆手机号） | check-info-leak.js 手机号正则对 18-19 位数字串误匹配 | 在 HTML 中**把 `status/<id>` 改为链接形式** `<a href="https://x.com/<user>/status/<id>" style="color:inherit;text-decoration:none">推文原文</a>`，两处同步（`docs/` 和 `.docs/<run-id>/<slug>/card.html`）；改后重新过门禁 |
 | H-7 | 子智能体选了禁用主题或虚构主题名（如 `q-style`），仍被发布 | 委派时未用 `infocard-theme-assignment`，成品未核验 `data-theme` 与 decision record 一致性 | 见 `infocard-publish-sop` Theme Enforcement Gate；发布前必须 `grep data-theme=` 与 `theme-decision.json.selected_theme` 比对；不符即 `BLOCKED_AT_THEME_MISMATCH` |
-
 | H-6 | 移动端布局翻车（hero 双栏 `1fr 340px` 在 ≤640px 溢出，右侧 stat-block 被切） | HTML 缺少 `@media (max-width: 640px)` 响应式规则 | 在 `</style>` 前插入响应式折叠 CSS（见 H-6 详细节）；同步 `.docs/` 副本后再 build |
+| H-11 | 子智能体委派超时 card.html 未写出 | write_file 25s 超时，owner exit 中断写入 | 主线直接创作（H-12 补强路径）；委派 completed ≠ 写入成功 |
+| H-12 | 子智能体产出 < 27KB | 受 token 预算或模板不熟截断内容节 | 主线 patch 补节（竞品对比表/技术细节/代码示例/Pipeline 示例等） |
+| H-13 | 子智能体产出缺 `data-theme` 属性 | 知道但漏写根标签属性 | `grep -o 'data-theme='` 强制门禁；无则主线 patch `<html>` 标签 |
+| H-14 | 委派 completed 但文件不存在 | write/execute_code 超时中断 | 每次收口先 `ls -la + wc -c` 验证 existence + size，再决定走补强还是主线创作 |
+| H-15 | info-leak 误杀推文 ID 手机号 | 18 位数字串被手机号正则匹配 | ID 全在 `<a href>` 内则 PASS；裸 ID 必须外套链接；Anatomy/GEV 实测通过 |
+| H-16 | 子智能体只覆盖模板自带类的 media query，自建类在移动端全部失效 | 委派要求「复用模板类名」，子智能体另建 `.risk-grid`/`.grid-3`/`.matrix`/`.flow`/`.comparison-table`/`.data-table`/`.env-table`/`.analysis-block`/`.code-block` 等类却不为它们写窄屏规则 | 发布前跑批量扫描脚本（见 H-16 详细节）：表格数 vs `.table-wrap` 数量、`<pre>` 数 vs 720px media 是否覆盖代码块类、三栏栅格类是否在 media 内改单列；发现即主线补 720px 规则并包 `table-wrap` |
+| H-17 | 宽表格在移动端挤爆、第三列被裁 | `<table>` 无最小宽度、无横向滚动容器，浏览器强行压缩列宽导致文字逐字换行 | 所有 `<table>` 必须包 `<div class="table-wrap">`，并在 720px media 内设 `min-width:600px`（多列对比表 720px）+ 可见滚动条样式 |
 
 ---
 
@@ -254,6 +260,88 @@ open(path, 'w').write(raw)
 
 ---
 
+## H-13 · 子智能体产出缺 `data-theme` 属性
+
+**症状**：子智能体 `status: completed`，card.html 存在且 size 正常，但 `<html>` 根标签缺少 `data-theme` 属性，导致 build 后页面无主题样式、index 记录缺失。
+
+**根因**：子智能体在委派 prompt 里知道 `data-theme="graph-paper"`（写在类名、注释或 theme-decision.json 里），但输出 HTML 时漏写根标签属性。darkblue 和 graph-paper 模板的 `<html>` 标签均无默认 `data-theme` 值。
+
+**已确认案例**：Anatomy（graph-paper, 44,602B）和 God's Eye View（darkblue, 39,617B）均漏写，发布前均由主线 `patch` 补上。
+
+**修复路径**：
+
+```bash
+# 发布前强制 grep 检查 data-theme
+grep -o 'data-theme="[^"]*"' .docs/<run-id>/<slug>/card.html
+
+# 若输出为空 → 主线直接 patch（主题名已在 theme-decision.json 中确认）
+patch .docs/<run-id>/<slug>/card.html \
+  '<html lang="zh-CN">' \
+  '<html lang="zh-CN" data-theme="<selected_theme>">'
+```
+
+**规则**：`grep data-theme=` 是发布前强制门禁，不通过不得 build。子智能体 `status: completed` 不等于 `data-theme` 存在——必须实际检查文件。
+
+---
+
+## H-14 · 委派完成后必须验证文件 existence + size
+
+**症状**：子智能体 `status: completed`（owner exit）但 `card.html` 不存在（size = 0 或文件缺失），或文件写出但 size 远低于预期（如 2KB）。
+
+**根因**：`write_file` 工具 25s 超时硬限制；大文件在慢 I/O 下无法时限内写入；子智能体改用 `execute_code` 后 kernel write 同样受 25s 限制；owner exit 时写入被中断。
+
+**已确认案例**：Unlimited OCR 委派超时，card.html 未写出（deleg_8b373256，owner exit）。
+
+**主线程兜底流程**：
+
+```bash
+# 步骤1：检查文件 existence + size
+ls -la .docs/<run-id>/<slug>/card.html
+wc -c .docs/<run-id>/<slug>/card.html
+
+# 步骤2：判断
+# size = 0 或不存在  → 主线直接创作（H-12 补强路径）
+# size 1KB-26KB      → H-12 主线补节
+# size ≥ 27KB        → 进入 H-13 data-theme 检查
+
+# 步骤3：主线程创作用 execute_code（主线无 25s 内核限制）
+# 素材已在主线程 context，open(path,'w').write(html) 直接写
+```
+
+**关键教训**：委派 `status: completed` ≠ 写入成功。检查文件 existence + size 是每次委派收口的第一个动作。
+
+---
+
+## H-15 · 推文 ID 安全格式判定规则
+
+**症状**：推文 ID（18-19 位纯数字）出现在 HTML 中，info-leak 误判为手机号；但 ID 全在 `<a href>` 内时无实际风险。
+
+**已确认安全案例**：Anatomy 中 2 个推文 ID 全在 href 内 → info-leak PASS；God's Eye View 中 2 个推文 ID 全在 href 内 → info-leak PASS。
+
+**判定规则**：
+
+```
+IF  所有推文 ID 出现都在 href 属性内  → info-leak PASS，无风险
+IF  任意裸 ID 纯文本出现（不在 href）  → info-leak FAIL，必须修复
+```
+
+```bash
+# 验证脚本
+python3 -c "
+content=open('card.html').read()
+ids=['2109800865854881808']  # 替换为实际 ID
+for id in ids:
+    in_href=all('href=' in content[max(0,m.start()-80):m.start()+len(id)+10]
+                 for m in __import__('re').finditer(id, content))
+    total=content.count(id)
+    print(f'{id}: total={total} all_in_href={in_href}')
+"
+```
+
+**强制规则**：推文 ID 串不允许以纯文本形式出现在 card.html 中，必须外套 `<a href>` 链接或改为其他表述（日期、作者名等）。
+
+---
+
 ## H-11 · 子智能体委派超时导致 card.html 未写出
 
 **症状**：子智能体委派完成（owner exit）但 `.docs/<run-id>/<slug>/card.html` 不存在或 size = 0；日志显示 `write_file` 超时或 execute_code 超时。
@@ -263,7 +351,7 @@ open(path, 'w').write(raw)
 **主线程兜底流程**：
 
 ```bash
-# 步骤1：检查子智能体是否写出了文件
+# 步骤1：检查子智能体是否写出了文件（H-14）
 ls -la .docs/<run-id>/<slug>/card.html
 
 # 步骤2：若文件不存在或 size < 1KB → 主线程直接创作
@@ -359,6 +447,84 @@ wc -c .docs/<run-id>/<slug>/card.html
 - [ ] H-2 预览：使用 `live-server`，禁止 `python3 -m http.server`
 - [ ] meta.yaml：`date` 为 ISO 格式 `"YYYY-MM-DD HH:MM:SS"`，无尾部 `---`
 - [ ] build 后：`npm run build` 成功输出 `wrote _index.yaml`
+
+---
+
+## H-16 详细节 · 移动端适配批量扫描脚本
+
+**何时跑**：任何子智能体产出 card.html 之后、build 之前。子智能体只覆盖模板自带类的窄屏规则，自建类一律漏写 —— 2026-10-13 一天内连续在 Anatomy / RustGIS / LLM Wiki v2 / Qwen Image / God's Eye View 五张卡复现。
+
+**扫描脚本**（Python，直接对 `docs/<slug>.html` 跑）：
+
+```python
+import re, os, glob
+
+base = '/home/ccwq/qbox/opendir/project/infocard-pub/docs'
+
+def media_block(style, key):
+    m = re.search(r'@media[^{]*' + key + r'[^{]*\{', style)
+    if not m:
+        return None
+    d = 0; i = m.end() - 1
+    while i < len(style):
+        if style[i] == '{': d += 1
+        elif style[i] == '}':
+            d -= 1
+            if d == 0: break
+        i += 1
+    return style[m.end():i]
+
+for f in sorted(glob.glob(os.path.join(base, '2026*.html'))):
+    c = open(f, encoding='utf-8').read()
+    style = c.split('</style>')[0]
+    blk = media_block(style, '720px')
+    nt = len(re.findall(r'<table', c))
+    wrap = c.count('<div class="table-wrap">')
+    pre = len(re.findall(r'<pre', c))
+    flags = ''
+    if nt and not wrap:            flags += ' TABLE-NOWRAP'
+    if pre and blk and 'code' not in blk.lower(): flags += ' CODE-NOMOBILE'
+    if nt and blk and 'table-wrap' not in blk:      flags += ' TW-NOMOBILE'
+    if not blk:                    flags += ' NO-720'
+    if flags:
+        print(f'{os.path.basename(f)[:48]:50} t={nt:2} wrap={wrap:2} pre={pre:2}{flags}')
+```
+
+**判定**：`TABLE-NOWRAP` = 表格没有滚动容器（必炸）；`NO-720` = 卡片根本没有窄屏断点；`CODE-NOMOBILE` / `TW-NOMOBILE` = 有 720px media 但没覆盖对应类。
+
+**修复动作**（主线执行，勿交回子智能体）：
+
+```python
+# 1) 所有表格包滚动容器
+tables = re.findall(r'<table\b.*?</table>', c, re.S)
+out = []; last = 0
+for t in tables:
+    pos = c.index(t, last); out.append(c[last:pos])
+    if 'table-wrap' in c[max(0, pos-40):pos]:
+        out.append(t)
+    else:
+        out.append('<div class="table-wrap">' + t + '</div>')
+    last = pos + len(t)
+out.append(c[last:]); c = ''.join(out)
+
+# 2) 在 720px media 收尾 } 前插入规则（找不到就整段新增 media）
+```
+
+**标准修复 CSS**：
+
+```css
+@media (max-width: 720px){
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px -6px;padding:0 6px}
+  .table-wrap::-webkit-scrollbar{height:6px}
+  .table-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:3px}
+  .table-wrap table{min-width:600px}
+  .table-wrap td,.table-wrap th{padding:7px 9px;font-size:11.5px}
+}
+```
+
+暗色主题把滚动条颜色改成 `rgba(255,255,255,.22)`，轨道 `rgba(255,255,255,.06)`。
+
+**收尾必查**：`.section-head` 在 720px 下补 `padding-left:14px`（编号方块贴边，历史高频 bug）；三栏栅格类（`.risk-grid`/`.grid-2`/`.grid-3`/`.matrix`/`.flow`）改 `grid-template-columns:1fr`；标签平衡用 `for t in ['div','table','section','ul','li']` 校验开闭数量一致。
 
 ---
 

@@ -137,6 +137,29 @@ For a numbered poster-shell card, keep the number, stripe, and body structurally
 
 Do not let a body fall into the number column. If the mobile variant switches to flex, verify that the body has an explicit usable width; a generic `flex:1` patch may lose to a more-specific media rule. For every rebuild, inspect DOM parentage before changing CSS: a prematurely closed tag can turn a description into a grid sibling, which no overflow rule can fix.
 
+### 自建类必须自带窄屏规则（委派子智能体时的强制项）
+
+**根因（2026-10-13 实测，一天内五张卡连续复现）**：委派时说「复用模板类名」，子智能体仍会另建 `.risk-grid` / `.grid-2` / `.grid-3` / `.matrix` / `.flow` / `.comparison-table` / `.data-table` / `.env-table` / `.analysis-block` / `.code-block` / `.mapping-row` / `.step-row` / `.wide-section` 等类。它只为**模板自带类**补 `@media (max-width:720px)`，自建类一个都不写 —— 窄屏下栅格不塌陷、宽表挤爆、内容贴边。
+
+**委派时必须写死的三件事**：
+
+1. **自建类也要在 720px media 内覆盖**：所有 `grid-template-columns: repeat(N, ...)` 的类在窄屏改 `1fr`（或 2 列）；padding / font-size 收窄一档。
+2. **所有 `<table>` 包滚动容器**：`<div class="table-wrap">` + media 内 `min-width:600px`（多列对比表 720px）+ `overflow-x:auto` + 可见滚动条。浏览器对无 min-width 的宽表会强行压缩列宽，导致文字逐字换行、右列被裁。
+3. **代码块也要窄屏规则**：`overflow-x:auto` + 字号下调（桌面 .85rem → 移动 .76rem 左右）+ padding 收窄；`white-space:pre` 下不滚动就是横向溢出。
+4. **`.section-head`（含编号方块的章节头）补 `padding-left:14px`**，否则编号块贴左边——历史高频 bug。
+
+**验收命令**（收口时跑，不通过就打回或主线补）：
+
+```bash
+# 表格必须全部被 table-wrap 包裹
+grep -c '<table' card.html; grep -c '<div class="table-wrap">' card.html
+# 720px media 必须存在且覆盖上述类
+grep -o '@media[^{]*720px' card.html
+grep -o 'table-wrap\|code-block\|analysis-block\|grid-template-columns:1fr' card.html | sort | uniq -c
+```
+
+判定口径：`<table>` 数量 == `table-wrap` 数量；720px media 内必须能 grep 到 `table-wrap` 与至少一个代码块类名或 `grid-template-columns:1fr`。详见 `infocard-pub-hardening` 的 H-16 / H-17 与 H-16 详细节扫描脚本（可对整个 `docs/` 批量跑）。
+
 ### Required verification
 
 At desktop and 390px mobile, inspect `scrollWidth`, `clientWidth`, body geometry, number/card center alignment, computed display, and relevant `grid-column`/flex values. Then capture fresh visual evidence. A structural or CSS change invalidates every prior screenshot and manifest.
