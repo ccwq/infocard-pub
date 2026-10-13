@@ -1,0 +1,1728 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="darkblue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RustGIS · Rust 编写的专业级 GIS</title>
+  <style>
+    :root{
+      --bg:#0c1020;
+      --bg-2:#11162a;
+      --panel:#171c2b;
+      --panel-2:#0f1424;
+      --ink:#eef4ff;
+      --muted:#a8b7df;
+      --line:rgba(255,255,255,.12);
+      --cyan:#58c3ff;
+      --blue:#4a78ff;
+      --green:#2db36a;
+      --yellow:#f4c84c;
+      --purple:#8459ff;
+      --shadow:0 18px 42px rgba(0,0,0,.34);
+      --grid:rgba(88,195,255,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(8,12,24,.96), rgba(8,12,24,.92)),
+        radial-gradient(circle at 18% 10%, rgba(88,195,255,.12) 0 10%, transparent 11%),
+        radial-gradient(circle at 86% 8%, rgba(132,89,255,.14) 0 9%, transparent 10%),
+        radial-gradient(circle at 72% 72%, rgba(45,179,106,.10) 0 13%, transparent 14%),
+        radial-gradient(circle at 18% 78%, rgba(244,200,76,.08) 0 11%, transparent 12%),
+        linear-gradient(180deg,#0b1020 0%,#10162a 46%,#0c1020 100%);
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:56px 0 72px;position:relative}
+    .page::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.04) 0, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 0, transparent 1px);
+      background-size:48px 48px;opacity:.26;mix-blend-mode:screen}
+    .hero-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 16px 30px rgba(74,120,255,.18);margin:0 0 16px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:14px;color:#fff;margin-bottom:14px}
+    .hero-copy{
+      min-width:0;
+      display:grid;
+      gap:10px;
+      align-content:start;
+      padding:12px 0 0;
+    }
+    .kicker-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:fit-content;
+      padding:5px 10px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);
+      backdrop-filter:blur(10px);
+      color:#fff;
+      font:900 11px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      border-radius:999px;
+    }
+    .source{
+      max-width:280px;
+      text-align:right;
+      font:800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#b8c8f5;
+      overflow-wrap:anywhere;
+    }
+    .title{
+      margin:0;
+      font-size:clamp(40px,7vw,88px);
+      line-height:.92;
+      letter-spacing:-.07em;
+      font-weight:950;
+    }
+    .subtitle{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(15px,2vw,20px);
+      line-height:1.55;
+      color:#e8eefc;
+    }
+    .subcn{
+      margin:0;
+      max-width:980px;
+      font-size:clamp(13px,1.6vw,16px);
+      line-height:1.65;
+      color:#c5d2f7;
+    }
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.05);
+      border-radius:999px;
+      color:#fff;
+      font-size:12px;
+      font-weight:850;
+      letter-spacing:.01em;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .pill.cyan{border-color:rgba(88,195,255,.32);background:rgba(88,195,255,.12);color:#d8f4ff}
+    .pill.green{border-color:rgba(45,179,106,.32);background:rgba(45,179,106,.12);color:#ddffe8}
+    .pill.yellow{border-color:rgba(244,200,76,.35);background:rgba(244,200,76,.12);color:#fff0bf}
+    .pill.purple{border-color:rgba(132,89,255,.35);background:rgba(132,89,255,.12);color:#ede3ff}
+    .hero-note{
+      display:grid;
+      gap:8px;
+      border:1.5px solid rgba(255,255,255,.16);
+      background:linear-gradient(135deg,rgba(74,120,255,.23),rgba(88,195,255,.12) 45%,rgba(132,89,255,.18));
+      padding:14px 16px 12px;
+      border-radius:18px;
+      box-shadow:var(--shadow);
+    }
+    .hero-note strong{font-size:14px;line-height:1.35}
+    .hero-note p{margin:0;font-size:12.8px;line-height:1.66;color:#edf2ff}
+    .hero-visual{
+      min-width:0;
+      background:rgba(10,12,22,.5);
+      border:1.5px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:14px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+    .visual-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .orb{
+      width:66px;
+      height:66px;
+      border-radius:22px;
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,.36) 0 10%, transparent 11%),
+        linear-gradient(135deg,var(--cyan) 0%, var(--blue) 34%, var(--purple) 68%, var(--green) 100%);
+      box-shadow:0 10px 26px rgba(88,195,255,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      display:grid;
+      place-items:center;
+      color:#fff;
+      font-size:26px;
+      font-weight:950;
+      letter-spacing:-.08em;
+    }
+    .visual-meta{display:grid;gap:4px;justify-items:end;text-align:right}
+    .visual-meta .big{font-size:15px;font-weight:900;letter-spacing:-.02em}
+    .visual-meta .small{font:800 11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#b7c6f4;text-transform:uppercase;letter-spacing:.08em}
+    .visual-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .mini-card{
+      min-width:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+      border:1.5px solid rgba(255,255,255,.09);
+      border-radius:16px;
+      padding:10px 10px 9px;
+      display:grid;
+      gap:8px;
+      box-shadow:0 12px 26px rgba(0,0,0,.2);
+    }
+    .mini-card .label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#9fb0de}
+    .mini-card .value{font-size:14px;font-weight:900;line-height:1.18;color:#fff}
+    .mini-card .desc{font-size:11.5px;line-height:1.45;color:#c9d4f7}
+    .mini-icon{
+      width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+      background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.1);
+      color:#fff;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .mini-icon.cyan{color:var(--cyan)}
+    .mini-icon.green{color:var(--green)}
+    .mini-icon.yellow{color:var(--yellow)}
+    .mini-icon.purple{color:var(--purple)}
+    .mini-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .visual-strip{
+      height:12px;
+      border-radius:999px;
+      background:
+        linear-gradient(90deg,var(--cyan) 0%, #53a3ff 22%, var(--purple) 54%, var(--green) 80%, var(--yellow) 100%);
+      box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 10px 24px rgba(88,195,255,.16);
+    }
+
+    .shell{
+      display:grid;
+      grid-template-columns:1fr 1.28fr .92fr;
+      gap:12px;
+      background:rgba(9,12,22,.42);
+      border:1.5px solid rgba(255,255,255,.1);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:12px;
+      margin-bottom:14px;
+    }
+    .panel{
+      min-width:0;
+      background:linear-gradient(180deg,var(--panel) 0%, #141a29 100%);
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow:0 12px 26px rgba(0,0,0,.18);
+      display:flex;
+      flex-direction:column;
+    }
+    .panel-head{
+      padding:10px 12px 9px;
+      border-bottom:1.5px solid rgba(255,255,255,.08);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+    }
+    .panel-head h3{
+      margin:0;
+      font-size:12px;
+      line-height:1.2;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:#fff;
+    }
+    .panel-head .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.04);
+      color:#dfe8ff;
+      font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      white-space:nowrap;
+    }
+    .panel-body{padding:12px;display:grid;gap:10px;color:#e8edf8}
+    .search{
+      display:flex;align-items:center;gap:8px;
+      border:1.5px solid rgba(255,255,255,.1);
+      background:#0f1424;
+      padding:9px 10px;
+      border-radius:12px;
+      color:#9fb0de;
+      font-size:12px;
+    }
+    .project{
+      border:1.5px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,#1a2131,#171c2b);
+      padding:10px 11px;
+      border-radius:14px;
+      display:grid;
+      gap:4px;
+      min-width:0;
+    }
+    .project .name{font-size:13px;font-weight:900;color:#fff}
+    .project .path{font-size:11.5px;color:#9fb0de;overflow-wrap:anywhere}
+    .project .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .mini-dot{
+      width:10px;height:10px;border-radius:50%;margin-top:2px;
+      background:linear-gradient(135deg,var(--cyan),var(--purple));box-shadow:0 0 0 3px rgba(88,195,255,.12)
+    }
+    .task{
+      border:1.5px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,#1a2030,#151a28);
+      padding:10px 11px;
+      border-radius:14px;
+      display:grid;
+      gap:8px;
+    }
+    .task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .task-name{font-size:13px;font-weight:900;color:#fff}
+    .status{
+      font-size:10.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+      padding:4px 8px;border-radius:999px;
+      background:rgba(45,179,106,.14);
+      color:#7fe1a2;
+      border:1px solid rgba(45,179,106,.32)
+    }
+    .task p{font-size:12px;line-height:1.55;color:#d9e2ff;margin:0}
+    .progress{height:10px;border-radius:999px;background:#101525;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .progress > span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--green))}
+    .task-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#b6c5f2}
+    .chip{
+      display:inline-flex;align-items:center;gap:5px;
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.04);
+      padding:4px 8px;border-radius:999px;
+    }
+    .status-list{display:grid;gap:8px}
+    .status-item{
+      display:flex;justify-content:space-between;gap:10px;align-items:center;
+      border:1px solid rgba(255,255,255,.08);
+      background:#0f1424;
+      padding:9px 10px;
+      border-radius:12px;
+      font-size:12px;
+      color:#d8e2ff;
+    }
+    .status-item .left{display:grid;gap:2px}
+    .status-item .small{font-size:10.5px;color:#9db0de;letter-spacing:.08em;text-transform:uppercase}
+    .term{
+      background:#0b1020;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .term-top{
+      display:flex;justify-content:space-between;gap:8px;align-items:center;
+      padding:9px 12px;
+      background:#111831;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      color:#dfe8ff;
+      font-size:11px;
+    }
+    .term-body{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#a8f59f;
+      font-size:12px;
+      line-height:1.7;
+      min-height:180px;
+      white-space:pre-wrap;
+    }
+    .term .url{color:#7ad9ff}
+    .editor{
+      background:#0f1524;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .editor-top{
+      display:flex;justify-content:space-between;gap:8px;align-items:center;
+      padding:9px 12px;
+      background:#131a2d;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      color:#fff;
+    }
+    .editor-top .tab{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .code{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      color:#dbe5ff;
+      font-size:11.8px;
+      line-height:1.7;
+      white-space:pre-wrap;
+    }
+    .code .kw{color:#7ad9ff}
+    .code .fn{color:#f4c84c}
+    .diff{
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+      background:#0d1220;
+    }
+    .diff-top{
+      padding:9px 12px;
+      background:#13192c;
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      border-bottom:1px solid rgba(255,255,255,.08);
+    }
+    .diff-body{
+      padding:12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:11.5px;
+      line-height:1.6;
+      color:#dbe5ff;
+      white-space:pre-wrap;
+    }
+    .diff .add{color:#90f0a8}
+    .stats{
+      background:#13192c;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .stats-top{
+      padding:9px 12px;
+      background:#171f35;
+      color:#fff;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+    .stats-body{padding:12px;display:grid;gap:12px;color:#dce4ff}
+    .stat{display:grid;gap:6px}
+    .stat .label{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+    .bar{height:10px;border-radius:999px;background:#0d1220;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .bar > span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--purple))}
+    .donut{
+      width:126px;height:126px;border-radius:50%;
+      background:conic-gradient(#58c3ff 0 38%, #2db36a 38% 62%, #f4c84c 62% 80%, #8459ff 80% 92%, #54627f 92% 100%);
+      margin:4px auto 0;
+      position:relative;
+      box-shadow:inset 0 0 0 14px #13192c;
+    }
+    .donut::after{
+      content:"Activity";
+      position:absolute;
+      inset:50% auto auto 50%;
+      transform:translate(-50%,-50%);
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .feature-row{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:repeat(6,minmax(0,1fr));
+      gap:10px;
+    }
+    .feature{
+      background:#171c2b;
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      padding:11px 9px;
+      color:#e8edf8;
+      text-align:center;
+      display:grid;
+      gap:7px;
+      min-width:0;
+    }
+    .icon{
+      width:28px;height:28px;margin:0 auto;border-radius:50%;
+      background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.09);
+      display:grid;place-items:center;
+      font-size:14px;
+      color:#fff;
+    }
+    .feature span{font-size:11px;line-height:1.35;font-weight:800}
+    .download{margin:16px auto 0;display:flex;justify-content:center}
+    .download-btn{
+      display:inline-flex;align-items:center;gap:12px;
+      background:linear-gradient(135deg,var(--purple),#6a4cff 54%, var(--blue));
+      color:#fff;border:0;border-radius:18px;
+      padding:16px 24px;
+      box-shadow:0 16px 36px rgba(132,89,255,.34);
+      font-weight:950;
+      letter-spacing:.02em;
+      font-size:18px;
+    }
+    .download-btn small{display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em}
+    .footer{
+      margin-top:14px;
+      background:#0b1020;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      color:#dfe8ff;
+      font-size:12px;
+      flex-wrap:wrap;
+    }
+    .footer .stars{font-weight:900}
+
+    @media (max-width:1080px){
+      .hero,.shell{grid-template-columns:1fr}
+      .feature-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1180px);padding:10px 0 58px}
+      .hero{gap:12px}
+      .title{font-size:clamp(34px,13vw,54px)}
+      .subtitle{font-size:14px}
+      .subcn{font-size:13px}
+      .shell{padding:10px;gap:10px}
+      .feature-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .download-btn{width:100%;justify-content:center;text-align:center;font-size:16px;padding:14px 16px;border-radius:16px}
+      .footer{font-size:11.5px}
+      .visual-grid{grid-template-columns:1fr}
+      .source{text-align:left;max-width:none}
+      .visual-top{flex-direction:column;align-items:flex-start}
+      .visual-meta{text-align:left;justify-items:start}
+    }
+
+    .section{margin:18px 0;padding:18px 20px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(20,28,52,.78), rgba(12,18,38,.82));box-shadow:0 14px 30px rgba(0,0,0,.34)}
+    .section-head{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+    .section-no{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#f4f9ff;background:linear-gradient(135deg,#3aa8ff,#4a78ff 60%,#8459ff);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 8px 18px rgba(74,120,255,.30)}
+    .section-no.b{background:linear-gradient(135deg,#8459ff,#4a78ff)}
+    .section-no.k{background:linear-gradient(135deg,#2db36a,#3aa8ff)}
+    .section-meta .label{font-size:12px;color:#9fb0e0;letter-spacing:.08em;margin-bottom:4px}
+    .section-meta h2{margin:0 0 6px;font-size:24px;color:#f4f9ff}
+    .section-meta p{margin:0;color:#b8c4e8;font-size:13px}
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .grid-5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+    .matrix{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card,.mini,.risk,.feat{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));box-shadow:0 8px 18px rgba(0,0,0,.24)}
+    .risk[data-accent="red"]{border-color:rgba(244,84,84,.36);background:linear-gradient(180deg, rgba(244,84,84,.14), rgba(255,255,255,.02))}
+    .risk[data-accent="blue"]{border-color:rgba(88,195,255,.36);background:linear-gradient(180deg, rgba(74,120,255,.16), rgba(255,255,255,.02))}
+    .risk[data-accent="dark"]{border-color:rgba(132,89,255,.36);background:linear-gradient(180deg, rgba(132,89,255,.16), rgba(255,255,255,.02))}
+    .risk[data-accent="green"]{border-color:rgba(45,179,106,.36);background:linear-gradient(180deg, rgba(45,179,106,.16), rgba(255,255,255,.02))}
+    .card h3,.risk h4,.mini h4,.feat h4{margin:6px 0 8px;font-size:16px;color:#f4f9ff}
+    .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+    .tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#cfd9f5;background:rgba(255,255,255,.05)}
+    .tag.red{border-color:rgba(244,84,84,.45);color:#ffd1d1;background:rgba(244,84,84,.12)}
+    .tag.blue{border-color:rgba(88,195,255,.45);color:#d8f4ff;background:rgba(88,195,255,.12)}
+    .tag.dark{border-color:rgba(132,89,255,.45);color:#ede3ff;background:rgba(132,89,255,.14)}
+    .tag.green{border-color:rgba(45,179,106,.45);color:#ddffe8;background:rgba(45,179,106,.12)}
+    .tag.yellow{border-color:rgba(244,200,76,.45);color:#fff0bf;background:rgba(244,200,76,.12)}
+    .lead{font-size:11px;letter-spacing:.08em;color:#9fb0e0;margin-bottom:4px}
+    .lead.red{color:#ffd1d1}.lead.blue{color:#d8f4ff}.lead.dark{color:#ede3ff}.lead.green{color:#ddffe8}
+    .quote-line{margin:0;color:#cfd9f5;font-size:13px;line-height:1.5}
+    .rule{height:1px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);margin:18px 0}
+    .source-note{margin:0;color:#9fb0e0;font-size:12px;line-height:1.7}
+    .flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .flow-item{padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+    .flow-item .t{font-weight:700;color:#f4f9ff;font-size:13px}
+    .flow-item .c{color:#9fb0e0;font-size:12px;margin-top:2px}
+    .flow-item.red{border-color:rgba(244,84,84,.4);background:rgba(244,84,84,.10)}
+    .flow-item.blue{border-color:rgba(88,195,255,.4);background:rgba(88,195,255,.10)}
+    .flow-item.dark{border-color:rgba(132,89,255,.4);background:rgba(132,89,255,.10)}
+    .flow-item.green{border-color:rgba(45,179,106,.4);background:rgba(45,179,106,.10)}
+
+    table{width:100%;border-collapse:collapse;font-size:12.5px;color:#d8e2ff}
+    thead tr{background:rgba(255,255,255,.06)}
+    th{padding:8px 10px;text-align:left;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#a8b7df;border-bottom:1.5px solid rgba(255,255,255,.12)}
+    td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,.03)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;color:#a8f59f}
+    .dim{color:#7a88b0}
+    .hl{color:#f4c84c;font-weight:700}
+    .hlb{color:#58c3ff;font-weight:700}
+    .hlg{color:#2db36a;font-weight:700}
+    .hlp{color:#8459ff;font-weight:700}
+
+    .arch-layer{display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+    .arch-layer:last-child{border-bottom:none}
+    .arch-layer .lyr{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px}
+    .arch-layer .crate{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#7ad9ff;font-weight:700}
+    .arch-layer .job{font-size:12px;color:#c5d2f7}
+
+    .comparison-table{width:100%;border-collapse:collapse;font-size:12px}
+    .comparison-table th{background:rgba(255,255,255,.06);padding:8px 10px;text-align:left;font-weight:900;color:#a8b7df;border-bottom:1.5px solid rgba(255,255,255,.12)}
+    .comparison-table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);color:#d8e2ff;vertical-align:top}
+    .comparison-table tr:last-child td{border-bottom:none}
+    .comp-yes{color:#2db36a;font-weight:700}
+    .comp-no{color:#ff5454;font-weight:700}
+    .comp-partial{color:#f4c84c;font-weight:700}
+    .comp-unknown{color:#9fb0de}
+
+    .cmd-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .cmd-item{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px}
+    .cmd-item .cname{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:#7ad9ff;font-weight:700}
+    .cmd-item .cdesc{font-size:11.5px;color:#b8c4e8;margin-top:3px}
+
+    .ai-models{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .ai-card{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;text-align:center}
+    .ai-card .prov{font-size:14px;font-weight:900;color:#f4f9ff;margin-bottom:6px}
+    .ai-card .mods{font-size:11px;color:#9fb0de;line-height:1.5}
+
+    .fmt-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .fmt-card{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px}
+    .fmt-card .fmt-cat{font-size:12px;font-weight:900;color:#58c3ff;margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase}
+    .fmt-card ul{margin:0;padding:0 0 0 14px;font-size:11.5px;color:#c5d2f7;line-height:1.8}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="hero-bar"></div>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker-row">
+          <div class="kicker">PRO GIS · RUST NATIVE · WEBASSEMBLY</div>
+          <div class="source">opengeos/RustGIS · Apache-2.0</div>
+        </div>
+        <h1 class="title">RustGIS</h1>
+        <p class="subtitle">A fast, free and open-source GIS in pure Rust.</p>
+        <p class="subcn">Rust 编写的专业级 GIS——GPU 绘制、316 条命令、1000+ 工具、ArcGIS Pro 浏览器版体验。本地私密，零服务器，跨平台运行，WebAssembly 零安装。</p>
+        <div class="pill-row">
+          <span class="pill cyan">Rust Native</span>
+          <span class="pill green">GPU 绘制</span>
+          <span class="pill yellow">316 条命令</span>
+          <span class="pill purple">WebAssembly</span>
+          <span class="pill">1,000+ GeoLibre 工具</span>
+        </div>
+        <div class="hero-note">
+          <strong>GIS 世界的 Rust 重构来了</strong>
+          <p>OpenGeos 组织出品（@giswqs，地理空间工具链老牌），2026-10-10 创建极新，10-13 即 push 活跃开发。自述「ArcGIS Pro 浏览器版」——每个 Ribbon 操作都是一条可脚本化的 RustGIS 命令。</p>
+        </div>
+      </div>
+
+      <aside class="hero-visual">
+        <div class="visual-top">
+          <div class="orb">R</div>
+          <div class="visual-meta">
+            <div class="big">RustGIS</div>
+            <div class="small">Pure Rust · 512 ★ · 67 forks</div>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <article class="mini-card">
+            <div class="mini-icon cyan" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+            </div>
+            <div class="label">Speed</div>
+            <div class="value">GPU 绘制</div>
+            <div class="desc">tiny-skia 渲染器，GPU 加速，无需运行时</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon purple" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"></path><path d="M12 6v6l4 2"></path></svg>
+            </div>
+            <div class="label">Commands</div>
+            <div class="value">316 条命令</div>
+            <div class="desc">每个 Ribbon 操作带 id，可脚本化与 AI Agent 接管</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon green" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            </div>
+            <div class="label">Privacy</div>
+            <div class="value">本地私密</div>
+            <div class="desc">文件本地读写，不自动上传，仅请求底图/插件/AI</div>
+          </article>
+          <article class="mini-card">
+            <div class="mini-icon yellow" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            </div>
+            <div class="label">Tools</div>
+            <div class="value">1,000+ 工具</div>
+            <div class="desc">GeoLibre + Whitebox：地形、水文、LiDAR、遥感全覆盖</div>
+          </article>
+        </div>
+        <div class="visual-strip"></div>
+      </aside>
+    </section>
+
+    <!-- Chapter 1: Project Positioning -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">1</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER ONE</div>
+          <h2>项目定位与 GitHub 数据</h2>
+          <p>OpenGeos 组织出品，@giswqs 主导，地理空间工具链老牌（landsat-scenes、whiteboxtools 等多个 GIS 工具作者）</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <div class="card">
+          <div class="tagrow">
+            <span class="tag blue">Rust</span>
+            <span class="tag">Apache-2.0</span>
+          </div>
+          <h3>语言与许可</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:4px 0 0">纯 Rust 实现，无任何外部 GIS 运行时依赖。Apache-2.0 许可证，商业友好。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow">
+            <span class="tag yellow">2026-10-10</span>
+            <span class="tag green">活跃开发中</span>
+          </div>
+          <h3>创建时间</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:4px 0 0">极新项目，2026-10-13 即有 push（Last push: 11:56:38 UTC），社区参与度高，Discussions 已开启。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow">
+            <span class="tag">512 ★</span>
+            <span class="tag">67 forks</span>
+            <span class="tag">12 issues</span>
+          </div>
+          <h3>社区规模</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:4px 0 0">Stars 512 / Forks 67 / Watchers 512 / Subscribers 5，发布首周即获大量关注。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow">
+            <span class="tag purple">WebAssembly</span>
+            <span class="tag green">桌面三平台</span>
+          </div>
+          <h3>部署形态</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:4px 0 0">Windows / macOS / Linux 桌面，浏览器 web.rustgis.app 零安装，同 Ribbon 同工具集。</p>
+        </div>
+      </div>
+      <div class="rule"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>元数据字段</th>
+            <th>值</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">仓库</td>
+            <td class="hlb">opengeos/RustGIS</td>
+            <td class="dim">OpenGeos 组织维护</td>
+          </tr>
+          <tr>
+            <td class="mono">描述</td>
+            <td class="hl">A fast, free and open-source GIS in pure Rust.</td>
+            <td class="dim">官方 tagline</td>
+          </tr>
+          <tr>
+            <td class="mono">Stars / Forks</td>
+            <td class="hl">512 ★ / 67 forks</td>
+            <td class="dim">截至 2026-10-13 实测</td>
+          </tr>
+          <tr>
+            <td class="mono">Issues</td>
+            <td class="hl">12 Open Issues</td>
+            <td class="dim">活跃维护信号</td>
+          </tr>
+          <tr>
+            <td class="mono">Size</td>
+            <td class="hl">2,377 KB</td>
+            <td class="dim">仓库压缩体积</td>
+          </tr>
+          <tr>
+            <td class="mono">Topics</td>
+            <td class="hlp">geospatial, gis, remote-sensing, rust, rust-lang</td>
+            <td class="dim">GitHub 主题标签</td>
+          </tr>
+          <tr>
+            <td class="mono">Homepage</td>
+            <td class="mono"><a href="https://rustgis.app" style="color:#7ad9ff">https://rustgis.app</a></td>
+            <td class="dim">官网（桌面下载）</td>
+          </tr>
+          <tr>
+            <td class="mono">Web</td>
+            <td class="mono"><a href="https://web.rustgis.app" style="color:#7ad9ff">https://web.rustgis.app</a></td>
+            <td class="dim">零安装 Web 版本</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Chapter 2: Five Core Features -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">2</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER TWO</div>
+          <h2>五大核心特色</h2>
+          <p>Why RustGIS——每个特性都有 Rust 语言级别的工程保障</p>
+        </div>
+      </div>
+      <div class="grid-5">
+        <div class="feat">
+          <div style="font-size:28px;margin-bottom:8px">⚡</div>
+          <h4>快速小巧</h4>
+          <p style="font-size:12px;color:#b8c4e8;margin:0;line-height:1.6">一个原生程序，GPU 绘制（tiny-skia），无需任何运行时安装，无需服务器。启动即用，内存占用低。</p>
+          <div class="tagrow" style="margin-top:10px">
+            <span class="tag blue">GPU 渲染</span>
+            <span class="tag green">零依赖</span>
+          </div>
+        </div>
+        <div class="feat">
+          <div style="font-size:28px;margin-bottom:8px">🌐</div>
+          <h4>处处运行</h4>
+          <p style="font-size:12px;color:#b8c4e8;margin:0;line-height:1.6">同一程序在 Windows / macOS / Linux 桌面运行，编译为 WebAssembly 在 web.rustgis.app 零安装运行。同一 Ribbon，同一工具集。</p>
+          <div class="tagrow" style="margin-top:10px">
+            <span class="tag dark">WebAssembly</span>
+            <span class="tag yellow">三平台</span>
+          </div>
+        </div>
+        <div class="feat">
+          <div style="font-size:28px;margin-bottom:8px">🔒</div>
+          <h4>本地私密</h4>
+          <p style="font-size:12px;color:#b8c4e8;margin:0;line-height:1.6">文件在本地读写，不自动上传任何数据。仅有请求底图、插件、GeoLibre 工具和 AI 模型时才访问网络。</p>
+          <div class="tagrow" style="margin-top:10px">
+            <span class="tag green">本地优先</span>
+            <span class="tag">隐私保护</span>
+          </div>
+        </div>
+        <div class="feat">
+          <div style="font-size:28px;margin-bottom:8px">⌨️</div>
+          <h4>一切皆命令</h4>
+          <p style="font-size:12px;color:#b8c4e8;margin:0;line-height:1.6">每个 Ribbon 按钮都是带 id 的命令。316 个功能区功能 → 316 条 RustGIS 命令。脚本化、notebooks 链式调用、AI Agent 接管全覆盖。</p>
+          <div class="tagrow" style="margin-top:10px">
+            <span class="tag blue">316 条命令</span>
+            <span class="tag purple">AI 可控</span>
+          </div>
+        </div>
+        <div class="feat">
+          <div style="font-size:28px;margin-bottom:8px">🧩</div>
+          <h4>熟悉 + 可扩展</h4>
+          <p style="font-size:12px;color:#b8c4e8;margin:0;line-height:1.6">按工作流程组织的 Ribbon 布局（Home/Data/Style/Edit/Analyze/View/Publish），1,000+ GeoLibre + Whitebox 工具，沙箱 WebAssembly 插件。</p>
+          <div class="tagrow" style="margin-top:10px">
+            <span class="tag yellow">1,000+ 工具</span>
+            <span class="tag dark">WASM 插件</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chapter 3: Installation -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">3</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER THREE</div>
+          <h2>四种安装路径</h2>
+          <p>从零安装到源码构建，适合所有用户层级</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">路径一</span><span class="tag green">零安装</span></div>
+          <h3>🌐 Web 在线版</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:6px 0 0">访问 <a href="https://web.rustgis.app" style="color:#7ad9ff">web.rustgis.app</a>，同 Ribbon 和工具集，无需安装任何软件。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">路径二</span><span class="tag">桌面下载</span></div>
+          <h3>💻 桌面客户端</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:6px 0 0">从 <a href="https://downloads.rustgis.app" style="color:#7ad9ff">downloads.rustgis.app</a> 或 GitHub latest release 下载对应平台安装包。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">路径三</span><span class="tag yellow">包管理器</span></div>
+          <h3>📦 包管理器</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:6px 0 0">
+            <span class="mono">winget install OpenGeos.RustGIS</span><br>
+            <span class="mono">brew install --cask opengeos/rustgis/rustgis</span><br>
+            <span class="mono">yay -S rustgis-bin</span> (AUR)<br>
+            <span class="mono">sudo dnf copr enable giswqs/rustgis && sudo dnf install rustgis</span>
+          </p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">路径四</span><span class="tag dark">源码构建</span></div>
+          <h3>🔧 Rust 1.90+ 源码</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:6px 0 0">
+            <span class="mono">cargo run --release -p rustgis</span><br>
+            需 Rust 1.90+ ❓，Cargo 工作区编译完整工具链。
+          </p>
+        </div>
+      </div>
+      <div class="rule"></div>
+      <div class="term">
+        <div class="term-top"><span>Quick Start Commands</span><span>shell</span></div>
+        <div class="term-body"><span class="hlg"># 桌面应用 + World Atlas 示例项目</span>
+<span class="mono">cargo run --release -p rustgis</span>
+
+<span class="hlg"># 打开本地数据文件</span>
+<span class="mono">cargo run --release -p rustgis -- data.geojson</span>
+
+<span class="hlg"># 渲染地图为 PNG（底图 ocean）</span>
+<span class="mono">rustgis-cli render countries.geojson map.png --basemap ocean</span>
+
+<span class="hlg"># 列出所有 316 条命令 id 和参数</span>
+<span class="mono">rustgis-cli commands</span>
+
+<span class="hlg"># 用自然语言问数据（需配置 AI 模型）</span>
+<span class="mono">rustgis-cli ask --sample "Which 5 countries have the largest GDP?"</span>
+
+<span class="hlg"># 将 RustGIS 作为 MCP server 接入 Claude Code</span>
+<span class="mono">claude mcp add rustgis -- rustgis-cli mcp --sample</span></div>
+      </div>
+    </section>
+
+    <!-- Chapter 4: Architecture -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">4</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER FOUR</div>
+          <h2>12 层架构</h2>
+          <p>L0–L6 crates 分层，从几何核心到 UI 前端，插件与 WebAssembly 并行</p>
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 16px">
+        <div class="arch-layer" style="border-bottom:2px solid rgba(88,195,255,.2)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(88,195,255,.2);color:#58c3ff">L0</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-geom</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">坐标、范围、Web Mercator 投影、大地测量距离/面积、比例尺计算</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(88,195,255,.2);color:#58c3ff">L1</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-data</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">要素/类型属性；GeoJSON、CSV、Shapefile；GeoPackage、GeoParquet、FlatGeobuf 提供方；SQL where 子句；栅格及坐标系统</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(45,179,106,.2);color:#2db36a">L2</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-map + rustgis-analysis</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">图层、符号化、标注、相机、底图；地理处理工具（基于 geo crate）</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(45,179,106,.2);color:#2db36a">L2</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-tiles</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">Web 地图瓦片：XYZ/TMS/WMS、Mapbox Vector Tiles、MapLibre styles、瓦片缓存</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(244,200,76,.2);color:#f4c84c">L3</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-render</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">tiny-skia 渲染器、标注布局引擎、PNG 导出、字体处理</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(244,200,76,.2);color:#f4c84c">L3</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-plugins</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">沙箱 WebAssembly 插件和插件注册表，支持从 plugins.rustgis.app 安装</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(244,200,76,.2);color:#f4c84c">L3</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-geolibre</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">GeoLibre 工具套件作为地理处理工具集成</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(132,89,255,.2);color:#8459ff">L4</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-engine</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">会话管理、撤销/重做、命令注册表、示例项目</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(132,89,255,.2);color:#8459ff">L5</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-assistant</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">AI Assistant：通过自然语言命令行动的聊天 agent，每个更改可撤销</span>
+          </div>
+        </div>
+        <div class="arch-layer" style="border-bottom:1.5px solid rgba(255,255,255,.06)">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff">L6</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis-ui-egui</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">Ribbon 前端 UI（可交换的 UI 层）</span>
+          </div>
+        </div>
+        <div class="arch-layer">
+          <div style="display:grid;grid-template-columns:48px 1fr 1.5fr;gap:8px;align-items:center">
+            <span class="arch-layer .lyr" style="font-family:ui-monospace;font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)">APPS</span>
+            <span class="arch-layer .crate" style="font-family:ui-monospace;font-size:12px;color:#7ad9ff;font-weight:700">rustgis / rustgis-cli / rustgis-web</span>
+            <span class="arch-layer .job" style="font-size:12px;color:#c5d2f7">三个应用入口：桌面 GUI、命令行 CLI、浏览器 WASM</span>
+          </div>
+        </div>
+      </div>
+      <p class="source-note" style="margin-top:10px"><span class="hl">cargo xtask ci</span> 可运行格式化、clippy、测试和分层检查，确保架构分层合规。</p>
+    </section>
+
+    <!-- Chapter 5: Complete Feature Table -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">5</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER FIVE</div>
+          <h2>完整功能对照表</h2>
+          <p>13 个功能区逐行展开，316 条命令覆盖专业 GIS 全流程</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:110px">功能区</th>
+            <th>功能详情</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag blue" style="font-size:10px">数据</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              <strong class="hlb">读取：</strong>GeoJSON、CSV/TSV（任意坐标系 x/y 或 WKT 几何）、Excel、OpenDocument 电子表格、GeoRSS、LandXML、编码折线、<strong class="hl">Shapefile（含 zipped，浏览器也支持）</strong>、GeoPackage、GeoParquet、FlatGeobuf、KML/KMZ（含样式）、GPX、GML、MapInfo MIF/MID、OpenStreetMap PBF、TopoJSON（大型文件原地读取）、URL 文件路径、GDAL 支持的所有矢量格式、DuckDB Spatial SQL 查询和 DuckDB 数据库；PMTiles（Web 或文件）和 MBTiles<br>
+              <strong class="hlb">输出：</strong>GeoJSON、CSV、GeoPackage、GeoParquet、Shapefile、FlatGeobuf、KML/KMZ、GPX、WKT<br>
+              <strong class="hlb">其他：</strong>独立表；图层和地图文件、样式、模板和包
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag yellow" style="font-size:10px">栅格</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              GeoTIFF 和云优化 GeoTIFF（<strong class="hl">任意像素类型，tiled 或 striped，带压缩</strong>）、ASCII grids；<strong class="hlg">任意 EPSG 代码重投影</strong>；拉伸、RGB、分类、着色地形；DRA、波段组合、亮度/对比度/伽马；栅格函数、指数、变化检测、分类、地理配准
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag" style="font-size:10px">地图</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              每项目多地图；3D 地球；Web Mercator 或<strong class="hl">任意投影</strong>（Equal Earth、Robinson、Winkel Tripel、极地和区域预设，或 EPSG 代码）；书签、范围历史、转到 XY；<strong class="hlg">5 个离线底图</strong>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag blue" style="font-size:10px">Web 服务</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              WMS、WMTS、WFS、<strong class="hlb">OGC API Features</strong> 和 ArcGIS REST（Featureserver、MapServer、ImageServer、VectorTileServer）按 capabilities 获取
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag" style="font-size:10px">Web 瓦片</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              XYZ/TMS/WMS 栅格瓦片、<strong class="hl">Mapbox Vector Tiles</strong> 和 MapLibre styles（sprites、patterns、expressions），后台缓存和获取
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag purple" style="font-size:10px">制图</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              单一符号、唯一值、<strong class="hl">分级色彩、比例符号</strong>；冲突-free 标注含放置、比例范围和注解；遮罩、显示过滤器、聚合容器、<strong class="hl">2.5D 挤压</strong>；图形和动态文本
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag yellow" style="font-size:10px">编辑</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              创建、移动、旋转、缩放、合并、分割和炸开要素；捕捉、模板、高程、导线、拓扑规则；域、子类型、属性规则、关系、归档；<strong class="hlg">所有操作撤销</strong>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag green" style="font-size:10px">分析</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              按属性（SQL）和位置选择；缓冲、裁剪、擦除、融合、按位置汇总、汇总统计等；视域、通视、IDW、最短路径、适宜性建模；ModelBuilder 和脚本；<strong class="hl">1,000+ GeoLibre 和 Whitebox 栅格、矢量、LiDAR、水文和地形工具</strong>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag" style="font-size:10px">影像</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              正射和现实映射、<strong class="hl">像素分类（k-means、最小距离、可训练神经网络）</strong>、测量、托管影像瓦片
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag blue" style="font-size:10px">布局报告</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              页面布局含地图框、图例、比例尺、网格和地图序列；报告含分组、统计、图表和子报告；演示（HTML 幻灯片、PDF）；<strong class="hlb">Jupyter 输入输出的 notebooks</strong>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag purple" style="font-size:10px">分享</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              任意 DPI 的 PNG 导出；PDF；网页地图页面、OGC API Features 集合、MapLibre styles、<strong class="hl">glTF 场景</strong>、定位器；项目、地图和移动地图包；带同步的离线区域
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag dark" style="font-size:10px">AI Assistant</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              用自然语言问数据或告诉地图做什么，支持 <strong class="hlp">Anthropic / OpenAI / Gemini / OpenRouter / Ollama / 任意 OpenAI 兼容模型</strong>；也有 rustgis-cli ask；<strong class="hl">MCP server（rustgis-cli mcp）</strong>支持 Claude Code、Cursor、VS Code 和其他 agent
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag green" style="font-size:10px">插件</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              沙箱 <strong class="hlg">WebAssembly 插件</strong>，从 plugins.rustgis.app 安装，显示权限请求；插件可添加命令、工具和 Ribbon 标签页
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag" style="font-size:10px">界面</span></td>
+            <td style="font-size:12px;color:#c5d2f7">
+              命令搜索（Ctrl+K）、键盘快捷键、<strong class="hlb">深色模式</strong>、可自定义 Ribbon 和快速访问工具栏、链接并排地图、<strong class="hl">15 种语言</strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Chapter 6: AI Assistant -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">6</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER SIX</div>
+          <h2>AI Assistant 详解</h2>
+          <p>地图窗口内直接自然语言交互，AI 运行 RustGIS 命令，所有更改可撤销</p>
+        </div>
+      </div>
+      <div class="grid-3" style="margin-bottom:14px">
+        <div class="card">
+          <div class="tagrow"><span class="tag dark">L5 核心模块</span><span class="tag green">可撤销</span></div>
+          <h3>地图窗口内交互</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:6px 0 0">直接在地图窗口内用自然语言对话，告诉地图做什么，AI 理解意图并执行对应的 RustGIS 命令。每个操作均在命令历史中，可随时撤销。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag blue">rustgis-cli ask</span><span class="tag yellow">CLI</span></div>
+          <h3>命令行 AI 交互</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:6px 0 0">无需打开 GUI，在终端即可向 AI 提问数据或触发分析任务。适合自动化脚本和 CI/CD 流程中的 GIS 任务。</p>
+        </div>
+        <div class="card">
+          <div class="tagrow"><span class="tag purple">MCP Server</span><span class="tag green">Agent 接入</span></div>
+          <h3>Claude Code / Agent 接入</h3>
+          <p style="font-size:12px;color:#b8c4e8;margin:6px 0 0"><span class="mono">rustgis-cli mcp</span> 将 RustGIS 作为 MCP server 暴露，Claude Code、Cursor、VS Code 和其他 AI Agent 均可接管地图操作。</p>
+        </div>
+      </div>
+      <div class="ai-models">
+        <div class="ai-card">
+          <div class="prov">🤖 Anthropic</div>
+          <div class="mods">Claude 系列模型 · 直接接入 OpenAI 兼容接口</div>
+        </div>
+        <div class="ai-card">
+          <div class="prov">🟡 OpenAI</div>
+          <div class="mods">GPT-4o、GPT-4o mini 等 OpenAI 模型</div>
+        </div>
+        <div class="ai-card">
+          <div class="prov">🔵 Gemini</div>
+          <div class="mods">Google Gemini 系列模型</div>
+        </div>
+        <div class="ai-card">
+          <div class="prov">🟣 OpenRouter</div>
+          <div class="mods">聚合多模型路由服务</div>
+        </div>
+        <div class="ai-card">
+          <div class="prov">🟢 Ollama</div>
+          <div class="mods">本地部署大模型（离线 AI）</div>
+        </div>
+        <div class="ai-card">
+          <div class="prov">⚙️ OpenAI 兼容</div>
+          <div class="mods">任意第三方兼容 API（本地或云端）</div>
+        </div>
+      </div>
+      <div class="rule"></div>
+      <div class="term">
+        <div class="term-top"><span>MCP Server Integration</span><span>shell</span></div>
+        <div class="term-body"><span class="hlg"># 启动 MCP server（Claude Code 接入示例）</span>
+<span class="mono">claude mcp add rustgis -- rustgis-cli mcp --sample</span>
+
+<span class="hlg"># 运行带有示例数据的 MCP 命令链</span>
+<span class="mono">rustgis-cli run --sample \
+  --cmd 'gp.run={"tool":"countPoints","params":{"polygons":"Countries","points":"Cities"}}' \
+  --cmd 'layer.symbology={"layer":"Countries_Summarize","type":"graduated","field":"point_count"}' \
+  --cmd 'share.exportMap={"path":"out.png","dpi":192}' --save atlas.rgis</span>
+
+<span class="hlg"># 自然语言问数据（需配置 AI 模型 API key）</span>
+<span class="mono">rustgis-cli ask --sample "Which 5 countries have the largest GDP?"</span></div>
+      </div>
+    </section>
+
+    <!-- Chapter 7: 316 Commands -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">7</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER SEVEN</div>
+          <h2>316 条命令详解</h2>
+          <p>每个 Ribbon 操作带唯一 id，可脚本化、CLI 执行、AI Agent 接管</p>
+        </div>
+      </div>
+      <div class="cmd-list">
+        <div class="cmd-item">
+          <div class="cname">gp.run</div>
+          <div class="cdesc">执行地理处理工具（countPoints / buffer / clip / merge 等）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">layer.symbology</div>
+          <div class="cdesc">设置图层符号化（单一符号 / 唯一值 / 分级色彩 / 比例符号）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">layer.label</div>
+          <div class="cdesc">配置标注（放置规则、比例范围、冲突处理）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">share.exportMap</div>
+          <div class="cdesc">导出地图（PNG / PDF，指定 DPI）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">data.open</div>
+          <div class="cdesc">打开数据文件（GeoJSON / Shapefile / GeoPackage 等）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">data.save</div>
+          <div class="cdesc">保存为指定格式（GeoJSON / CSV / KML 等）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">view.zoomIn / view.zoomOut</div>
+          <div class="cdesc">放大 / 缩小地图视图</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">view.pan</div>
+          <div class="cdesc">平移地图视图</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">map.bookmark</div>
+          <div class="cdesc">保存 / 管理书签和视图范围</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">render</div>
+          <div class="cdesc">渲染地图为图像（PNG/JPG，支持底图参数）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">query.selectByAttr</div>
+          <div class="cdesc">按属性（SQL WHERE 子句）选择要素</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">query.selectByLoc</div>
+          <div class="cdesc">按位置关系（包含 / 相交 / 邻接）选择要素</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">edit.create</div>
+          <div class="cdesc">创建新要素（点 / 线 / 面）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">edit.move / edit.rotate</div>
+          <div class="cdesc">移动 / 旋转要素</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">edit.merge / edit.split</div>
+          <div class="cdesc">合并 / 分割要素</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">raster.reproject</div>
+          <div class="cdesc">栅格重投影（任意 EPSG 代码）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">raster.stretch</div>
+          <div class="cdesc">栅格拉伸（DRA / RGB / 分类 / 着色地形）</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">service.wms / service.wfs</div>
+          <div class="cdesc">连接 WMS / WFS 等 OGC Web 服务</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">tiles.addXYZ / tiles.addMVT</div>
+          <div class="cdesc">添加 XYZ 栅格瓦片或 Mapbox Vector Tiles 底图</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">ai.ask</div>
+          <div class="cdesc">自然语言查询数据或触发地图操作</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">undo / redo</div>
+          <div class="cdesc">撤销 / 重做上一个操作</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cname">commands</div>
+          <div class="cdesc">列出所有 316 条命令 id、参数和说明</div>
+        </div>
+      </div>
+      <p class="source-note" style="margin-top:12px">全部 316 条命令通过 <span class="mono">rustgis-cli commands</span> 列出。每条命令均可通过 rustgis-cli 执行、在 notebooks 中链式调用，或由 AI Agent 通过 MCP 接管。</p>
+    </section>
+
+    <!-- Chapter 8: Competitor Comparison -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">8</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER EIGHT</div>
+          <h2>竞品定位对比</h2>
+          <p>RustGIS 自述「ArcGIS Pro 浏览器版」——对比 GeoLibre、QGIS、ArcGIS</p>
+        </div>
+      </div>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th><span class="hlb">RustGIS</span><br><span style="font-size:10px;color:#9fb0de">ArcGIS Pro 浏览器版</span></th>
+            <th>ArcGIS Pro</th>
+            <th>QGIS</th>
+            <th>GeoLibre</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>许可证</strong></td>
+            <td class="comp-yes">Apache-2.0 ✅</td>
+            <td class="comp-no">专有商业软件 ❌</td>
+            <td class="comp-yes">GPL-2 ✅</td>
+            <td class="comp-yes">MIT/Apache ✅</td>
+          </tr>
+          <tr>
+            <td><strong>价格</strong></td>
+            <td class="comp-yes">免费（开源）✅</td>
+            <td class="comp-no">订阅制（贵）❌</td>
+            <td class="comp-yes">免费 ✅</td>
+            <td class="comp-yes">免费 ✅</td>
+          </tr>
+          <tr>
+            <td><strong>语言实现</strong></td>
+            <td class="hl">Rust（编译型，高性能）</td>
+            <td>C++ / .NET</td>
+            <td>C++ / Python</td>
+            <td>Java / Python</td>
+          </tr>
+          <tr>
+            <td><strong>Web 版本</strong></td>
+            <td class="comp-yes">✅ web.rustgis.app（WebAssembly）</td>
+            <td class="comp-partial">ArcGIS Online（独立产品）⚠️</td>
+            <td class="comp-no">❌ 无官方 Web 版</td>
+            <td class="comp-partial">⚠️ 部分功能</td>
+          </tr>
+          <tr>
+            <td><strong>零安装运行</strong></td>
+            <td class="comp-yes">✅ 浏览器直接运行</td>
+            <td class="comp-no">❌ 需安装客户端</td>
+            <td class="comp-no">❌ 需安装桌面</td>
+            <td class="comp-partial">⚠️ 需 Java 环境</td>
+          </tr>
+          <tr>
+            <td><strong>GPU 渲染</strong></td>
+            <td class="comp-yes">✅ tiny-skia</td>
+            <td class="comp-yes">✅ 硬件加速</td>
+            <td class="comp-partial">⚠️ 部分</td>
+            <td class="comp-partial">⚠️ 依赖平台</td>
+          </tr>
+          <tr>
+            <td><strong>Ribbon 界面</strong></td>
+            <td class="comp-yes">✅ Home/Data/Style/Edit/Analyze/View/Publish</td>
+            <td class="comp-yes">✅ ArcGIS Pro 同款</td>
+            <td class="comp-no">❌ 工具栏/面板</td>
+            <td class="comp-no">❌ 无</td>
+          </tr>
+          <tr>
+            <td><strong>316 命令体系</strong></td>
+            <td class="hl">316 条 RustGIS 命令（每个 Ribbon 操作带 id）</td>
+            <td>ArcPy 脚本化</td>
+            <td>Python / Processing</td>
+            <td>有限</td>
+          </tr>
+          <tr>
+            <td><strong>AI Assistant</strong></td>
+            <td class="comp-yes">✅ MCP + 多模型 + CLI</td>
+            <td class="comp-partial">⚠️ ArcGIS AI（需订阅）</td>
+            <td class="comp-no">❌ 无内置</td>
+            <td class="comp-no">❌ 无</td>
+          </tr>
+          <tr>
+            <td><strong>1000+ 分析工具</strong></td>
+            <td class="comp-yes">✅ GeoLibre + Whitebox</td>
+            <td class="comp-yes">✅ Spatial Analyst</td>
+            <td class="comp-yes">✅ Processing</td>
+            <td class="comp-yes">✅ 核心工具</td>
+          </tr>
+          <tr>
+            <td><strong>本地私密</strong></td>
+            <td class="comp-yes">✅ 文件本地，不自动上传</td>
+            <td class="comp-no">❌ Esri 云集成</td>
+            <td class="comp-yes">✅ 本地优先</td>
+            <td class="comp-yes">✅ 本地</td>
+          </tr>
+          <tr>
+            <td><strong>项目成熟度</strong></td>
+            <td class="comp-unknown">⚠️ 2026-10-10 新建（极新）</td>
+            <td class="comp-yes">✅ 成熟商业产品</td>
+            <td class="comp-yes">✅ 20+ 年社区</td>
+            <td class="comp-partial">⚠️ 发展中</td>
+          </tr>
+          <tr>
+            <td><strong>3D 地球</strong></td>
+            <td class="comp-yes">✅ 支持</td>
+            <td class="comp-yes">✅ Globe</td>
+            <td class="comp-yes">✅ 3D 视图</td>
+            <td class="comp-partial">⚠️ 有限</td>
+          </tr>
+          <tr>
+            <td><strong>WASM 插件</strong></td>
+            <td class="comp-yes">✅ 沙箱 WebAssembly</td>
+            <td class="comp-no">❌ 无此机制</td>
+            <td class="comp-no">❌ 无此机制</td>
+            <td class="comp-no">❌ 无此机制</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="source-note" style="margin-top:10px">对比参考：官网 <span class="mono">rustgis.app</span> Comparison 页面，实测数据截至 2026-10-13。</p>
+    </section>
+
+    <!-- Chapter 9: Data Format Support -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">9</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER NINE</div>
+          <h2>数据格式支持大表</h2>
+          <p>矢量、栅格、数据库、瓦片全覆盖，逐行列出</p>
+        </div>
+      </div>
+      <div class="fmt-grid">
+        <div class="fmt-card">
+          <div class="fmt-cat">矢量格式 · 读</div>
+          <ul>
+            <li>GeoJSON</li>
+            <li>CSV/TSV（含任意坐标系 x/y 或 WKT 几何）</li>
+            <li>Excel (.xlsx)</li>
+            <li>OpenDocument 电子表格</li>
+            <li>GeoRSS</li>
+            <li>LandXML</li>
+            <li>Shapefile（含 zipped，浏览器也支持）</li>
+            <li>GeoPackage</li>
+            <li>GeoParquet</li>
+            <li>FlatGeobuf</li>
+            <li>KML/KMZ（含样式）</li>
+            <li>GPX</li>
+            <li>GML</li>
+            <li>MapInfo MIF/MID</li>
+            <li>OpenStreetMap PBF</li>
+            <li>TopoJSON（大型文件原地读取）</li>
+            <li>GDAL 支持的所有矢量格式</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <div class="fmt-cat">矢量格式 · 写</div>
+          <ul>
+            <li>GeoJSON</li>
+            <li>CSV</li>
+            <li>GeoPackage</li>
+            <li>GeoParquet</li>
+            <li>Shapefile</li>
+            <li>FlatGeobuf</li>
+            <li>KML/KMZ</li>
+            <li>GPX</li>
+            <li>WKT（Well-Known Text）</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <div class="fmt-cat">栅格格式</div>
+          <ul>
+            <li>GeoTIFF</li>
+            <li>云优化 GeoTIFF (COG)</li>
+            <li>任意像素类型</li>
+            <li>Tiled 或 striped</li>
+            <li>带压缩（Deflate / LZW / JPEG）</li>
+            <li>ASCII Grid</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <div class="fmt-cat">数据库 / SQL</div>
+          <ul>
+            <li>DuckDB Spatial SQL 查询</li>
+            <li>DuckDB 数据库文件</li>
+            <li>任意 EPSG 坐标系统</li>
+            <li>Web Mercator / Equal Earth / Robinson / Winkel Tripel / 极地投影</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <div class="fmt-cat">瓦片格式</div>
+          <ul>
+            <li>PMTiles（Web 或文件）</li>
+            <li>MBTiles</li>
+            <li>XYZ / TMS 栅格瓦片</li>
+            <li>Mapbox Vector Tiles (MVT)</li>
+            <li>MapLibre styles（含 sprites / patterns / expressions）</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <div class="fmt-cat">Web 服务</div>
+          <ul>
+            <li>WMS（Web Map Service）</li>
+            <li>WMTS（Web Map Tile Service）</li>
+            <li>WFS（Web Feature Service）</li>
+            <li>OGC API Features</li>
+            <li>ArcGIS REST（FeatureServer / MapServer / ImageServer / VectorTileServer）</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <div class="fmt-cat">输出格式</div>
+          <ul>
+            <li>PNG（全 DPI）</li>
+            <li>PDF</li>
+            <li>HTML 幻灯片</li>
+            <li>glTF 场景</li>
+            <li>MapLibre styles</li>
+            <li>OGC API Features 集合</li>
+            <li>定位器</li>
+            <li>项目 / 地图 / 移动地图包</li>
+            <li>带同步的离线区域</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <div class="fmt-cat">样式与模板</div>
+          <ul>
+            <li>图层样式（.lyrx / .stylx 等）</li>
+            <li>地图文件</li>
+            <li>图层包</li>
+            <li>样式模板</li>
+            <li>项目模板</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chapter 10: Honest Limitations -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">10</div>
+        <div class="section-meta">
+          <div class="label">CHAPTER TEN</div>
+          <h2>诚实与局限性</h2>
+          <p>标注 ❓ 的为待验证信息，请以实际发布版本为准</p>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <div class="risk" data-accent="red">
+          <div class="tagrow"><span class="tag red">❓ 待验证</span></div>
+          <h4>项目极新，稳定性待验证</h4>
+          <p style="font-size:12px;color:#ffd1d1;margin:6px 0 0">RustGIS 于 <strong>2026-10-10</strong> 才创建，2026-10-13 首次 push。虽然 push 活跃，但距离生产环境使用还有待社区验证。Bug 修复节奏、功能完成度未知。</p>
+        </div>
+        <div class="risk" data-accent="dark">
+          <div class="tagrow"><span class="tag dark">❓ 门槛</span></div>
+          <h4>Rust 1.90+ 源码构建门槛</h4>
+          <p style="font-size:12px;color:#ede3ff;margin:6px 0 0">从源码构建需要 Rust 1.90+ 环境 ❓（原文「Rust 1.90+」标注）。若系统 Rust 版本较低，需要手动升级工具链，这对非 Rust 开发者有一定门槛。</p>
+        </div>
+        <div class="risk" data-accent="blue">
+          <div class="tagrow"><span class="tag blue">❓ 待验证</span></div>
+          <h4>WASM 功能覆盖可能小于桌面版</h4>
+          <p style="font-size:12px;color:#d8f4ff;margin:6px 0 0">WebAssembly 运行环境与桌面存在差异，部分依赖本地系统调用或大型库的功能可能受限。实际功能覆盖率需待 Web 版稳定后验证。</p>
+        </div>
+      </div>
+      <div class="rule"></div>
+      <div class="grid-3">
+        <div class="risk" data-accent="dark">
+          <div class="tagrow"><span class="tag dark">❓ 待确认</span></div>
+          <h4>GeoLibre / Whitebox 许可兼容性</h4>
+          <p style="font-size:12px;color:#ede3ff;margin:6px 0 0">1,000+ GeoLibre 和 Whitebox 工具的许可协议与 RustGIS Apache-2.0 的集成方式尚未明确。插件层面的许可链需仔细审查。</p>
+        </div>
+        <div class="risk" data-accent="blue">
+          <div class="tagrow"><span class="tag blue">❓ 观察中</span></div>
+          <h4>AI 模型费用</h4>
+          <p style="font-size:12px;color:#d8f4ff;margin:6px 0 0">AI Assistant 支持多模型，但使用 Anthropic / OpenAI / Gemini 等商业模型会产生 API 费用。Ollama 支持本地部署可规避，但需 GPU 资源。</p>
+        </div>
+        <div class="risk" data-accent="green">
+          <div class="tagrow"><span class="tag green">✅ 无问题</span></div>
+          <h4>示例数据：Natural Earth 公有领域</h4>
+          <p style="font-size:12px;color:#ddffe8;margin:6px 0 0">World Atlas 示例项目使用 Natural Earth 公有领域数据，与 Apache-2.0 许可证完全兼容，商业使用无风险。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Shell Section: Tweet + Meta -->
+    <section class="shell">
+      <aside class="panel">
+        <div class="panel-head"><h3>来源与引用</h3><span class="badge">2026-10-13</span></div>
+        <div class="panel-body">
+          <div class="task">
+            <div class="task-top">
+              <div>
+                <div class="task-name">@huihoo</div>
+                <div style="font-size:11px;color:#9db0de">灰狐 · 透过简单与美丽认识真理 · 26,382 关注者</div>
+              </div>
+              <div class="status">132 赞</div>
+            </div>
+            <p>GIS 世界的 Rust 重构来了。Web 堪称 ArcGIS Pro 浏览器版。支持 Windows/macOS/Linux 桌面运行。每个操作对应一条命令，316 个功能区功能 → 316 条 RustGIS 命令。示例数据 Natural Earth 公有领域，Apache v2。</p>
+            <div class="task-meta">
+              <span class="chip">117 书签</span>
+              <span class="chip">19 转发</span>
+              <span class="chip">7,467 浏览</span>
+            </div>
+          </div>
+          <div class="project">
+            <div class="top">
+              <div>
+                <div class="name">推文数据</div>
+                <div class="path"><a href="https://x.com/huihoo/status/2109830074958831708" style="color:#7ad9ff">点击查看推文</a></div>
+              </div>
+              <div class="mini-dot"></div>
+            </div>
+          </div>
+          <div class="project">
+            <div class="top">
+              <div>
+                <div class="name">GitHub 仓库</div>
+                <div class="path">opengeos/RustGIS</div>
+              </div>
+              <div class="mini-dot"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="panel" style="background:transparent;border:none;box-shadow:none;display:grid;grid-template-rows:auto auto auto;gap:12px;padding:0">
+        <div class="panel">
+          <div class="panel-head"><h3>RustGIS 快速元数据</h3><span class="badge">GitHub API 实测</span></div>
+          <div class="panel-body">
+            <div class="status-list">
+              <div class="status-item"><div class="left"><span class="small">Stars</span><strong>512 ★</strong></div><span class="hl">↑ 增长中</span></div>
+              <div class="status-item"><div class="left"><span class="small">Forks</span><strong>67</strong></div><span></span></div>
+              <div class="status-item"><div class="left"><span class="small">Issues</span><strong>12 Open</strong></div><span></span></div>
+              <div class="status-item"><div class="left"><span class="small">Size</span><strong>2,377 KB</strong></div><span></span></div>
+              <div class="status-item"><div class="left"><span class="small">Last Push</span><strong>2026-10-13 11:56 UTC</strong></div><span class="hlg">✅</span></div>
+              <div class="status-item"><div class="left"><span class="small">语言</span><strong>Rust</strong></div><span class="hlb">Pure Rust</span></div>
+              <div class="status-item"><div class="left"><span class="small">许可</span><strong>Apache-2.0</strong></div><span class="hlg">商业友好</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="term">
+          <div class="term-top"><span>rustgis-cli render</span><span>shell</span></div>
+          <div class="term-body">➜  <span class="hlg">rustgis-cli render</span> countries.geojson map.png --basemap ocean
+  Rendering: countries.geojson
+  Basemap: ocean (offline)
+  Output: map.png (2560x1440 @ 96 DPI)
+  ✅ Done in 1.24s
+
+➜  <span class="hlg">rustgis-cli commands</span> | wc -l
+  316</div>
+        </div>
+
+        <div class="editor">
+          <div class="editor-top"><span class="tab">rustgis.app</span><span style="font-size:11px;color:#9fb0de">Homepage</span></div>
+          <div class="code">rustgis-app/
+ ├── web.rustgis.app    ← WebAssembly 零安装版
+ ├── downloads.rustgis  ← 桌面客户端下载
+ ├── plugins.rustgis    ← WASM 插件市场
+ └── rustgis.app        ← 官网 / 文档
+
+<span class="kw"># 三个应用入口</span>
+rustgis         ← 桌面 GUI（rustgis-ui-egui）
+rustgis-cli     ← 命令行工具
+rustgis-web     ← 浏览器 WASM</div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <div class="panel-head"><h3>项目快照</h3><span class="badge">2026-10-13</span></div>
+        <div class="panel-body">
+          <div class="stats">
+            <div class="stats-top">Community · GitHub</div>
+            <div class="stats-body">
+              <div class="stat"><div class="label"><span>Stars</span><strong>512 ★</strong></div><div class="bar"><span style="width:51%"></span></div></div>
+              <div class="stat"><div class="label"><span>Forks</span><strong>67</strong></div><div class="bar"><span style="width:67%"></span></div></div>
+              <div class="stat"><div class="label"><span>Issues</span><strong>12</strong></div><div class="bar"><span style="width:12%"></span></div></div>
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <div class="flow-item blue">
+              <div class="t">⭐ 512 Stars</div>
+              <div class="c">发布首周极快速增长</div>
+            </div>
+            <div class="flow-item green" style="margin-top:6px">
+              <div class="t">🕐 2026-10-13 push</div>
+              <div class="c">Last push: 11:56:38 UTC</div>
+            </div>
+            <div class="flow-item dark" style="margin-top:6px">
+              <div class="t">🌐 5 离线底图</div>
+              <div class="c">开箱即用，无需网络</div>
+            </div>
+            <div class="flow-item" style="margin-top:6px">
+              <div class="t">🎨 15 种语言</div>
+              <div class="c">界面多语言支持</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="feature-row">
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+        </div>
+        <span>快速小巧</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        </div>
+        <span>WebAssembly</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        </div>
+        <span>本地私密</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+        </div>
+        <span>316 条命令</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        </div>
+        <span>Ribbon 界面</span>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+        </div>
+        <span>1,000+ 工具</span>
+      </div>
+    </section>
+
+    <div class="download">
+      <a href="https://web.rustgis.app" style="display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--purple),#6a4cff 54%, var(--blue));color:#fff;border:0;border-radius:18px;padding:16px 24px;box-shadow:0 16px 36px rgba(132,89,255,.34);font-weight:950;letter-spacing:.02em;font-size:18px;text-decoration:none">
+        🌐 <span>零安装在线使用<span style="display:block;font-size:12px;font-weight:700;color:#e7dbff;letter-spacing:.02em">web.rustgis.app · 浏览器直接运行</span></span>
+      </a>
+    </div>
+
+    <section class="footer">
+      <div>🟦 RustGIS · opengeos/RustGIS · Apache-2.0</div>
+      <div class="stars">★ 512 Stars · 67 Forks</div>
+      <div>
+        <a href="https://x.com/huihoo/status/2109830074958831708" style="color:#7ad9ff">推文来源：@huihoo</a> · 
+        <a href="https://rustgis.app" style="color:#7ad9ff">rustgis.app</a> · 
+        <a href="https://web.rustgis.app" style="color:#7ad9ff">web.rustgis.app</a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      function send(){
+        var h=document.body.scrollHeight;
+        window.parent.postMessage({type:'theme-height',slug:'darkblue',height:h},'*');
+      }
+      if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}
+      setTimeout(send,500);
+    })();
+  </script>
+</body>
+</html>
