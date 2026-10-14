@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="wood">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sgrep：本地语义代码搜索 · 按含义找代码，不生成答案</title>
+<style>
+:root{
+  --bg:#f3eee7;
+  --paper:#fffdf8;
+  --ink:#101010;
+  --muted:#5f584f;
+  --line:#1b1713;
+  --blue:#2f5fb8;
+  --blue-soft:#eaf1ff;
+  --wood:#8a5a3c;
+  --wood-soft:#f1e3d3;
+  --wood-dark:#5a381f;
+  --shadow:6px 6px 0 rgba(16,16,16,.12);
+  --serif:Georgia,"Times New Roman","Songti SC","SimSun",serif;
+  --sans:Inter,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:13px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  overflow-wrap:break-word;
+}
+a{color:var(--blue);text-decoration:none;border-bottom:1px solid rgba(47,95,184,.4)}
+a:hover{border-bottom-color:var(--blue)}
+.wrap{max-width:1120px;margin:0 auto;padding:26px 20px 40px}
+.card{background:var(--paper);border:1.5px solid var(--line);box-shadow:var(--shadow)}
+
+/* ---------- meta row ---------- */
+.meta{
+  display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;
+  align-items:flex-start;padding:16px 20px;border-bottom:1.5px solid var(--line);
+}
+.meta-left{font-size:11.5px;color:var(--muted);min-width:220px}
+.meta-left .who{font-family:var(--serif);font-size:15px;color:var(--ink);font-weight:700;letter-spacing:.2px}
+.meta-left .row{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:5px}
+.meta-left .row span{display:inline-block}
+.meta-left b{color:var(--ink);font-weight:600}
+.meta-left .url{font-family:var(--mono);font-size:11.5px}
+.versus{
+  background:var(--ink);color:#fff;padding:10px 14px;min-width:250px;max-width:420px;
+}
+.versus .tag{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#c9b8a6}
+.versus .line{font-family:var(--serif);font-size:16px;line-height:1.4;margin-top:4px}
+.versus .line em{font-style:normal;color:#ffd9a8}
+.versus .sub{font-size:11.5px;color:#cfc7bc;margin-top:6px;line-height:1.5}
+
+/* ---------- hero ---------- */
+.hero{padding:30px 24px 26px;border-bottom:1.5px solid var(--line)}
+.eyebrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.pill{
+  font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--line);padding:2px 8px;background:var(--paper);color:var(--ink);
+}
+.pill.solid{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pill.woodp{background:var(--wood-soft);border-color:var(--wood);color:var(--wood-dark)}
+h1{
+  font-family:var(--serif);font-weight:700;margin:0;
+  font-size:clamp(28px,5vw,58px);line-height:1.08;letter-spacing:-.5px;
+}
+h1 .thin{display:block;font-size:.46em;font-weight:400;color:var(--muted);letter-spacing:.02em;margin-top:10px;line-height:1.45}
+.lead{margin:16px 0 0;font-size:15px;max-width:74ch;color:#24211d}
+.lead b{font-weight:700}
+.metaline{margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px}
+.metaline b{color:var(--ink)}
+
+/* ---------- quote ---------- */
+.quote{
+  background:var(--wood);color:#fff7ee;padding:20px 24px;
+  border-bottom:1.5px solid var(--line);
+}
+.quote .mark{font-family:var(--serif);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#f0d9c4}
+.quote p{font-family:var(--serif);font-size:clamp(17px,2.4vw,25px);line-height:1.5;margin:8px 0 0;max-width:70ch}
+.quote p b{color:#ffe6c8}
+
+/* ---------- process ---------- */
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:var(--ink);border-bottom:1.5px solid var(--line)}
+.flow .step{padding:13px 16px;color:#fff;border-right:1px solid #3a352f}
+.flow .step:last-child{border-right:none}
+.flow .n{font-family:var(--mono);font-size:11px;color:#e0a86a}
+.flow .t{font-family:var(--serif);font-size:15px;margin-top:2px}
+.flow .d{font-size:11.5px;color:#b9b2a8;margin-top:3px;line-height:1.5}
+
+/* ---------- sections ---------- */
+section{padding:26px 24px;border-bottom:1.5px solid var(--line)}
+section:last-of-type{border-bottom:none}
+.shead{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.shead .num{font-family:var(--mono);font-size:11.5px;background:var(--ink);color:#fff;padding:2px 8px;letter-spacing:.08em}
+.shead h2{font-family:var(--serif);font-size:clamp(18px,2.4vw,22px);margin:0;line-height:1.3}
+.shead .hint{font-size:11.5px;color:var(--muted)}
+h3{font-family:var(--serif);font-size:15.5px;margin:20px 0 8px}
+h3:first-child{margin-top:0}
+p{margin:9px 0}
+ol,ul{margin:9px 0;padding-left:20px}
+li{margin:5px 0}
+code{
+  font-family:var(--mono);font-size:12px;background:var(--blue-soft);
+  border:1px solid rgba(47,95,184,.25);padding:.5px 4px;border-radius:2px;
+}
+.codewrap{position:relative;margin:12px 0}
+.codewrap .bar{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  background:var(--line);color:#e7ded2;font-family:var(--mono);font-size:11px;
+  padding:5px 10px;letter-spacing:.04em;
+}
+.codewrap .bar .cp{
+  font-family:var(--sans);font-size:11px;background:transparent;color:#f0cfa6;
+  border:1px solid #6d6154;padding:1px 8px;cursor:pointer;
+}
+.codewrap .bar .cp:hover{background:#f0cfa6;color:var(--line)}
+pre{
+  margin:0;background:#17150f;color:#eae4d9;border:1.5px solid var(--line);border-top:none;
+  padding:13px 14px;overflow-x:auto;font-size:12.3px;line-height:1.7;
+}
+pre code{background:none;border:none;padding:0;color:inherit;font-size:12.3px}
+pre .c{color:#9aa7b8}
+pre .k{color:#8fd0a5}
+pre .p{color:#f0c47a}
+
+.note{
+  background:var(--blue-soft);border-left:3px solid var(--blue);
+  padding:10px 13px;font-size:12.5px;margin:12px 0;
+}
+.note b{color:#1e4791}
+.warn{
+  background:var(--wood-soft);border-left:3px solid var(--wood);
+  padding:10px 13px;font-size:12.5px;margin:12px 0;color:#3d2a1a;
+}
+
+/* ---------- grids ---------- */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.mini{border:1.5px solid var(--line);background:var(--paper);padding:14px 15px}
+.grid2>*,.grid3>*{min-width:0}
+.mini .cap{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--wood-dark);background:var(--wood-soft);display:inline-block;padding:1px 7px;
+  border:1px solid rgba(138,90,60,.45);
+}
+.mini h4{font-family:var(--serif);font-size:15px;margin:9px 0 6px}
+.mini p{font-size:12.4px;margin:6px 0}
+.mini ul{font-size:12.4px;padding-left:18px;margin:6px 0}
+.mini.dark{background:var(--ink);color:#e9e3d8;border-color:var(--ink)}
+.mini.dark h4{color:#fff}
+.mini.dark .cap{background:#2c2820;color:#f0cfa6;border-color:#565046}
+.mini.dark a{color:#8fb6ff;border-bottom-color:rgba(143,182,255,.4)}
+
+/* ---------- table ---------- */
+.tablewrap{overflow-x:auto;border:1.5px solid var(--line);margin:14px 0}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:12.4px;background:var(--paper)}
+th,td{padding:7px 11px;text-align:left;border-bottom:1px solid #ddd5c8;vertical-align:top}
+thead th{background:var(--ink);color:#fff;font-weight:600;font-size:11.5px;letter-spacing:.05em;white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+tbody tr.hl td{background:var(--wood-soft);font-weight:600}
+td.num{font-family:var(--mono);white-space:nowrap}
+caption{caption-side:bottom;font-size:11.5px;color:var(--muted);text-align:left;padding:7px 2px 0}
+
+/* ---------- footer ---------- */
+footer{
+  padding:18px 24px 22px;font-size:11.5px;color:var(--muted);
+  display:flex;flex-wrap:wrap;gap:10px 26px;justify-content:space-between;align-items:flex-start;
+}
+footer .brand{font-family:var(--serif);font-size:13.5px;color:var(--ink)}
+footer .links{display:flex;flex-wrap:wrap;gap:6px 16px;font-family:var(--mono);font-size:11.5px}
+
+@media (max-width:860px){
+  .grid3{grid-template-columns:1fr 1fr}
+}
+@media (max-width:720px){
+  .wrap{padding:16px 12px 30px}
+  .grid3,.grid2{grid-template-columns:1fr}
+  .flow{grid-template-columns:1fr 1fr}
+  .flow .step{border-bottom:1px solid #3a352f}
+  .flow .step:nth-child(2n){border-right:none}
+  .meta{padding:14px 16px}
+  .versus{max-width:none;width:100%}
+  section{padding:22px 16px}
+  .hero{padding:24px 16px 20px}
+  .quote{padding:18px 16px}
+}
+@media (max-width:390px){
+  body{font-size:12.5px}
+  .flow{grid-template-columns:1fr}
+  .flow .step{border-right:none}
+  h1{font-size:27px}
+  pre{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+
+  <!-- ========== META ROW ========== -->
+  <div class="meta">
+    <div class="meta-left">
+      <div class="who">context-dot-dev / sgrep</div>
+      <div class="row">
+        <span>本地语义代码搜索 CLI</span>
+        <span>快照 <b>2026-10-14</b></span>
+        <span>最新标签 <b>v0.3.0</b>（2026-10-09）</span>
+      </div>
+      <div class="row">
+        <span>★ <b>54</b> star</span>
+        <span>fork <b>1</b></span>
+        <span>许可 <b>MIT</b></span>
+        <span>建仓 <b>2026-10-07</b></span>
+        <span>最近推送 <b>2026-10-13</b></span>
+      </div>
+      <div class="row"><span class="url">github.com/context-dot-dev/sgrep</span></div>
+    </div>
+    <div class="versus">
+      <div class="tag">sgrep ≠ ripgrep</div>
+      <div class="line">ripgrep 按<em>名称和字面</em>找，sgrep 按<em>含义</em>找。</div>
+      <div class="sub">不生成答案，只把源码 passage 和行号交给你；也能作为 ripgrep 结果的重排序器。不需要账号、托管索引或模型服务。</div>
+    </div>
+  </div>
+
+  <!-- ========== HERO ========== -->
+  <div class="hero">
+    <div class="eyebrow">
+      <span class="pill solid">开源项目</span>
+      <span class="pill woodp">progressive-doc 分层卡</span>
+      <span class="pill">Rust CLI</span>
+      <span class="pill">纯 CPU · 离线</span>
+      <span class="pill">第一方基准</span>
+    </div>
+    <h1>用一句人话搜代码
+      <span class="thin">Search code and documents in plain English. Runs locally.</span>
+    </h1>
+    <p class="lead"><b>身份：</b>本地语义代码搜索 CLI。按含义而不是名称找代码，也能给 ripgrep 的结果重排序。不需要账号、托管索引或模型服务。</p>
+    <div class="metaline">
+      <span>主页 <b>context.dev</b></span>
+      <span>建仓 <b>2026-10-07</b> → 快照 <b>2026-10-14</b> 仅 7 天</span>
+      <span>语言统计 <b>Python 字节数 &gt; Rust</b>（本体是 Rust CLI）</span>
+    </div>
+  </div>
+
+  <!-- ========== QUOTE ========== -->
+  <div class="quote">
+    <div class="mark">核心洞察</div>
+    <p>它返回的是<b>文件 + 行范围</b>，不是生成的答案；查询与源码<b>留在本机</b>，首次搜索下载 32–34 MB 模型之后可离线运行。</p>
+  </div>
+
+  <!-- ========== PROCESS BAR ========== -->
+  <div class="flow">
+    <div class="step">
+      <div class="n">01</div>
+      <div class="t">第一动作</div>
+      <div class="d">装 ripgrep，cargo 从 git 装 sgrep</div>
+    </div>
+    <div class="step">
+      <div class="n">02</div>
+      <div class="t">核心机制</div>
+      <div class="d">切块 → 混合检索 → 静态向量</div>
+    </div>
+    <div class="step">
+      <div class="n">03</div>
+      <div class="t">可执行步骤</div>
+      <div class="d">首次搜索 · 管道 · 模型 · 索引缓存</div>
+    </div>
+    <div class="step">
+      <div class="n">04</div>
+      <div class="t">预期 · 限制 · 数据</div>
+      <div class="d">看到行号，不是答案；自测基准</div>
+    </div>
+  </div>
+
+  <!-- ========== 01 第一动作 ========== -->
+  <section>
+    <div class="shead">
+      <span class="num">01</span>
+      <h2>读者第一动作：先把命令跑起来</h2>
+      <span class="hint">可直接复制</span>
+    </div>
+    <p>前置条件：<b>Rust 1.90 或更新版本</b>，以及 <b>ripgrep</b>。</p>
+    <div class="codewrap">
+      <div class="bar"><span>step 1 — 装 ripgrep</span><button class="cp" type="button">复制</button></div>
+      <pre><code>brew install ripgrep</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="bar"><span>step 2 — 从 git 安装 sgrep</span><button class="cp" type="button">复制</button></div>
+      <pre><code>cargo install --git https://github.com/context-dot-dev/sgrep --locked</code></pre>
+    </div>
+    <div class="grid2">
+      <div class="mini">
+        <span class="cap">Alternative</span>
+        <h4>不用 cargo 的话</h4>
+        <p>从 <a href="https://github.com/context-dot-dev/sgrep/releases/latest">releases/latest</a> 下载 macOS Apple Silicon 二进制。</p>
+      </div>
+      <div class="mini">
+        <span class="cap">Upgrade</span>
+        <h4>旧的 Python 安装要先卸载</h4>
+        <p>旧版本如果是 Python 装的，先卸载：<code>uv tool uninstall sgrep</code> 或 <code>pip uninstall sgrep</code>。</p>
+      </div>
+    </div>
+    <div class="note"><b>为什么是两步：</b>sgrep 本身靠 ripgrep 列出候选文件，所以 ripgrep 不是可选项，是前置依赖。</div>
+  </section>
+
+  <!-- ========== 02 核心机制 ========== -->
+  <section>
+    <div class="shead">
+      <span class="num">02</span>
+      <h2>核心机制：切块、混合检索、静态向量</h2>
+      <span class="hint">靠什么做到</span>
+    </div>
+    <div class="grid3">
+      <div class="mini">
+        <span class="cap">Chunking</span>
+        <h4>切块</h4>
+        <ul>
+          <li>ripgrep 列出文件，Rust 用 Chonkie + Tree-sitter 切成 passage。</li>
+          <li>代码解析器支持 Python、C/C++、Go、Java、Rust、JavaScript/JSX、TypeScript/TSX；其余文件用文本切分。</li>
+          <li>每个 passage 目标 <b>2048 字符</b>，按整行切。</li>
+        </ul>
+      </div>
+      <div class="mini">
+        <span class="cap">Hybrid retrieval</span>
+        <h4>混合检索</h4>
+        <ul>
+          <li>取词法 top 200 与语义 top 200 合并：<b>75% 语义 + 25% BM25</b>，各自先缩放到 0–1。</li>
+          <li>完全精确、大小写敏感的标识符匹配排最前（camelCase、下划线、美元符、数字）。</li>
+        </ul>
+      </div>
+      <div class="mini">
+        <span class="cap">Static vectors</span>
+        <h4>静态向量模型</h4>
+        <ul>
+          <li>embedding 用 Minish Lab 的 <b>Potion Code 16M v2</b> 与 <b>Potion Base 8M</b>：静态向量模型，每个 token 一个向量。</li>
+          <li>查询时没有 transformer 前向，<b>纯 CPU 搜索</b>，向量归一化到 256 维。</li>
+          <li>模型固定 revision，<b>MIT 许可</b>。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="warn"><b>为什么还要 BM25 和精确匹配：</b>静态向量平均会丢 token 顺序，可能丢上下文；因此额外加了 BM25 与精确标识符优先。</div>
+  </section>
+
+  <!-- ========== 03 可执行步骤 ========== -->
+  <section>
+    <div class="shead">
+      <span class="num">03</span>
+      <h2>可执行步骤：安装 → 首次搜索 → 管道 → 模型 → 索引与缓存</h2>
+      <span class="hint">照抄即可</span>
+    </div>
+
+    <h3>① 首次搜索（会触发模型下载）</h3>
+    <div class="codewrap">
+      <div class="bar"><span>语义查询 · 代码目录</span><button class="cp" type="button">复制</button></div>
+      <pre><code>sgrep "when does a failed scrape consume credits" ./src</code></pre>
+    </div>
+    <p>选项：<code>-n 10</code> 取十条，<code>--json</code> 出 JSON。</p>
+    <div class="note"><b>首次成本：</b>首次搜索下载模型（<b>32–34 MB</b>）与所需解析器，之后可离线运行。源码与查询留在本机；本地索引会存 passage 的副本。</div>
+
+    <h3>② 管道模式（给 ripgrep 的结果重排序）</h3>
+    <div class="codewrap">
+      <div class="bar"><span>rg --json -C 3 | sgrep --stdin</span><button class="cp" type="button">复制</button></div>
+      <pre><code>rg --json -C 3 'creditCost|shouldBill' ./src | sgrep "when does a failed scrape consume credits" --stdin</code></pre>
+    </div>
+    <div class="warn"><b>两条命令要在同一目录执行。</b></div>
+
+    <h3>③ model code / text 怎么选</h3>
+    <div class="grid2">
+      <div class="mini dark">
+        <span class="cap">--model code</span>
+        <h4>代码语义</h4>
+        <div class="codewrap" style="margin:8px 0 0">
+          <div class="bar"><span>代码库查询</span><button class="cp" type="button">复制</button></div>
+          <pre><code>sgrep "retry with exponential backoff" ./src --model code</code></pre>
+        </div>
+      </div>
+      <div class="mini dark">
+        <span class="cap">--model text</span>
+        <h4>文档 / 自然语言</h4>
+        <div class="codewrap" style="margin:8px 0 0">
+          <div class="bar"><span>文档目录查询</span><button class="cp" type="button">复制</button></div>
+          <pre><code>sgrep "how do refunds work" ./docs --model text</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <h3>④ 索引与缓存控制</h3>
+    <ul>
+      <li>索引缓存上限 <b>256 MiB / 128 条</b>，LRU 清理，<b>30 天</b>未用的清掉。</li>
+      <li>超大条目不保存；缓存失败会<b>退回无索引搜索</b>。</li>
+      <li>源码副本会一直留到清理或手动删除。</li>
+    </ul>
+  </section>
+
+  <!-- ========== 04 预期现象 ========== -->
+  <section>
+    <div class="shead">
+      <span class="num">04</span>
+      <h2>预期现象：执行后你会看到什么</h2>
+      <span class="hint">验收口径</span>
+    </div>
+    <div class="grid3">
+      <div class="mini">
+        <span class="cap">Output</span>
+        <h4>返回文件 + 行范围</h4>
+        <p>输出是命中的源码 passage 与其位置，<b>不是生成的答案</b>。<code>--json</code> 则给出结构化结果。</p>
+      </div>
+      <div class="mini">
+        <span class="cap">First run</span>
+        <h4>首次会先下模型</h4>
+        <p>第一次搜索下载 32–34 MB 模型与解析器，之后离线可用；查询与源码留在本机。</p>
+      </div>
+      <div class="mini">
+        <span class="cap">Pipeline</span>
+        <h4>管道模式换序不换料</h4>
+        <p>ripgrep 的 JSON 上下文进入 sgrep 后被重排序，两条命令必须在同一目录执行。</p>
+      </div>
+    </div>
+    <div class="note"><b>一句话验收：</b>提问是英文句子，回的是文件路径和行号——没有解释、没有总结、没有改写。</div>
+  </section>
+
+  <!-- ========== 05 已知限制与边界 ========== -->
+  <section>
+    <div class="shead">
+      <span class="num">05</span>
+      <h2>已知限制与边界</h2>
+      <span class="hint">先看清楚再用</span>
+    </div>
+    <div class="grid2">
+      <div class="mini">
+        <span class="cap">Not this</span>
+        <h4>它不做的事</h4>
+        <ul>
+          <li>只返回源码 passage，<b>不生成答案</b>。</li>
+          <li><b>不解析 PDF 与图片</b>。</li>
+          <li>静态向量平均会丢 token 顺序，可能丢上下文（所以才补 BM25 与精确标识符优先）。</li>
+        </ul>
+      </div>
+      <div class="mini">
+        <span class="cap">Storage</span>
+        <h4>缓存与副本</h4>
+        <ul>
+          <li>索引缓存上限 256 MiB / 128 条，LRU 清理，30 天未用的清掉。</li>
+          <li>超大条目不保存，缓存失败退回无索引搜索。</li>
+          <li>本地索引会存 passage 的副本；源码副本会一直留到清理或手动删除。</li>
+        </ul>
+      </div>
+      <div class="mini">
+        <span class="cap">Repo hygiene</span>
+        <h4>语言统计与安装方式</h4>
+        <ul>
+          <li>GitHub 语言统计里 <b>Python 字节数大于 Rust</b>（README 说明本体是 Rust CLI，Python 用于测试与基准脚本）。</li>
+          <li>旧的 Python 安装方式需要先卸载：<code>uv tool uninstall sgrep</code> 或 <code>pip uninstall sgrep</code>。</li>
+        </ul>
+      </div>
+      <div class="mini">
+        <span class="cap">Maturity</span>
+        <h4>项目很新</h4>
+        <ul>
+          <li>2026-10-07 建仓，快照时 <b>54 star</b>，最新标签 v0.3.0（2026-10-09）。</li>
+          <li>README 给出的对照分工，不是全部替代关系：</li>
+        </ul>
+        <p style="font-size:12.2px"><b>ripgrep</b>：适合已知名称、精确文本和正则。意图查询要 agent 先想出合适的模式，宽了结果太多，窄了会漏。</p>
+        <p style="font-size:12.2px"><b>CK</b>：本地语义与混合检索，多个 embedding 模型，带 MCP server。要计入索引构建、更新与查询时间。仓库承认在 CoSQA 上 CK 的语义模式赢过 sgrep。</p>
+        <p style="font-size:12.2px"><b>mgrep</b>：托管语义检索 + 重排 + agent 集成，文件同步到 Mixedbread，需要认证，本次基准未测。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 06 数据与来源 ========== -->
+  <section>
+    <div class="shead">
+      <span class="num">06</span>
+      <h2>数据与来源：官方基准表</h2>
+      <span class="hint">读这张表必须带的限定</span>
+    </div>
+
+    <div class="warn"><b>先说性质：</b>这是本项目自己的基准（benchmarks/README.md），<b>不是第三方评测</b>；快照 <b>2026-10-14</b>，许可 <b>MIT</b>。</div>
+
+    <h3>表 A · SWE-bench 风格 agent 评测（2026-10-13）</h3>
+    <p style="font-size:12.5px;color:var(--muted)">设置：同一个 GPT-6 Luna agent（medium reasoning）在 12 个仓库的 50 个任务上，每种配置跑两次，共 100 次尝试，用官方 SWE-bench patch/test 打分。成本包含编码与检索的 LLM 调用、实际缓存读写、输出与推理 token；<b>不含机器与打分成本</b>。</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>配置</th><th>解题 / 100</th><th>平均 LLM API 成本</th></tr>
+        </thead>
+        <tbody>
+          <tr class="hl"><td>sgrep · 管道</td><td class="num">70</td><td class="num">$0.00475</td></tr>
+          <tr><td>ripgrep</td><td class="num">68</td><td class="num">$0.00604</td></tr>
+          <tr><td>ColGrep</td><td class="num">69</td><td class="num">$0.00654</td></tr>
+          <tr class="hl"><td>sgrep · 常驻索引发现</td><td class="num">67</td><td class="num">$0.00637</td></tr>
+          <tr><td>Jevgrep</td><td class="num">67</td><td class="num">≥ $0.11347（下界，有两次尝试缺用量回执）</td></tr>
+          <tr><td>CK semantic</td><td class="num">25</td><td class="num">$0.00366（图表中省略：57 次索引构建失败）</td></tr>
+          <tr><td>CK hybrid</td><td class="num">27</td><td class="num">$0.00348（图表中省略：58 次索引构建失败）</td></tr>
+          <tr><td>ColGrep agent</td><td class="num">62</td><td class="num">$0.00392（图表中省略：46 次搜索超时）</td></tr>
+        </tbody>
+        <caption>来源：仓库自带 benchmarks/README.md，第一方数据。SGREP 管道与常驻索引两行以木色标出。</caption>
+      </table>
+    </div>
+    <p><b>头条数字（原文口径）：</b>管道模式 sgrep 把平均 LLM API 成本比 ripgrep 降低 <b>21.3%</b>，解题数 <b>70/100 vs 68/100</b>。</p>
+    <div class="note"><b>准确率的自我限定：</b>配对准确率差 +2 个百分点（<b>95% 任务 bootstrap 区间 −3 到 +8</b>）。仓库原文：这只支持预设的五点损失边界，<b>不证明准确率更高或完全相等</b>。</div>
+
+    <h3>表 B · 完整检索套件（2026-10-09）与延迟测试</h3>
+    <div class="grid2">
+      <div class="mini">
+        <span class="cap">RepoQA + CoSQA</span>
+        <h4>600 + 500 道题</h4>
+        <p>600 道 RepoQA + 500 道 CoSQA，对比 CK、Jevgrep、ripgrep，sgrep 主分支 <code>0fbe8e5</code>。RepoQA 看结果里是否包含目标函数完整体（8000 源 token 内）；CoSQA 看标注片段是否出现在前十条。</p>
+      </div>
+      <div class="mini">
+        <span class="cap">Latency</span>
+        <h4>2160 次计时调用</h4>
+        <p>120 条固定查询、每条 6 次重复、2160 次计时 CLI 调用；模型与索引预热，中位与 p95 都含进程启动，全部在共享的 M5 Max 上串行执行。</p>
+      </div>
+    </div>
+
+    <h3>这些数字不能证明什么</h3>
+    <ul>
+      <li>这是本项目自己的基准，不是第三方评测。</li>
+      <li>ripgrep 用的是固定 literal-OR 查询，不是人或 agent 选的正则，所以不测量 agent 选查询的能力。</li>
+      <li>RepoQA 的度量是为检索改编的，不是官方代码生成分数。</li>
+      <li>两个数据集都在开发期间被用过。</li>
+      <li>图表中省略了存在构建失败或搜索超时的配置——廉价的失败不算成本优势。</li>
+      <li>本机是四核 8 GiB Linux CPU 沙箱；结果只描述这个面板，不外推到其他机器与负载。</li>
+    </ul>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>项目元数据</th><th>值</th></tr></thead>
+        <tbody>
+          <tr><td>仓库</td><td class="num">context-dot-dev/sgrep</td></tr>
+          <tr><td>来源</td><td class="num"><a href="https://github.com/context-dot-dev/sgrep">github.com/context-dot-dev/sgrep</a></td></tr>
+          <tr><td>主页</td><td class="num"><a href="https://context.dev">context.dev</a></td></tr>
+          <tr><td>star / fork</td><td class="num">54 / 1</td></tr>
+          <tr><td>许可</td><td class="num">MIT</td></tr>
+          <tr><td>建仓 / 最近推送</td><td class="num">2026-10-07 / 2026-10-13</td></tr>
+          <tr><td>最新标签</td><td class="num">v0.3.0（2026-10-09）</td></tr>
+          <tr><td>数据快照</td><td class="num">2026-10-14</td></tr>
+        </tbody>
+        <caption>标签语：Search code and documents in plain English. Runs locally.</caption>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========== FOOTER ========== -->
+  <footer>
+    <div>
+      <div class="brand">infocard-pub · 木感编辑风 · sgrep-local-semantic-search</div>
+      <div>数据快照 2026-10-14 · MIT · 全部数字取自仓库 README 与 benchmarks/README.md</div>
+    </div>
+    <div class="links">
+      <a href="https://github.com/context-dot-dev/sgrep">GitHub</a>
+      <a href="https://github.com/context-dot-dev/sgrep/releases/latest">Releases</a>
+      <a href="https://context.dev">context.dev</a>
+      <a href="https://x.com/shao__meng/status/2110181417040957738">推文原文</a>
+    </div>
+  </footer>
+
+</div>
+</div>
+<script>
+(function(){
+  document.querySelectorAll('.codewrap .cp').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var code=btn.closest('.codewrap').querySelector('pre').innerText;
+      var done=function(){var t=btn.textContent;btn.textContent='已复制';setTimeout(function(){btn.textContent=t;},1400);};
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(code).then(done,function(){fallback(code,done);});
+      }else{fallback(code,done);}
+    });
+  });
+  function fallback(text,cb){
+    var ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');cb();}catch(e){}
+    document.body.removeChild(ta);
+  }
+})();
+</script>
+</body>
+</html>
