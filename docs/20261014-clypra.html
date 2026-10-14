@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="wood">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clypra：从下载到第一段视频导出</title>
+  <style>
+    :root{
+      --bg:#f4efe8;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#5f584f;
+      --line:#1b1713;
+      --blue:#244a9c;
+      --blue-soft:#e9f0ff;
+      --wood:#8a5a3c;
+      --wood-soft:#efe0d2;
+      --wood-dark:#5a381f;
+      --shadow:7px 7px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255,255,255,.42) 0 18%, transparent 19%),
+        radial-gradient(circle at 80% 0%, rgba(255,255,255,.28) 0 12%, transparent 13%),
+        linear-gradient(180deg,#f5efe8 0%, #f4efe8 100%);
+      color:var(--ink);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+      font-size:12.5px;
+      line-height:1.62;
+      position:relative;
+    }
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background-image:
+        repeating-linear-gradient(0deg, rgba(17,17,17,.016) 0 1px, transparent 1px 4px),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);
+      mix-blend-mode:multiply;
+      opacity:.55;
+    }
+    .page{
+      width:min(1080px,calc(100% - 24px));
+      margin:0 auto;
+      padding:16px 0 78px;
+      position:relative;
+      z-index:1;
+    }
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(0,1.35fr) minmax(260px,.85fr);
+      gap:16px;
+      background:var(--paper);
+      border:2px solid var(--line);
+      box-shadow:var(--shadow);
+      padding:16px 16px 14px;
+      margin-bottom:14px;
+    }
+    .hero-copy{min-width:0}
+    .kicker-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+    .kicker{font:700 11px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--blue);text-transform:uppercase}
+    .source{font:700 11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right;overflow-wrap:anywhere;max-width:240px}
+    h1{
+      margin:0 0 10px;
+      font-family:Georgia,"Times New Roman","Songti SC",serif;
+      font-size:clamp(28px,5vw,56px);
+      line-height:.98;
+      letter-spacing:-.03em;
+      color:var(--ink);
+    }
+    .subtitle{
+      margin:0;
+      max-width:58ch;
+      font-size:14px;
+      line-height:1.72;
+      color:#3f3932;
+    }
+    .subtitle strong{color:var(--blue)}
+    .meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 10px;
+      border:1.5px solid var(--line);
+      background:#fff;
+      font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+      white-space:nowrap;
+    }
+    .chip.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+    .chip.wood{background:var(--wood-soft);border-color:var(--wood);color:var(--wood-dark)}
+    .chip.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+    .compare{
+      background:#111;
+      color:#fff;
+      border:2px solid #111;
+      box-shadow:6px 6px 0 rgba(17,17,17,.08);
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+    }
+    .compare-head{
+      padding:10px 12px 8px;
+      border-bottom:1.5px solid rgba(255,255,255,.18);
+      font:800 12px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .compare-body{padding:12px}
+    .compare-body .big{font-size:16px;font-weight:900;line-height:1.2;margin-bottom:8px}
+    .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    .compare-card{
+      background:#fff;
+      color:var(--ink);
+      border:1.5px solid #fff;
+      padding:10px 10px 8px;
+      min-width:0;
+    }
+    .compare-card h3{margin:0 0 4px;font-size:12px;line-height:1.2}
+    .compare-card p{margin:0;color:#444;font-size:11.5px;line-height:1.5}
+    .compare-card .tag{display:inline-block;margin-bottom:6px;padding:2px 6px;border:1.5px solid var(--ink);font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
+    .banner{
+      background:linear-gradient(135deg,var(--wood) 0%, #9a6a46 58%, var(--wood-dark) 58%, var(--wood-dark) 100%);
+      color:#fff;
+      border:2px solid var(--line);
+      box-shadow:var(--shadow);
+      padding:14px 16px 12px;
+      margin-bottom:14px;
+      display:grid;
+      gap:8px;
+    }
+    .banner .quote{font-family:Georgia,"Times New Roman","Songti SC",serif;font-size:26px;line-height:1.18;font-weight:700;letter-spacing:-.02em}
+    .banner .note{max-width:70ch;font-size:13px;line-height:1.65;color:#f6ede4}
+    .process{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:0;
+      background:#111;
+      color:#fff;
+      border:2px solid #111;
+      box-shadow:var(--shadow);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .step{
+      padding:10px 10px 8px;
+      border-right:1.5px solid rgba(255,255,255,.18);
+      min-width:0;
+    }
+    .step:last-child{border-right:none}
+    .step .n{display:block;color:#fff;font:900 18px/1 Georgia,"Times New Roman",serif;margin-bottom:6px}
+    .step .t{display:block;font:800 11px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+    .step .d{font-size:11.5px;line-height:1.5;color:#dfd7cd}
+    .content{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px;
+      margin-bottom:12px;
+    }
+    .col{
+      background:var(--paper);
+      border:2px solid var(--line);
+      box-shadow:var(--shadow);
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+    }
+    .col-head{
+      padding:12px 12px 10px;
+      border-bottom:1.5px solid var(--line);
+      background:#faf7f0;
+    }
+    .col-kicker{margin:0 0 6px;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--blue);text-transform:uppercase}
+    .col-title{margin:0;font-size:21px;line-height:1.08;font-family:Georgia,"Times New Roman","Songti SC",serif;letter-spacing:-.03em}
+    .col-body{padding:12px 12px 10px;display:grid;gap:10px}
+    .principle{
+      padding:10px 10px 8px;
+      border:1.5px solid var(--line);
+      background:#fff;
+    }
+    .principle .num{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--blue-soft);border:1.5px solid var(--blue);color:var(--blue);font:800 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:8px}
+    .principle h4{margin:0 0 4px;font-size:13px;line-height:1.3}
+    .principle p{margin:0;color:#45413b;font-size:12px;line-height:1.6}
+    .stack{display:grid;gap:8px}
+    .mini{
+      padding:10px 10px 8px;
+      border:1.5px solid var(--line);
+      background:#fff;
+    }
+    .mini h4{margin:0 0 5px;font-size:12.5px;line-height:1.3}
+    .mini p{margin:0;font-size:11.8px;line-height:1.6;color:#47423c}
+    .mini .label{display:inline-block;margin-bottom:6px;padding:2px 6px;border:1.5px solid var(--blue);background:var(--blue-soft);color:var(--blue);font:800 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
+    .test-list{margin:0;padding:0 0 0 16px;display:grid;gap:6px}
+    .test-list li{font-size:12px;line-height:1.6;color:#47423c}
+    .footer{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      border:2px solid var(--line);
+      background:var(--paper);
+      box-shadow:var(--shadow);
+      padding:12px 12px 10px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.6;
+    }
+    .footer .brand{font-weight:800;color:var(--ink)}
+    .footer .small{font:700 11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6b6257}
+    @media (max-width:960px){
+      .hero{grid-template-columns:1fr}
+      .compare-grid,.content{grid-template-columns:1fr}
+      .process{grid-template-columns:1fr 1fr}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 14px,1080px);padding:10px 0 72px}
+      .hero,.banner,.process,.col,.footer{box-shadow:4px 4px 0 rgba(17,17,17,.1)}
+      h1{font-size:clamp(26px,8vw,38px)}
+      .banner .quote{font-size:22px}
+      .process{grid-template-columns:1fr}
+      .step{border-right:none;border-bottom:1.5px solid rgba(255,255,255,.16)}
+      .step:last-child{border-bottom:none}
+      .compare-body .big{font-size:14px}
+      .subtitle{font-size:13px}
+      .col-title{font-size:19px}
+      .footer{flex-direction:column}
+    }
+  </style>
+<style>
+body{font-size:15px;line-height:1.8}a{color:var(--blue);text-underline-offset:3px;overflow-wrap:anywhere}h1{line-height:1.1;overflow-wrap:anywhere}h2{scroll-margin-top:20px}p{margin:0 0 12px}.subtitle{font-size:16px}.compare-card p,.step .d,.mini p,.test-list li{font-size:14px}.source,.kicker,.chip,.col-kicker,.footer .small{font-size:12px}.compare-card h3,.step .t,.mini h4{font-size:15px}.compare-grid{gap:10px}.content{grid-template-columns:1fr;gap:18px}.col-head{padding:18px 22px}.col-title{font-size:25px;line-height:1.3}.col-body{padding:20px 22px;gap:12px}.triad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.mini{padding:14px}.mini p{line-height:1.8}.process .step{padding:16px}.process .step .d{color:#eee7dd}.compare-head{font-size:14px}.compare-body .big{font-size:19px}.compare-body{padding:16px}.compare-card .tag{font-size:12px}.compare-card p{color:#39332d}.banner .note{font-size:15px}.tbl-wrap{max-width:100%;overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:680px;font-size:14px}th,td{text-align:left;vertical-align:top;padding:12px;border:1px solid #918477}th{background:var(--wood-soft)}code{font-family:ui-monospace,monospace;font-size:.92em;background:var(--blue-soft);color:#153367;padding:2px 4px;overflow-wrap:anywhere}pre{margin:0;max-width:100%;overflow-x:auto;background:#181511;color:#fff4e6;padding:16px;border:1px solid var(--line);font-size:14px;line-height:1.7}pre code{color:inherit;background:none;border:0;padding:0;white-space:pre;overflow-wrap:normal}.note-box{border-left:4px solid var(--wood);padding:12px 16px;background:var(--wood-soft)}.test-list{padding-left:22px;gap:9px}.footer{font-size:14px}.nav{display:flex;flex-wrap:wrap;gap:8px 20px;padding:10px 0 20px}.nav a{font-size:14px;font-weight:700}.chip{white-space:normal;line-height:1.4}.source{max-width:240px}.page{padding-top:24px}section{min-width:0}.section-note{color:var(--muted);font-size:14px}.path{font-family:ui-monospace,monospace;color:var(--blue)}@media(max-width:720px){.triad,.compare-grid{grid-template-columns:1fr}.page{width:calc(100% - 28px)}.hero{padding:18px}.col-head,.col-body{padding:16px}.subtitle{font-size:15px}.col-title{font-size:22px}.kicker-row{flex-direction:column}.source{text-align:left;max-width:100%}.banner .quote{font-size:23px;line-height:1.4}.step .t{letter-spacing:0}.nav{gap:8px 16px}h1{font-size:38px}.compare-grid{gap:8px}}
+</style>
+</head>
+<body data-theme="wood"><main class="page">
+<section class="hero" id="start"><div class="hero-copy"><div class="kicker-row"><div class="kicker">AG雷达 · 2026-10-14</div><div class="source">AIEraDev / Clypra<br>开源桌面视频编辑器</div></div><h1>Clypra<br>先剪一小段，再决定</h1><p class="subtitle">用 Rust、Tauri v2、React 19 和 FFmpeg 构建的视频编辑器。适合想试用开源工具做<strong>短片裁剪、音量调整与简单叠字</strong>的人；赶交付、处理保密素材或迁移复杂工程时，先别把它当成已验证的替代品。</p><div class="meta-row"><span class="chip blue">MIT 开源</span><span class="chip wood">桌面上手指南</span><span class="chip dark">未安装实测</span></div></div><aside class="compare"><div class="compare-head">项目声明 ≠ 你的验收结果</div><div class="compare-body"><div class="big">第一步：备份一段约 30 秒的自有视频。</div><div class="compare-grid"><div class="compare-card"><span class="tag">可以先试</span><h3>非关键的小任务</h3><p>选匹配的桌面安装包，只做一次导入→裁剪→导出。</p></div><div class="compare-card"><span class="tag">先别假定</span><h3>性能与兼容保证</h3><p>“低于 10ms”“无水印”来自项目文档，本页没有测得这些结果。</p></div></div></div></aside></section>
+<section class="banner"><div class="quote">先让一个导出文件通过检查，再把更多素材交给它。</div><div class="note">下方流程是基于文档的上手建议，不是逐按钮实测教程；界面文案、安装签名、编码器可用性以你下载的版本为准。</div></section>
+<nav class="nav" aria-label="阅读路线"><a href="#download">01 下载选择</a><a href="#edit">02 最小剪辑</a><a href="#export">03 导出验收</a><a href="#features">04 功能架构</a><a href="#privacy">05 性能隐私</a><a href="#develop">06 开发路线</a><a href="#troubleshoot">07 排错</a><a href="#sources">08 限制与来源</a></nav>
+<div class="process" aria-label="最小验证流程"><div class="step"><span class="n">1</span><span class="t">核对安装包</span><span class="d">系统、CPU 架构与来源匹配。</span></div><div class="step"><span class="n">2</span><span class="t">只剪小样</span><span class="d">先备份，少轨道，少效果。</span></div><div class="step"><span class="n">3</span><span class="t">导出 H.264</span><span class="d">先验证常见输出，再试高规格。</span></div><div class="step"><span class="n">4</span><span class="t">外部复查</span><span class="d">时长、音画、头尾与水印。</span></div></div>
+<div class="content">
+<section class="col" id="download"><header class="col-head"><p class="col-kicker">01 · GET THE RIGHT BUILD</p><h2 class="col-title">按系统和架构下载，不按宣传名猜</h2></header><div class="col-body"><p>打开 <a href="https://github.com/AIEraDev/Clypra/releases">官方 Releases</a>，先读发布说明，再展开 Assets。README 写支持 macOS、Windows 10/11 和 Linux；实际能安装哪一版，还要看发布页有没有你的架构。下面是已核对资产的<strong>命名示例</strong>，不是永久最新版本清单。</p><div class="tbl-wrap"><table><thead><tr><th>你的机器</th><th>核对过的资产示例</th><th>选择规则</th></tr></thead><tbody><tr><td>Mac · Apple Silicon</td><td><code>Clypra_1.2.2_aarch64.dmg</code></td><td>aarch64 对应 ARM64；先核对来源与系统要求。</td></tr><tr><td>Mac · Intel</td><td>本次资产证据不能确认 Intel 包</td><td>README 的 universal 描述不等于当前 DMG 是通用包；先找 x64 或明确标注 universal 的资产。</td></tr><tr><td>Windows 10/11 · x64</td><td><code>Clypra_1.2.2_x64-setup.exe</code><br><code>Clypra_1.2.2_x64_en-US.msi</code></td><td>选一种安装方式即可；不能据此承诺 Windows ARM 原生支持。</td></tr><tr><td>Linux · x86-64</td><td><code>Clypra_1.2.2_amd64.AppImage</code><br>amd64 .deb / x86_64 .rpm</td><td>AppImage 按需赋执行权限；deb/rpm 按发行版包格式选择，不适用于 ARM64。</td></tr></tbody></table></div><pre><code># 仅在下载并核对该文件后执行；文件名需匹配实际下载
+chmod +x Clypra_1.2.2_amd64.AppImage
+./Clypra_1.2.2_amd64.AppImage</code></pre><div class="note-box"><strong>遇到安全拦截先停一下。</strong> 本页未确认安装包签名。不要关闭 Gatekeeper 或全局安全防护；先核对仓库发布者、发布说明及可用的签名/校验信息。移动端 Capacitor 代码不等于已有可安装的 iPad 商店版本。</div></div></section>
+<section class="col" id="edit"><header class="col-head"><p class="col-kicker">02 · ONE SMALL CLIP</p><h2 class="col-title">第一次只做三件事：导入、裁剪、调音量</h2></header><div class="col-body"><p>用约 30 秒、你拥有使用权的视频副本练习。先选择常见 MP4 素材；README 列出 MP4、MOV、WebM、MKV、MP3、WAV、PNG 导入，但<strong>扩展名在列表里不代表任意内部编码都能解码</strong>。</p><ol class="test-list"><li><strong>导入并放到时间线：</strong>确认预览能播放，音频有声，素材时长符合预期。先不要叠加其他媒体。</li><li><strong>裁掉头尾：</strong>以保留中间约 10 秒为练习目标，调整片段边界；播放开头和结尾，确认没切掉要保留的内容。</li><li><strong>调整片段音量：</strong>从原音量开始试听，再适度降低；是否有百分比、dB 或其他单位以当前界面为准，不照抄未经核对的默认值。</li><li><strong>尝试撤销/重做：</strong>文档声明支持 undo/redo，可用一次小改动验证能否回退；不要依赖未验证的快捷键。</li></ol><p class="section-note">这一轮先不加滤镜和动画。这样导出失败时，能区分基础媒体问题与效果叠加问题；原素材副本始终保留。</p></div></section>
+<section class="col" id="export"><header class="col-head"><p class="col-kicker">03 · ACCEPTANCE BEFORE SCALE</p><h2 class="col-title">“导出完成”不是验收完成</h2></header><div class="col-body"><p>若当前导出界面提供 H.264，先以它完成小样；优先保持素材原分辨率和帧率，暂不做升采样。README 也列出 ProRes，但本页未验证各平台编码器、封装格式组合或导出预设。</p><div class="triad"><div class="mini"><h4>导出前：范围</h4><p>确认目标是裁后的约 10 秒，而非整段素材；核对输出位置，避免覆盖原文件。</p></div><div class="mini"><h4>导出时：记录</h4><p>记录应用版本、所选编码/分辨率/帧率和错误提示；不要把某种扩展名当成编码器名称。</p></div><div class="mini"><h4>导出后：独立播放</h4><p>在外部播放器打开文件，不只看编辑器预览；至少播放首帧、中段和末尾。</p></div></div><ul class="test-list"><li><strong>时长：</strong>是否与保留范围一致，有没有多余黑场或尾部截断？</li><li><strong>音画：</strong>有没有失声、爆音、明显不同步或掉帧？</li><li><strong>画面：</strong>文字是否裁切，比例是否拉伸，头尾是否完整？</li><li><strong>水印：</strong>项目声明无水印；检查你的实际输出，不能用本页代替确认。</li></ul><div class="note-box">全部通过后，再加一条音轨或一段文字叠加，并重新验收。重要交付前，必须用自己的目标素材和目标播放设备做第二轮测试。</div></div></section>
+<section class="col" id="features"><header class="col-head"><p class="col-kicker">04 · FEATURES → ENGINE</p><h2 class="col-title">能做什么，底层各自负责什么</h2></header><div class="col-body"><p>以下为 README 的能力范围，不是本页对功能完整度的实测评分。</p><div class="triad"><div class="mini"><span class="label">剪辑</span><h4>多轨时间线</h4><p>多层轨道、帧级裁剪与撤销/重做。先验证单轨，再测试你的多轨组合。</p></div><div class="mini"><span class="label">声音</span><h4>波形与片段音量</h4><p>peak + RMS 波形、音画同步与音量控制。不据此推断已具备专业混音全套功能。</p></div><div class="mini"><span class="label">画面</span><h4>文字、叠加、滤镜</h4><p>自定义文字样式、动画叠加、滤镜和实时画布预览；复杂效果兼容性仍需验证。</p></div></div><pre><code>React 19 / TypeScript
+  时间线 UI · 预览 Canvas · Filmstrip 缓存
+                  ↓ Tauri IPC
+Rust / FFmpeg
+  解码池（LRU 缓存）→ 帧解码 / 导出管线
+  硬件路径：VideoToolbox / D3D11VA / VAAPI</code></pre><p>React 管交互和预览界面，Tauri 连接前端与原生 Rust 核心，FFmpeg 参与媒体处理。<strong>有硬件加速路径 ≠ 每个 GPU、驱动与编码都能成功加速</strong>；卡顿时要连同机器信息和素材编码一起查。</p></div></section>
+<section class="col" id="privacy"><header class="col-head"><p class="col-kicker">05 · PERFORMANCE & PRIVACY</p><h2 class="col-title">低延迟是项目宣称，遥测是明确边界</h2></header><div class="col-body"><p>README 宣称 sub-10ms 解码并面向流畅 60 FPS 播放。本页没有安装、采样或跑性能基准；这不是对任意分辨率、编码、轨道数量和硬件组合的承诺。</p><div class="triad"><div class="mini"><h4>文档明示收集</h4><p>production 性能遥测：decode/compose 时延、P95 seek、掉帧数、OS 类别、GPU 厂商和型号。</p></div><div class="mini"><h4>项目声称不收集</h4><p>视频帧、媒体素材、工程标题、文件路径和个人身份信息。此处转述 README，未独立审计实现。</p></div><div class="mini"><h4>尚未证实</h4><p>退出开关、端点、保留期限和离线行为。本页不提供虚构的关闭选项，也不写“零遥测”。</p></div></div><p>README 还写了自适应采样：流畅播放时 1%，掉帧超过 5% 或驱动回退时 100%。不要把“本地编辑”理解成“完全不联网”。处理客户、保密或受监管素材前，先审阅 <a href="https://github.com/AIEraDev/Clypra/blob/master/docs/performance-telemetry.md">遥测说明</a> 与你的组织政策；无法接受或确认时，先不导入。</p></div></section>
+<section class="col" id="develop"><header class="col-head"><p class="col-kicker">06 · FOR DEVELOPERS</p><h2 class="col-title">用安装包试用，和从源码开发，是两条路</h2></header><div class="col-body"><p>只想剪视频：先走 Release 安装包，不必从源码编译。准备贡献代码：阅读 <a href="https://github.com/AIEraDev/Clypra/blob/master/CONTRIBUTING.md">贡献指南</a>，再沿 <a href="https://github.com/AIEraDev/Clypra/blob/master/README.md#development">Development</a> 核对环境。</p><ul class="test-list"><li><strong>源码入口：</strong>默认分支是 <code>master</code>；<code>src/</code> 为 React/TypeScript 前端，<code>src-tauri/</code> 为 Rust 原生后端。</li><li><strong>README 最低说明：</strong>Node.js 18+、Rust 1.70+、FFmpeg 6+ 及开发头文件；这不是当前依赖组合的充分兼容保证。</li><li><strong>依赖先核对：</strong>package 使用 Vite 7，实际 Node 要求可能更高；先查依赖和平台构建前提，不要盲装旧版本。</li><li><strong>开发入口：</strong><code>npm run tauri dev</code>；先完成项目依赖、原生库和 sidecar 配置。环境样例是否存在需另查，本页不教复制未经确认的文件。</li><li><strong>验证入口：</strong>package 列有 <code>npm run typecheck</code>、<code>npm test</code>；README 列有 Rust <code>cargo test</code>。命令存在不代表本页已经跑通。</li></ul><div class="note-box"><strong>版本分开看：</strong>保存的 master package 写 1.6.0；主线程 Release API 快照返回 v1.2.2。源码版本不等于正式发布版本，下载和报告问题时以所用安装包的发布标签为准。</div></div></section>
+<section class="col" id="troubleshoot"><header class="col-head"><p class="col-kicker">07 · WHEN THE FIRST TEST FAILS</p><h2 class="col-title">先缩小问题，再报一个能复现的故障</h2></header><div class="col-body"><div class="tbl-wrap"><table><thead><tr><th>现象</th><th>第一项检查</th><th>下一步</th></tr></thead><tbody><tr><td>装不上 / 打不开</td><td>系统、架构、安装包来源及安全提示</td><td>Mac Intel 不拿 aarch64 包试；签名不明先核对，不绕过安全防护。</td></tr><tr><td>导入失败 / 黑屏</td><td>文件是否完整；实际视频/音频编码，不只看扩展名</td><td>换一段已知可播放的小素材对照；仍失败，记录提示和编码信息。</td></tr><tr><td>播放卡顿 / 拖动慢</td><td>分辨率、帧率、轨道与效果数量、GPU 驱动</td><td>回到单轨无效果小样；不要用 sub-10ms 宣传值判定你的机器必然正常。</td></tr><tr><td>导出报错 / 音画异常</td><td>范围、编码器、封装格式、输出目录与空间</td><td>若可选，回到常见 H.264 输出；用外部播放器区分预览和文件问题。</td></tr></tbody></table></div><p>到 <a href="https://github.com/AIEraDev/Clypra/issues">官方 Issues</a> 报告时，附系统与 CPU/GPU、应用发布标签、素材编码/分辨率/帧率、最短复现步骤和原始错误。可共享时只用非敏感小样；提交截图和日志前，清理路径、标题等敏感信息。</p></div></section>
+<section class="col" id="sources"><header class="col-head"><p class="col-kicker">08 · BOUNDARIES & SOURCES</p><h2 class="col-title">把“开源承诺”与“可交付证明”分开</h2></header><div class="col-body"><p>“无水印、无付费墙、无订阅、无功能限制”是项目 README 的声明。本页未独立验证收费策略、安装体验或长期稳定性，也不依据推文断言十月发布频率。先做自己的导出验收，再判断是否适合正式使用。</p><p><strong>许可：</strong>保存的 LICENSE 为 MIT，可使用、修改和分发，但要保留版权与许可声明，且软件按现状提供。README 另注明 FFmpeg 依赖为 LGPL v2.1+；重新打包或分发前，需核对具体组件、构建选项和适用义务，不能只看主项目 MIT。</p><ul class="test-list"><li><a href="https://github.com/AIEraDev/Clypra">官方仓库</a> / <a href="https://github.com/AIEraDev/Clypra/blob/master/README.md">master README</a>：身份、功能、平台、架构和遥测声明。</li><li><a href="https://github.com/AIEraDev/Clypra/releases">Releases 与 Assets</a>：下载时按实际发布说明、系统和架构选择；<a href="https://github.com/AIEraDev/Clypra/releases/tag/v1.2.2">已核对资产所属发布页</a> 仅作快照来源。</li><li><a href="https://github.com/AIEraDev/Clypra/blob/master/package.json">package.json</a> / <a href="https://github.com/AIEraDev/Clypra/blob/master/LICENSE">LICENSE</a>：源码版本、依赖、脚本与许可。</li><li><a href="https://x.com/Ryrenz/status/2110205204268253419">发现这款工具的推文</a>：发现入口，不作为性能、发布频率或移动端可安装性的证明。</li></ul><p class="section-note">证据范围：读取仓库文档与主线程提供的 Release API 核对记录；未运行 Clypra。界面路径、签名、遥测实现和目标素材兼容性仍待验证。</p></div></section>
+</div><footer class="footer"><div><div class="brand">AG雷达 · 开源工具实用指南</div><div class="small">2026-10-14 · Clypra · 文档核对，非软件实测</div></div><div><a href="#start">回到第一步 ↑</a></div></footer></main></body></html>
