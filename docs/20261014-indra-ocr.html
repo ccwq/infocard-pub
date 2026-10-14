@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="sage-swiss">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-contract" content="theme/sage-swiss.html">
+<title>Indra OCR｜1M 参数本地 OCR，ONNX Runtime 免 PyTorch</title>
+<style>
+/* ============================================================
+   SAGE SWISS (theme/sage-swiss.html tokens) + progressive-doc
+   骨白纸底 + 鼠尾草绿 + 深炭绿 · 无圆角 · 1px 细线
+   ============================================================ */
+:root{
+  --bg:#F5F4EF;--paper:#FAFAF7;--ink:#1C1C1A;--green:#5F7E62;--green-deep:#3D5A42;
+  --green-soft:#E9EDE7;--muted:#6B6B63;--muted-2:#9E9E94;--line:#D4D2C9;
+  --line-strong:#B8B6AB;--fill:#ECEAE1;--dark:#1E2620;--warn:#8A5A2B;--warn-soft:#F3EADD;
+  --ink-soft:#333333;--on-dark:#FFFFFF;--card-ink:#2B2B28;--note-ink:#243528;
+  --warn-ink:#4A3319;--note-dark-ink:#E6E9E6;--code-ink:#E8EDE8;--code-com:#93B79B;
+  --code-str:#E2C58A;--code-plain:#B9C7BD;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{
+  font-family:Inter,"Helvetica Neue",Helvetica,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:13px;line-height:1.7;-webkit-font-smoothing:antialiased;
+}
+code,pre,.mono{font-family:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:var(--green-deep)}
+.page{width:min(1080px,calc(100% - 24px));margin:0 auto;padding:16px 0 40px;min-width:0}
+
+/* ---- header ---- */
+.hdr{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.hdr-brand{font:700 10.5px/1.3 "JetBrains Mono",monospace;letter-spacing:.05em;white-space:nowrap}
+.hdr-mid{text-align:center;font:600 10.5px/1.3 "JetBrains Mono",monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.hdr-mid .rid{display:block;font-weight:400;color:var(--muted-2);margin-top:2px}
+.badge-live{font:700 11px/1 "JetBrains Mono",monospace;letter-spacing:.08em;color:var(--green-deep);border:1px solid var(--green-deep);padding:5px 11px;white-space:nowrap}
+
+/* ---- hero ---- */
+.hero{margin-top:16px;border:1px solid var(--line);background:var(--paper)}
+.hero-ref{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--line-strong)}
+.hero-ref-cell{padding:9px 13px;font:500 10px/1.4 "JetBrains Mono",monospace;color:var(--muted)}
+.hero-ref-cell:not(:last-child){border-right:1px solid var(--line)}
+.hero-ref-cell .lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);display:block}
+.hero-ref-cell .val{color:var(--ink);font-weight:600;margin-top:1px;overflow-wrap:anywhere}
+.hero-body{padding:15px 16px;border-bottom:1px solid var(--line)}
+.hero-title{font:800 23px/1.18 Inter,sans-serif;letter-spacing:-.02em;margin-bottom:7px}
+.hero-title em{font-style:normal;color:var(--green)}
+.hero-meta{display:flex;gap:10px;flex-wrap:wrap;font:500 10.5px/1.6 "JetBrains Mono",monospace;color:var(--muted);margin-bottom:10px;align-items:center}
+.tag{background:var(--green-soft);color:var(--green-deep);padding:2px 7px;font-weight:600;letter-spacing:.04em}
+.tag.plain{background:var(--fill);color:var(--muted)}
+.hero-summary{font-size:13px;line-height:1.75;color:var(--ink-soft);max-width:none}
+.hero-summary code{font-size:12px;background:var(--fill);padding:1px 4px}
+
+/* ---- stats ---- */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-top:none;background:var(--paper)}
+.stat{padding:10px 13px;border-right:1px solid var(--line);text-align:center;min-width:0}
+.stat:last-child{border-right:none}
+.stat-num{display:block;font:800 21px/1 "JetBrains Mono",monospace;color:var(--green-deep);overflow-wrap:anywhere}
+.stat-lbl{display:block;font:500 9px/1.3 "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-top:4px}
+
+/* ---- sections ---- */
+.sec{margin-top:26px;border-top:1px solid var(--line-strong);padding-top:16px}
+.sec-head{display:grid;grid-template-columns:52px minmax(0,1fr);gap:14px;align-items:start;margin-bottom:13px}
+.sec-no{width:52px;height:52px;display:grid;place-items:center;border:1px solid var(--green-deep);background:var(--green-deep);color:var(--on-dark);font:800 16px/1 "JetBrains Mono",monospace}
+.sec-no.alt{background:var(--paper);color:var(--green-deep)}
+.sec-label{font:700 9.5px/1 "JetBrains Mono",monospace;letter-spacing:.11em;text-transform:uppercase;color:var(--green);margin-bottom:5px}
+.sec h2{font:800 21px/1.25 Inter,sans-serif;letter-spacing:-.015em;margin-bottom:5px}
+.sec-intro{margin:0;color:var(--muted);font-size:12.5px;line-height:1.75;max-width:none}
+.sec-intro code{font-size:11.5px;background:var(--fill);padding:1px 4px}
+
+/* ---- grids ---- */
+.grid{display:grid;gap:0;min-width:0}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-top:none;background:var(--paper)}
+.main-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;min-width:0}
+.analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;min-width:0}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.gap{gap:12px}
+.card{background:var(--paper);border:1px solid var(--line);padding:13px 14px;min-width:0}
+.card.g-b{background:var(--green-soft);border-color:var(--green)}
+.card.g-w{background:var(--warn-soft);border-color:var(--line-strong)}
+.card h3{font:700 14px/1.35 Inter,sans-serif;margin-bottom:6px}
+.card h3 .n{font:700 11px "JetBrains Mono",monospace;color:var(--green);margin-right:6px}
+.card p{color:var(--card-ink);font-size:12.5px;line-height:1.75}
+.card p+p{margin-top:6px}
+.card code,.card li code{font-size:11.5px;background:var(--fill);padding:1px 4px}
+.card ul{margin:6px 0 0;padding-left:17px}
+.card li{font-size:12.5px;line-height:1.7;color:var(--card-ink);margin-bottom:3px}
+.card .kb{font:700 9.5px/1 "JetBrains Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);margin-bottom:5px;display:block}
+.card .src-note{display:block;margin-top:7px;font:500 10px/1.5 "JetBrains Mono",monospace;color:var(--muted-2)}
+
+/* ---- flow / steps ---- */
+.flow{background:var(--paper);border:1px solid var(--line);padding:12px 14px}
+.flow-item{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;line-height:1.65}
+.flow-item:last-child{border-bottom:none;padding-bottom:0}
+.flow-item:first-child{padding-top:0}
+.flow-n{font:700 9.5px "JetBrains Mono",monospace;color:var(--on-dark);background:var(--green-deep);width:16px;height:16px;display:grid;place-items:center;flex-shrink:0;margin-top:2px}
+.flow-item strong{font-weight:700}
+
+/* ---- code ---- */
+.code-wrap{border:1px solid var(--line-strong);background:var(--dark);padding:11px 13px;overflow-x:auto;max-width:100%}
+.code-wrap pre{margin:0;color:var(--code-ink);font:12px/1.75 "JetBrains Mono",SFMono-Regular,Menlo,Consolas,monospace;white-space:pre}
+.code-wrap .c{color:var(--code-com)}
+.code-wrap .s{color:var(--code-str)}
+.code-wrap .p{color:var(--code-plain)}
+.code-cap{font:500 10px/1.5 "JetBrains Mono",monospace;color:var(--muted-2);margin-top:5px}
+code.inline{font-size:11.5px;background:var(--fill);padding:1px 4px;overflow-wrap:anywhere}
+
+/* ---- tables (局部横滚) ---- */
+.tbl-wrap{border:1px solid var(--line);background:var(--paper);max-width:100%;overflow-x:auto;min-width:0}
+.tbl-wrap table{width:100%;min-width:640px;border-collapse:collapse;font-size:12px}
+.tbl-wrap th,.tbl-wrap td{padding:8px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;vertical-align:top}
+.tbl-wrap th{background:var(--fill);font:700 9.5px/1.35 "JetBrains Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.tbl-wrap tr:last-child td{border-bottom:none}
+.tbl-wrap th:last-child,.tbl-wrap td:last-child{border-right:none}
+.tbl-wrap td.n{font-family:"JetBrains Mono",monospace;font-weight:700;white-space:nowrap;color:var(--green-deep)}
+.tbl-wrap td.dim{color:var(--muted)}
+.tbl-wrap tr.hl td{background:var(--green-soft)}
+.tbl-note{font:500 10px/1.6 "JetBrains Mono",monospace;color:var(--muted-2);margin-top:6px}
+
+/* ---- callouts ---- */
+.note{border-left:3px solid var(--green);background:var(--green-soft);padding:11px 13px;font-size:12.5px;line-height:1.75;color:var(--note-ink)}
+.note b,.note strong{color:var(--green-deep)}
+.note.warn{border-left-color:var(--warn);background:var(--warn-soft);color:var(--warn-ink)}
+.note.warn strong{color:var(--warn)}
+.note.dark{border-left-color:var(--dark);background:var(--dark);color:var(--note-dark-ink)}
+.note.dark strong{color:var(--on-dark)}
+.note+.note{margin-top:9px}
+.untested{display:inline-block;font:700 9px/1 "JetBrains Mono",monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--warn);border:1px solid var(--warn);padding:2px 5px;vertical-align:2px}
+
+/* ---- source bar / footer ---- */
+.src-bar{border:1px solid var(--line);border-top:none;background:var(--fill);padding:8px 13px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font:500 9.5px "JetBrains Mono",monospace;color:var(--muted)}
+.src-bar .sb{display:flex;align-items:center;gap:5px}
+.src-bar .sb-lbl{color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase}
+.src-bar .sb-val{color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+.src-bar .sep{flex:1}
+.foot{margin-top:10px;padding:8px 0;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font:500 9.5px "JetBrains Mono",monospace;color:var(--muted-2)}
+.foot a{color:var(--green-deep);font-weight:600}
+
+/* ---- 响应式：<=720px 单列，表格/pre 局部横滚 ---- */
+@media(max-width:720px){
+  .stats-row,.main-grid,.analysis-grid{grid-template-columns:minmax(0,1fr)}
+  .hdr{grid-template-columns:auto 1fr}
+  .hdr-mid{display:none}
+  .hero-ref{grid-template-columns:1fr}
+  .hero-ref-cell{border-right:none;border-bottom:1px solid var(--line)}
+  .hero-ref-cell:last-child{border-bottom:none}
+  .hero-title{font-size:20px}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .stat:nth-child(2){border-right:none}
+  .stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid var(--line)}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .sec-head{grid-template-columns:40px minmax(0,1fr);gap:10px}
+  .sec-no{width:40px;height:40px;font-size:13px}
+  .sec h2{font-size:18px}
+  .tbl-wrap table{min-width:560px;font-size:11.5px}
+  .tbl-wrap th,.tbl-wrap td{padding:7px 8px}
+  .code-wrap pre{font-size:11.5px}
+  .page{width:calc(100% - 16px);padding-top:11px}
+  .sec{margin-top:20px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+<!-- ============ HEADER ============ -->
+<div class="hdr">
+  <div class="hdr-brand">AG 雷达</div>
+  <div class="hdr-mid">INDRA OCR · 官方仓库与模型
+    <span class="rid">REF INDRA-OCR-20261014</span>
+  </div>
+  <div class="badge-live">2026-10-13 发布</div>
+</div>
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-ref">
+    <div class="hero-ref-cell"><span class="lbl">Source</span><span class="val">github.com/datalab-to/indra</span></div>
+    <div class="hero-ref-cell"><span class="lbl">Model</span><span class="val">huggingface.co/datalab-to/indra-ocr</span></div>
+    <div class="hero-ref-cell"><span class="lbl">Author</span><span class="val">Datalab（Vik Paruchuri）</span></div>
+  </div>
+  <div class="hero-body">
+    <h1 class="hero-title">Indra OCR：<em>1M 参数</em>的本地 PDF 解析器</h1>
+    <div class="hero-meta">
+      <span class="tag">ONNX Runtime</span>
+      <span class="tag">Python 3.10+</span>
+      <span class="tag">Apache-2.0（代码）</span>
+      <span class="tag plain">权重 OpenRAIL-M 限制</span>
+      <span>142 ★ / 10 forks</span>
+    </div>
+    <p class="hero-summary">
+      识别模型 <code>rec.onnx</code> 约 100 万参数，模型文件合计约 18MB，用 ONNX Runtime 跑，<strong>不装 PyTorch</strong>。输出 markdown / text / json 三种格式，json 里带每行 box、版块 label、阅读顺序和每页 source。适合把扫描件和数字 PDF 批量转成结构化文本的开发者。星数只是发布一天的快照，不代表质量。
+    </p>
+  </div>
+</div>
+
+<!-- ============ STATS ============ -->
+<div class="stats-row">
+  <div class="stat"><span class="stat-num">~1M</span><span class="stat-lbl">识别模型参数</span></div>
+  <div class="stat"><span class="stat-num">18MB</span><span class="stat-lbl">模型合计体积</span></div>
+  <div class="stat"><span class="stat-num">49.4</span><span class="stat-lbl">页/秒（32 核 OCR）</span></div>
+  <div class="stat"><span class="stat-num">3</span><span class="stat-lbl">输出格式</span></div>
+</div>
+
+<!-- ============ 01 首屏 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no">01</div>
+    <div>
+      <div class="sec-label">它是什么 · 适合谁 · 第一步</div>
+      <h2>先搞清三件事，再决定装不装</h2>
+      <p class="sec-intro">下面全部口径来自官方 README 与官方博客（datalab.to，2026-10-13），数字按原文照抄。凡是本轮没有实机验证的，文里都标了标记。</p>
+    </div>
+  </div>
+  <div class="grid g3 gap">
+    <article class="card">
+      <span class="kb">它是什么</span>
+      <h3>本地 PDF → 结构化文本</h3>
+      <p>一个 Python 包加一个 CLI。读 PDF，逐页出 markdown、纯文本或 json。json 每个页面一个对象，含每行的 box/text/confidence、版块 label + bbox + text、阅读顺序、source 字段、rotation/skew 和 timings。</p>
+      <span class="src-note">来源：官方 README 输出格式段</span>
+    </article>
+    <article class="card">
+      <span class="kb">适合谁</span>
+      <h3>要自建 PDF 解析管线的人</h3>
+      <ul>
+        <li>本地跑、不想把文件传出去的团队</li>
+        <li>文档量大、需要多核并行（<code>--cores N</code>）</li>
+        <li>要版块标签和阅读顺序做下游 RAG 或索引</li>
+        <li>接受复杂表格、手写会出错的场景</li>
+      </ul>
+      <span class="src-note">判断为作者观点，非官方定位</span>
+    </article>
+    <article class="card g-b">
+      <span class="kb">第一步</span>
+      <h3>装包，跑一个单文件</h3>
+      <p><code>pip install indra-ocr</code>，然后 <code>indra-ocr paper.pdf</code>，markdown 直接打到 stdout。首次运行会从 Hugging Face 下载约 18MB 模型并缓存，之后离线可用。</p>
+      <span class="src-note">来源：官方 README 安装与 CLI 段</span>
+    </article>
+  </div>
+</section>
+
+<!-- ============ 02 安装 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no alt">02</div>
+    <div>
+      <div class="sec-label">安装与首次运行</div>
+      <h2>模型从哪来、缓存在哪、怎么指定本地目录</h2>
+    </div>
+  </div>
+  <div class="analysis-grid grid gap">
+    <article class="card">
+      <span class="kb">依赖</span>
+      <h3>Python 3.10+，不依赖 PyTorch</h3>
+      <p>安装 <code>indra-ocr</code>，依赖 ONNX Runtime、OpenCV、pypdfium2。运行时用 ONNX Runtime，没有 torch / torchvision。</p>
+      <p>推文说“18MB”，指模型体积，不是安装体积——依赖装完实际占用远大于此。</p>
+      <span class="src-note">来源：官方 README；安装体积为未实测项</span>
+    </article>
+    <article class="card">
+      <span class="kb">模型缓存</span>
+      <h3>首次联网下载，之后本地</h3>
+      <p>首次运行从 Hugging Face 拉约 18MB 模型并缓存。离线环境可用 <code>INDRA_OCR_MODEL_DIR</code> 指定本地模型目录，CLI 也有对应 <code>--model-dir</code>。</p>
+      <p>看模型本身：<code>huggingface.co/datalab-to/indra-ocr</code>。</p>
+      <span class="src-note">来源：官方 README 模型段</span>
+    </article>
+  </div>
+</section>
+
+<!-- ============ 03 最小命令 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no">03</div>
+    <div>
+      <div class="sec-label">最小可用命令</div>
+      <h2>两条命令：批量出 markdown，单文件出 json</h2>
+      <p class="sec-intro">先把输出拿全，再调开关。json 里的版块和阅读顺序是这张卡最有价值的部分。</p>
+    </div>
+  </div>
+  <div class="grid g2 gap">
+    <div>
+      <div class="code-wrap"><pre><span class="c"># 批量：*.pdf 每个文件一份 md，落 results/，占满全部核心</span>
+indra-ocr *.pdf --out results/
+
+<span class="c"># 单文件：json，含 box / 版块 / 阅读顺序</span>
+indra-ocr paper.pdf --format json --out results/</pre></div>
+      <p class="code-cap">命令形式来自官方 README。通配符由 shell 展开，一个输入文件对应一个 worker 进程。</p>
+    </div>
+    <div>
+      <div class="code-wrap"><pre><span class="c"># 输出有三种</span>
+--format markdown   <span class="c"># 默认</span>
+--format text
+--format json
+
+<span class="c"># 打一个 json 对象（节选字段名）</span>
+{
+  <span class="p">"pages"</span>: [{
+    <span class="p">"markdown"</span>: <span class="s">"..."</span>,
+    <span class="p">"blocks"</span>: [{ <span class="p">"label"</span>: <span class="s">"Table"</span>, <span class="p">"bbox"</span>: [...], <span class="p">"text"</span>: <span class="s">"..."</span> }],
+    <span class="p">"lines"</span>:   [{ <span class="p">"box"</span>: [...], <span class="p">"text"</span>: <span class="s">"..."</span>, <span class="p">"confidence"</span>: 0.98 }],
+    <span class="p">"reading_order"</span>: [...],
+    <span class="p">"source"</span>: <span class="s">"hybrid"</span>,   <span class="c">// text|ocr|hybrid|error</span>
+    <span class="p">"rotation"</span>: 0, <span class="p">"skew"</span>: 0.3,
+    <span class="p">"timings"</span>: {...}
+  }]
+}</pre></div>
+      <p class="code-cap">版块 label 全集：Text、Section-Header、Page-Header、Page-Footer、List-Group、Table、Caption、Footnote、Table-Of-Contents、Form。</p>
+    </div>
+  </div>
+  <div class="note" style="margin-top:12px">
+    <strong>source 字段是最省事的排错依据。</strong> <code>text</code> 表示这页直接用了 PDF 文本层，<code>ocr</code> 表示整页走识别，<code>hybrid</code> 表示只 OCR 缺失部分，<code>error</code> 表示这页失败。做数据质量抽样时先按这个字段分组，比逐页人眼看快得多。（来源：官方 README json 输出说明）
+  </div>
+</section>
+
+<!-- ============ 04 CLI 开关 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no alt">04</div>
+    <div>
+      <div class="sec-label">CLI 关键开关</div>
+      <h2>真正影响结果的是这几个</h2>
+      <p class="sec-intro">其余开关（<code>--no-image-ocr</code>、<code>--model-order</code>、<code>--timings</code>）不影响识别质量，按需用。表格可横向滚动。</p>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>开关</th><th>默认</th><th>作用与代价</th></tr></thead>
+      <tbody>
+        <tr class="hl"><td class="n">--mode</td><td class="n">auto</td><td>auto：有文本层就读层、只 OCR 缺失部分；文本层检查失败时也照样用它。ocr：完全不看文本层，全页识别。text：只抽文本层，不识别。混合语料（扫描件+数字 PDF）保持 auto。</td></tr>
+        <tr><td class="n">--cores</td><td class="n">全核</td><td>每个核一个 worker 进程。<code>indra-ocr *.pdf</code> 传多个文件时本就占满核心；单文件想并行要靠这个。</td></tr>
+        <tr><td class="n">--dpi</td><td class="n">200</td><td>渲染 dpi。超过 100 兆像素的页会被降 dpi 渲染，小字可能丢（见第 09 节）。</td></tr>
+        <tr><td class="n">--keep-furniture</td><td class="n">丢</td><td>默认丢掉页眉页脚。补录正文里的重复行、或页眉本身有信息时才加。</td></tr>
+        <tr><td class="n">--math</td><td class="n">关</td><td>默认公式只出纯文本；开则出行内 LaTeX，更慢。文本分从 41.3 升到 57.5，就是靠它。</td></tr>
+        <tr><td class="n">--max-pages</td><td class="n">不限</td><td>只处理前 N 页，试跑时用它控成本。</td></tr>
+        <tr><td class="n">--password</td><td class="n">无</td><td>加密 PDF 的口令。</td></tr>
+        <tr><td class="n">--model-dir</td><td class="n">缓存</td><td>本地模型目录，等价于 <code>INDRA_OCR_MODEL_DIR</code>。离线部署用。</td></tr>
+        <tr><td class="n">--timings</td><td class="n">关</td><td>耗时打到 stderr，不污染输出文件。</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">以上默认值与语义来自官方 README CLI 段。读不了的文件会被跳过；只要有一个文件失败，退出码为 1——批处理脚本里别只看 stdout 有没有内容。</p>
+</section>
+
+<!-- ============ 05 Python API ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no">05</div>
+    <div>
+      <div class="sec-label">Python API 与批量</div>
+      <h2>convert_many 少了那行保护会退化成单进程</h2>
+      <p class="sec-intro">批量 API 用多进程，坑在 <code>__main__</code> 保护上：macOS 和 Windows 缺这行会警告并单进程跑完全部文件。</p>
+    </div>
+  </div>
+  <div class="grid g2 gap">
+    <div>
+      <div class="code-wrap"><pre><span class="c"># 批量：每核一个单线程 worker，按输入顺序返回</span>
+<span class="p">import</span> indra_ocr
+
+<span class="p">if</span> __name__ == <span class="s">"__main__"</span>:          <span class="c"># macOS/Windows 必需</span>
+    pages = indra_ocr.convert_many(
+        [<span class="s">"a.pdf"</span>, <span class="s">"b.pdf"</span>, <span class="s">"c.pdf"</span>],
+        cores=<span class="p">None</span>,          <span class="c"># None = 每核一个 worker</span>
+    )</pre></div>
+      <p class="code-cap">来源：官方 README Python API 段</p>
+    </div>
+    <div>
+      <div class="code-wrap"><pre><span class="c"># 单文件逐页产出</span>
+conv = indra_ocr.load(threads=<span class="p">4</span>, mode=<span class="s">"auto"</span>)
+
+<span class="p">for</span> page <span class="p">in</span> conv.convert(<span class="s">"paper.pdf"</span>):
+    page.markdown   <span class="c"># 该页 markdown</span>
+    page.blocks     <span class="c"># 版块</span>
+    page.lines      <span class="c"># 行</span>
+
+<span class="c"># 不可读文件按异常类型判断，不要静默吞掉</span>
+<span class="p">from</span> indra_ocr <span class="p">import</span> INDRA_OCR_INPUT_ERROR
+<span class="p">try</span>:
+    ...
+<span class="p">except</span> INDRA_OCR_INPUT_ERROR <span class="p">as</span> e:
+    <span class="p">print</span>(<span class="s">"bad input:"</span>, e)</pre></div>
+      <p class="code-cap">来源：官方 README Python API 段</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 查看器 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no alt">06</div>
+    <div>
+      <div class="sec-label">本地查看器</div>
+      <h2>indra-ocr-viewer：文件不出本机</h2>
+      <p class="sec-intro">调参阶段比读 json 文本快得多。默认 <code>http://localhost:8765</code>，页面全在本机，文件不上传。</p>
+    </div>
+  </div>
+  <div class="grid g3 gap">
+    <article class="card">
+      <span class="kb">能干什么</span>
+      <h3>逐项叠加</h3>
+      <p>在原页上叠加识别出的行、版块、阅读顺序，能直接看出哪一块串行了、哪一块顺序错了。</p>
+    </article>
+    <article class="card">
+      <span class="kb">对照</span>
+      <h3>和 Tesseract 并排比</h3>
+      <p><code>--tesseract</code> 可以切出管道选项做对照。需要额外装 <code>pytesseract</code> 和 Tesseract 本体。</p>
+      <span class="src-note">本轮未安装，未实测</span>
+    </article>
+    <article class="card">
+      <span class="kb">远程机</span>
+      <h3>SSH 端口转发</h3>
+      <div class="code-wrap" style="margin-top:2px"><pre>ssh -N -L 8765:localhost:8765 host</pre></div>
+      <p style="margin-top:6px">本地开 8765 就能看到远端的查看器。</p>
+    </article>
+  </div>
+</section>
+
+<!-- ============ 07 速度 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no">07</div>
+    <div>
+      <div class="sec-label">速度基准</div>
+      <h2>官方自测的四核到三十二核</h2>
+      <p class="sec-intro">口径必须一起读：AMD EPYC x86、无 GPU、OCR 模式、300 页 OmniParseBench；模型加载和每个 worker 的首页预热<b>不计入</b>时间。</p>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>引擎</th><th>4 核</th><th>8 核</th><th>16 核</th><th>32 核</th><th>备注</th></tr></thead>
+      <tbody>
+        <tr class="hl"><td>Indra OCR</td><td class="n">7.3</td><td class="n">14.2</td><td class="n">27.2</td><td class="n">49.4</td><td>页/秒，OCR 模式</td></tr>
+        <tr><td>PaddleOCR PP-OCRv6 small<span class="dim">（RapidOCR）</span></td><td class="n">0.65</td><td class="n">1.24</td><td class="n">2.42</td><td class="n">4.28</td><td>只出行，不出版块与表格</td></tr>
+        <tr><td>Tesseract 5</td><td class="n">0.78</td><td class="n">1.37</td><td class="n">2.27</td><td class="n">2.92</td><td>只出行</td></tr>
+        <tr><td>PP-StructureV3</td><td class="n">≤0.022</td><td class="n">≤0.044</td><td class="n">≤0.089</td><td class="n">≤0.18</td><td>时间封顶子集，为<b>上界</b>；实际更低</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">单位：页/秒。数据来自官方博客自建基准，本轮未实测。</p>
+  <div class="main-grid grid gap" style="margin-top:12px">
+    <div class="note">
+      <strong>倍数怎么来的。</strong> 32 核时，Indra 是 PP-OCR 文本模型的 11.5 倍、Tesseract 5 的 16.9 倍、约 280 倍 PP-StructureV3（后者是封顶上界，倍数只会更大不会更小）。四个对比对象里只有两个产出完整文档结构。
+    </div>
+    <div class="note">
+      <strong>更贴近生产的两个数。</strong> 单页延迟约 230ms（4 vCPU）；含模型加载的 300 页短任务，32 核跑到 37.7 页/秒。开 <code>--math</code> 后 32 核约 30 页/秒，4 核从 6.8 掉到 4.8、32 核从 44.9 掉到 29.2，低 30–35%。带文本层的数字 PDF 页中位 130ms，需要 OCR 的页 304ms。
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 准确率 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no alt">08</div>
+    <div>
+      <div class="sec-label">准确率怎么读</div>
+      <h2>62.1 这个数，藏着一个取舍</h2>
+      <p class="sec-intro">OmniParseBench，16288 项 pass/fail、2937 页。headline 是 text、tables、layout 三项的<b>均值</b>，不是单一文本分。</p>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>系统</th><th>headline</th><th>text</th><th>tables</th><th>layout</th><th>每页耗时</th></tr></thead>
+      <tbody>
+        <tr class="hl"><td>Indra 默认</td><td class="n">62.1</td><td class="n">41.3</td><td class="n">56.4</td><td class="n">88.6</td><td class="n">228ms</td></tr>
+        <tr class="hl"><td>Indra --math</td><td class="n">66.8</td><td class="n">57.5</td><td class="n">54.8</td><td class="n">88.1</td><td class="n dim">更慢</td></tr>
+        <tr><td>PaddleOCR PP-StructureV3</td><td class="n">58.4</td><td class="n">55.6</td><td class="n">47.8</td><td class="n">71.7</td><td class="n">40958ms</td></tr>
+        <tr><td>PP-OCR 文本模型</td><td class="n dim">—</td><td class="n">35.8</td><td class="n dim">—</td><td class="n dim">—</td><td class="n dim">—</td></tr>
+        <tr><td>Tesseract 5</td><td class="n dim">—</td><td class="n">19.3</td><td class="n dim">—</td><td class="n dim">—</td><td class="n dim">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">数据来自官方博客准确率段，本轮未实测。“—”表示该项不产出或官方未列。</p>
+  <div class="grid g2 gap" style="margin-top:12px">
+    <div class="note warn">
+      <strong>关键取舍。</strong> 默认模式的 text 分 41.3，<b>低于</b> PP-StructureV3 的 55.6——纯文本召回上打不过它。开了 <code>--math</code> 才有 57.5，反超。表格分 56.4 对 47.8、layout 88.6 对 71.7 才是它领先的地方。选型时先看你下游更在意文本准确还是表格/版块结构。
+    </div>
+    <article class="card">
+      <span class="kb">中文子集（136 项）</span>
+      <h3>纯中文排版，PP-StructureV3 仍领先</h3>
+      <p>Indra 64.7，PP-OCRv5 mobile 中文 65.4，PP-StructureV3 68.4。三家差距在 4 分以内，中文专用场景下 Indra 没有优势。</p>
+      <span class="src-note">来源：官方博客；小样本，136 项</span>
+    </article>
+  </div>
+  <div class="grid g2 gap" style="margin-top:12px">
+    <div class="tbl-wrap">
+      <table style="min-width:430px">
+        <thead><tr><th>olmOCR-bench</th><th>Indra</th><th>对比方</th></tr></thead>
+        <tbody>
+          <tr class="hl"><td>headers_footers</td><td class="n">91.2</td><td class="n dim">35.5</td></tr>
+          <tr><td>multi_column</td><td class="n">70.0</td><td class="n dim">70.4</td></tr>
+          <tr><td>long_tiny_text</td><td class="n">67.9</td><td class="n dim">64.0</td></tr>
+          <tr><td>table_tests</td><td class="n">60.5</td><td class="n dim">1.0</td></tr>
+          <tr><td>old_scans</td><td class="n">20.0</td><td class="n dim">18.4</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note dark">
+      <strong>多栏排版是个弱点。</strong> multi_column 70.0 对 70.4，落后。靠版块表头和页脚剥离拿到的巨大优势（headers_footers 91.2 对 35.5）来自默认丢 furniture，正文里重复出现的固定行会因此被误丢。双栏期刊论文要当心。<br><br>
+      old_scans 只有 20.0，两边都在 20 上下——退化扫描件谁都不行（见第 09 节）。
+    </div>
+  </div>
+</section>
+
+<!-- ============ 09 不该用 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no">09</div>
+    <div>
+      <div class="sec-label">什么时候不该用</div>
+      <h2>官方自己列的限制，照抄</h2>
+      <p class="sec-intro">下面每条都对应官方 README / 博客限制段。中途碰到这些再回来看一眼，比调参数省时间。</p>
+    </div>
+  </div>
+  <div class="grid g3 gap">
+    <article class="card g-w"><span class="kb">表格</span><h3>复杂表格会行列错位</h3><p>合并单元格、跨行单元格、多级表头、无框线表格都可能错。规整的网格表没问题。</p></article>
+    <article class="card g-w"><span class="kb">手写</span><h3>不支持</h3><p>OmniParseBench 上手写体约 8%。手写稿直接排除。</p></article>
+    <article class="card g-w"><span class="kb">公式</span><h3>默认纯文本</h3><p>默认不出 LaTeX，要 <code>--math</code>。旧扫描件里的公式仍难（22.2 → 23.1，几乎没动）。</p></article>
+    <article class="card g-w"><span class="kb">文种</span><h3>扫描件上非支持文种会认错</h3><p>见第 10 节的 OCR / 仅文本层分界。例：韩文扫描件会认成错误汉字。</p></article>
+    <article class="card g-w"><span class="kb">扫描质量</span><h3>退化件约 20%</h3><p>老、褪色、低分辨率的扫描件正确率只有两成。</p></article>
+    <article class="card g-w"><span class="kb">排版</span><h3>竖排不支持</h3><p>竖排文本不处理。方向模型还会把约一半竖直的阿拉伯 / 希伯来页面误转。</p></article>
+    <article class="card g-w"><span class="kb">版面</span><h3>极宽页与工程图</h3><p>极宽横幅页读得差。工程图内部标签常被当成小表格处理。</p></article>
+    <article class="card g-w"><span class="kb">超大页</span><h3>200dpi 下超过 100 兆像素</h3><p>会以降 dpi 渲染，小字可能丢。超大图纸/海报要么先切分，要么降 dpi 前先评估。</p></article>
+    <article class="card"><span class="kb">兜底</span><h3>官方托管平台</h3><p>官方平台跑他们的 Chandra 模型处理手写、数学、复杂表格、退化扫描，zero data retention、SOC 2 Type 2；批量服务称每天 10 亿+ 页。<span class="untested">商业选项 · 未实测</span></p></article>
+  </div>
+</section>
+
+<!-- ============ 10 语言 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no alt">10</div>
+    <div>
+      <div class="sec-label">语言支持的真实边界</div>
+      <h2>“支持 50 种语言”和“扫描件只认这些”，是两件事</h2>
+      <p class="sec-intro">最容易踩的坑：官方列了两组语言，一组是真能识别，一组只是能从数字 PDF 里抽文本层。</p>
+    </div>
+  </div>
+  <div class="grid g2 gap">
+    <article class="card g-b">
+      <span class="kb">OCR 识别（扫描件 / 图片）</span>
+      <h3>拉丁约 50 种 + 少量其他</h3>
+      <p>Latin 约 50 种、Cyrillic、Greek、Devanagari、Bengali、中文简体与繁体。含汉字的行走中文识别器在这一组里。</p>
+      <p>RTL（阿拉伯、希伯来）行内保序。</p>
+      <span class="src-note">来源：官方 README 语言段</span>
+    </article>
+    <article class="card g-w">
+      <span class="kb">仅文本层（数字 PDF）</span>
+      <h3>这些文种只靠文本层活着</h3>
+      <p>阿拉伯、希伯来、波斯、泰、柬、老、缅、高棉、亚美尼亚、埃塞、印地系、中日韩——只依赖数字 PDF 的文本层，<b>不进 OCR 识别列表</b>。扫描件上会认错。</p>
+      <p>文本层模式本身支持任意文字系统。官方在 75 个语言家族的 1125 页上测过，通过检查的页面保留至少 98% 文本层字符。</p>
+      <span class="src-note">来源：官方 README 语言段与评测说明</span>
+    </article>
+  </div>
+  <div class="note" style="margin-top:12px">
+    <strong>对你意味着什么。</strong> 中文文档如果同时有数字 PDF 和扫描件，要分开设预期：数字 PDF 走文本层、几乎不会错；扫描件里汉字没问题，但日文、韩文一旦是扫描件就不可靠。这条直接决定 <code>--mode</code> 怎么设（混合格式保持 auto）。
+  </div>
+</section>
+
+<!-- ============ 11 许可 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no">11</div>
+    <div>
+      <div class="sec-label">许可与商业化</div>
+      <h2>代码和权重是两套许可</h2>
+      <p class="sec-intro">这是最容易写错的一项：代码 Apache-2.0 不代表模型权重可以随意商用。</p>
+    </div>
+  </div>
+  <div class="grid g2 gap">
+    <article class="card">
+      <span class="kb">代码</span>
+      <h3>Apache 2.0</h3>
+      <p>仓库 <code>github.com/datalab-to/indra</code> 为 Apache-2.0，默认分支 main，主体语言 Python。</p>
+    </article>
+    <article class="card g-w">
+      <span class="kb">模型权重</span>
+      <h3>OpenRAIL-M 限制版</h3>
+      <p>权重是修改版 OpenRAIL-M：可免费用于研究、个人使用，以及融资 / 营收 2000 万美元以下的初创；<b>不可</b>用来与官方 API 做竞争性使用。要去掉限制或拿到更宽的商业授权，得看官方定价页。</p>
+      <p style="font-weight:700">“完全免费商用”不成立。</p>
+      <span class="src-note">来源：官方仓库许可说明</span>
+    </article>
+  </div>
+  <div class="note warn" style="margin-top:12px">
+    <strong>仓库快照（2026-10-14 查询 GitHub API）：</strong> stars 142，forks 10，Apache-2.0，created 2026-10-13，默认分支 main，Python。项目发布一天，star 数只当时间快照用，不作为质量指标。
+  </div>
+</section>
+
+<!-- ============ 12 试做建议 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no alt">12</div>
+    <div>
+      <div class="sec-label">上手建议</div>
+      <h2>拿自己 20–50 页先跑一轮</h2>
+      <p class="sec-intro">这是作者建议的操作路径，不是官方推荐，也不是实测结论。</p>
+    </div>
+  </div>
+  <div class="flow">
+    <div class="flow-item"><span class="flow-n">1</span><div><strong>选 20–50 页自己的 PDF。</strong> 要含一份扫描件和一份数字 PDF，混着才能测出 <code>--mode auto</code> 的真实行为。</div></div>
+    <div class="flow-item"><span class="flow-n">2</span><div><strong>先只出 markdown。</strong> <code>indra-ocr paper.pdf</code>，看整体可读性和版块顺序对不对。</div></div>
+    <div class="flow-item"><span class="flow-n">3</span><div><strong>再出一次 json。</strong> <code>--format json</code>，重点看两件事：表格的 bbox 和行列有没有错位，<code>reading_order</code> 在多栏页上对不对。</div></div>
+    <div class="flow-item"><span class="flow-n">4</span><div><strong>开 <code>indra-ocr-viewer</code> 对照原页看。</strong> 逐块叠加行、版块、阅读顺序，比在 json 里翻快。</div></div>
+    <div class="flow-item"><span class="flow-n">5</span><div><strong>公式多就加 <code>--math</code> 重跑对比。</strong> 接受 30–35% 的速度损失换 text 分从 41.3 到 57.5。</div></div>
+  </div>
+</section>
+
+<!-- ============ 13 推文口径 ============ -->
+<section class="sec">
+  <div class="sec-head">
+    <div class="sec-no">13</div>
+    <div>
+      <div class="sec-label">来源核对</div>
+      <h2>推文转述里需要打折的三处</h2>
+      <p class="sec-intro">转述源为程序员鱼皮 X 帖（<code>x.com/yupi996/status/2110334301367845184</code>）。下面按官方一手材料逐条校正，避免照搬二手结论。</p>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>推文说法</th><th>官方口径</th><th>怎么理解</th></tr></thead>
+      <tbody>
+        <tr><td>“每秒 49 页，是 PaddleOCR 的 11 倍”</td><td>49.4 页/秒；32 核 OCR 模式</td><td>成立，但有三重限定：32 核、纯 OCR 模式、对比对象是 PP-OCR 文本模型——后者只出行，不出版块和表格。换成完整流水线 PP-StructureV3，比的是准确率不是这个倍数。</td></tr>
+        <tr><td>“18MB”</td><td>模型合计约 18MB</td><td>是模型体积，不是安装体积。依赖 ONNX Runtime、OpenCV、pypdfium2。</td></tr>
+        <tr><td>“手写和复杂表格认不好”</td><td>与官方限制一致</td><td>这条转述准确，见第 09 节。</td></tr>
+        <tr><td>“M2 Max 150 页 9 秒、1025 个汉字全对”</td><td>官方无此基准</td><td>作者自测，只能当第三方观察；官方未给 M 系列基准，本文不替他推算原因。</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tbl-note">未采用 wmzhe / agihunt / hn 等第三方转载作为基准来源——那些都是二手转述。</p>
+</section>
+
+<!-- ============ SOURCE BAR ============ -->
+<div class="src-bar">
+  <div class="sb"><span class="sb-lbl">code</span><span class="sb-val">github.com/datalab-to/indra</span></div>
+  <div class="sb"><span class="sb-lbl">model</span><span class="sb-val">huggingface.co/datalab-to/indra-ocr</span></div>
+  <div class="sb"><span class="sb-lbl">blog</span><span class="sb-val">datalab.to/blog/indra-ocr</span></div>
+  <div class="sb"><span class="sb-lbl">license</span><span class="sb-val">Apache-2.0 / OpenRAIL-M</span></div>
+  <div class="sep"></div>
+  <div class="sb"><span class="sb-val">本轮未安装、未跑 OCR</span></div>
+</div>
+
+<div class="foot">
+  <span class="mono">生成于 infocard-pub · sage-swiss · 内容形状 progressive-doc</span>
+  <a href="https://github.com/datalab-to/indra">查看官方仓库 →</a>
+</div>
+
+</main>
+</body>
+</html>
