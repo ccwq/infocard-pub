@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="blue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Architecture Canvas：本机跑，用对话画架构图</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    :root{--bg:#f6f4ef;--paper:#fffdf8;--ink:#111;--text:#333;--muted:#666;--line:#111;--blue:#1f63ff;--blue-soft:#eef4ff;--red:#d80018;--red-soft:#fde9eb;--green:#15803d;--green-soft:#dcfce7;--soft:#ccc;--code-ink:#e8e8e8;--on-dark:#fff;--red-deep:#c8102e;}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
+    .page{width:100%;max-width:720px;margin:0 auto;padding:0 0 80px}
+    /* === 黑色顶栏 === */
+    header{background:var(--ink);color:var(--on-dark);padding:10px 14px;border-bottom:3px solid var(--red)}
+    .tag{display:inline-block;padding:2px 8px;border:1.5px solid var(--on-dark);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+    h1{font-size:18px;font-weight:700;margin:0;letter-spacing:-.02em}
+    .sub{font-size:12px;color:var(--soft);margin-top:3px}
+    /* === 蓝标题区 === */
+    .blue-band{background:var(--blue);color:var(--on-dark);padding:8px 14px;margin:12px 0 0;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+    .blue-band::before{content:'▶';font-size:10px}
+    /* === 内容 === */
+    section{padding:12px 14px 0}
+    h2{font-size:15px;font-weight:700;margin:0 0 8px;color:var(--ink);border-bottom:2px solid var(--blue);padding-bottom:5px}
+    h3{font-size:13px;font-weight:700;margin:12px 0 6px;color:var(--blue)}
+    p{font-size:13px;line-height:1.7;margin:0 0 10px;color:var(--text)}
+    ul,ol{font-size:13px;line-height:1.7;margin:0 0 10px;padding-left:20px;color:var(--text)}
+    li{margin-bottom:4px}
+    a{color:var(--blue)}
+    /* === 步骤流 === */
+    .steps{display:flex;gap:0;margin-bottom:12px}
+    .step{flex:1;border:2px solid var(--blue);padding:8px 8px 6px;margin-right:-2px;text-align:center;position:relative}
+    .step:last-child{margin-right:0}
+    .step .n{display:block;font-size:18px;font-weight:900;color:var(--blue);line-height:1}
+    .step .label{display:block;font-size:10px;font-weight:700;color:var(--text);margin-top:3px}
+    .step.active{background:var(--blue);color:var(--on-dark)}
+    .step.active .n,.step.active .label{color:var(--on-dark)}
+    /* === 表格（局部横滚，不整页横滚） === */
+    .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px}
+    .tw table{margin-bottom:0;min-width:420px}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+    th,td{padding:6px 10px;border:1.5px solid var(--ink);text-align:left}
+    th{background:var(--ink);color:var(--on-dark);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+    tr:nth-child(even) td{background:var(--blue-soft)}
+    .check{color:var(--green);font-weight:900}
+    .cross{color:var(--red-deep);font-weight:900}
+    /* === 标签 === */
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+    .chip{padding:3px 9px;border:1.5px solid var(--ink);font-size:11px;font-weight:700}
+    .chip.blue{border-color:var(--blue);color:var(--blue);background:var(--blue-soft)}
+    .chip.red{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+    .chip.green{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+    /* === 红色警示 === */
+    .warn{border-left:4px solid var(--red);padding:10px 14px;background:var(--red-soft);margin:0 0 12px;font-size:13px;line-height:1.65}
+    .warn strong{color:var(--red)}
+    .note{border-left:4px solid var(--blue);padding:10px 14px;background:var(--blue-soft);margin:0 0 12px;font-size:13px;line-height:1.65}
+    .note strong{color:var(--blue)}
+    /* === 按钮 === */
+    .btn{display:inline-block;padding:7px 14px;border:2px solid var(--blue);background:var(--blue);color:var(--on-dark);font-size:12px;font-weight:700;text-decoration:none}
+    .btn.red{background:var(--red);border-color:var(--red)}
+    /* === 代码块（局部横滚） === */
+    code{font-family:ui-monospace,monospace;font-size:12px;background:var(--blue-soft);padding:1px 5px;border-radius:3px}
+    pre{background:var(--ink);color:var(--code-ink);padding:10px 12px;border-radius:6px;font-size:11px;font-family:ui-monospace,monospace;overflow-x:auto;margin-bottom:12px}
+    /* === 自建双列网格，窄屏单列 === */
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+    .box{border:1.5px solid var(--ink);padding:8px 10px;font-size:12px;line-height:1.6}
+    .box .bt{font-weight:700;font-size:12px;color:var(--blue);display:block;margin-bottom:3px}
+    /* === 窄屏：所有网格单列，步骤换行 === */
+    @media (max-width:720px){
+      .grid2{grid-template-columns:1fr}
+      .steps{flex-wrap:wrap}
+      .step{flex:1 1 100%;margin-right:0;margin-bottom:-2px}
+      .step:last-child{margin-bottom:0}
+      section{padding-left:12px;padding-right:12px}
+      header{padding-left:12px;padding-right:12px}
+      .blue-band{padding-left:12px;padding-right:12px}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="tag">开源项目 · 本机运行 · Alpha</div>
+      <h1>Architecture Canvas：用对话画架构图</h1>
+      <div class="sub">weike-zhang/architecture-canvas · Apache-2.0 · 本机单用户 · Excalidraw 画布</div>
+    </header>
+
+    <div class="blue-band">从零到第一张图：6 步，先不配密钥</div>
+
+    <section>
+      <p><strong>它是什么：</strong>一个跑在你本机的架构图工具。你上传需求文档，配一个能调工具的模型，然后用对话让它生成架构图；画布本身用的是 Excalidraw。作者在 README 里把当前状态写成「本机运行的 Alpha 版本」。</p>
+
+      <h2>适合谁</h2>
+      <div class="tw">
+      <table>
+        <tr><th>你大概是</th><th>能不能用</th><th>原因</th></tr>
+        <tr><td>要把需求文档变成一张分层架构图的后端/架构工程师</td><td class="check">✓</td><td>README「核心能力」写的就是分层架构、业务模块、简单部署总览</td></tr>
+        <tr><td>想在离线环境先试编辑和导出</td><td class="check">✓</td><td>手动编辑与导出不需要模型；<code>demo.py</code> 能生成不含模型调用的会话备份</td></tr>
+        <tr><td>要画时序图、ER 图</td><td class="cross">✗</td><td>README「能力边界」明确列为当前不支持</td></tr>
+        <tr><td>要给团队做协作架构图平台</td><td class="cross">✗</td><td>README「当前边界」写的是本机单用户，无多用户账号</td></tr>
+      </table>
+      </div>
+
+      <h3>第一步</h3>
+      <pre>git clone https://github.com/weike-zhang/architecture-canvas
+cd architecture-canvas
+python3 start.py</pre>
+      <p>首次运行会自动建 venv、装锁定版本的 npm 依赖并构建页面，耗时比第二次长。第二次直接复用，README「快速开始」是这么写的。</p>
+      <p>前置条件三个：Python 3.10+、Node.js 22.12+、npm。缺了就先 <code>python3 start.py --check</code>，它专门用来查依赖。</p>
+    </section>
+
+    <section>
+      <div class="blue-band">启动与依赖检查：端口和密钥</div>
+
+      <h2>两个端口口径，原样照写</h2>
+      <p>README 里出现两个端口，不要当成笔误去替作者统一：</p>
+      <div class="tw">
+      <table>
+        <tr><th>方式</th><th>命令</th><th>端口</th></tr>
+        <tr><td>默认</td><td><code>python3 start.py</code></td><td>127.0.0.1:5093</td></tr>
+        <tr><td>换端口</td><td><code>python3 start.py --port 5096</code></td><td>你指定的值</td></tr>
+        <tr><td>README 另给</td><td><code>PORT=5096 node harness/workspace.mjs</code></td><td>环境变量指定</td></tr>
+      </table>
+      </div>
+      <p>服务只监听本机回环地址，没有对外暴露的选项。</p>
+
+      <h2>密钥的三个存放口径</h2>
+      <div class="grid2">
+        <div class="box"><span class="bt">① 页面里填</span>填模型地址、模型名、API Key。密钥只在服务进程内存里，重启服务要重填。README「模型配置」是这么说的。</div>
+        <div class="box"><span class="bt">② llm.env 文件</span><code>cp llm.env.example llm.env</code>。这个文件不纳入版本管理，可以留着复用。重启后不用重填。</div>
+        <div class="box"><span class="bt">③ Tavily 搜索密钥</span>联网搜索是可选模块。密钥只在进程内存，不进会话备份，运行中可以换或停用，不用重启 Harness。</div>
+        <div class="box"><span class="bt">不需要密钥的部分</span>手动新建形状、拖动改字、导出 SVG/PNG、导入导出会话备份，都在本地完成。</div>
+      </div>
+
+      <h2>模型要求：推文说得松了</h2>
+      <p>推文 @GitHub_Daily 的说法是「模型不绑定，填兼容接口的地址和 Key 就能用」。准确的条件更窄一点，必须写成这样：</p>
+      <ul>
+        <li>需要兼容 <strong>Chat Completions 且支持工具调用（tool calling）</strong>的模型接口。填普通聊天接口不一定能跑通。</li>
+        <li>要让模型「看图」（比如对着已有架构图提问），还需要<strong>支持视觉输入</strong>的模型，并在页面上勾选对应选项。</li>
+      </ul>
+      <p>不是 OpenAI 专用。地址、名称、Key 都是你自己填。</p>
+
+      <div class="warn"><strong>边界提醒：</strong>README「当前边界」写明这是仅本机、单用户的 Alpha 版本：没有多用户账号，没有多人协作，没有生产部署说明。不要按团队平台来评估它。</div>
+
+      <div class="note"><strong>数据放在哪：</strong>会话数据存在 <code>.workspace/</code>。换路径用环境变量 <code>ARCH_DATA_DIR</code>。这意味着它跟本机文件系统一样，需要你自己管权限和备份。</div>
+    </section>
+
+    <section>
+      <div class="blue-band">不配密钥，先把编辑和导出走通</div>
+
+      <h2>无密钥体验</h2>
+      <p>README 给了 <code>demo.py</code>，生成一份会话备份：</p>
+      <pre>python3 demo.py --output demo-session.json</pre>
+      <p>然后在页面的「上下文 → 导入会话备份」里导入它，就能看到一张示例图。<strong>这份示例是手工编写的知识助手结构，不调模型，也不搜索</strong>——它证明的是编辑和导出链路，不是生成质量。</p>
+      <p>导入后你可以拖动改字，然后导出 SVG 或 PNG。这条链路全程离线。</p>
+    </section>
+
+    <section>
+      <div class="blue-band">上传资料：支持什么，读到什么程度</div>
+
+      <h2>资料类型</h2>
+      <p>文本类：TXT、Markdown、CSV、JSON、YAML、XML、HTML、代码文本。文档类：DOCX、XLSX、PPTX、PDF。图片类：常见格式。</p>
+      <p>读法分两种。文档由本机解析，<strong>按行读取</strong>；图片作为视觉输入发给模型。</p>
+      <p>图片发送前最长边会压到 2048 像素。</p>
+
+      <h3>不支持的</h3>
+      <ul>
+        <li>旧版 DOC / XLS / PPT，需要自己先转换。</li>
+        <li>Office 内嵌图片。</li>
+        <li>表格公式重算。</li>
+        <li>音视频内容。</li>
+      </ul>
+
+      <h2>扫描版 PDF 与 OCR：可选依赖，不是自动能力</h2>
+      <p>扫描件要出文字，需要额外装 Tesseract，而且<strong>中文需要 <code>chi_sim</code> 语言包</strong>。不装的话，页面会提示「无法识别」，不会假装已经读过。这一条推文完全没提，是决定能不能用它读合同/扫描需求文档的关键。</p>
+
+      <h2>上限（README「限制」章节）</h2>
+      <div class="tw">
+      <table>
+        <tr><th>对象</th><th>上限</th></tr>
+        <tr><td>每会话资料数</td><td>20 份</td></tr>
+        <tr><td>单文件大小</td><td>25MB</td></tr>
+        <tr><td>正文长度</td><td>30 万字符</td></tr>
+        <tr><td>PDF 页数</td><td>100 页</td></tr>
+        <tr><td>表格</td><td>20 个工作表 / 2000 行 / 100 列</td></tr>
+      </table>
+      </div>
+      <p>触到边界会给出提示，不会静默截断。会话保存消息、资料、当前图和最近 12 次生成历史。</p>
+    </section>
+
+    <section>
+      <div class="blue-band">一次真实工作流（作者建议，未实测）</div>
+      <p>下面这条路径按 README 的功能串起来，<strong>我没有克隆、启动或生成过任何架构图，以下未实测</strong>。它的作用是告诉你各功能按什么顺序用。</p>
+      <div class="steps">
+        <div class="step active"><span class="n">1</span><span class="label">导入备份</span></div>
+        <div class="step"><span class="n">2</span><span class="label">配模型</span></div>
+        <div class="step"><span class="n">3</span><span class="label">上传需求</span></div>
+        <div class="step"><span class="n">4</span><span class="label">出首稿</span></div>
+        <div class="step"><span class="n">5</span><span class="label">对话改</span></div>
+        <div class="step"><span class="n">6</span><span class="label">导出</span></div>
+      </div>
+      <ol>
+        <li>「上下文 → 导入会话备份」导入 <code>demo.py</code> 产出的 <code>demo-session.json</code>，先把界面认熟。</li>
+        <li>填模型地址、模型名、API Key。要看图再勾视觉输入选项。</li>
+        <li>上传需求文档。有扫描页就按上一节先把 Tesseract 和 <code>chi_sim</code> 装好。</li>
+        <li>让它出第一稿。首次生成直接显示，不走确认。</li>
+        <li>对话改。可以固定某个组件的位置，也可以限定只改选区。</li>
+        <li>导出 SVG、PNG，或者含图片的可编辑文件。</li>
+      </ol>
+
+      <h2>上下文面板能做什么</h2>
+      <ul>
+        <li>备份或导入整个会话。</li>
+        <li>删除会话或单份资料。</li>
+        <li>看每个组件的来源。</li>
+        <li>预览资料原文、启用或停用某个文件。</li>
+        <li>填写需要跨会话保留的需求摘要。</li>
+        <li>开启新上下文：画布和已选文件保留，旧对话还能看。</li>
+      </ul>
+
+      <h2>长会话怎么处理</h2>
+      <p>重放正文以 <strong>12 万字符</strong>为预算。README 说明这是正文预算，不是模型的 token 用量。撞到上限要你手填摘要，再开新上下文。</p>
+      <p>图片在同一个运行时里只发第一次；闲置 15 分钟运行时会释放，之后重建运行时需要重新附图。重启后它用持久化的消息和需求摘要来重建上下文——这不是模型 SDK 原生的工具日志恢复，是它自己的做法。</p>
+    </section>
+
+    <section>
+      <div class="blue-band">为什么修改要你点一下「应用」</div>
+
+      <h2>先列变更，再生效</h2>
+      <p>首次生成直接显示，后续修改会先列出这次要改什么，你点「应用修改」才落到画布上，可以放弃。这多一步是有理由的：AI 改图常常顺手把没关系的部分一起挪了，让人失去对版面的控制。</p>
+
+      <h2>它怎么保护你的手工调整</h2>
+      <ul>
+        <li>可以固定选中的组件，让 AI 改别处时它不动。</li>
+        <li>可以限定只改某个选区。</li>
+        <li>AI 修改尽量保留你手动摆的位置和样式。</li>
+        <li>支持停止请求、失败反馈与重试。</li>
+      </ul>
+
+      <h2>语义结构只认该认的东西</h2>
+      <p>你手动新建的<strong>带文字形状</strong>和<strong>两端都绑定了的箭头</strong>会同步进语义结构，AI 后续能理解它们。自由线条、没绑定的箭头、纯装饰元素不算架构关系，不会被拿去当组件编辑。</p>
+      <div class="warn"><strong>代价：</strong>新增节点之后可能需要你手工排版。复杂的多列布局，它只展示相邻模块之间的少量主关系，完整细节留在结构数据里——图上不会全画出来。</div>
+    </section>
+
+    <section>
+      <div class="blue-band">图标和导出为什么能离线</div>
+
+      <h2>图标</h2>
+      <p>统一用 Lucide 0.468.0。引擎内置 <strong>32 个常用图标</strong>，按语义自动匹配；遇到不认识的名字回退到通用组件图标。图标以 SVG 形式随图一起嵌入，所以导出文件和离线打开都不请求 CDN。中文节点会保留图标并预留文字空间。</p>
+      <p>要更新图标跑 <code>python3 sync_icons.py</code>。这和推文说的「内置 32 个常用图标自动匹配」一致。</p>
+
+      <h2>导出</h2>
+      <div class="chips">
+        <span class="chip blue">SVG</span>
+        <span class="chip blue">PNG</span>
+        <span class="chip blue">含图片的可编辑文件</span>
+        <span class="chip green">离线可用</span>
+      </div>
+      <p>三种都是本地生成，不调外部服务。</p>
+    </section>
+
+    <section>
+      <div class="blue-band">可插拔边界：SDK、MCP、搜索</div>
+
+      <div class="tw">
+      <table>
+        <tr><th>接入方式</th><th>怎么用</th><th>边界</th></tr>
+        <tr><td>Python SDK</td><td><code>diagram_sdk.render(ir)</code>、<code>diagram_sdk.read_document(path)</code></td><td>无状态渲染</td></tr>
+        <tr><td>MCP 服务</td><td><code>python3 mcp_server.py --root /授权目录</code></td><td>协议 2024-11-05；不传 <code>--root</code> 时只给渲染工具，不读文件</td></tr>
+        <tr><td>Harness 插件</td><td><code>harness/plugin.mjs</code></td><td>注册 read_diagram、create_diagram、update_diagram、list_documents、read_document</td></tr>
+        <tr><td>架构 Agent</td><td>—</td><td>不开放 shell</td></tr>
+      </table>
+      </div>
+      <p><code>--root</code> 传哪个目录，它就只能读哪个目录。不传就等于关掉读文件能力。这是个有意的设计，不是 bug。</p>
+      <p>MCP 侧不修改你正在编辑的那张图。</p>
+
+      <h2>联网搜索是可选模块</h2>
+      <p>填自己的 Tavily API Key 并勾选「联网搜索」后，支持搜索、正文阅读、会话快照和组件来源引用。密钥只存进程内存，不进备份，运行中可启停换密钥，不用重启 Harness 会话。</p>
+      <p>想单独打包这个模块：<code>python3 manage.py bundle-search --output /tmp/architecture-tavily-module.zip</code>。</p>
+      <p>不填 Key，搜索关掉，其余功能照用。</p>
+    </section>
+
+    <section>
+      <div class="blue-band">边界与不适用场景</div>
+
+      <div class="tw">
+      <table>
+        <tr><th>维度</th><th>实际情况</th></tr>
+        <tr><td>部署形态</td><td>仅本机、单用户。无多用户账号、无多人协作、无生产部署</td></tr>
+        <tr><td>成熟度</td><td>README 自称 Alpha</td></tr>
+        <tr><td>图形类型</td><td>以分层架构、业务模块、简单部署总览为主；通常不超过 22 个组件</td></tr>
+        <tr><td>不做</td><td>时序图、ER 图、复杂分支流程不在当前范围</td></tr>
+        <tr><td>布局</td><td>复杂列布局只展示相邻模块的少量主关系，完整细节留在结构数据</td></tr>
+        <tr><td>人工成本</td><td>新增节点可能要手工排版；模型输出必须人工检查</td></tr>
+      </table>
+      </div>
+
+      <h2>隐私边界（README「隐私」章节）</h2>
+      <p>分两句读：</p>
+      <ul>
+        <li>上传的内容存在你本机，不上传到作者的服务器。</li>
+        <li><strong>但</strong>：启用的图片、被工具读到的文件片段、对话内容和架构结构，会发给你自己配置的那个模型服务。你选哪个模型端点，就等于你把内容交给了谁。</li>
+      </ul>
+      <p>还有一个容易漏的点：<strong>移除文件只是阻止后续读取</strong>，它对已有对话的影响不会自动消失。要清干净，得开一个新上下文。</p>
+
+      <div class="warn"><strong>推文没说的五件事：</strong>当前是 Alpha、仅本机单用户、时序图和 ER 图不支持、组件上限 22、不给 <code>--root</code> 的 MCP 不读文件。另外还有资料与正文上限，以及扫描 PDF 文字识别需可选装 Tesseract 且中文要 <code>chi_sim</code>，没有 OCR 时页面会提示而不会假装已读。</div>
+    </section>
+
+    <section>
+      <div class="blue-band">建议的试做规模与验收方法（未实测）</div>
+      <p>想试的话，别一上来喂一整个代码库。README「限制」写着正文最多 30 万字符、每会话 20 份资料，但一次塞满只会让上限和噪音同时出现。</p>
+      <ol>
+        <li><strong>拿一份真实需求文档</strong>跑首稿——一份就够，最好是分层清楚的那种。</li>
+        <li><strong>对照原文档核两件事</strong>：层级划分对不对，组件命名是不是你自己的叫法。这两项错了，后面改得越多越乱。</li>
+        <li><strong>锁定关键组件再改一轮</strong>：用「固定选中组件 + 只改选区」把重点区域调准，同时确认它有没有动到你手动摆过的位置。</li>
+        <li><strong>检查导出</strong>：把导出的 SVG 断网打开，看图标有没有变方块（SVG 没嵌入）、连线有没有丢。</li>
+        <li><strong>有扫描页就单独验 OCR</strong>：装 Tesseract 和 <code>chi_sim</code>，对同一页分别看「装了」和「没装」时的提示差别，确认它没有替你编内容。</li>
+      </ol>
+      <p>这几步是我按 README 功能编排的验收路径，<strong>未实测</strong>。如果你跑下来哪一步和文档说的不一样，以你看到的为准。</p>
+    </section>
+
+    <section>
+      <div class="blue-band">来源与许可</div>
+      <div class="tw">
+      <table>
+        <tr><th>项</th><th>值</th></tr>
+        <tr><td>仓库</td><td>github.com/weike-zhang/architecture-canvas</td></tr>
+        <tr><td>作者</td><td>weike-zhang</td></tr>
+        <tr><td>许可</td><td>Apache-2.0</td></tr>
+        <tr><td>默认分支</td><td>main</td></tr>
+        <tr><td>建仓日期</td><td>2026-10-03</td></tr>
+        <tr><td>Stars / Forks</td><td>155 / 12（快照，非质量指标）</td></tr>
+        <tr><td>Open Issues</td><td>0</td></tr>
+        <tr><td>语言</td><td>CSS、HTML、JavaScript、Python、TypeScript</td></tr>
+        <tr><td>Topics</td><td>ai-agent、architecture-diagram、excalidraw、local-first、mcp、tavily</td></tr>
+        <tr><td>画布</td><td>Excalidraw（不是自研画布）</td></tr>
+      </table>
+      </div>
+      <p>推文来源：<a href="https://x.com/GitHub_Daily/status/2110309686574784513">@GitHub_Daily</a>。仓库建仓时间很近（2026-10-03），155 star 说明关注度，不说明稳定性——Alpha 状态和零 issue 都可能来自同一件事。</p>
+
+      <h3>开发与测试命令</h3>
+      <pre>python3 -m unittest discover -s tests -v
+npm --prefix editor test
+python3 manage.py build
+python3 manage.py bundle --output /tmp/architecture-assistant-source.zip</pre>
+      <p>源码包包含引擎、前端、Harness 插件、锁文件、示例、测试、文档和 SHA-256 清单；不含密钥、会话资料、Git 历史、依赖和构建产物。</p>
+
+      <div>
+        <a class="btn" href="https://github.com/weike-zhang/architecture-canvas">打开仓库</a>
+        <a class="btn red" href="https://x.com/GitHub_Daily/status/2110309686574784513" style="margin-left:8px">看原推文</a>
+      </div>
+    </section>
+  </div>
+<script>
+(function(){
+  function send(){var h=document.body.scrollHeight;window.parent.postMessage({type:'theme-height',slug:'blue',height:h},'*');}if(document.readyState==='complete'){send()}else{window.addEventListener('load',send)}setTimeout(send,500);})();
+</script>
+</body>
+</html>
