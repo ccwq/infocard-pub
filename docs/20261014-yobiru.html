@@ -1,0 +1,455 @@
+<!doctype html><html lang="zh-CN" data-theme="archive-green"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>yobiru：跨机器 Agent 通信、回执与唤醒边界</title><style>
+    /* ============================================================
+       ARCHIVE GREEN — Swiss Information Layout
+       设计语言：极简瑞士网格 · 鼠尾草绿单强调 · 全扁平 · 编号锚点
+       核心原则：零圆角 · 零阴影 · 1px 细线 · 大留白 · 信息密度
+       ============================================================ */
+    :root{--extra-0:#f4f4f0;--extra-1:#e0e0dc;--extra-2:#a8a8a3;--extra-3:#e8e8e3;
+      --bg:#f6f4ee;          /* 暖骨纸白 — 主背景（加暖） */
+      --paper:#fcfaf4;       /* 纸面白 — 内容卡片（加暖） */
+      --ink:#1a1a1a;         /* 近黑 — 主文字 */
+      --green:#5f7e62;       /* 鼠尾草绿 — 降饱和灰橄榄（原 #4a7856） */
+      --green-deep:#4a6350;  /* 深绿 — hover/强调 */
+      --green-soft:#e9ede7;  /* 极浅绿 — 浅底 */
+      --muted:#6b6b66;       /* 灰 — 次要文字（微暖） */
+      --muted-2:#9a9a92;     /* 浅灰 — 标签副字 */
+      --line:#d5d3cb;        /* 细线 — 边框/分割（微暖） */
+      --line-strong:#b8b6ad; /* 强线 — 表头分割 */
+      --fill:#eceae3;        /* 浅填充 — 源信息条（微暖） */
+      --dark:#1d2520;        /* 深炭绿 — 暗色块/页脚（微绿调） */
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,"Helvetica Neue",Helvetica,system-ui,-apple-system,
+        "PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);
+      font-size:12.5px;line-height:1.6;
+      -webkit-font-smoothing:antialiased;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre,.mono{
+      font-family:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,
+        Menlo,Consolas,monospace;
+    }
+
+    .page{width:min(1040px,calc(100% - 32px));margin:0 auto;padding:20px 0 0}
+
+    /* ============================================================
+       1. HEADER — 品牌左 · 中心元数据 · WATCH 右
+       ============================================================ */
+    .header{
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      align-items:center;
+      gap:16px;
+      padding-bottom:12px;
+      border-bottom:1px solid var(--line);
+    }
+    .header-brand{
+      font:700 11px/1.3 "JetBrains Mono","SF Mono",ui-monospace,monospace;
+      letter-spacing:.04em;
+      color:var(--ink);
+    }
+    .header-center{
+      text-align:center;
+      font:600 11px/1.3 "JetBrains Mono","SF Mono",ui-monospace,monospace;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .header-center .ref-id{
+      display:block;
+      font-weight:400;
+      color:var(--muted-2);
+      margin-top:2px;
+      letter-spacing:.04em;
+    }
+    .header-center .src-count{
+      color:var(--ink);
+      font-weight:700;
+    }
+    .watch-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 10px 4px;
+      border:1px solid var(--ink);
+      background:var(--paper);
+      font:700 10px/1 "JetBrains Mono",ui-monospace,monospace;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .watch-badge .date{color:var(--green);font-weight:700}
+
+    /* ============================================================
+       2. ARCHIVE SIGNAL — 绿色信号 + 主标题
+       ============================================================ */
+    .signal-block{padding:20px 0 18px}
+    .signal-label{
+      font:700 10px/1 "JetBrains Mono",ui-monospace,monospace;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      color:var(--green);
+      margin-bottom:10px;
+    }
+    .signal-title{
+      font-size:22px;
+      font-weight:800;
+      line-height:1.2;
+      letter-spacing:-.01em;
+      color:var(--ink);
+    }
+
+    /* ============================================================
+       3. HERO — 大字论点 + 巨型英文副标 + 描述
+       ============================================================ */
+    .hero{padding:24px 0 28px;border-top:1px solid var(--line)}
+    .hero-statement{
+      font-size:17px;
+      font-weight:700;
+      line-height:1.45;
+      letter-spacing:-.005em;
+      color:var(--ink);
+      max-width:820px;
+      margin-bottom:14px;
+    }
+    .hero-subhead{
+      font-size:46px;
+      font-weight:900;
+      line-height:.98;
+      letter-spacing:-.04em;
+      text-transform:uppercase;
+      color:var(--ink);
+      margin-bottom:16px;
+    }
+    .hero-desc{
+      font-size:13px;
+      line-height:1.65;
+      color:var(--muted);
+      max-width:720px;
+    }
+    .hero-desc code{
+      font-size:12px;
+      color:var(--green-deep);
+      background:var(--green-soft);
+      padding:1px 5px;
+    }
+
+    /* ============================================================
+       4. SOURCE BAR — 浅灰填充 · 绿色 SOURCE 标签
+       ============================================================ */
+    .source-bar{
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      align-items:center;
+      gap:14px;
+      padding:10px 16px;
+      background:var(--fill);
+      border-top:1px solid var(--line);
+      border-bottom:1px solid var(--line);
+    }
+    .source-bar .label{
+      font:700 10px/1 "JetBrains Mono",ui-monospace,monospace;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      color:var(--green);
+    }
+    .source-bar .info{
+      font:400 11.5px/1.4 "JetBrains Mono",ui-monospace,monospace;
+      color:var(--muted);
+    }
+    .source-bar .metric{
+      font:800 14px/1 Inter,sans-serif;
+      color:var(--ink);
+      letter-spacing:-.02em;
+    }
+
+    /* ============================================================
+       5. MAIN GRID — 左表格 60% · 右分析面板 40%
+       ============================================================ */
+    .main-grid{
+      display:grid;
+      grid-template-columns:1.5fr 1fr;
+      gap:0;
+      border-bottom:1px solid var(--line);
+    }
+
+    /* --- 左：技能表 --- */
+    .skill-table{padding:16px 16px 16px 0}
+    .table-head{
+      display:grid;
+      grid-template-columns:32px 1fr 1.6fr;
+      gap:10px;
+      padding-bottom:8px;
+      border-bottom:1px solid var(--line-strong);
+      font:700 9px/1 "JetBrains Mono",ui-monospace,monospace;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      color:var(--muted);
+      text-align:left;
+    }
+    .table-row{
+      display:grid;
+      grid-template-columns:32px 1fr 1.6fr;
+      gap:10px;
+      padding:11px 0;
+      border-bottom:1px solid var(--line);
+      align-items:start;
+    }
+    .table-row:last-child{border-bottom:none}
+    .table-row .no{
+      font:700 12px/1.4 "JetBrains Mono",ui-monospace,monospace;
+      color:var(--green);
+    }
+    .table-row .skill-name{
+      font:700 12px/1.4 "JetBrains Mono",ui-monospace,monospace;
+      color:var(--ink);
+    }
+    .table-row .skill-desc{
+      font-size:11.5px;
+      line-height:1.5;
+      color:var(--muted);
+    }
+
+    /* --- 右：分析面板 --- */
+    .analysis-panel{
+      padding:16px 0 16px 18px;
+      border-left:1px solid var(--line);
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+    .analysis-block .block-label{
+      font:700 9px/1 "JetBrains Mono",ui-monospace,monospace;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-bottom:7px;
+    }
+    .judgment-box{
+      background:var(--dark);
+      color:var(--extra-0);
+      padding:14px 16px;
+    }
+    .judgment-box .block-label{color:var(--green);margin-bottom:8px}
+    .judgment-box p{
+      font-size:12px;
+      line-height:1.55;
+      color:var(--extra-1);
+    }
+    .judgment-box p + p{margin-top:8px;color:var(--extra-2)}
+    .analysis-block p{
+      font-size:11.5px;
+      line-height:1.55;
+      color:var(--muted);
+    }
+    .analysis-block p + p{margin-top:6px}
+    .analysis-block p strong{color:var(--ink);font-weight:700}
+
+    /* ============================================================
+       6. RISK & NEXT ACTION — 对称双列
+       ============================================================ */
+    .action-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      border-bottom:1px solid var(--line);
+    }
+    .action-col{
+      padding:16px 0;
+    }
+    .action-col + .action-col{
+      border-left:1px solid var(--line);
+      padding-left:18px;
+      border-left-color:var(--line);
+    }
+    .action-col:first-child{padding-right:18px}
+    .action-col-title{
+      font:700 14px/1.2 Inter,sans-serif;
+      letter-spacing:-.01em;
+      color:var(--ink);
+      margin-bottom:14px;
+    }
+    .action-item{
+      display:grid;
+      grid-template-columns:28px 1fr;
+      gap:10px;
+      padding:11px 0;
+      border-bottom:1px solid var(--line);
+      align-items:start;
+    }
+    .action-item:last-child{border-bottom:none}
+    .action-item .no{
+      font:700 12px/1.4 "JetBrains Mono",ui-monospace,monospace;
+      color:var(--green);
+      text-align:left;
+    }
+    .action-item .item-title{
+      font:700 12px/1.4 Inter,sans-serif;
+      color:var(--ink);
+      margin-bottom:3px;
+    }
+    .action-item .item-desc{
+      font-size:11.5px;
+      line-height:1.5;
+      color:var(--muted);
+    }
+
+    /* ============================================================
+       7. TAKEAWAY — 深色全宽页脚条
+       ============================================================ */
+    .takeaway-bar{
+      background:var(--dark);
+      color:var(--extra-0);
+      padding:16px 20px;
+    }
+    .takeaway-label{
+      font:700 9px/1 "JetBrains Mono",ui-monospace,monospace;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:var(--green);
+      margin-bottom:8px;
+    }
+    .takeaway-text{
+      font-size:14px;
+      font-weight:600;
+      line-height:1.5;
+      letter-spacing:-.005em;
+      color:var(--extra-3);
+    }
+
+    /* ============================================================
+       8. FOOTER — 元数据底栏
+       ============================================================ */
+    .footer{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:12px 0 40px;
+      font:400 10.5px/1.4 "JetBrains Mono",ui-monospace,monospace;
+      color:var(--muted-2);
+    }
+    .footer a{color:var(--green);text-decoration:none}
+    .footer a:hover{text-decoration:underline}
+
+    /* ============================================================
+       9. 通用组件 — 标签 · 芯片 · 强调块
+       ============================================================ */
+    .label-tag{
+      display:inline-block;
+      font:700 9px/1 "JetBrains Mono",ui-monospace,monospace;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      color:var(--green);
+    }
+    .label-tag.ink{color:var(--ink)}
+    .label-tag.muted{color:var(--muted)}
+
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      padding:4px 8px 3px;
+      border:1px solid var(--line);
+      background:var(--paper);
+      font:600 10px/1 "JetBrains Mono",ui-monospace,monospace;
+      letter-spacing:.04em;
+      color:var(--muted);
+    }
+    .chip.green{
+      border-color:var(--green);
+      color:var(--green);
+    }
+
+    .divider{height:1px;background:var(--line);border:none;margin:0}
+
+    /* ============================================================
+       10. 水印 — 背景极低透明度品牌字
+       ============================================================ */
+    .watermark{
+      position:fixed;
+      bottom:60px;
+      right:50px;
+      font:900 72px/.9 Inter,sans-serif;
+      letter-spacing:-.05em;
+      color:var(--ink);
+      opacity:.03;
+      pointer-events:none;
+      z-index:0;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+    .page > *{position:relative;z-index:1}
+
+    /* ============================================================
+       RESPONSIVE — 720px 断点
+       ============================================================ */
+    @media (max-width:720px){
+      .page{width:calc(100% - 16px);padding:12px 0 0}
+      .header{
+        grid-template-columns:1fr;
+        gap:8px;
+        text-align:left;
+      }
+      .header-center{text-align:left}
+      .hero-subhead{font-size:36px}
+      .hero-statement{font-size:15px}
+      .source-bar{
+        grid-template-columns:1fr;
+        gap:4px;
+      }
+      .main-grid{grid-template-columns:1fr}
+      .analysis-panel{
+        border-left:none;
+        border-top:1px solid var(--line);
+        padding:16px 0;
+      }
+      .skill-table{padding:14px 0}
+      .action-grid{grid-template-columns:1fr}
+      .action-col + .action-col{
+        border-left:none;
+        border-top:1px solid var(--line);
+        padding-left:0;
+        padding-top:16px;
+      }
+      .action-col:first-child{padding-right:0;padding-bottom:16px}
+      .table-head,.table-row{
+        grid-template-columns:24px 1fr;
+      }
+      .table-head .col-contract,
+      .table-row .skill-desc{
+        grid-column:1/-1;
+        padding-left:34px;
+      }
+      .footer{flex-direction:column;align-items:flex-start;gap:4px}
+      .watermark{display:none}
+    }
+   body{font-size:16px}.page{padding-top:24px}.signal-title{font-size:44px;line-height:1.25}.hero-desc{font-size:17px;line-height:1.85}.chapter{padding:30px 0;border-bottom:1px solid var(--line)}.takeaway-bar{padding:22px;background:var(--green-soft);color:var(--ink);border-top:2px solid var(--green);margin:24px 0}.main-grid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px}.main-grid aside{padding:18px;border:1px solid var(--line)}pre{background:var(--dark);color:var(--paper)}.flow{display:grid;gap:5px;padding:22px;background:var(--green-soft);margin:22px 0}.flow div{border:1px solid var(--line);padding:12px;background:var(--paper)}.flow span{text-align:center;color:var(--green)}.header-brand,.header-center,.watch-badge{font-size:13px}@media(max-width:720px){.signal-title{font-size:32px}.main-grid{grid-template-columns:1fr}.header{grid-template-columns:1fr auto}.header-center{display:none}.chapter{padding:26px 0}.hero-desc{font-size:16px}}*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.8}p{margin:12px 0}h2{font-size:27px;line-height:1.4;margin:0 0 18px}h3{font-size:20px;line-height:1.45;margin:0 0 12px}pre{overflow-x:auto;max-width:100%;padding:18px;font-size:14px;line-height:1.7;white-space:pre}code{overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;font-size:15px;line-height:1.8}td,th{padding:13px;border:1px solid var(--line);vertical-align:top;text-align:left}.table-wrap{overflow-x:auto;max-width:100%}.links{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0}.links a{text-decoration:underline;overflow-wrap:anywhere}.note,.original{font-size:13px;color:var(--muted)}footer{padding:24px;font-size:13px}.grid,.steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.grid article,.steps article{border:1px solid var(--line);padding:20px;min-width:0}li{margin:12px 0}article,aside,section{min-width:0}@media(max-width:720px){.grid,.steps{grid-template-columns:1fr}h2{font-size:23px}h3{font-size:19px}.table-wrap table{min-width:660px}}</style></head><body><main class="page"><header class="header"><a href="../index.html" class="header-brand">AG雷达 / Agent 工具</a><span class="header-center">通信与权限</span><span class="watch-badge">0.5.0</span></header><div class="signal-block"><div class="signal-label">yobiru · 跨机器协作</div><h1 class="signal-title">让 Agent 互相说话，<br>不替你决定谁有执行权</h1></div><div class="hero"><p class="hero-statement">yobiru 把消息、附件、请求回执与可选唤醒接到已有 Agent 上。Tailscale 负责机器网络与身份；接收端负责访问策略；任务是否完成，仍需看实际产物。</p><p class="hero-desc">从两台获准通信的机器开始，先验证普通消息和附件，再增加请求生命周期，最后才配置 wake 与 Codex bridge。不要一次把网络、常驻服务、自动回复和任务执行全部放开。</p><p class="links"><a href="https://github.com/chekusu/yobiru">官方仓库 ↗</a><a href="#poc">最小两机试验 ↓</a><a href="#states">状态含义 ↓</a></p></div><div class="takeaway-bar"><strong>先判断是否适用</strong><p>两端都需 Python、可用的 tailnet、执行 CLI 的权限和持续可用的 receiver。只有聊天界面、不能运行脚本或访问私网的云端 Agent，无法直接使用这一套。</p></div>
+<section class="chapter"><h2>01 / 它补的是通信层，不是任务调度器</h2><div class="flow"><div>已有 Agent 界面</div><span>↓</span><div>6 个 Skill + Python CLI</div><span>↓</span><div>Tailscale 网络与机器身份</div><span>↓</span><div>接收端策略 → 本地 inbox → 可选 wake adapter</div><span>↓</span><div>Agent 处理获准事项 → 上报结果 → 人或调用方验收</div></div><p>消息使用 <code>host/agent</code> 寻址。receiver 通常监听 Tailscale 地址的 <code>tcp:7766</code>，通过 <code>tailscale whois</code> 核对连接机器，再检查本地访问规则。Agent 名称用于路由，不是机器内部不同 Agent 的安全隔离。</p><p>它使用 tailmsg protocol v1；不提供 MCP server、新聊天群组 UI、调度器或“别人已经完成工作”的证明。通知、请求、已存储回执和验收结果是不同对象。</p></section>
+<section class="chapter"><h2>02 / 装插件之前，检查四个前置条件</h2><div class="grid"><article><h3>Python 与 shell</h3><p>文档要求 Python 3.8+，运行时使用标准库。宿主需允许执行 CLI；Skill 文本已加载，不等于捆绑脚本已经可用。</p></article><article><h3>可达的 tailnet</h3><p>Tailscale 已安装并登录，网络策略允许对端访问 receiver 端口。接收节点需要合适的 shields-up 设置，但 yobiru 不会自行修改 ACL 或 shields-up。</p></article><article><h3>receiver 常驻</h3><p>两端都运行 receiver 才方便双向回执与回复。附件由接收方从发送机器拉取，文件取走之前发送端也要保持服务可达。</p></article><article><h3>wake 执行环境</h3><p>自动唤醒需接收方设置本地程序或 webhook。安装 Skill 不会自动叫醒一个休眠 Agent，也不会授予它远程执行权限。</p></article></div><p>手机可以只是 Agent 的用户界面，不必充当执行节点。容器缺少相应网络能力、权限或持久服务条件时，应报告阻塞，不能用“能安装插件”代替“能运行完整链路”。</p></section>
+<section class="chapter"><h2>03 / 六个 Skill 按问题选，不要全部当安装步骤</h2><div class="main-grid"><div><table><thead><tr><th>Skill</th><th>什么时候用</th></tr></thead><tbody><tr><td>yobiru-setup</td><td>首次环境诊断、配置身份与接收条件</td></tr><tr><td>yobiru-sessions</td><td>查看机器与 Agent，绑定已有会话身份</td></tr><tr><td>yobiru-send</td><td>发送通知、跟踪请求、结构化数据与文件</td></tr><tr><td>yobiru-inbox</td><td>读消息、取附件、进度与结果回复、ack</td></tr><tr><td>yobiru-wake</td><td>由接收端设置唤醒、静默时段与限频</td></tr><tr><td>yobiru-upgrade</td><td>核对插件、持久 runtime 与运行 receiver 版本</td></tr></tbody></table></div><aside><h3>Codex 文档安装入口</h3><pre><code>codex plugin marketplace add chekusu/yobiru
+codex plugin add yobiru@yobiru</code></pre><p>新建会话后说“Set up Yobiru on this machine”。安装没有 install hook，不会自动配对机器、启动服务或发送消息。</p><p>这是仓库 marketplace 路线，不代表已经进入公开 Codex 插件目录。Cursor 可加载本地插件目录或经团队 marketplace 导入；公开 Cursor Marketplace listing 尚未提交。</p></aside></div></section>
+<section class="chapter" id="poc"><h2>04 / 最小试验：先普通通知，再带结果的请求</h2><p class="note">以下是根据官方命令组织的教学试验，不是本文已运行的记录。只用于你已授权的两台机器、虚构测试数据和指定对端。先让 <code>Y</code> 指向实际插件启动器；示例中的 <code>research-node/grok</code>、消息 ID 与文件名都要替换为自己的对象。</p><pre><code># 从项目根目录解析实际启动器
+Y="$PWD/plugins/yobiru/scripts/yobiru"
+sh "$Y" paths
+sh "$Y" onboard
+sh "$Y" doctor</code></pre><p><code>onboard</code> 与 <code>doctor</code> 是只读诊断入口。预期是得到环境、配置与服务状态，以及由谁完成下一步。未安装或没有 receiver 时出现缺项并不代表诊断命令失败。</p><div class="steps"><article><h3>A / 身份和策略</h3><p>按 setup 指引先预览，再经授权用 apply。新安装默认 tailnet 模式：网络策略放行的认证机器可发送，除非本地 deny 命中。需要收紧时选 allowlist；deny 优先于 allow。</p></article><article><h3>B / 双端接收</h3><pre><code>sh "$Y" serve</code></pre><p>在每台机器独立终端保持运行，再从另一终端诊断。先验证前台链路，再生成 systemd-user、launchd 或 Windows 服务模板；模板本身不等于服务已启动。</p></article><article><h3>C / 普通通知</h3><pre><code>sh "$Y" send research-node/grok \
+  "The brief is available." --kind notice</code></pre><p>接收方用 inbox/show 核对消息 ID 与正文。通知不要求回复；HTTP 202 只证明接收端接受并存储。</p></article><article><h3>D / 请求与附件</h3><pre><code>sh "$Y" request send research-node/grok \
+  "Please review this brief." --file ./brief.md \
+  --timeout-seconds 900 --wake none</code></pre><p>先创建不含秘密的测试文件。此处显式不请求唤醒，便于先排除 wake 配置变量。接收方应先取得消息与附件，再只处理已有授权范围的事项。</p></article></div><pre><code># 接收端：用实际消息 ID 替换 MESSAGE_ID
+sh "$Y" show MESSAGE_ID
+sh "$Y" fetch MESSAGE_ID
+sh "$Y" request respond MESSAGE_ID "Started reviewing." --state running
+sh "$Y" request respond MESSAGE_ID "Reviewed; see evidence." --state completed
+sh "$Y" ack MESSAGE_ID
+
+# 发送端：用实际请求 ID 替换 REQUEST_ID
+sh "$Y" request status REQUEST_ID --refresh --json</code></pre><p>验收要同时包含发送记录、接收正文、附件内容与结果证据。接收方先上报终态，再 ack；没有回复权限或执行条件，应上报 blocked，不用“消息收到了”冒充任务完成。</p></section>
+<section class="chapter" id="states"><h2>05 / 六个状态，别读成六种成功</h2><div class="table-wrap"><table><thead><tr><th>信号</th><th>证明了什么</th><th>没有证明什么</th></tr></thead><tbody><tr><td>HTTP 202 / received</td><td>对端接受并持久保存消息</td><td>Agent 已经开始或完成任务</td></tr><tr><td>running</td><td>Agent 上报已开始</td><td>正在正确执行、最终一定完成</td></tr><tr><td>completed</td><td>Agent 上报终态为完成</td><td>代码、文件或外部变更验收通过</td></tr><tr><td>failed / rejected / blocked</td><td>明确的失败、拒绝或阻塞结果</td><td>自动获得修复或扩大权限的授权</td></tr><tr><td>timed_out</td><td>期限内未收到终态，实际结果未知</td><td>任务已取消，或者可安全重新执行</td></tr><tr><td>late</td><td>原请求之后收到迟到终态</td><td>重复发送的新请求已被去重执行</td></tr><tr><td>ack / wake 成功</td><td>本地标记处理；或通知 adapter 接受</td><td>发送者已获完成通知；或 Agent 产出正确</td></tr></tbody></table></div><p>无 refresh 时读本地账本；有 refresh 时向原认证接收方对账。超时先查询与核对副作用，不要立刻重发。请求响应通过稳定 ID 的 durable outbox 重试，不等于普通消息自动重投，也不是 exactly-once 任务执行。</p><p>结果响应不进入普通任务 inbox，不触发新的 wake 或回复循环。要取结果文件，从 request status 中找到 response.id，再 show/fetch；不要把协议回执当成新任务。</p></section>
+<section class="chapter"><h2>06 / 文件不进中央存储，但链路可能使用中继</h2><p>附件在发送端暂存，接收方通过 tailnet 拉取，核对大小与 SHA-256。文档默认下载链接有效期为 24 小时，且限定接收机器。大内容走附件；消息 envelope 默认上限 256 KiB。</p><div class="takeaway-bar"><strong>纠正推文里的绝对说法</strong><p>“yobiru 不运营中央消息或附件存储”有官方依据；“文件不经过任何中转服务器”过于绝对。Tailscale 可以直连，也可能经加密中继传输。应用没有集中存储与网络路径绝不经 relay，是两个问题。</p></div><p>SHA-256 和大小校验只证明传输完整性，不保证内容安全；到期链接也不会撤销已经下载的副本。数据 home 默认 <code>~/.tailmsg</code>，也可指定 home；项目不增加静态存储加密，需保护主机和文件系统。</p><p>你的 Agent 服务商仍可能处理你交给 Agent 的内容。不要通过报告、日志或 JSON 顺带发送密钥和无关私有文件；先确定接收方、用途、保存期限与可分享范围。</p></section>
+<section class="chapter"><h2>07 / 接收、唤醒、回复、执行是四道边界</h2><div class="grid"><article><h3>消息访问策略</h3><p>Tailscale ACL/grants 与本地策略共同作用。agent 名称不是独立安全主体；同机多 Agent 或共用 home 时，不要把路由名称当成隔离保证。</p></article><article><h3>唤醒由接收方决定</h3><p>发送方请求 now、batch 或 none，接收端还会检查允许的发送者、目标 Agent、静默时段和限频。wake-config 默认预览，apply 才写入。</p></article><article><h3>自动回复不默认开放</h3><p>新的 Codex bridge 安装默认关闭业务自动回复。allow_replies=false 会记录最小 blocked 结果而不运行模型；开启回复仍只覆盖用户已有授权。</p></article><article><h3>收到文字不是执行许可</h3><p>对端消息和文件是待处理数据，不授权命令、购买、配置变更或披露其他资料。唤醒一个 Agent，不等于让它按远程提示任意执行。</p></article></div></section>
+<section class="chapter"><h2>08 / Codex、Grok Bot、DOTS 的支持要分层看</h2><p>Codex bridge 用已有会话做 dispatcher：macOS 走桌面端；Linux 需要你已运行的 app-server、同用户本地 Unix socket、明确会话 UUID 与可用的用户 systemd。它不替你启动 Codex，不自动新建会话，也不使用“最近一个会话”替代精确身份。Windows 不套用这套桥。</p><p>enqueued 表示 Codex queue 接受通知，不表示工作完成。uncertain 表示可能已投递，不自动重发；先核对原会话。插件升级也不会自动升级持久 receiver，需分别核对 plugin、runtime 与正在运行的服务。</p><p>README 的 Grok Bot / DOTS / Codex 配图标为 AI 生成概念展示，不是真实截图或完整集成实测。Grok Bot 的账号级完整运行与 wake 循环仍需验证；DOTS 是有条件示例，仓库没有经过验证的 DOTS connector。</p></section>
+<section class="chapter"><h2>09 / 故障按层查，别一律重装</h2><table><thead><tr><th>现象</th><th>先核对</th></tr></thead><tbody><tr><td>插件装上却不能通信</td><td>脚本是否可用、Tailscale登录、端口策略和 receiver 常驻；安装不会启动服务</td></tr><tr><td>403</td><td>认证与访问策略拒绝，不先按网络故障重试</td></tr><tr><td>发现旧端 receiver 显示 legacy</td><td>旧版本 /info 能力未知，不能直接判离线</td></tr><tr><td>收到了但没有 wake</td><td>adapter、允许发送者、静默时段、限频与宿主运行条件</td></tr><tr><td>请求超时</td><td>本地账本与原对端 refresh，检查是否已有副作用或迟到结果，不盲目重发</td></tr><tr><td>插件已更新但行为没变</td><td>持久 runtime 和 running receiver 是否也升级并重启</td></tr></tbody></table></section>
+<section class="chapter"><h2>10 / 文档测试不等于你的两机部署验收</h2><p>docs/VERIFICATION.md 报告 0.5.0 在 Python 3.12.3 下通过 220 项 plugin 与 146 项 bridge/resident/installer 测试，共 366 项。Python 3.8 语法解析通过不等于在 3.8 解释器执行测试；fake Tailscale 与 loopback HTTP 测试不替代真实 tailnet 两机验证。</p><p>官方历史验证表与详细验证段落有滞后差异，阅读时按具体场景、测试环境与尚未验证项拆开，不汇总成“全平台已验证”。项目没有正式独立安全审计；本文只做材料核查，未安装、配置、发送消息或复现这些测试。</p><ul><li>基础验收：双向消息 ID 与正文一致，测试附件大小/哈希/内容一致。</li><li>生命周期验收：received → running → 终态可关联，终态前不 ack；timeout 与 late 对账无重复执行。</li><li>权限负例：被拒访问、被拒 wake、未经授权的执行请求均没有越界副作用。</li><li>扩展验收：receiver 重启、离线结果恢复、真实 Codex/Grok 宿主能力各自单独记录。</li></ul><p>许可为 MIT；保留版权与许可声明。适合你有多个可控执行节点、已有 Agent、愿意维护身份与持久服务的场景；不适合拿来替代任务管理平台，或给无 shell、无私网、无接收服务的聊天产品“直接开通互联”。</p><div class="links"><a href="https://github.com/chekusu/yobiru">官方仓库</a><a href="https://github.com/chekusu/yobiru/blob/main/docs/SETUP.md">Setup</a><a href="https://github.com/chekusu/yobiru/blob/main/docs/VERIFICATION.md">验证边界</a><a href="https://github.com/chekusu/yobiru/blob/main/docs/PLATFORMS.md">平台说明</a><a href="https://tailscale.com/docs/reference/connection-types">Tailscale 连接类型</a></div><p class="note">发现来源：GitHubDaily 推文。事实依据：官方 README、平台与验证文档，快照 2026-10-14，206 stars / 27 forks；动态数值不是质量保证。</p></section><footer>AG雷达 · Agent通信实操与边界 · 2026-10-14</footer></main></body></html>
