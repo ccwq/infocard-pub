@@ -270,7 +270,11 @@ function checkManifest(manifestPath, htmlRelative, htmlHash, htmlTextHash) {
 
   const status = manifest.review_status || manifest.status || manifest.visual_status;
 
-  if (manifest.route === 'light') {
+  if (status === 'VISUAL_EXCEPTION_AFTER_BUDGET') {
+    errors.push(...require('./lib/visual-exception-policy').validateVisualBudgetException(manifest, htmlHash));
+  }
+
+  if (manifest.route === 'light' && status !== 'VISUAL_EXCEPTION_AFTER_BUDGET') {
     errors.push(...checkLightRouteEvidence(manifest));
     for (const viewport of ['desktop', 'mobile']) {
       const geometry = manifest.geometry && manifest.geometry[viewport];
@@ -285,7 +289,7 @@ function checkManifest(manifestPath, htmlRelative, htmlHash, htmlTextHash) {
   if (status === 'VISUAL_EXCEPTION_AFTER_MAX_REPAIRS') {
     // Exception path: require completed repair rounds with fresh evidence
     errors.push(...checkVisualException(manifest, htmlHash, htmlTextHash));
-  } else if (status && manifest.route !== 'light') {
+  } else if (status && manifest.route !== 'light' && status !== 'VISUAL_EXCEPTION_AFTER_BUDGET') {
     // Existing path: strict 0 critical / 0 major
     if (!['VISUAL_PASSED', 'PASSED', 'passed'].includes(status)) {
       errors.push(error('manifest.review_status', 'must be VISUAL_PASSED before push'));

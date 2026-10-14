@@ -1,0 +1,11 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {validateVisualBudgetException:v}=require('../lib/visual-exception-policy');
+const h='d'.repeat(64);
+const pass=()=>({id:'desktop',viewport:'desktop',html_sha256:h,status:'passed',review:{critical:0,major:0,screenshot_path:'desktop.png'}});
+const tool=()=>({id:'mobile',viewport:'mobile',html_sha256:h,status:'tool_exhausted',remaining_defects:[],attempts:[1,2,3].map(attempt=>({attempt,type:'infrastructure_failure',error_category:'503',error:'busy',strategy:'region-'+attempt,evidence_gap:true}))});
+test('three actual tool errors allow budget exception',()=>assert.deepEqual(v({checks:[pass(),tool()]},h),[]));
+test('two errors do not exhaust initial plus two retries',()=>{let t=tool();t.attempts.pop();assert(v({checks:[pass(),t]},h).length)});
+test('stale current hash blocked',()=>assert(v({checks:[pass(),tool()]},'e'.repeat(64)).length));
+test('fabricated review on tool failure blocked',()=>{let t=tool();t.attempts[0].review={};assert(v({checks:[pass(),t]},h).length)});
+test('three real chained repair failures accepted',()=>{let t={id:'mobile',viewport:'mobile',html_sha256:h,status:'repairs_exhausted',initial_review:{critical:0,major:1,screenshot_path:'initial.png'},remaining_defects:[{description:'clipped',impact:'unreadable'}],repairs:[1,2,3].map((round,i)=>({round,change_made:true,change_description:'layout repair',before_hash:'abc'[i].repeat(64),after_hash:i===2?h:'abc'[i+1].repeat(64),review:{critical:0,major:1,screenshot_path:'round-'+round+'.png'}}))};assert.deepEqual(v({checks:[pass(),t]},h),[]);t.repairs[1].change_made=false;assert(v({checks:[pass(),t]},h).length)});

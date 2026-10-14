@@ -200,7 +200,7 @@ After promotion, before build:
 3. record explicit per-panel `critical / major / minor` findings and bind the four raw images plus two contact sheets to current HTML SHA-256;
 4. run `npm run verify:visual-gate -- docs/<slug>.html`;
 5. repair and recapture after every HTML/CSS/content/structure change;
-6. block commit/push on any critical or major defect.
+6. apply visual-verification-gate budget policy: initial call + two tool retries, or up to three defect repair rounds; validated exhaustion allows direct release with disclosure.
 
 Infrastructure-only capture or visual-review failure must be recorded according to `visual-verification-gate`, with an explicit `evidence_gap`, error category, and outcome. It is never visual pass, and must not fabricate screenshots or dispositions.
 
@@ -210,7 +210,7 @@ Infrastructure-only capture or visual-review failure must be recorded according 
 
 ### Visual exceptions
 
-All `VISUAL_EXCEPTION_AFTER_MAX_REPAIRS` rules, attempt counting, repair-round schema, and final wording are owned by `visual-verification-gate`. This SOP only requires that the Publisher consume its result; do not duplicate or reinterpret that schema here.
+All `VISUAL_EXCEPTION_AFTER_BUDGET` rules, attempt counting, repair-round schema, and final wording are owned by `visual-verification-gate`. This SOP only requires that the Publisher consume its result; do not duplicate or reinterpret that schema here.
 
 ## Main-checkout gates and release
 

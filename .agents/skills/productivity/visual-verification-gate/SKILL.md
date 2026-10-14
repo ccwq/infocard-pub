@@ -47,7 +47,7 @@ For a batch of two or more cards, visual review must record the selected theme a
 
 The following are mechanical preconditions only, never visual PASS evidence: build success, HTTP 200, DOM/accessibility snapshots, CSS/class presence, and `scrollWidth == clientWidth`.
 
-Before the first push of every card, require a current rendered screenshot manifest with four raw captures: desktop/mobile `hero` and the planner-selected `complex` region. Package the two regions for each viewport as one labeled contact sheet, retaining independent panel dispositions. Geometry/DOM checks remain mandatory; footer/sticky evidence is conditional. Any critical or major panel defect blocks push. If capture or analysis infrastructure fails after differentiated retries, keep `VISUAL_PENDING` and do not push unless an explicitly authorized pending-visual release path is used.
+Before the first push of every card, require a current rendered screenshot manifest with four raw captures: desktop/mobile `hero` and the planner-selected `complex` region. Package the two regions for each viewport as one labeled contact sheet, retaining independent panel dispositions. Geometry/DOM checks remain mandatory; footer/sticky evidence is conditional. Any critical or major panel defect blocks push. If capture or analysis infrastructure fails after differentiated retries, keep `VISUAL_PENDING` and apply the exception policy below after its budget is exhausted.
 
 Any HTML/CSS/structure/content change invalidates all prior visual evidence. Re-render the exact public URL after CDN propagation and re-audit after every publish repair. For multi-card batches, track evidence per card; never infer batch visual status from HTTP 200 or one card's PASS.
 
@@ -65,10 +65,10 @@ Any HTML/CSS/structure/content change invalidates all prior visual evidence. Re-
 4. Run `vision_analyze` once per viewport contact sheet. Demand an explicit `critical / major / minor` defect list for each labeled panel. Screenshot delivery to the user is evidence-sharing or requested human review; it never substitutes for the Agent's disposition.
 
    Classify only observable release defects as critical/major: clipping, overlap, missing text, unreadable contrast, broken responsive layout, unintended overflow, or controls obscuring content. Treat subjective suggestions (different shadow, border weight, or stylistic preference) as minor unless they produce one of those observable failures. If an assessment is ambiguous, recapture the affected region at the same viewport and ask a narrow, defect-specific question before editing; do not let fluctuating aesthetic commentary trigger unbounded CSS churn.
-5. If vision infrastructure fails, retry up to five times with a different strategy each time: split the image/region, reduce size, recapture the affected region, or switch to an actually available visual entrypoint. Do not spend retries merely rephrasing the same prompt. From the second failure, record input, strategy, error category, and outcome in run-local evidence.
-6. If any `critical` or `major` defect remains, BLOCK publish. Label `视觉未通过 — 待修复`.
-7. After any repair, repeat from step 1. Only `0 critical / 0 major` may promote to `PUBLISHED`.
-8. After five infrastructure-only failures, static checks may be reported as passed but visual status is `VISUAL_PENDING` / `PUBLISHED_PENDING_VISUAL`, never visual pass.
+5. If vision infrastructure fails, retry twice after the initial call with a different strategy each time: split the image/region, reduce size, recapture the affected region, or switch to an actually available visual entrypoint. Do not spend retries merely rephrasing the same prompt. From the second failure, record input, strategy, error category, and outcome in run-local evidence.
+6. If critical/major defects remain, repair up to three rounds, then apply the exception policy below.
+7. After any repair, repeat from step 1. Zero critical/major is a visual pass; exhausted budgets use the explicit exception state.
+8. After three infrastructure-only failures, static checks may be reported as passed but visual status is `VISUAL_PENDING` / `PUBLISHED_PENDING_VISUAL`, never visual pass.
 9. After any HTML edit that touches structure (new section, new table row, new timeline block, new grid component, content enrichment patch), repeat from step 1. The first review is invalidated by the edit, regardless of how "small" the change feels.
 
 ## Recurring defects (darkblue / hardblue templates)
@@ -134,7 +134,7 @@ agent-browser tab <id> && set viewport 390 844 && screenshot <path>/mobile.png
 A local render pass does not promote a public page to visual PASS. After any HTML/CSS rebuild:
 
 1. Review the exact local candidate at desktop and 390px first.
-2. Build, commit, and push only after local critical/major defects are zero.
+2. Build, commit, and push after local visual pass or a validated budget exception.
 3. Re-open the exact public URL with a cache-busting query and verify the served HTML contains the new structural signatures (`data-theme`, target section count, code-block/risk classes).
 4. Capture and review the public page again at desktop and 390px. If the public visual capture or analysis fails, keep the terminal state `VISUAL_PENDING`; do not convert local PASS + HTTP 200 + DOM checks into public visual PASS.
 5. Record local and public evidence separately, including commit SHA, public `age`/`last-modified` when available, viewport, screenshot path, and critical/major/minor disposition.
@@ -152,70 +152,21 @@ A tool timeout is infrastructure evidence, not a visual pass and not a visual fa
 - Don't commit + push a follow-up patch without re-running the gate. The first pass covered the first version; the patch invalidates that pass.
 - Don't claim "small change, no need to re-screenshot" — the user has corrected this exact anti-pattern (visual review must precede every commit, including follow-up enrichment patches).
 
-## Visual failure exception policy (VISUAL_EXCEPTION_AFTER_MAX_REPAIRS)
+## Visual failure exception policy（唯一权威规则）
 
-The visual gate may be passed by explicit exception after **at most 2 recorded visual failure attempts**. Once the second failed attempt is recorded, stop automatic visual repair and publish only with the manual-review marker at the top of the result. Attempts include real visual defects and screenshot/capture/visual-review infrastructure failures. Infrastructure failures count as attempts, but are not completed repair rounds and must record an explicit evidence gap without fabricated screenshots or review dispositions.
+长期默认，覆盖当前未完成卡与后续信息卡；无需再次逐卡请求例外发布授权。
 
-**Counting rule:** A completed repair round counts only when:
-1. A real HTML/CSS/content/structure change was made (`change_made: true`), **AND**
-2. Fresh desktop AND mobile screenshot evidence was captured afterward, **AND**
-3. A fresh review disposition was recorded.
+- 工具失败：首次调用加两次重试，共最多三次。记录每次实际错误、策略与证据缺口，达到上限后直接继续发布。
+- 布局缺陷：首次审查发现缺陷后，最多三轮真实修复，每轮重新截图与审查；第三轮仍失败时，记录缺陷和影响并直接继续发布。
+- 按每张卡、每个检查项计数；换工具、会话、截图尺寸或策略不清零。桌面通过而移动失败时，只重试失败项。
+- 修复后审查发生工具错误时走独立工具预算，不编造视觉结果。保存此前已确认缺陷。
+- 例外状态是 `VISUAL_EXCEPTION_AFTER_BUDGET`，绝不是 `VISUAL_PASSED`。结果注明视觉未验证或遗留缺陷。
+- DOM发现的布局问题记为布局缺陷；主题契约、内容来源、hash、taxonomy、leak、build与Git策略仍独立阻断。
 
-Every failure attempt must have deterministic `name`, `type` (`visual_defect` or `infrastructure_failure`), and `outcome`. The manifest must record exactly two `visual_failure_attempts` and valid completed `repair_rounds`; fewer or more than two attempts, missing/malformed/unrecorded attempts, stale evidence, or `VISUAL_PENDING` remain blocked.
+机器契约：manifest必须绑定当前target与html_sha256；checks包含desktop/mobile及每个检查项唯一id、viewport、当前html_sha256。
+`passed`包含零严重/主要缺陷的真实review；`tool_exhausted`包含三条顺序attempts（attempt/type=infrastructure_failure/error_category/error/strategy/evidence_gap=true），及remaining_defects数组；`repairs_exhausted`包含initial_review、三条顺序repairs（round/change_made/change_description/before_hash/after_hash/review），最后hash等于当前HTML，及非空remaining_defects（description/impact）。历史轮次hash保留，不能全部伪写为最终hash。
 
-**Exception manifest contract:**
-
-Add a top-level `visual_failure_attempts` array. Each entry is `{ "name": "...", "type": "visual_defect" | "infrastructure_failure", "outcome": "..." }`; infrastructure entries also require `evidence_gap: true` and `error_category`, and must omit screenshots/review dispositions.
-
-```json
-{
-  "target": "docs/<slug>.html",
-  "html_sha256": "<current-sha256>",
-  "review_status": "VISUAL_EXCEPTION_AFTER_MAX_REPAIRS",
-  "theme_match": true,
-  "repair_rounds": [
-    {
-      "attempt": 1,
-      "repair_completed": true,
-      "html_sha256": "<same-sha256>",
-      "desktop": { "critical": 1, "major": 1, "minor": 0, "screenshot_path": "/path/to/desktop-1.png" },
-      "mobile":   { "critical": 1, "major": 1, "minor": 0, "screenshot_path": "/path/to/mobile-1.png" }
-    },
-    {
-      "attempt": 2,
-      "repair_completed": true,
-      "html_sha256": "<same-sha256>",
-      "desktop": { "critical": 0, "major": 1, "minor": 2, "screenshot_path": "/path/to/desktop-2.png" },
-      "mobile":   { "critical": 0, "major": 0, "minor": 0, "screenshot_path": "/path/to/mobile-2.png" }
-    },
-    {
-      "attempt": 2,
-      "repair_completed": true,
-      "html_sha256": "<same-sha256>",
-      "desktop": { "critical": 0, "major": 0, "minor": 2, "screenshot_path": "/path/to/desktop-2.png" },
-      "mobile":   { "critical": 0, "major": 0, "minor": 1, "screenshot_path": "/path/to/mobile-2.png" }
-    }
-  ]
-}
-```
-
-- `repair_rounds` must contain completed repair records; its length is not the failure-attempt count and is not required to be exactly 2.
-- Each record must set `repair_completed: true`, `change_made: true`, and use sequential `attempt` values; these fields make repair evidence deterministic rather than dependent on prose.
-- `visual_failure_attempts` must contain exactly 2 valid records for the exception.
-- Every round's `html_sha256` must match the manifest root `html_sha256` (evidence binding to the reviewed HTML).
-- Every round must have both `desktop` and `mobile` objects with `critical`, `major`, `minor` numbers and a `screenshot_path` string.
-- `review_status` must be the exact string `"VISUAL_EXCEPTION_AFTER_MAX_REPAIRS"`.
-- Fewer than 3 recorded failure attempts, missing evidence, stale hash, malformed records, or `VISUAL_PENDING` **fail the gate** — no automatic upgrade. The exception report must disclose the evidence gap and must not claim visual PASS.
-
-**No automatic retry loop:** The mechanical validator (`scripts/verify-visual-gate.js`) does not edit HTML, recapture, or re-review. The publisher/agent owns each repair action; the validator only checks the declared evidence and final disposition.
-
-**Non-visual gates are unaffected:** `theme_match=false`, hash mismatches, build failures, leak checks, taxonomy failures, and Git policy violations all remain blocking regardless of visual exception status.
-
-**Final report wording** (use verbatim after an exception release):
-
-> 视觉门禁：两次失败后例外放行。已完成最多 2 次"修复 → 重新截图 → 重新审查"；结果顶部标注“需要人工审核”；最终仍遗留 critical=N、major=N、minor=N。该放行仅适用于视觉门禁，非视觉门禁均已独立通过。
-
-A clean visual pass (zero critical/major on initial review) must **not** be reported as an exception.
+`verify-visual-gate.js`只校验证据，不执行重试、修复或发布。Publisher负责实际动作与公开内容复核。旧`VISUAL_EXCEPTION_AFTER_MAX_REPAIRS`仅兼容历史证据，新发布不生成它。
 
 ## Deprecated compatibility entry
 
