@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="graph-paper">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f6f2">
+  <title>把域名验证权交给第三方：ssl.inurl.link 的 CNAME 委派核查 · graph-paper</title>
+  <style>
+    :root{
+      --bg:#f7f6f2;
+      --paper:#fffdf8;
+      --paper-2:rgba(255,255,255,.72);
+      --paper-3:rgba(255,255,255,.45);
+      --ink:#111111;
+      --muted:#6c6a63;
+      --line:#ddd7cb;
+      --grid:rgba(17,17,17,.04);
+      --grid-strong:rgba(17,17,17,.06);
+      --accent:#3f6cff;
+      --accent-soft:rgba(63,108,255,.10);
+      --accent-2:#0f172a;
+      --shadow:0 10px 28px rgba(17,17,17,.05);
+      --tint:rgba(255,255,255,.35);
+      --tint-2:rgba(255,255,255,.48);
+      --tint-3:rgba(255,255,255,.42);
+      --nav-bg:rgba(255,253,248,.86);
+      --dim-fill:#faf8f3;
+      --max:1160px;
+      color-scheme:light;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden}
+    body{
+      min-height:100vh;background:var(--bg);color:var(--ink);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+      font-size:15px;line-height:1.72;
+      background-image:linear-gradient(var(--grid) 1px, transparent 1px),linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size:36px 36px,36px 36px;
+    }
+    img,svg,table{max-width:100%}
+    a{color:inherit}
+    code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .frame{
+      max-width:var(--max);margin:14px auto;border:1px solid var(--line);
+      background-image:linear-gradient(var(--grid-strong) 1px, transparent 1px),linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px),linear-gradient(180deg,var(--paper-2),var(--paper-3));
+      background-size:28px 28px,28px 28px,auto;
+      box-shadow:0 24px 60px var(--shadow);
+    }
+    .nav{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:16px 26px;border-bottom:1px solid var(--line);background:var(--nav-bg)}
+    .wordmark{font-weight:800;font-size:1.05rem;letter-spacing:-.03em}
+    .nav-links{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end;font-size:.88rem}
+    .nav-links a{color:var(--muted);text-decoration:none}
+    .nav-links a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:4px}
+    .star{display:inline-flex;align-items:center;border:1px solid var(--line);padding:.35rem .7rem;background:var(--tint);font-size:.8rem}
+
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;border-bottom:1px solid var(--line)}
+    .hero-left{padding:46px 30px 36px;min-width:0}
+    .hero-right{border-inline-start:1px solid var(--line);padding:26px;display:flex;align-items:flex-start;justify-content:center;min-width:0}
+    .eyebrow{display:inline-flex;align-items:center;gap:.55rem;font-size:.75rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+    .eyebrow:before{content:"";width:38px;height:1px;background:var(--line)}
+    h1{font-size:clamp(1.9rem,4.4vw,3.1rem);line-height:1.06;font-weight:800;letter-spacing:-.045em;margin:0 0 16px;max-width:20ch}
+    .lede{font-size:1.02rem;line-height:1.66;color:var(--muted);margin:0 0 20px;max-width:54ch}
+    .verdict{border:1px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:16px 18px;margin:0 0 18px;max-width:60ch}
+    .verdict strong{display:block;margin-bottom:6px;font-size:.86rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+    .verdict p{margin:0;line-height:1.66}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px}
+    .pill{border:1px solid var(--line);padding:6px 9px;font-size:.78rem;background:var(--tint-2)}
+    .meta-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:.92rem}
+    .meta-list li{display:flex;gap:10px;border-top:1px dashed var(--line);padding-top:8px}
+    .meta-list li:first-child{border-top:none;padding-top:0}
+    .meta-list b{font-weight:600;color:var(--accent-2);min-width:6.5em}
+
+    .graph-shell{width:100%;max-width:560px;border:1px solid var(--line);background:linear-gradient(180deg,var(--paper-2),var(--paper-3));box-shadow:var(--shadow);padding:18px}
+    .graph-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;font-size:.76rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .graph-title strong{color:var(--ink)}
+    svg{width:100%;height:auto;display:block}
+    .edges line{stroke:var(--line);stroke-width:1.2}
+    .node circle{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+    .node text{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;fill:var(--ink);dominant-baseline:middle}
+    .node.hot circle{fill:var(--accent-soft);stroke:var(--accent)}
+    .node.dim circle{fill:var(--dim-fill)}
+    .cap{font-size:.82rem;color:var(--muted);margin-top:10px;line-height:1.6}
+
+    .body-wrap{padding:0}
+    .doc-section{border-bottom:1px solid var(--line);padding:30px clamp(18px,4vw,42px) 34px}
+    .section-label{display:flex;align-items:center;gap:.55rem;font-size:.76rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+    .section-label:before{content:"";width:18px;height:1px;background:var(--line)}
+    h2{font-size:1.42rem;line-height:1.2;letter-spacing:-.03em;margin:0 0 12px}
+    h3{font-size:1.06rem;margin:22px 0 8px;letter-spacing:-.02em}
+    p{margin:0 0 12px}
+    ul,ol{margin:0 0 12px;padding-inline-start:1.2em}
+    li{margin-bottom:6px}
+    blockquote{margin:0 0 14px;padding:10px 14px;border-inline-start:2px solid var(--line);color:var(--muted);background:var(--tint)}
+    blockquote p{margin:0}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .card{border:1px solid var(--line);background:var(--paper);box-shadow:var(--shadow);padding:18px 18px 20px;min-width:0}
+    .card h3{margin-top:0}
+    .card p:last-child,.card ul:last-child{margin-bottom:0}
+    .callout{border:1px solid var(--line);background:var(--paper);padding:14px 16px;box-shadow:var(--shadow);margin:0 0 14px}
+    .callout strong{display:block;margin-bottom:6px}
+    .callout p:last-child{margin-bottom:0}
+    .risk{border-inline-start:3px solid var(--accent);background:var(--accent-soft)}
+    .risk strong{color:var(--accent-2)}
+    .tag{display:inline-block;border:1px solid var(--line);padding:2px 7px;font-size:.76rem;background:var(--tint-2);margin-inline-end:6px}
+    .unverified{color:var(--muted);font-size:.86rem}
+
+    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);background:var(--paper);margin:0 0 16px}
+    table{border-collapse:collapse;width:100%;min-width:640px;font-size:.9rem}
+    caption{caption-side:top;text-align:start;padding:10px 12px;color:var(--muted);font-size:.82rem}
+    th,td{border-bottom:1px solid var(--line);border-inline-end:1px solid var(--line);padding:9px 11px;text-align:start;vertical-align:top}
+    th{background:var(--tint-2);font-weight:600;white-space:nowrap}
+    tr:last-child td{border-bottom:none}
+    th:last-child,td:last-child{border-inline-end:none}
+
+    pre{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;background:var(--paper);border:1px solid var(--line);padding:12px 14px;margin:0 0 14px;font-size:.84rem;line-height:1.6}
+    code{background:var(--accent-soft);padding:1px 5px;border-radius:2px;font-size:.86em}
+    pre code{background:none;padding:0}
+
+    .timeline{display:grid;gap:0;margin:0 0 10px}
+    .step{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:14px 0;border-top:1px dashed var(--line)}
+    .step:first-child{border-top:none;padding-top:0}
+    .step b{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--accent-2);font-size:.92rem}
+    .step p{margin:0 0 8px}
+    .step p:last-child{margin-bottom:0}
+    .pass{font-size:.86rem;color:var(--muted)}
+    details{border:1px solid var(--line);background:var(--paper);padding:10px 14px;margin:0 0 12px}
+    summary{cursor:pointer;font-weight:600}
+    details[open] summary{margin-bottom:10px}
+    .footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:18px clamp(18px,4vw,42px);color:var(--muted);font-size:.85rem}
+    .footer a{border-bottom:1px solid var(--line);text-decoration:none}
+
+    @media (max-width:720px){
+      body{font-size:14.5px}
+      .frame{margin:8px 8px;width:auto}
+      .hero{grid-template-columns:1fr}
+      .hero-right{border-inline-start:none;border-top:1px solid var(--line);padding:18px 16px}
+      .hero-left{padding:30px 18px 24px}
+      .grid-2{grid-template-columns:1fr}
+      h1{max-width:none;font-size:clamp(1.7rem,7.4vw,2.3rem)}
+      .nav{padding:12px 16px}
+      .nav-links{gap:10px}
+      .doc-section{padding:24px 16px 28px}
+      .tbl-wrap table{min-width:600px}
+      .step{grid-template-columns:1fr;gap:4px}
+      pre{font-size:.78rem}
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="nav">
+      <span class="wordmark">SSL CNAME 委派核查 / GRAPH PAPER</span>
+      <nav class="nav-links">
+        <a href="#mechanism">机制</a>
+        <a href="#risk">风险</a>
+        <a href="#diff">口径对照</a>
+        <a href="#alternatives">替代路线</a>
+        <a href="#pilot">试点步骤</a>
+        <a href="#sources">来源</a>
+        <span class="star">2026-10-14 快照</span>
+      </nav>
+    </header>
+
+    <!-- 1 -->
+    <section class="hero">
+      <div class="hero-left">
+        <div class="eyebrow">微信推广文核查 · 一手页面实测</div>
+        <h1>把域名验证权交给第三方，值不值</h1>
+        <p class="lede">一篇公众号文章在推 <span class="mono">ssl.inurl.link</span>，说法是「用 CNAME 委派解决 SSL 证书过期」。这篇卡不替它写广告，也不无依据地否定它，只把机制、口径矛盾和可自验的动作摆出来。</p>
+        <div class="verdict">
+          <strong>一句话结论</strong>
+          <p>它是一个把 DNS-01 验证权交给第三方的托管服务。值不值，取决于你愿不愿意把「为你这个域名申领证书」的能力交给别人。签发和续签确实能省事，但控制权是实打实交出去的。</p>
+        </div>
+        <div class="pill-row">
+          <span class="pill">DNS-01 + CNAME 委派</span>
+          <span class="pill">Let's Encrypt 签发</span>
+          <span class="pill">套餐与文章口径不一致</span>
+          <span class="pill">安装环节仍需手动</span>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="graph-shell">
+          <div class="graph-title"><span>verification path</span><strong>图 1</strong></div>
+          <svg viewBox="0 0 560 300" role="img" aria-label="CNAME 委派验证链路示意">
+            <g class="edges">
+              <line x1="86" y1="66" x2="230" y2="66"></line>
+              <line x1="290" y1="66" x2="430" y2="66"></line>
+              <line x1="490" y1="106" x2="490" y2="180"></line>
+              <line x1="430" y1="220" x2="290" y2="220"></line>
+              <line x1="230" y1="220" x2="86" y2="220"></line>
+            </g>
+            <g class="node hot"><circle cx="60" cy="66" r="26"></circle><text x="60" y="66" text-anchor="middle">域名</text></g>
+            <g class="node"><circle cx="260" cy="66" r="30"></circle><text x="260" y="66" text-anchor="middle">CNAME</text></g>
+            <g class="node hot"><circle cx="466" cy="66" r="30"></circle><text x="466" y="66" text-anchor="middle">平台</text></g>
+            <g class="node dim"><circle cx="490" cy="206" r="26"></circle><text x="490" y="206" text-anchor="middle">LE</text></g>
+            <g class="node"><circle cx="260" cy="220" r="30"></circle><text x="260" y="220" text-anchor="middle">TXT</text></g>
+            <g class="node hot"><circle cx="60" cy="220" r="26"></circle><text x="60" y="220" text-anchor="middle">证书</text></g>
+          </svg>
+          <p class="cap">你的域名 → <span class="mono">_acme-challenge</span> 的 CNAME → 平台控制的区域 → Let's Encrypt 向平台读到 TXT → 签发 → 你把证书装到服务器。虚线以上是控制权交给谁，虚线以下是验证数据流向。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="body-wrap">
+
+    <!-- 1b 适合谁 -->
+    <section class="doc-section" id="fit">
+      <div class="section-label">Fit / 适合谁</div>
+      <h2>先看适合谁，再看机制</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>可能适合</h3>
+          <ul>
+            <li>域名多、服务器多，证书散在各个机器上，没有集中管理。</li>
+            <li>不愿在每台服务器上装 ACME 客户端、也不愿把 DNS API 凭证铺到各处。</li>
+            <li>只关心「证书别过期」，能接受签发环节由第三方代持。</li>
+            <li>用宝塔这类面板，手工粘贴一次证书可以接受。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>大概不适合</h3>
+          <ul>
+            <li>有合规或审计要求，要求私钥与签发链路完全自持。</li>
+            <li>只能用国内 CA，或有备案主体、合同主体的硬要求。文章和落地页都没有提到这家服务的经营主体信息<span class="unverified">（本轮未核到，见第 3 节⑤）</span>。</li>
+            <li>想要「一键全自动」。站内写得很清楚：当前安装到宝塔 Nginx 要手动粘贴，付费版才有自动部署。</li>
+            <li>需要 SLA 或书面条款兜底。落地页上没有搜到服务条款与退款说明。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="doc-section" id="mechanism">
+      <div class="section-label">Mechanism / 机制拆解</div>
+      <h2>它到底把哪一步外包了</h2>
+
+      <h3>DNS-01 验的是什么</h3>
+      <p>Let's Encrypt 要求你证明对域名的 DNS 控制权。挑战类型文档写的是：DNS-01 挑战要求把 token 写进 <code>_acme-challenge.&lt;你的域名&gt;</code> 的 TXT 记录里。CA 能读到这条 TXT，就认为你控制了这个域名的 DNS。这里验的是 DNS 控制权，不是服务器所有权。</p>
+
+      <h3>CNAME 委派怎么把「应答挑战」外包出去</h3>
+      <p>同一份文档明确说，可以（而且允许）用 CNAME 或 NS 记录把应答挑战这件事委派给其他 DNS 区域，常见做法就是把 <code>_acme-challenge</code> 子域委派给单独的区域，或者委派给响应更快的服务器。</p>
+      <p>落地到这家服务：你加一条 CNAME，把 <code>_acme-challenge.&lt;你的域名&gt;</code> 指向平台控制的区域。之后每次签发或续签，往那条 TXT 里写 token 的都是平台，不是你。</p>
+
+      <h3>为什么这能绕过装客户端、换服务器不用重配</h3>
+      <p>因为验证材料落在 DNS 层，不落在你的服务器上。换机器、换面板、换部署方式，都不影响平台往 TXT 里写值。<span class="unverified">这一条是机制推论，作者未在官方文档里找到逐字表述。</span></p>
+
+      <h3>链路走一遍</h3>
+      <div class="callout mono">
+        <p>你的域名 → <code>_acme-challenge</code> 的 CNAME 指向平台 → 平台在自己的区域写入 token TXT → Let's Encrypt 解析到平台区域并读到 TXT → 判定通过 → 签发证书 → 平台把证书交给你 → 你把证书装到服务器</p>
+      </div>
+      <p><span class="unverified">CNAME 条数两边口径不一致：文章说一条；站内写「平台给出 2 条 CNAME 记录，填一次」。以注册后的实际控制台为准。</span></p>
+    </section>
+
+    <!-- 3 -->
+    <section class="doc-section" id="risk">
+      <div class="section-label">Risk / 风险与边界</div>
+      <h2>信任边界在哪，你自己能验到什么</h2>
+      <p>下面五条不给整体结论，只写信任边界在哪，以及你自己能验到什么。</p>
+
+      <div class="callout risk">
+        <strong>① 委派之后，平台能够为你的域名申领证书</strong>
+        <p>acme-dns 的 README 说得很直白（大意）：你实际上是在授权该服务代表你应答 CA 的挑战，因此这个实例能够为你那个做了 CNAME 的域名申请并拿到 TLS 证书。正因如此，acme-dns 官方鼓励自建。（来源：github.com/acme-dns/acme-dns，MIT，stars 2847）</p>
+        <p>这不是漏洞，是 DNS 委派的设计使然。托管服务把这件事做成了产品，性质没变。</p>
+      </div>
+
+      <div class="callout risk">
+        <strong>② 私钥归谁，「私钥不变」对你意味着什么</strong>
+        <p>站内 FAQ 原话：「CNAME 委派模式下，平台只负责证书的签发与续签，并持有用于提供 HTTPS 的证书（公钥）。我们不碰你的业务数据、不登录你的服务器，私钥在续签周期内固定不变。」同一段还提到用 <code>--reuse-key</code> 保证私钥跨续签不变。</p>
+        <p>请注意两件事都要知道，它们不矛盾：平台能为你签发证书（第 ① 条），同时平台声称只持有公钥、不碰业务数据。前一条说的是能力，后一条说的是承诺。</p>
+        <p>站内没有写明私钥是你在本地生成后上传、还是平台生成后下发。<span class="unverified">这一点本轮未核实。</span>如果是平台生成的，那么「只持有公钥」这句话并不说明私钥从哪来。你可以用第 6 节的指纹命令自己回读。</p>
+      </div>
+
+      <div class="callout risk">
+        <strong>③ 平台故障、跑路、停服时，你的续签会怎样</strong>
+        <p>续签依赖平台能在 <code>_acme-challenge</code> 上写 TXT。平台不可用，续签就失败。如果你同时把私钥和客户端都交给了平台，你手里剩下的只有已经装到服务器上的那张证书，到期就是到期。</p>
+        <p>可退出性来自 DNS 记录本身：CNAME 在你的 DNS 账户里，删掉它你就收回了「应答挑战」的能力。<span class="unverified">这一条是机制推论，非官方文档原文。</span>但前提是你还留着一条自己的签发通道，否则删掉 CNAME 只是把续签彻底掐断。</p>
+      </div>
+
+      <div class="callout risk">
+        <strong>④ 证书还得你自己装到服务器上</strong>
+        <p>站内写：「当前需手动粘贴到宝塔 Nginx，二期将支持一键推送」；另一处写「付费版自动部署到宝塔 Nginx」。</p>
+        <p>所以「零操作」目前只覆盖签发与续签这一段。把证书装进 Nginx、reload 服务这一步，多数情况下还是要人来做。文章里那种「换完之后什么都不用管」的印象，和站内描述对不上。</p>
+      </div>
+
+      <div class="callout risk">
+        <strong>⑤ 落地页上没有主体信息链接</strong>
+        <p>本轮在 <span class="mono">ssl.inurl.link</span> 页面文本里搜「备案」「ICP」「隐私」「条款」「退款」，全部 0 命中。测法是在页面渲染后的文本里直接做字符串匹配。</p>
+        <p>这只能说明落地页上没有这些入口，不等于这家服务没有主体信息。<span class="unverified">主体、合同关系、退款规则本轮均未核实。</span>如果你要把它用在有合规要求的环境里，这一条需要你自己去问清楚。</p>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="doc-section" id="diff">
+      <div class="section-label">Diff / 口径对照</div>
+      <h2>文章说什么，站内说什么</h2>
+      <p>下面每一条左边是文章口径，中间是站内页面口径（2026-10-14 快照），右边是怎么自己验。两列冲突时不要凭印象选一个，按验证方式走一遍。</p>
+      <div class="tbl-wrap">
+        <table>
+          <caption>表 1 · 文章与站内口径逐条对照（价格为页面原文，均为 2026-10-14 快照）</caption>
+          <thead>
+            <tr><th>条目</th><th>文章口径</th><th>站内口径</th><th>读者该信哪个 / 怎么自己验</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>免费范围</td>
+              <td>「基于 Let's Encrypt，永久免费起步，不限品牌、不限张数」</td>
+              <td>免费版 ¥0 / 永久，2 个域名额度；另有个人版 ¥59/年 10 域名、专业版 ¥199/年 30 域名、企业版 ¥699/年 100 域名；并写明「所有套餐有效期均为 1 年」</td>
+              <td>「不限张数」与额度表冲突，以站内套餐页为准。注册后看控制台里的域名额度计数，加到第 3 个域名时看是否被拦。</td>
+            </tr>
+            <tr>
+              <td>① 域名数量</td>
+              <td>不限张数</td>
+              <td>免费版 2 个域名，其余版本按 10 / 30 / 100 计</td>
+              <td>这是文章最容易误导人的两处之一。额度是硬限制，不是软提示。以控制台实际额度为准。</td>
+            </tr>
+            <tr>
+              <td>② 免费版续签方式</td>
+              <td>平台会主动告警，读完像是自动续</td>
+              <td>免费版「到期手动续签（每年点击 1 次）」</td>
+              <td>这是第二处容易误导的地方。免费版不是全自动：每年你自己点一次。别把「有告警」等同「自动续签」。</td>
+            </tr>
+            <tr>
+              <td>CNAME 条数</td>
+              <td>平台给你一条 <code>_acme-challenge</code> 的 CNAME 记录</td>
+              <td>添加域名 → 平台给出 2 条 CNAME 记录 → 填一次</td>
+              <td>两边口径不一致，以注册后的实际控制台为准。差一条还是两条，你自己看控制台显示的记录数。</td>
+            </tr>
+            <tr>
+              <td>证书安装</td>
+              <td>换成平台后不用再管证书</td>
+              <td>当前需手动粘贴到宝塔 Nginx，二期支持一键推送；付费版自动部署到宝塔 Nginx</td>
+              <td>「零操作」只覆盖签发续签。装证书这一步按站内描述多数要手动，或需要付费版。</td>
+            </tr>
+            <tr>
+              <td>数据与私钥</td>
+              <td>未展开</td>
+              <td>FAQ 原话：平台只负责签发与续签、持有用于 HTTPS 的证书（公钥）、不碰业务数据、不登录服务器，私钥在续签周期内固定不变（提到 <code>--reuse-key</code>）</td>
+              <td>这条承诺与「平台能为你签发证书」并不矛盾，两件事都要知道。私钥从哪里生成，站内没写清楚。</td>
+            </tr>
+            <tr>
+              <td>套餐有效期</td>
+              <td>「永久免费起步」</td>
+              <td>所有套餐有效期均为 1 年</td>
+              <td>「永久免费」指免费档位长期存在，不指单张证书或单次订阅永久有效。两者不冲突，但表述容易混。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="doc-section" id="alternatives">
+      <div class="section-label">Alternatives / 替代路线</div>
+      <h2>按「你能控制什么」分四类</h2>
+      <p>下面只写官方文档能支撑的事实。不做性能或成功率对比，本轮没有测过这些方案的速度。</p>
+      <div class="tbl-wrap">
+        <table>
+          <caption>表 2 · 四条自持或半自持路线</caption>
+          <thead>
+            <tr><th>路线</th><th>能解决什么</th><th>新增什么信任面</th><th>官方出处</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>自建 acme-dns 做受限委派</td>
+              <td>服务器上不放大权限 DNS API 凭证；多台机器共享一条委派；委派范围限于 <code>_acme-challenge</code> 那一个子域。</td>
+              <td>信任你自己运行的实例。acme-dns README 说，该实例因此能为你那个做了 CNAME 的域名申请并拿到证书，所以官方鼓励自建。</td>
+              <td>github.com/acme-dns/acme-dns（MIT，stars 2847）</td>
+            </tr>
+            <tr>
+              <td>自己跑 acme.sh / certbot + DNS API</td>
+              <td>私钥与签发链路完全自持，最通用；不依赖任何第三方委派。</td>
+              <td>DNS API 凭证放在服务器上。Let's Encrypt 挑战类型文档提醒，把完整 DNS API 凭证放在服务器上会放大被入侵时的影响面。</td>
+              <td>letsencrypt.org/docs/challenge-types/（DNS-01 段）</td>
+            </tr>
+            <tr>
+              <td>K8s 用 cert-manager + <code>cnameStrategy: Follow</code></td>
+              <td>集群内自动签发，并允许把 <code>_acme-challenge</code> 委派到别的区域。</td>
+              <td>默认不跟随指向子域的 CNAME，必须显式开启 Follow 才算委派；跟随之后，被信任的区域同样获得应答能力。</td>
+              <td>cert-manager.io/docs/configuration/acme/dns01/（警告：若存在通配 CNAME，挑战会被写到错误区域并报错，建议显式建 <code>_acme-challenge</code> 记录或用默认 None）</td>
+            </tr>
+            <tr>
+              <td>托管平台自带：Cloudflare Universal SSL / Caddy 自动 HTTPS</td>
+              <td>不用自己碰 ACME。Cloudflare 官方称默认对所有已激活域名签发并续订免费且非共享的公共可信证书；Caddy 官方称默认自动为所有站点配置并续订 TLS。</td>
+              <td>信任 DNS/CDN 平台或你部署的 Caddy 本体。控制权和密钥位置由平台或你的部署环境决定。</td>
+              <td>developers.cloudflare.com（Universal SSL 文档）、caddyserver.com/docs/automatic-https</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details>
+        <summary>如果你只能用国内 CA（阿里云文档口径）</summary>
+        <p>阿里云帮助中心写：免费版个人测试证书服务有效期 90 天、每自然年最多申请 20 张、不提供 SLA、严禁用于有可用性要求的生产业务。</p>
+        <p>同一站另一页写：CA/B 论坛投票自 2026-02-24 起，所有证书最长有效期计划缩至 200 天。<span class="unverified">这条作者只在阿里云文档看到，未从 CA/B 论坛或 Let's Encrypt 一手源独立核到，按阿里云文档口径记录。</span></p>
+        <p>把这两条和上面的托管服务放在一起看：有效期缩短意味着续签频率变高，谁帮你续这件事的价值就上升，同时信任边界的代价也照旧存在。</p>
+      </details>
+    </section>
+
+    <!-- 6 -->
+    <section class="doc-section" id="pilot">
+      <div class="section-label">Pilot / 试点步骤</div>
+      <h2>想试就先在小域名上走一遍</h2>
+      <p><span class="unverified">以下为作者建议流程，本轮未实测：本次没有注册该服务、没有做委派、没有下载或安装任何证书。</span>命令里的 <code>&lt;你的域名&gt;</code> 都换成你自己的域名。</p>
+
+      <div class="timeline">
+        <div class="step">
+          <b>01</b>
+          <div>
+            <p>选一个最不重要的测试域名，确认它的 DNS 解析记录在你的账户里、你能改。</p>
+            <p class="pass">通过标准：你能在同一账户里增删记录。DNS 不在你手上的域名，这一整套都不要碰。</p>
+          </div>
+        </div>
+        <div class="step">
+          <b>02</b>
+          <div>
+            <p>按控制台提示加上 CNAME 记录（条数两边口径不一致，看控制台实际给几条），然后自己去看挑战值有没有落地：</p>
+            <pre><code>dig +short TXT _acme-challenge.&lt;你的域名&gt;
+dig +short CNAME _acme-challenge.&lt;你的域名&gt;</code></pre>
+            <p class="pass">通过标准：CNAME 指向平台；发起签发后能读到 TXT 值（形如一段 base64 串）。读不到就说明委派没生效，先别往下走。</p>
+          </div>
+        </div>
+        <div class="step">
+          <b>03</b>
+          <div>
+            <p>如果平台提供 staging / 测试环境，先在那边验一轮 HTTPS 可用性，避免一上来就在生产域名上做实验。</p>
+            <p class="pass">通过标准：staging 环境下浏览器访问无证书告警，或 <code>curl -v</code> 里能看到完整的证书链。<span class="unverified">站内是否提供 staging 环境，本轮未核实。</span></p>
+          </div>
+        </div>
+        <div class="step">
+          <b>04</b>
+          <div>
+            <p>正式签发后，自己回读证书的签发给谁、什么时候到期：</p>
+            <pre><code>openssl s_client -connect &lt;你的域名&gt;:443 -servername &lt;你的域名&gt; &lt;/dev/null 2&gt;/dev/null \
+  | openssl x509 -noout -issuer -subject -dates</code></pre>
+            <p class="pass">通过标准：<code>issuer</code> 指向 Let's Encrypt 对应中间证书，<code>notAfter</code> 落在 LE 现行有效期区间内（90 天）。和文章说的「基于 Let's Encrypt」对得上，才算这一条被验证。</p>
+          </div>
+        </div>
+        <div class="step">
+          <b>05</b>
+          <div>
+            <p>记下当前证书指纹，作为后续对比基线：</p>
+            <pre><code>openssl s_client -connect &lt;你的域名&gt;:443 -servername &lt;你的域名&gt; &lt;/dev/null 2&gt;/dev/null \
+  | openssl x509 -noout -fingerprint -sha256</code></pre>
+            <p class="pass">通过标准：命令有输出且你能把它存到自己的记录里（复制粘贴即可）。</p>
+          </div>
+        </div>
+        <div class="step">
+          <b>06</b>
+          <div>
+            <p>让平台续一轮（等一次自动续签，或在控制台手动触发，取决于你用的是哪个版本），再跑一次第 05 步的指纹命令。</p>
+            <p class="pass">通过标准：如果站内 <code>--reuse-key</code> 的说法成立，指纹应完全不变。指纹变了说明私钥被重新生成，你就需要把所有服务器上的证书重装一遍——这是选型时要先知道的成本。</p>
+          </div>
+        </div>
+        <div class="step">
+          <b>07</b>
+          <div>
+            <p>做一次退出演练：删掉 CNAME 记录，再查一次：</p>
+            <pre><code>dig +short CNAME _acme-challenge.&lt;你的域名&gt;
+dig +short TXT _acme-challenge.&lt;你的域名&gt;</code></pre>
+            <p class="pass">通过标准：两个命令都不再返回平台的地址。删掉记录即收回验证权，这样你才知道自己随时能退出。<span class="unverified">此处为机制推论，非官方文档原文。</span></p>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>试点要看的其实是三件事</strong>
+        <p>一，控制台给几条 CNAME、额度怎么算；二，免费版到期是不是真的要你手动点；三，私钥是否会变。这三件事都能用自己的命令或控制台界面验出来，不需要信任任何一方的口头描述。</p>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="doc-section" id="scenario">
+      <div class="section-label">Scenario / 场景对照</div>
+      <h2>什么场景适合，什么场景别用</h2>
+      <div class="tbl-wrap">
+        <table>
+          <caption>表 3 · 按场景看（判断依据来自第 2、3 节的一手事实）</caption>
+          <thead>
+            <tr><th>场景</th><th>判断</th><th>依据</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>家庭小站、一两个域名</td>
+              <td>可以用，也可以不用。省下的是客户端维护成本，代价是信任边界外移。</td>
+              <td>免费版 2 个域名额度够用；但每域名每年要手动点一次续签（站内套餐页）。</td>
+            </tr>
+            <tr>
+              <td>多台服务器、同一证书铺在很多机器上</td>
+              <td>签发这一段确实省事；安装这一段省不了多少。</td>
+              <td>站内写当前需手动粘贴到宝塔 Nginx，付费版才自动部署。</td>
+            </tr>
+            <tr>
+              <td>只有 DNS 权限，没有服务器权限</td>
+              <td>这类场景委派的收益最明显。</td>
+              <td>验证材料在 DNS 层，不依赖服务器权限（LE challenge-types 文档的 DNS-01 与 CNAME 委派说明）。</td>
+            </tr>
+            <tr>
+              <td>合规要求高、要审计签发链路</td>
+              <td>不建议把验证权交出去，除非你能补齐主体与条款信息。</td>
+              <td>委派后平台可为你域名申领证书（acme-dns README）；落地页未见隐私政策、服务条款、备案入口（第 3 节⑤实测）。</td>
+            </tr>
+            <tr>
+              <td>只能用国内 CA</td>
+              <td>这套方案不适用，它是 Let's Encrypt 路线。</td>
+              <td>文章与站内都写基于 Let's Encrypt；阿里云免费个人测试证书是另一条线（90 天、每年最多 20 张、无 SLA、禁用于有可用性要求的生产业务）。</td>
+            </tr>
+            <tr>
+              <td>域名数量大（几十上百）</td>
+              <td>看额度是否够。免费版 2 个，专业版 30 个，企业版 100 个。</td>
+              <td>站内套餐页价格与额度（2026-10-14 快照）。文章「不限张数」与这里冲突。</td>
+            </tr>
+            <tr>
+              <td>不想维护 crontab 和 ACME 客户端</td>
+              <td>这是它相对 acme.sh / certbot 最直接的价值。</td>
+              <td>续签动作由平台执行，你只需保证 DNS 里的 CNAME 还在。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="doc-section" id="sources">
+      <div class="section-label">Sources / 来源与边界</div>
+      <h2>本轮用到的一手来源</h2>
+      <ul>
+        <li>来源文章（推广文）：<span class="mono">https://mp.weixin.qq.com/s/uUbT4hT8iLUK_gNm29aAzQ</span>，《用这个工具，再也不用担心 SSL 证书过期了》。含「凌晨两点被客户截图叫醒」这类叙事，属推广/软文体。</li>
+        <li>服务落地页：<span class="mono">https://ssl.inurl.link/</span>（实测 HTTP 200）。该站自身证书：subject CN=ssl.inurl.link，issuer C=US,O=Let's Encrypt,CN=YR2，notBefore 2026-10-07，notAfter 2027-01-05（openssl s_client 实测）。域名 NS 在 Cloudflare（aldo.ns.cloudflare.com / joyce.ns.cloudflare.com），A 记录指向其托管 IP（可用 <code>dig +short ssl.inurl.link</code> 自查）。</li>
+        <li>Let's Encrypt 挑战类型文档：<span class="mono">https://letsencrypt.org/docs/challenge-types/</span>（DNS-01 写入位置、CNAME/NS 委派允许、DNS API 凭证风险提示）。</li>
+        <li>acme-dns：<span class="mono">https://github.com/acme-dns/acme-dns</span>（MIT，stars 2847；README 关于「授权服务代表你应答挑战、实例能为你域名拿到证书、鼓励自建」）。</li>
+        <li>cert-manager DNS01：<span class="mono">https://cert-manager.io/docs/configuration/acme/dns01/</span>（默认不跟随子域 CNAME，需显式 <code>cnameStrategy: Follow</code>；通配 CNAME 会把挑战写到错误区域并报错）。</li>
+        <li>Caddy 自动 HTTPS：<span class="mono">https://caddyserver.com/docs/automatic-https</span>（官方称默认自动为所有站点配置并续订 TLS）。</li>
+        <li>Cloudflare Universal SSL 文档：官方称默认对所有已激活域名签发并续订免费且非共享的公共可信证书。</li>
+        <li>阿里云帮助中心：免费版个人测试证书 90 天 / 每自然年最多 20 张 / 不提供 SLA / 严禁用于有可用性要求的生产业务；另一页写 CA/B 论坛投票自 2026-02-24 起最长有效期计划缩至 200 天（此条仅见阿里云文档口径）。</li>
+      </ul>
+      <div class="callout">
+        <strong>边界声明</strong>
+        <p>本轮未注册该服务、未做任何 CNAME 委派、未下载或安装任何证书。文章属推广文。所有价格、套餐与官网描述均为 2026-10-14 页面快照，之后可能变化。本卡不呼吁使用，也不呼吁抵制任何一方，只给判断方法和可自验的命令。落地页主体信息、私钥生成方式、staging 环境是否存在，均为本轮未核实项，正文已逐处标注。</p>
+      </div>
+    </section>
+
+    </div>
+
+    <footer class="footer">
+      <div>AG雷达 · SSL CNAME 委派核查 · graph-paper · 2026-10-14</div>
+      <div><a href="https://letsencrypt.org/docs/challenge-types/" target="_blank" rel="noreferrer">Let's Encrypt</a> · <a href="https://github.com/acme-dns/acme-dns" target="_blank" rel="noreferrer">acme-dns</a> · <a href="https://cert-manager.io/docs/configuration/acme/dns01/" target="_blank" rel="noreferrer">cert-manager</a></div>
+    </footer>
+  </div>
+</body>
+</html>
