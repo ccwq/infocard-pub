@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="black">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>avante.nvim — Neovim 里的 AI 编码插件（progressive-doc）</title>
+<style>
+  :root{
+    --black:#0a0a0a;
+    --red:#d0202b;
+    --red-soft:#f6e6e7;
+    --teal:#0e7c72;
+    --teal-soft:#e4f2f0;
+    --ink:#141414;
+    --body:#2a2a2a;
+    --muted:#6b6b6b;
+    --paper:#ffffff;
+    --bg:#f1f1ef;
+    --line:#e2e2de;
+    --code-bg:#0f1012;
+    --code-ink:#e8e8e4;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--body);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    font-size:15.5px;
+    line-height:1.72;
+    -webkit-text-size-adjust:100%;
+    overflow-x:hidden;
+  }
+  .wrap{max-width:900px;margin:0 auto;background:var(--paper);}
+  h1,h2,h3,h4{margin:0;font-weight:800;color:var(--ink);letter-spacing:-0.01em;}
+  p{margin:0 0 12px;}
+  a{color:var(--red);text-decoration:none;border-bottom:1px solid rgba(208,32,43,.35);word-break:break-all;}
+  a:hover{border-bottom-color:var(--red);}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:0.88em;}
+
+  /* ---------- header (black head) ---------- */
+  .header{background:#0a0a0a;color:#f5f5f2;padding:34px 28px 30px;}
+  .kicker{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#b9b9b2;margin-bottom:14px;font-weight:700;}
+  .kicker span{color:var(--red);}
+  .header h1{font-size:44px;line-height:1.06;color:#fff;margin-bottom:6px;}
+  .header h1 em{font-style:normal;color:var(--red);}
+  .sub{font-size:18px;line-height:1.55;color:#d5d5cf;max-width:640px;margin-top:10px;}
+  .pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;}
+  .pill{font-size:12.5px;font-weight:600;color:#e6e6e0;background:#1c1c1c;border:1px solid #2e2e2e;border-radius:999px;padding:4px 11px;white-space:nowrap;}
+  .pill.red{color:#fff;background:var(--red);border-color:var(--red);}
+  .pill.teal{color:#0a0a0a;background:#7fd6c9;border-color:#7fd6c9;}
+
+  /* ---------- provenance strip ---------- */
+  .prov{background:#141414;color:#a9a9a2;font-size:13px;padding:12px 28px;border-top:1px solid #242424;line-height:1.6;}
+  .prov b{color:#e9e9e3;font-weight:700;}
+  .prov .red{color:#ff6b74;}
+
+  /* ---------- sections ---------- */
+  section{padding:30px 28px 6px;border-top:1px solid var(--line);}
+  section:first-of-type{border-top:0;}
+  .sec-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;}
+  .sec-no{
+    flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+    min-width:38px;height:30px;padding:0 9px;
+    background:var(--black);color:var(--red);
+    font-size:15px;font-weight:800;border-radius:4px;letter-spacing:.02em;
+  }
+  .sec-head h2{font-size:27px;line-height:1.25;padding-top:1px;}
+  h3{font-size:17.5px;margin:22px 0 10px;padding-left:11px;border-left:3px solid var(--red);line-height:1.4;}
+  h4{font-size:15.5px;margin:16px 0 8px;color:var(--ink);}
+  .lead{font-size:17.5px;line-height:1.62;color:#3a3a3a;margin-bottom:16px;}
+  ul,ol{margin:0 0 12px;padding-left:22px;}
+  li{margin:5px 0;}
+  li::marker{color:var(--red);font-weight:700;}
+  .small{font-size:13.5px;color:var(--muted);line-height:1.65;}
+  strong{color:var(--ink);font-weight:700;}
+
+  /* ---------- cards ---------- */
+  .card{border:1px solid var(--line);border-radius:8px;padding:16px 18px;background:#fbfbf9;margin:0 0 14px;}
+  .card.red{border-color:#eecdd0;background:#fdf7f7;}
+  .card.teal{border-color:#cfe4e1;background:#f6fbfa;}
+  .card-tag{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.06em;padding:2px 8px;border-radius:3px;margin-bottom:9px;text-transform:uppercase;}
+  .tag-red{background:var(--red);color:#fff;}
+  .tag-teal{background:var(--teal);color:#fff;}
+  .tag-black{background:var(--black);color:#fff;}
+
+  .quote{border-left:4px solid var(--red);background:var(--red-soft);padding:13px 16px;border-radius:0 6px 6px 0;margin:0 0 14px;color:#4a2226;font-size:14.5px;line-height:1.68;}
+
+  /* ---------- code ---------- */
+  .codewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 14px;border:1px solid #23262a;border-radius:8px;background:var(--code-bg);}
+  pre{margin:0;padding:14px 16px;color:var(--code-ink);font-size:13px;line-height:1.65;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;}
+  pre .c{color:#7f8b7f;}
+  pre .k{color:#ff8f96;}
+  pre .s{color:#8fd6c9;}
+
+  /* ---------- table ---------- */
+  .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 14px;border:1px solid var(--line);border-radius:8px;}
+  table{border-collapse:collapse;width:100%;min-width:520px;font-size:13.5px;background:#fff;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.6;}
+  th{background:#141414;color:#f2f2ee;font-size:12.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;}
+  tr:last-child td{border-bottom:0;}
+  td code{background:#f1f1ef;padding:1px 5px;border-radius:3px;color:#8f1720;white-space:nowrap;}
+
+  /* ---------- chips ---------- */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px;}
+  .chip{font-size:12.5px;font-weight:600;color:#1d1d1d;background:#f0f0ee;border:1px solid var(--line);border-radius:5px;padding:3px 9px;white-space:nowrap;}
+  .chip.teal{color:#0b5b54;background:var(--teal-soft);border-color:#cbe2df;}
+
+  /* ---------- grids ---------- */
+  .grid2{display:grid;grid-template-columns:calc(50% - 6px) calc(50% - 6px);gap:12px;margin:0 0 14px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 14px;}
+  .grid2 > *,.grid3 > *{min-width:0;}
+  .mini{border:1px solid var(--line);border-radius:7px;padding:12px 13px;background:#fbfbf9;min-width:0;}
+  .mini .t{font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:5px;}
+  .mini .d{font-size:13px;color:#4d4d4d;line-height:1.62;}
+  .stat{font-size:26px;font-weight:800;color:var(--ink);line-height:1.2;}
+  .stat.red{color:var(--red);}
+
+  /* ---------- steps ---------- */
+  .step{display:flex;gap:12px;margin:0 0 14px;}
+  .step-n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--black);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  .step-b{min-width:0;flex:1 1 auto;}
+  .step-b .t{font-weight:800;color:var(--ink);font-size:15px;margin-bottom:5px;}
+
+  /* ---------- flags ---------- */
+  .flag{display:inline-block;font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:3px;vertical-align:1px;white-space:nowrap;}
+  .flag.ok{background:var(--teal-soft);color:#0b5b54;border:1px solid #cbe2df;}
+  .flag.warn{background:var(--red-soft);color:#8f1720;border:1px solid #eecdd0;}
+  .flag.gray{background:#eeeeec;color:#555;border:1px solid var(--line);}
+
+  footer{background:#0a0a0a;color:#9a9a94;font-size:12.5px;padding:20px 28px 26px;line-height:1.7;}
+  footer b{color:#e9e9e3;}
+  footer a{color:#ff7a82;border-bottom-color:#5a2b2f;}
+
+  /* ---------- mobile ---------- */
+  @media (max-width:720px){
+    body{font-size:15px;}
+    .header{padding:26px 18px 22px;}
+    .header h1{font-size:32px;}
+    .sub{font-size:16px;}
+    .prov{padding:11px 18px;}
+    section{padding:24px 18px 4px;}
+    .sec-head h2{font-size:21px;}
+    .lead{font-size:16px;}
+    .grid2{grid-template-columns:100%;}
+    .grid3{grid-template-columns:100%;}
+    h3{font-size:16.5px;}
+    footer{padding:18px;}
+    .stat{font-size:23px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============ 黑头 ============ -->
+<header class="header">
+  <div class="kicker">开源项目 · Neovim 插件 · <span>progressive-doc</span></div>
+  <h1>avante.nvim</h1>
+  <div class="sub">在 Neovim 侧边栏里对话、改选中代码块；agentic 模式下它自己调工具改文件、跑 bash、搜网页。也可以走 ACP 接外部 agent。</div>
+  <div class="pills">
+    <span class="pill red">Apache-2.0</span>
+    <span class="pill">18,189 star</span>
+    <span class="pill">858 fork</span>
+    <span class="pill">v0.4.0 · 2026-09-26</span>
+    <span class="pill">Lua</span>
+    <span class="pill teal">快照 2026-10-14</span>
+  </div>
+</header>
+<div class="prov">
+  仓库 <b>avante-corp/avante.nvim</b>（<b class="red">yetone/avante.nvim 已重定向到这里</b>）· 安装步骤与命令取自 README，本卡未在 Neovim 中实际安装运行。
+</div>
+
+<!-- ============ 01 先做这一步 ============ -->
+<section>
+  <div class="sec-head"><span class="sec-no">01</span><h2>先做这一步</h2></div>
+  <p class="lead">最小可用配置就是下面这段。装之前先记住两条硬要求：<strong>build 字段必须写</strong>（README 用三个感叹号强调，不写会装上但跑不起来），<strong>version 不能设成 <code>"*"</code></strong>（README 原话：Never set this value to <code>"*"</code>! Never!）。</p>
+
+  <div class="codewrap"><pre>{
+  <span class="s">"avante-corp/avante.nvim"</span>,
+  <span class="c">-- build 字段必须设置（README 用三个感叹号强调）</span>
+  <span class="c">-- 不设：插件装上了，但二进制/依赖没构建，跑不起来</span>
+  build = <span class="s">"make"</span>,
+  <span class="c">-- 从源码构建才用它，需要 cargo：</span>
+  <span class="c">-- build = "make BUILD_FROM_SOURCE=true"</span>
+  <span class="c">-- Windows：</span>
+  <span class="c">-- build = "powershell -ExecutionPolicy Bypass -File Build.ps1 -BuildFromSource false"</span>
+
+  <span class="c">-- version 不要写 "*"：README 明确禁止</span>
+  <span class="c">-- version = "*"   -- 错了，别这么写</span>
+
+  dependencies = {
+    <span class="s">"nvim-lua/plenary.nvim"</span>,
+    <span class="s">"MunifTanjim/nui.nvim"</span>,
+    <span class="s">"ColinKennedy/mega.cmdparse"</span>,
+    <span class="s">"ColinKennedy/mega.logging"</span>,
+  },
+}</pre></div>
+
+  <div class="grid2" style="display:grid !important;grid-template-columns:calc(50% - 6px) calc(50% - 6px) !important;gap:12px !important;">
+    <div class="mini">
+      <div class="t">安装方式</div>
+      <div class="d">lazy.nvim，README 首推。示例即上面这段。</div>
+    </div>
+    <div class="mini">
+      <div class="t">预编译产物依赖</div>
+      <div class="d">需要 <code>curl</code> 与 <code>tar</code> 拉取预编译二进制；只有从源码构建时才需要 <code>cargo</code>。</div>
+    </div>
+    <div class="mini">
+      <div class="t">四个依赖插件</div>
+      <div class="d">plenary.nvim、nui.nvim、mega.cmdparse、mega.logging。</div>
+    </div>
+    <div class="mini">
+      <div class="t">项目专属指令</div>
+      <div class="d"><code>instructions_file = "avante.md"</code>，放在项目里，只对该项目生效。</div>
+    </div>
+  </div>
+
+  <div class="quote">踩坑对照：<strong>漏写 build</strong> → 插件加载了但功能不可用；<strong>version 写 "*"</strong> → README 明确点名禁止的写法。这两条是最容易出错的地方。</div>
+</section>
+
+<!-- ============ 02 核心机制 ============ -->
+<section>
+  <div class="sec-head"><span class="sec-no">02</span><h2>核心机制</h2></div>
+  <p class="lead">它做两件事：在编辑器侧边栏里跟你对话；以及改你选中的代码块。区别在于「谁动手」——agentic 模式自己动手，legacy 模式等你批准。</p>
+
+  <div class="grid2" style="display:grid !important;grid-template-columns:calc(50% - 6px) calc(50% - 6px) !important;gap:12px !important;">
+    <div class="mini">
+      <div class="t">agentic 模式 <span class="flag warn">默认</span></div>
+      <div class="d">AI 可用工具，自动生成并应用代码改动：文件操作、bash、网页搜索等。</div>
+    </div>
+    <div class="mini">
+      <div class="t">legacy 模式</div>
+      <div class="d">传统规划模式，不做自动工具执行，所有动作需人工批准。</div>
+    </div>
+  </div>
+
+  <h3>关工具：disable_tools 与 disabled_tools 不是一回事</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>配置项</th><th>作用范围</th><th>什么时候用</th></tr></thead>
+      <tbody>
+        <tr><td><code>disable_tools = true</code></td><td>provider 下设，整体关掉工具</td><td>部分模型不支持工具调用</td></tr>
+        <tr><td><code>disabled_tools = { "python" }</code></td><td>只禁指定工具</td><td>模型过度使用某个工具，单独掐掉</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small">一个整体开关，一个白名单式剔除；混用会把该留的工具一起关掉。</p>
+
+  <h3>工具清单（agentic 模式下可被调用）</h3>
+  <div class="chips">
+    <span class="chip">rag_search</span><span class="chip">python</span><span class="chip">git_diff</span><span class="chip">git_commit</span><span class="chip">glob</span><span class="chip">search_keyword</span><span class="chip">read_file_toplevel_symbols</span><span class="chip">read_file</span><span class="chip">create_file</span><span class="chip">move_path</span><span class="chip">copy_path</span><span class="chip">delete_path</span><span class="chip">create_dir</span><span class="chip">bash</span><span class="chip">web_search_tavily</span>
+  </div>
+  <p class="small">可用的网页搜索后端：Tavily、SerpApi、SearchAPI、Google Programmable Search Engine、Kagi、Brave Search、Firecrawl、SearXNG。</p>
+
+  <h3>ACP：把外部 agent 接进来</h3>
+  <p>ACP 指 Agent Client Protocol（文档 <a href="https://agentclientprotocol.com/overview/introduction">agentclientprotocol.com</a>），目的是让遵循该协议的 AI agent 与开发环境用统一协议交互，覆盖代码编辑、文件操作与工具执行。插件默认内置三个 provider：<strong>codex、gemini、claude-code</strong>。要自建 provider 就写配置里的 <code>acp_providers</code> 段，细节看 <code>:h avante-acp</code> 与 wiki 的 Custom providers 页。</p>
+</section>
+
+<!-- ============ 03 可执行步骤 ============ -->
+<section>
+  <div class="sec-head"><span class="sec-no">03</span><h2>可执行步骤</h2></div>
+
+  <h3>A. 安装</h3>
+  <div class="step">
+    <div class="step-n">1</div>
+    <div class="step-b">
+      <div class="t">先确认环境</div>
+      <div class="d">机器上有 <code>curl</code> 和 <code>tar</code>（取预编译二进制用）。只有走源码构建才需要 <code>cargo</code>。</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-n">2</div>
+    <div class="step-b">
+      <div class="t">写进 lazy.nvim 配置</div>
+      <div class="d">照 <strong>01 先做这一步</strong>里那段骨架：<code>build</code> 字段必设，<code>version</code> 不写 <code>"*"</code>，四个依赖列全。</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-n">3</div>
+    <div class="step-b">
+      <div class="t">Unix 用 make，Windows 用 Build.ps1</div>
+      <div class="d"><code>build = "make"</code>；要从源码构建改成 <code>"make BUILD_FROM_SOURCE=true"</code>。Windows 用 <code>powershell -ExecutionPolicy Bypass -File Build.ps1 -BuildFromSource false</code>。</div>
+    </div>
+  </div>
+
+  <h3>B. 认证</h3>
+  <div class="card red">
+    <span class="card-tag tag-red">Claude Pro / Max 订阅</span>
+    <p style="margin-bottom:8px;">把 claude provider 的 <code>auth_type</code> 设为 <code>"max"</code>，重开 Neovim 后走浏览器授权，登录后把页面上显示的 code 粘回 Neovim 的提示框。</p>
+    <p style="margin-bottom:0;"><span class="flag warn">前置</span> 如果之前选过别的 provider，先执行 <code>:AvanteSwitchProvider claude</code>。</p>
+  </div>
+  <div class="card teal">
+    <span class="card-tag tag-teal">自己的 API key</span>
+    <p style="margin-bottom:8px;">环境变量加 <code>AVANTE_</code> 前缀可与其它应用隔离，例如 <code>AVANTE_ANTHROPIC_API_KEY</code>、<code>AVANTE_OPENAI_API_KEY</code>、<code>AVANTE_GEMINI_API_KEY</code>。</p>
+    <p style="margin-bottom:0;">不设环境变量时，Avante 启动会提示输入 API key。README 建议把环境变量写进 shell 配置，保持跨会话一致。</p>
+  </div>
+
+  <h3>C. 常用命令</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>命令</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>:AvanteAsk [question] [position]</code></td><td>就代码提问，position 设窗口位置</td></tr>
+        <tr><td><code>:AvanteChat</code></td><td>就整个代码库开始对话会话（默认 ask=false）</td></tr>
+        <tr><td><code>:AvanteChatNew</code></td><td>开新会话；旧会话可用会话选择器重新打开</td></tr>
+        <tr><td><code>:AvanteEdit</code></td><td>编辑选中的代码块</td></tr>
+        <tr><td><code>:AvanteHistory</code></td><td>打开历史会话选择器</td></tr>
+        <tr><td><code>:AvanteBuild</code></td><td>构建项目依赖</td></tr>
+        <tr><td><code>:AvanteFocus</code></td><td>在侧边栏与主窗口间切换焦点</td></tr>
+        <tr><td><code>:AvanteRefresh</code></td><td>刷新所有 Avante 窗口</td></tr>
+        <tr><td><code>:AvanteClear</code></td><td>清空当前会话聊天记录</td></tr>
+        <tr><td><code>:Avante acp modes</code></td><td>切换 ACP 模式（<code>:AvanteACPModes</code> 是废弃别名）</td></tr>
+        <tr><td><code>:Avante acp sessions</code></td><td>列出当前 ACP agent 的会话（含它 CLI 里开的）并恢复选中项</td></tr>
+        <tr><td><code>:Avante rag start | stop | status</code></td><td>管理 RAG 服务</td></tr>
+        <tr><td><code>:Avante rag query How does authentication work?</code></td><td>查询当前项目</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>D. 可选：RAG 与 MCP</h3>
+  <p>RAG <strong>默认不启用</strong>，且要单独装 rag service。安装二选一：</p>
+  <div class="codewrap"><pre><span class="c"># 方式一：nix</span>
+nix build .#ragService
+
+<span class="c"># 方式二：uv</span>
+uv venv &amp;&amp; source .venv/bin/activate &amp;&amp; uv pip install --editable py/rag-service</pre></div>
+  <p>然后配 <code>rag_service</code> 段：<code>enabled</code>、<code>url</code>（默认 <code>http://localhost:20250</code>）、<code>runner</code>（<code>docker</code> 或 <code>native</code>）、<code>llm</code>（provider / endpoint / api_key / model，示例用 openai + <code>gpt-4o-mini</code>）、<code>embed</code>（示例用 <code>text-embedding-3-large</code>，<code>max_embedding_tokens</code> 512）。</p>
+  <p>MCP 不走本插件：通过 <strong>mcphub.nvim</strong> 接入，需额外安装。</p>
+</section>
+
+<!-- ============ 04 预期现象 ============ -->
+<section>
+  <div class="sec-head"><span class="sec-no">04</span><h2>预期现象</h2></div>
+  <p class="lead">装好之后：侧边栏出现对话面板，选中代码后它能给改动建议，agentic 模式下改动可以直接落到文件里。</p>
+
+  <div class="grid3" style="display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:10px !important;">
+    <div class="mini">
+      <div class="t">侧边栏里能看到的</div>
+      <div class="d">对话记录、改动内容，以及 <strong>apply all</strong> / <strong>apply cursor</strong> 这类应用按钮——决定把哪些改动写回文件。</div>
+    </div>
+    <div class="mini">
+      <div class="t">选中代码块之后</div>
+      <div class="d">用 <code>:AvanteEdit</code> 直接编辑选中的块，不用把代码复制到别处。</div>
+    </div>
+    <div class="mini">
+      <div class="t">RAG 开启之后</div>
+      <div class="d">服务起来后可以用 <code>:Avante rag query &lt;问题&gt;</code> 查询当前项目，例如「How does authentication work?」。</div>
+    </div>
+  </div>
+
+  <h3>作者怎么用它日更（推文侧信息）</h3>
+  <div class="quote">这一段来自 <a href="https://x.com/yupi996/status/2109906986032668888">推文原文</a>，不是 README 内容。推文未点名仓库，本卡按作者 yetone 高置信度匹配到 <strong>avante-corp/avante.nvim</strong>（18,189 star，2026-10-14），此匹配关系属推断。</div>
+  <p>推文称作者在 Claude Code 里用 <code>/loop</code> 定时命令挂了 <strong>3 条提示词</strong>，每隔一阵自动重跑：</p>
+  <ol>
+    <li>盯 GitHub issue 与 PR——别人的 PR 先拉下来跑一遍再合并；</li>
+    <li>盯推特反馈——能复现的 bug 修好就上线，再回复网友；</li>
+    <li>定期清理屎山代码，把踩过的坑写进经验文件。</li>
+  </ol>
+
+  <div class="card red">
+    <span class="card-tag tag-red">关键边界 · /loop 不是常驻后台</span>
+    <p style="margin-bottom:8px;"><code>/loop</code> 是 <strong>Claude Code 内置的会话内定时能力</strong>：<code>/loop [interval]</code> 让一条 prompt 或 slash command 按间隔重复执行，最小粒度 <strong>1 分钟</strong>，支持 Ns / Nm / Nh / Nd 写法。官方文档：<a href="https://code.claude.com/docs/en/scheduled-tasks">code.claude.com/docs/en/scheduled-tasks</a>。</p>
+    <p style="margin-bottom:0;">官方文档说明这类定时任务 <strong>session-scoped（会话内生效）</strong>，依赖 Claude Code 会话处于活动状态，<strong>不是常驻后台服务</strong>。所以推文那句「每隔一阵自动重跑」不等于常驻自动化——会话关掉就不跑了。</p>
+  </div>
+
+  <h3>未核实项（推文侧）</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>推文说法</th><th>状态</th><th>怎么核实</th></tr></thead>
+      <tbody>
+        <tr><td>「1 万 Star 的开源项目一天发了 19 个版本」</td><td><span class="flag warn">未核实</span></td><td>看仓库 Releases 页在对应日期的发布记录</td></tr>
+        <tr><td>「挂了 3 条提示词」的具体提示词原文</td><td><span class="flag warn">未核实</span></td><td>看作者 X 时间线或仓库文档（推文只给了摘要）</td></tr>
+        <tr><td>「网友上午吐槽，2 小时后修复版上线，同一分钟还回复了这位网友」</td><td><span class="flag warn">未核实</span></td><td>个案，属推文转述，需比对 issue/commit/发布记录</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small">已核实部分只有 <code>/loop</code> 本身的行为与粒度，来源是 Claude Code 官方文档；README 未提及该用法。</p>
+</section>
+
+<!-- ============ 05 已知限制与边界 ============ -->
+<section>
+  <div class="sec-head"><span class="sec-no">05</span><h2>已知限制与边界</h2></div>
+  <p class="lead">README 自述仍处早期阶段（Given its early stage），基础功能列表本身也是以「当前支持以下基础功能」的措辞给出的。</p>
+
+  <h3>TODOs 里的未完成项</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>未完成项</th><th>对使用者的意思</th></tr></thead>
+      <tbody>
+        <tr><td>改进安全方面并文档化沙箱方案</td><td>沙箱方案尚未文档化，安全边界自己心里要有数</td></tr>
+        <tr><td>让 RAG 服务更好接入</td><td>现在接起来不方便</td></tr>
+        <tr><td>把更多内部代码迁到 Rust</td><td>内部实现仍在迁移中</td></tr>
+        <tr><td>更好的调试能力（尤其针对 prompts）</td><td>调 prompts 的手段偏弱</td></tr>
+        <tr><td>更有效的 bug 上报助手</td><td>——</td></tr>
+        <tr><td>更好的代码库索引</td><td>索引能力待加强</td></tr>
+        <tr><td>去掉已归档的 plenary.nvim</td><td>目前仍依赖一个已归档的插件</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>开箱即用程度</h3>
+  <ul>
+    <li><strong>MCP 不是开箱即用</strong>：需要额外装 mcphub.nvim。</li>
+    <li><strong>RAG 默认关闭</strong>：还要单独安装 rag service（nix 或 uv），并且自带 LLM 与 embedding 两套模型配置才能跑。</li>
+    <li><strong>默认输入提供器有已知问题</strong>：native（<code>vim.ui.input</code>）是默认值，README 提到它当前有问题，建议改用 snacks 或其它选择器。</li>
+  </ul>
+
+  <div class="card">
+    <span class="card-tag tag-black">本卡未验证的部分</span>
+    <ul style="margin-bottom:0;">
+      <li>未在 Neovim 中实际安装运行 avante.nvim，安装步骤与命令均取自 README。</li>
+      <li>推文提到的日更节奏与 issue/PR 自动处理流程未做实测。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 06 许可与来源 ============ -->
+<section>
+  <div class="sec-head"><span class="sec-no">06</span><h2>许可与来源</h2></div>
+  <div class="grid2" style="display:grid !important;grid-template-columns:calc(50% - 6px) calc(50% - 6px) !important;gap:12px !important;">
+    <div class="mini">
+      <div class="t">License</div>
+      <div class="d">Apache-2.0</div>
+    </div>
+    <div class="mini">
+      <div class="t">语言 / 当前版本</div>
+      <div class="d">Lua · v0.4.0（2026-09-26）</div>
+    </div>
+    <div class="mini">
+      <div class="t">仓库</div>
+      <div class="d"><a href="https://github.com/avante-corp/avante.nvim">github.com/avante-corp/avante.nvim</a><br><span class="small">yetone/avante.nvim 已重定向到这里。</span></div>
+    </div>
+    <div class="mini">
+      <div class="t">数据快照</div>
+      <div class="d">2026-10-14 · 18,189 star · 858 fork</div>
+    </div>
+  </div>
+  <p class="small">其它引用来源：Claude Code 定时任务官方文档 <a href="https://code.claude.com/docs/en/scheduled-tasks">code.claude.com/docs/en/scheduled-tasks</a>；ACP 协议文档 <a href="https://agentclientprotocol.com/overview/introduction">agentclientprotocol.com</a>；推文 <a href="https://x.com/yupi996/status/2109906986032668888">推文原文</a>（未点名仓库，按作者 yetone 高置信度匹配）。</p>
+</section>
+
+<footer>
+  <b>avante.nvim</b> · progressive-doc 分层卡 · 主题 black · 快照 2026-10-14<br>
+  安装步骤取自 README，未在 Neovim 中实测；推文侧内容已逐条标注核实状态。
+</footer>
+
+</div>
+</body>
+</html>
