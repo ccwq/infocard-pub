@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="redswiss" data-content-shape="progressive-doc">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudentSim：学生模拟与导师训练的实用阅读指南</title>
+<meta name="description" content="理解 StudentSim 两阶段 LoRA、象棋导师强化学习、实验指标与数据许可，从官方 README 和 chess 数据开始。">
+<style>
+    :root{
+      --bg:#f5f2ec; --paper:#fffdf9; --ink:#0a0a0a;
+      --red:#c8102e; --soft-red:#fff5f6;
+      --line:#0a0a0a;
+      --shadow:6px 6px 0 rgba(10,10,10,.10);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+      background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.6;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* === 顶栏：fact_store 风格 diagonal red-black hero + 右侧 meta pill === */
+    .topbar{
+      display:grid;grid-template-columns:1.28fr .72fr;
+      border-bottom:3px solid var(--line);
+      margin-bottom:14px;
+      overflow:hidden;
+    }
+    .topbar-hero{
+      padding:18px 18px 14px;
+      background:linear-gradient(135deg,var(--red) 0%,#d92a45 58%,#111 58%,#111 100%);
+      color:#fff;
+    }
+    /* === topbar-meta: 2行结构 + 字号分层 === */
+    .topbar-meta{
+      padding:14px;
+      border-left:3px solid var(--line);
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:0;
+      align-content:start;
+      background:#f6f1f1;
+    }
+    .meta-row-high{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      gap:5px;
+      padding-bottom:6px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:5px;
+    }
+    .meta-row-low{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 0.8fr;
+      gap:5px;
+    }
+    .meta-pill-lg{
+      border:2px solid var(--line);
+      padding:7px 9px 5px;
+      background:#fff;
+      font-weight:900;
+      font-size:14px;
+      line-height:1.1;
+    }
+    .meta-pill-lg .sub{
+      display:block;
+      font-size:9px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:2px;
+    }
+    .meta-pill-md{
+      border:2px solid var(--line);
+      border-left:4px solid var(--red);
+      padding:4px 7px 3px;
+      background:#fff;
+      font-weight:800;
+      font-size:11.5px;
+      line-height:1.25;
+    }
+    .meta-pill-md .sub{
+      display:block;
+      font-size:8.5px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#888;
+      margin-top:1px;
+    }
+    .meta-pill-sm{
+      border:2px solid var(--line);
+      border-left:4px solid #666;
+      padding:3px 7px 3px;
+      background:#fff;
+      font-weight:700;
+      font-size:11px;
+      color:#555;
+      line-height:1.3;
+    }
+    .meta-pill-sm .sub{
+      display:block;
+      font-size:8px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:#aaa;
+      margin-top:1px;
+    }
+    @media(max-width:720px){
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:none;border-top:3px solid var(--line)}
+      .meta-row-high,.meta-row-low{grid-template-columns:1fr 1fr}
+      .overview{padding:10px 0}
+      .overview-sentence{font-size:13px}
+      .overview-body{font-size:12px}
+    }
+    .kicker{
+      display:inline-block;border:2px solid #fff;padding:4px 8px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;
+    }
+    h1.demo-title{
+      margin:10px 0 6px;
+      font-size:clamp(20px,3.2vw,38px);font-weight:800;
+      letter-spacing:-.03em;line-height:1.05;
+    }
+    .sub-line{font-size:13px;line-height:1.55;color:#fff8f8;margin:6px 0 0;max-width:52ch}
+    .meta-pill{border:2px solid var(--line);padding:6px 10px;background:#fff;font-weight:700;font-size:11.5px}
+    .tagline{display:inline-block;padding:3px 8px;border:2px solid #fff;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+
+    /* === overview：一句话概述 + 正文缩略 === */
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:14px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+
+    /* === stats：红黑网格 === */
+    .stats{display:flex;flex-wrap:wrap;border:2px solid var(--line);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow)}
+    .stat{flex:1;min-width:60px;padding:10px 12px 8px;border-right:2px solid var(--line);text-align:center;background:#fff}
+    .stat:last-child{border-right:none}
+    .stat strong{display:block;font-size:18px;font-weight:900;line-height:1;color:var(--ink)}
+    .stat span{font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;display:block}
+
+    /* === pills：红/黑为主，无蓝黄绿 === */
+    .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .pill{padding:4px 10px;border:2px solid var(--line);font-size:11px;font-weight:800;background:#fff}
+    .pill.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .pill.dark{background:var(--ink);color:#fff}
+    .pill.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === section：红头黑框 dense grid === */
+    .section{border:2px solid var(--line);margin-bottom:10px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+    .sec-head{
+      background:var(--ink);color:#fff;padding:7px 12px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .sec-head .num{color:var(--red);font-size:13px;font-weight:900;letter-spacing:.02em}
+    .sec-head .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .sec-body{padding:10px 12px}
+
+    h3{font-size:14px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+    p{font-size:12.5px;line-height:1.68;margin:0 0 8px;color:#333}
+
+    /* === tags：红色为主 === */
+    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .tag{padding:3px 8px;border:1.5px solid var(--red);color:var(--red);font-size:10.5px;font-weight:800;background:var(--soft-red)}
+
+    /* === grid-2/3：纯红黑 grid === */
+    .grid-2,.grid-3{display:grid;gap:10px;margin-bottom:10px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .card h4{font-size:13px;font-weight:800;margin:0 0 5px;letter-spacing:-.01em}
+    .card p{font-size:12px;margin:0;color:#444;line-height:1.62}
+    .card .lead{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:5px}
+
+    /* === table：红黑高密度 === */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+    th,td{padding:7px 10px;border:1.5px solid var(--line);text-align:left}
+    th{background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    tr:nth-child(even) td{background:#faf8f4}
+    .check{color:var(--red);font-weight:900;font-size:13px}
+    .cross{color:var(--ink);font-weight:900;font-size:13px}
+
+    /* === flow：红箭头 === */
+    .flow{display:flex;align-items:center;gap:0;margin-bottom:10px;box-shadow:var(--shadow)}
+    .flow-item{flex:1;border:2px solid var(--line);padding:8px 10px;text-align:center;font-weight:800;font-size:12px;background:#fff}
+    .flow-item.red{background:var(--red);color:#fff;border-color:var(--red)}
+    .flow-arrow{width:22px;flex-shrink:0;text-align:center;font-size:14px;color:var(--red);font-weight:900;background:var(--bg)}
+
+    /* === btn：红/黑 === */
+    .btn{display:inline-block;padding:7px 14px;border:2px solid var(--line);background:var(--ink);color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+    .btn.red{background:var(--red);border-color:var(--red)}
+    .btn.soft{background:var(--soft-red);color:var(--red);border-color:var(--red)}
+
+    /* === rule === */
+    .rule{height:3px;background:var(--ink);margin:10px 0}
+    .source-note{margin-top:14px;text-align:center;color:#666;font-size:11.5px;line-height:1.62}
+
+    /* === Responsive === */
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .grid-3,.grid-2{grid-template-columns:1fr}
+      .stats{flex-direction:column}
+      .stat{border-right:0;border-bottom:2px solid var(--line)}
+      .stat:last-child{border-bottom:0}
+      .card{padding-left:12px;padding-right:12px}
+      .topbar{grid-template-columns:1fr}
+      .topbar-meta{border-left:0;border-top:3px solid var(--line)}
+      h1.demo-title{font-size:clamp(18px,6vw,28px)}
+    }
+  
+/* Readability overrides preserve the complete RedSwiss selector set. */
+body{font-size:15px;line-height:1.75}p,.card p,.overview-body{font-size:15px;line-height:1.78}.overview-body p{margin-bottom:8px}.overview-sentence{font-size:20px;line-height:1.5}
+h1.demo-title{line-height:1.2}h2{font-size:18px;line-height:1.45;margin:0}h3{font-size:17px;margin:14px 0 8px}.card h4{font-size:16px}
+.kicker,.tagline,.pill,.tag,.card .lead,.stat span,.sec-head .label,th,.source-note,.meta-pill-sm{font-size:12px}
+.meta-pill-lg .sub,.meta-pill-md .sub,.meta-pill-sm .sub{font-size:12px;color:#555;letter-spacing:0;text-transform:none;line-height:1.45}
+.meta-pill-lg,.meta-pill-md,.meta-pill-sm{line-height:1.4;overflow-wrap:anywhere}.topbar-hero,.topbar-meta,.sec-body{min-width:0}
+.sec-head{gap:12px;padding:10px 14px}.sec-head .num{color:#fff;background:var(--red);padding:3px 7px;flex-shrink:0}.sec-head h2{flex:1}.sec-body{padding:18px}.stat strong{font-size:24px;line-height:1.2}
+ul,ol{padding-left:24px;margin:10px 0 16px}li{margin:6px 0}
+.table-wrap{max-width:100%;overflow-x:auto;margin:10px 0 18px;border:1px solid var(--line);scrollbar-width:auto}.table-wrap table{min-width:680px;margin:0;box-shadow:none;font-size:14px}th,td{vertical-align:top;line-height:1.7;padding:10px 12px}th{font-size:13px}.scroll-hint{font-size:12px;color:#555;margin-bottom:4px}
+.alert{border:2px solid var(--red);background:var(--soft-red);padding:14px;margin:12px 0}.alert strong{color:var(--red)}.flow{align-items:stretch}.flow-item{font-size:14px;padding:12px 8px}.flow-arrow{align-self:center}
+.nav-links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.nav-links a{font-size:13px;border-bottom:2px solid var(--red)}.sec-body a:not(.btn),.source-note a{color:var(--red);text-decoration:underline;text-underline-offset:3px}a:focus-visible,summary:focus-visible{outline:3px solid var(--red);outline-offset:3px}
+details{border:2px solid var(--line);background:#fff;margin:12px 0}summary{font-size:15px;font-weight:800;cursor:pointer;padding:12px}details>div{padding:0 14px 14px}.code-block{background:var(--ink);color:#fff;padding:16px;overflow-x:auto;font-size:13px;line-height:1.8;white-space:pre-wrap;margin:12px 0}.footer-block{border:2px solid var(--line);background:#fff;padding:18px;margin-top:16px}.footer-block h3{margin-top:0}.source-note{text-align:left}code{overflow-wrap:anywhere}
+@media(max-width:720px){.grid-2,.grid-3{grid-template-columns:1fr}.meta-row-high,.meta-row-low{grid-template-columns:1fr}.sec-body{padding:14px}.topbar-hero{padding:18px 14px}.topbar-meta{padding:12px}.overview-body,.overview-body p,.card p,p{font-size:15px}.overview-sentence{font-size:18px}.table-wrap{overflow-x:auto}.table-wrap table{min-width:680px}.code-block{font-size:12px;padding:12px}.flow{flex-direction:column;gap:4px}.flow-arrow{transform:rotate(90deg);width:auto}.flow-item{flex:auto}.sec-head{padding-left:14px;flex-wrap:wrap}.sec-head .label{letter-spacing:0}.card{padding:14px}.source-note{overflow-wrap:anywhere}}
+.category-dot{letter-spacing:1px}</style>
+</head>
+<body>
+<main class="page">
+<header class="topbar"><div class="topbar-hero"><div class="category-dot kicker">开发工具 · 微软研究项目</div><h1 class="demo-title">StudentSim<br>先模拟学生，再研究导师</h1><p class="sub-line">用真实学习轨迹训练学生模拟器，为教学 AI 提供离线实验环境。适合教育 AI 研究者与具备微调经验的开发者，不是开箱即用的在线教学产品。</p><div class="tagline">第一步：看 chess 数据与官方 README</div></div><div class="topbar-meta"><div class="meta-row-high"><div class="meta-pill-lg">两阶段 LoRA<span class="sub">领域 pooled → 个体 specialization</span></div><div class="meta-pill-lg">60 名学习者<span class="sub">30 象棋 / 15 二语 / 15 数学</span></div></div><div class="meta-row-low"><div class="meta-pill-md">象棋 RL<span class="sub">仅导师概念验证</span></div><div class="meta-pill-md">MIT<span class="sub">软件许可，不是数据许可</span></div><div class="meta-pill-sm">研究框架<span class="sub">不等于真人学习证据</span></div></div></div></header>
+<div class="overview"><div class="overview-sentence">它模拟学习者如何回应，而不是直接证明教学有效。</div><div class="overview-body"><p><strong>是谁？</strong><code>microsoft/StudentSim</code> 是微软公开的学生模拟研究项目：先学习同一领域的共同行为，再针对个体专门化；论文还在象棋中用模拟反馈训练导师。</p><p><strong>适合谁？</strong>需要研究学习者差异、教学反馈奖励与可复现实验的人。如果要立即服务真实学生的聊天导师，或已经证实能提分的产品，它并不提供这种保证。</p><p><strong>第一步？</strong>先读官方 README 与 chess 数据说明，挑一条记录看懂输入、学习者行为和目标输出，再决定是否构建数据与训练。不要把长时间导师 RL 当作入门动作。</p></div><div class="nav-links" aria-label="阅读导航"><a href="#mechanism">机制</a><a href="#start">上手路径</a><a href="#metrics">实验口径</a><a href="#reproduce">复现清单</a><a href="#license">许可成本</a><a href="#sources">来源边界</a></div><a class="btn red" href="https://github.com/microsoft/StudentSim">从官方 README 开始 ↗</a> <a class="btn" href="https://microsoft.github.io/StudentSim/">查看项目介绍 ↗</a></div>
+<div class="stats" aria-label="数据范围"><div class="stat"><strong>30</strong><span>象棋学习者</span></div><div class="stat"><strong>15</strong><span>二语学习者</span></div><div class="stat"><strong>15</strong><span>数学学习者</span></div><div class="stat"><strong>仅象棋</strong><span>导师 RL 验证范围</span></div></div>
+<div class="pills"><span class="pill red">学习轨迹建模</span><span class="pill dark">离线教学研究</span><span class="pill">LoRA 专门化</span><span class="pill soft">奖励归因需谨慎</span></div>
+<section class="section" id="mechanism"><div class="sec-head"><span class="num">01</span><h2>两阶段机制：先共性，再个体</h2><span class="label">学生建模</span></div><div class="sec-body"><p>学生模拟不是给通用模型写一句角色提示。StudentSim 用两阶段 LoRA 区分领域共同模式与个体特征；模拟的是学习者行为与回应，不能自动等同于人的认知过程。</p><div class="grid-2"><article class="card"><div class="lead">Stage 1 · pooled</div><h4>领域汇总训练</h4><p>汇集同一领域的学习轨迹，学习该领域学生的共同回应模式。它是领域级模拟器，后面的象棋导师 RL 使用的是这一阶段。</p></article><article class="card"><div class="lead">Stage 2 · specialization</div><h4>个体专门化</h4><p>在第一阶段基础上，针对某名学习者的轨迹继续专门化，目标是更接近个体表现，而不是给所有人套同一个学生角色。</p></article></div><div class="flow"><div class="flow-item">领域学习轨迹</div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-item red">Stage 1 汇总 LoRA</div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-item">Stage 2 个体 LoRA</div></div><div class="alert"><strong>两个研究问题不能混为一谈。</strong><p>“能否模仿个体学生”与“能否给导师训练提供有用反馈”不是同一问题。导师 RL 使用 Stage 1 pooled，而非个体 Stage 2，所以不能把导师结果直接归功于个体化。</p></div><details><summary>深入理解：为什么先共性，再个体？</summary><div><p>直观上，第一阶段先学习领域语言与常见行为，第二阶段再调整个人偏差。这是理解设计的解释，不保证迁移到任意新领域都成功。实际复现仍需检查数据覆盖、个体划分与训练预算。</p><p>建议保留学习者标识，明确哪些轨迹用于训练、哪些用于评估；行为拟合与泛化应分别观察。这是复现检查建议，不是断言官方实验存在数据泄漏。</p></div></details></div></section>
+<section class="section"><div class="sec-head"><span class="num">02</span><h2>导师闭环：谁更新，谁保持冻结</h2><span class="label">象棋概念验证</span></div><div class="sec-body"><p>象棋实验中，导师先给指导，冻结的学生模拟器据此修正走法，再用 Stockfish 评估走法改善，把反馈用于更新导师。<strong>被更新的是导师，模拟器保持冻结。</strong></p><div class="flow"><div class="flow-item">导师给指导</div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-item">冻结模拟器修正走法</div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-item">Stockfish 评估改善</div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-item red">更新导师</div></div><div class="grid-2"><article class="card"><div class="lead">奖励结构</div><h4>不只看走法改善</h4><p>奖励包含风格头与棋盘事实头，并通过乘法门控组合。训练收益需要连同这些约束理解，不能只归因于模拟学生这一项。</p></article><article class="card"><div class="lead">对照边界</div><h4>GPT-5.4 条件并非完全同构</h4><p>GPT-5.4 模拟学生的对照没有相同奖励头。模拟器与奖励结构存在差别，整体收益不能解释为“个体化独立产生全部提升”。</p></article></div><p>二语与数学属于学生模拟的数据范围，但导师强化学习只在象棋中做概念验证，不代表在语言学习、数学课程或真实课堂证明同样的收益。</p></div></section>
+<section class="section" id="start"><div class="sec-head"><span class="num">03</span><h2>渐进上手：从样本理解到有限实验</h2><span class="label">先阅读再训练</span></div><div class="sec-body"><p>以下是建议的阅读与复现顺序。实际依赖、脚本、模型和参数以官方 README 为准，本卡不提供未经核验的安装或训练命令。</p><ol><li><strong>先看 chess 数据与 README。</strong>核对数据说明、许可和样本结构；挑一条记录，标出任务状态、学习者行为及模型目标输出。先不启动 API 构建。</li><li><strong>区分复用数据与自建数据。</strong>现有象棋材料能否回答你的问题？若要新领域，先确认原始数据可获取、可合法使用，再检查构建步骤。</li><li><strong>先理解 Stage 1，再看 Stage 2。</strong>对照领域训练与个体训练的输入、产物和评估目标，分别保存结果；不要只报告一个模糊总分。</li><li><strong>先评估模拟器，再接导师。</strong>区分模仿学习者行为和生成标准答案：你需要测行为一致性、事实性还是走法改善？提前写明。</li><li><strong>最后试象棋导师 RL。</strong>先弄清冻结模拟器、Stockfish 反馈与奖励头，用有限样本和明确预算做小规模试验，再考虑扩大。</li></ol><div class="alert"><strong>应该停在阅读阶段的情况</strong><p>数据许可不清、分不清两个阶段、尚未理解奖励口径，或 API 预算没有上限时，不要用“先跑起来”代替决策。</p></div><details><summary>第一次阅读 README：要记下哪些问题？</summary><div><ul><li>数据是原始轨迹还是已构建材料？哪些需要额外申请或下载？</li><li>基础模型、硬件、依赖与模型访问条件是什么？当前环境是否满足？</li><li>每个脚本消费什么输入，产生什么输出？哪些步骤调用外部 API？</li><li>哪个产物是 pooled，哪个是个体 specialization？</li><li>评估条件怎样划分，如何复现论文条件而非仅做一个相似实验？</li></ul><p>把官方命令、版本与参数记录到自己的实验日志。本卡未执行安装、数据构建或训练，不声称本地已经跑通。</p></div></details></div></section>
+<section class="section" id="metrics"><div class="sec-head"><span class="num">04</span><h2>实验口径：90.5% 到底是什么</h2><span class="label">不是学生正确率</span></div><div class="sec-body"><p><strong>90.5%、75.7%、71.6% 是导师输出中“没有严重、主动误导的事实错误”的比例。</strong>它们不是学生答题正确率、走法胜率，更不是接受指导的真人学习效果。</p><p class="scroll-hint">窄屏可横向滑动，查看完整口径与边界。</p><div class="table-wrap"><table><caption>论文中的导师事实性评审条件</caption><thead><tr><th scope="col">条件</th><th scope="col">报告值</th><th scope="col">正确解释</th><th scope="col">不能推导</th></tr></thead><tbody><tr><td>StudentSim 奖励的导师 RL</td><td><strong>90.5%</strong></td><td>导师输出无严重主动误导事实错误的比例；使用 Stage 1 pooled。</td><td>不是 Stage 2 个体化纯收益，也不是学生正确率。</td></tr><tr><td>监督微调导师（SFT）</td><td><strong>75.7%</strong></td><td>同一事实性评审口径下的 SFT 对照。</td><td>不直接等同于真实教学效果基线。</td></tr><tr><td>GPT-5.4 模拟学生奖励的导师 RL</td><td><strong>71.6%</strong></td><td>GPT-5.4 模拟学生的 RL 对照；没有相同奖励头。</td><td>不是其余条件完全不变的个体化因果验证。</td></tr></tbody></table></div><h3>人工评审规模如何读</h3><p><strong>8 名评审者、30 个象棋局面、74 份标注，每份标注评价所有条件。</strong>不能改写为每个条件独立有 74 个不同局面，也不能与 60 名学习者混成一场真人教学效果试验。</p><div class="grid-2"><article class="card"><div class="lead">可以说</div><h4>该评审中导师事实性更好</h4><p>论文报告的 StudentSim 奖励 RL 在这一象棋人工事实性口径上高于两个对照。描述结果时必须保留实验条件和指标定义。</p></article><article class="card"><div class="lead">不应说</div><h4>学生正确率达到 90.5%</h4><p>这把导师事实错误评价换成了学生能力指标。也不能说真人提分、三领域教学全面胜出，或个体化独立贡献全部收益。</p></article></div><details><summary>深入检查：怎样避免复现口径漂移？</summary><div><p>分别保存导师输出、对应局面、模拟学生原走法与修正走法、Stockfish 反馈以及奖励分量。人工标注与训练奖励属于不同证据，不应以奖励升高替代人工事实性评审。</p><p>若要分离收益来源，需要额外控制实验，逐项控制模拟器、风格头、棋盘事实头与训练预算。这是进一步研究建议，不宣称官方已完成所有这些消融。</p></div></details></div></section>
+<section class="section" id="reproduce"><div class="sec-head"><span class="num">05</span><h2>可复现实验清单：保留条件与产物</h2><span class="label">建议检查项</span></div><div class="sec-body"><p>下面是开始实验前的检查清单，不是已执行测试的报告。可复查的输入、设置和原始输出，比一个最终百分比更重要。</p><div class="grid-2"><article class="card"><div class="lead">数据与模型</div><h4>让训练对象可追溯</h4><ul><li>记录仓库版本、数据来源、许可、预处理。</li><li>保留学习者标识与训练/评估划分。</li><li>记录基础模型、LoRA 设置、随机种子和预算。</li><li>分开保存 Stage 1 与 Stage 2 产物。</li></ul></article><article class="card"><div class="lead">导师与评审</div><h4>让比较条件可复查</h4><ul><li>记录导师初始模型与 SFT 条件。</li><li>确认模拟器冻结，并标注 Stage 1。</li><li>记录 Stockfish 版本、评估设置与各奖励头。</li><li>保留局面、导师输出、标注单位与评审规则。</li></ul></article></div><h3>建议的实验日志结构</h3><p>下列仅为日志字段示意，不是项目配置文件或可执行命令。</p><pre class="code-block">实验身份：仓库版本 / 数据版本 / 日期
+数据范围：领域 / 学习者划分 / 样本范围 / 许可
+学生模型：基础模型 / Stage 1 或 Stage 2 / LoRA 设置
+导师条件：SFT 或 RL / 冻结模拟器版本
+奖励设置：走法改善 / 风格头 / 棋盘事实头 / 门控
+评估证据：局面标识 / 原始输出 / 标注口径与份数
+资源消耗：训练资源 / API 调用量 / 失败与重试成本
+结论边界：模拟行为 / 导师事实性 / 尚无真人学习证据</pre><div class="alert"><strong>三条结果分别报告。</strong><p>模拟器的行为拟合、导师的事实性、模拟走法的改善是不同结果。任一项变好都不自动替代其他项，更不替代真实学生长期学习效果。</p></div></div></section>
+<section class="section" id="license"><div class="sec-head"><span class="num">06</span><h2>许可与成本：MIT 不是全套通行证</h2><span class="label">先审数据权利</span></div><div class="sec-body"><p>软件采用 MIT，但数据权利必须逐项核查。可阅读、可训练、可再分发和可商用不是同一件事，不能从代码许可推导所有研究数据均可自由使用。</p><p class="scroll-hint">窄屏可横向滑动，查看数据获取与许可差异。</p><div class="table-wrap"><table><thead><tr><th scope="col">对象</th><th scope="col">已确认信息</th><th scope="col">使用前动作</th></tr></thead><tbody><tr><td>项目软件</td><td>MIT 许可。</td><td>读 LICENSE，按软件许可使用代码，数据另行审查。</td></tr><tr><td>象棋资料</td><td>含 CC0 派生记录。</td><td>核对具体记录、来源和范围；不推广到全部领域。</td></tr><tr><td>二语（L2）资料</td><td>需要 EFCAMDAT 数据。</td><td>核查获取条件、使用条款与必要授权。</td></tr><tr><td>数学资料</td><td>需要 FoundationalASSIST 数据。</td><td>核查原始数据的获取和使用条件，再进入构建。</td></tr></tbody></table></div><div class="grid-2"><article class="card"><div class="lead">API 成本</div><h4>构建不全是本地免费</h4><p>构建流程有三个步骤，其中两个涉及 API 成本。先查官方 README 对每步输入、调用与产物的说明，再估算请求量和重试预算。本卡没有未经核验的单价或总费用。</p></article><article class="card"><div class="lead">训练资源</div><h4>LoRA 不等于零门槛</h4><p>资源需求取决于基础模型、样本规模与配置。先确认模型访问和硬件条件，不凭 LoRA 一词推断普通笔记本足够，也不宣称全流程离线。</p></article></div><details><summary>开始前：预算与授权应确认什么？</summary><div><ul><li>分清复用已有材料与自己构建材料，两条路径费用不能混算。</li><li>确认 API 供应商、凭据要求、计费规则与调用上限，以官方当前说明为准。</li><li>核查学习轨迹是否允许提交给外部服务；新数据还应审查隐私与授权。</li><li>分别记录数据权利、模型访问、算力与人工评审预算。</li></ul><p>这些是使用建议；本卡没有代你获取受限数据、开通 API 或训练模型。</p></div></details></div></section>
+<section class="section"><div class="sec-head"><span class="num">07</span><h2>适用边界：研究环境，不是真人替身</h2><span class="label">如何决策</span></div><div class="sec-body"><div class="grid-2"><article class="card"><div class="lead">适合</div><h4>离线试验与研究假设</h4><ul><li>研究学习者行为模拟与个体差异。</li><li>比较导师反馈策略，为后续研究形成假设。</li><li>拆解走法改善、指导风格与事实性奖励。</li><li>复现象棋导师 RL 的概念验证。</li></ul></article><article class="card"><div class="lead">不适合直接承诺</div><h4>已经验证的教育效果</h4><ul><li>把模拟器当真人学生的完全替代品。</li><li>用 90.5% 宣传学生正确率或真人提分。</li><li>无需数据授权便迁移任意课程。</li><li>宣称二语与数学导师 RL 已验证。</li></ul></article></div><h3>迁移到新领域的顺序</h3><p>先明确研究问题与合法轨迹，再验证学生模拟质量，最后考虑导师训练。若没有类似 Stockfish 的可信反馈信号，奖励构建本身就是需要验证的研究问题，不能照搬象棋闭环便宣布教学有效。</p></div></section>
+<section class="section" id="sources"><div class="sec-head"><span class="num">08</span><h2>一手来源与事实边界</h2><span class="label">按用途回查</span></div><div class="sec-body"><ul><li><a href="https://github.com/microsoft/StudentSim">官方仓库 microsoft/StudentSim</a>：README、代码、数据说明、构建流程与软件许可的操作入口。</li><li><a href="https://microsoft.github.io/StudentSim/">官方项目页</a>：研究定位与整体介绍。</li><li><a href="https://arxiv.org/html/2609.01591v1#S6">论文 v1 第 6 节</a>：导师 RL、对照与人工评审；百分比应连同实验定义阅读。</li></ul><p>两阶段学生模拟与象棋导师 RL 要分开理解；三领域数据不是三领域导师训练验证；导师事实性不是学生成绩；软件 MIT 不是统一数据许可。检查清单与日志字段属于实践建议，不是官方新增功能。</p><p><strong>未执行数据构建、模型训练或论文复现实验。</strong>本卡不提供无法由官方说明确认的命令、费用、硬件指标或最新版本承诺。</p></div></section>
+<div class="footer-block"><h3>最值得带走的一句话</h3><p>先把学生模拟器当作教学研究的离线实验对象，再判断反馈能否帮助导师；不要把模拟结果包装成真人学习效果。</p><div class="tags"><span class="tag">先读 chess 数据</span><span class="tag">分清 Stage 1 / 2</span><span class="tag">核对奖励口径</span><span class="tag">单独审数据许可</span></div><a class="btn red" href="https://github.com/microsoft/StudentSim">返回官方仓库，开始阅读 ↗</a></div><div class="rule"></div><p class="source-note">StudentSim · 微软官方仓库、项目页与论文 v1 · 整理日期：2026-10-14</p>
+</main>
+</body>
+</html>

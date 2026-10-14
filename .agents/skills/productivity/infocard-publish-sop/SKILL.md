@@ -309,3 +309,6 @@ grep -o 'data-theme="[^"]*"' .docs/<run-id>/<slug>/card.html
 - `../infocard-subagent-delegation/SKILL.md` — filesystem-first timeout handoff, no-redelegation rule, and publisher takeover contract. (Now superseded by `../delegated-infocard-publishing/SKILL.md`; that skill is the active reference for the delegation loop.)
 
 Historical worktree incident notes may be retained only for a separately authorized migration/cleanup investigation. They are not active publication instructions and must never be loaded to create, recover, publish, or clean a new information card.
+
+### 修改日期最终验收
+每次修改信息卡必须同步正式 sidecar 和生成索引的 updated，保留首次 date。候选同步不算完成；full build 后回读正式 updated，与此次修改时间对比，push 后回读公网 sidecar/索引。构建若恢复旧 updated 必须定向修复后重新构建验证，不能宣称更新完成。
