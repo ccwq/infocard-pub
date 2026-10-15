@@ -300,6 +300,24 @@ grep -o 'data-theme="[^"]*"' .docs/<run-id>/<slug>/card.html
 
 **Known violations from 2026-10-12 session**: Termany and Strata delegations listed `darkgreen` in the "avoid list" but did not call `infocard-theme-assignment`, did not generate a decision record, and the delegation prompts contained `data-theme` preselection. Both cards were published anyway. This must not recur.
 
+## Promotion gate gotchas (2026-10-14)
+
+`promote-infocard.js` rejects a candidate on three recurring structural errors. Fixing them up front saves a round per card.
+
+1. `theme.html.data-theme` — the `<html>` element must carry `data-theme="<frozen theme>"`. Putting it on `<body>` does not satisfy the gate.
+2. `theme.html.implementation: missing required selector .x` — the check is a literal substring test for `class="x`. A node matches only when the selector name comes **first** in the class attribute: `class="main-grid grid gap"` passes, `class="grid main-grid gap"` fails. Read `required_selectors` from `theme/themes.json` and wire each one to a real element.
+3. `theme.html.colors` / `theme.html.tokens` — colour literals are forbidden outside `:root` (the checker strips `:root{...}` before scanning) and the page must consume tokens via `var(--token)`. Themes vary: `blue` ships no variables at all, `sage-swiss` requires `.stats-row/.main-grid/.analysis-grid`, `graph-paper` declares none. Declare the extra palette values as tokens inside `:root` and reference them, instead of editing the frozen theme.
+
+Any HTML edit after promotion invalidates the manifest's `sha256`; recompute `files[].sha256` before re-running promotion.
+
+## Push rejection under concurrent sessions (2026-10-14)
+
+Several Hermes sessions share this checkout. A push can fail with `remote ref points at a non-commit object`, or `fatal: bad object refs/heads/main` alongside `did not send all necessary objects`. This is a transient read of a ref another session is rewriting, not divergence.
+
+Recover with: `git fetch origin main`, confirm `git rev-list --left-right --count origin/main...main` shows divergence `0  N`, then re-run the ordinary `git push origin main`. **Never `--force`.**
+
+Because parallel sessions promote cards into the same `docs/`, run `npm run build -- --full` immediately before committing; the regenerated `_index.yaml`/`index.html` will legitimately reference sibling cards produced by other sessions. Commit those two generated files with your own card, but do not commit other sessions' card HTML/sidecar files.
+
 ## Canonical references
 
 - `references/publish-protocol-v3.md` — detailed release fields, states, and ownership.
