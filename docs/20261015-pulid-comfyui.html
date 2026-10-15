@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PuLID 在 ComfyUI：装之前先看清四道墙（源码核查版）</title>
+<style>
+  :root {
+    --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+    --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+    --white:#ffffff; --code-bg:#111111; --code-fg:#e8e8e8; --code-dim:#8a8a8a;
+    --code-str:#e8c200; --code-key:#6f9dff; --code-bad:#ff6b74;
+    --panel-a:#0f0f12; --panel-b:#18181c; --panel-ink:#ffffff; --panel-sub:#ece8dc;
+    --alert-fg:#ffffff; --alert-p:#f0ebe0; --warn-ink:#5a1010; --quote-ink:#111111;
+    --ok:#0b7a3f; --shadow:8px 8px 0 rgba(17,17,17,.12);
+    --link:#1f63ff;
+  /* 半透明色板：theme-contract 要求颜色只能在 :root 声明 */
+  --wash-ink-4:rgba(17,17,17,.04);  --wash-ink-45:rgba(17,17,17,.045);  --wash-red-7:rgba(216,0,24,.07);  --wash-blue-6:rgba(31,99,255,.06);
+}
+  
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{margin:0;overflow-x:hidden}
+  body{
+    color:var(--ink);line-height:1.58;
+    background:
+      linear-gradient(var(--wash-ink-45) 1px, transparent 1px) 0 0/100% 42px,
+      linear-gradient(90deg, var(--wash-ink-4) 1px, transparent 1px) 0 0/42px 100%,
+      radial-gradient(circle at 10% 8%, var(--wash-red-7) 0 10%, transparent 11%),
+      radial-gradient(circle at 88% 7%, var(--wash-blue-6) 0 9%, transparent 10%),
+      var(--bg);
+    font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  }
+  img{display:block;max-width:100%}
+  a{color:var(--link);text-decoration:underline;text-underline-offset:3px}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+  /* ============ HERO ============ */
+  .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+  .hero-bar{grid-column:1/-1;height:14px;background:var(--ink);border-bottom:3px solid var(--line);position:relative}
+  .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+  .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+  .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+  .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:var(--white);padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+  .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+  h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:1.0;letter-spacing:-.05em;overflow-wrap:anywhere}
+  .subtitle{color:var(--muted);font-size:12.5px;line-height:1.62}
+  .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+  .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:var(--white);font-size:11.8px;font-weight:850}
+  .badge.red{background:var(--red);color:var(--white)}
+  .badge.blue{background:var(--blue);color:var(--white)}
+  .badge.dark{background:var(--ink);color:var(--white)}
+  .badge.ink{background:var(--ink);color:var(--white);font-size:11px;min-height:24px;padding:4px 8px}
+  .alert{border:2px solid var(--line);background:var(--ink);color:var(--alert-fg);padding:10px 12px;display:grid;gap:8px}
+  .alert strong{display:block;font-size:13.5px;line-height:1.4}
+  .alert p{margin:0;font-size:12.5px;line-height:1.66;color:var(--alert-p)}
+  .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+  .mini-tag{display:inline-flex;align-items:center;border:1.5px solid var(--white);padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:var(--ink);color:var(--white)}
+  .hero-visual{background:var(--white);display:grid;grid-template-rows:auto 1fr}
+  .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,var(--panel-a) 0%,var(--panel-b) 100%);color:var(--panel-ink)}
+  .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid var(--white);padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+  .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.14;letter-spacing:-.04em}
+  .panel-top p{margin:0;color:var(--panel-sub);font-size:13px;line-height:1.66}
+  .panel-body{padding:14px;display:grid;gap:10px;background:var(--soft-ink)}
+  .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.6}
+  .flow{display:grid;gap:8px}
+  .flow-item{border:2px solid var(--line);background:var(--white);padding:10px 12px;display:grid;gap:3px;position:relative}
+  .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+  .flow-item:last-child::after{display:none}
+  .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+  .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+  .flow-item.red .c{color:var(--red)}
+  .flow-item.blue .c{color:var(--blue)}
+
+  /* ============ OVERVIEW ============ */
+  .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+  .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.4;letter-spacing:-.01em}
+  .overview-body{font-size:12.5px;line-height:1.72;color:var(--ink)}
+  .overview-body p{margin:0 0 8px}
+
+  /* ============ SECTIONS ============ */
+  .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+  .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+  .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:var(--white);font-size:34px;font-weight:950;line-height:1}
+  .section-no.b{background:var(--blue)}
+  .section-no.k{background:var(--ink)}
+  .section-meta{display:grid;gap:7px;padding-top:4px}
+  .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+  .section-meta .label.b{color:var(--blue)}
+  .section-meta .label.k{color:var(--ink)}
+  .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.04;letter-spacing:-.05em;overflow-wrap:anywhere}
+  .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.66;max-width:980px}
+
+  /* ============ GRIDS ============ */
+  .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+  .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .card,.mini{border:2px solid var(--line);background:var(--white);min-width:0;padding:14px}
+  .card{display:grid;gap:10px}
+  .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+  .card h3{font-size:17px;line-height:1.2}
+  .card p,.mini p{margin:0;font-size:14px;color:var(--ink);line-height:1.7}
+  .card ul,.mini ul{margin:0;padding-left:18px}
+  .card li,.mini li{margin:5px 0;font-size:13.5px;color:var(--ink);line-height:1.68}
+  .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:var(--white);font-size:11.8px;font-weight:850;line-height:1}
+  .tag.red{background:var(--soft-red)}
+  .tag.blue{background:var(--soft-blue)}
+  .tag.dark{background:var(--ink);color:var(--white)}
+
+  .matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .matrix .mini{display:grid;gap:8px}
+  .mini h4{font-size:15px;line-height:1.24}
+  .mini .lead{font-size:13px;color:var(--muted);font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+  .mini .lead.red{color:var(--red)}
+  .mini .lead.blue{color:var(--blue)}
+  .mini .quote-line{border-left:4px solid var(--red);padding-left:10px;font-weight:900;line-height:1.6}
+
+  .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .risk{border:2px solid var(--line);background:var(--white);padding:14px;display:grid;gap:8px;position:relative;overflow:hidden}
+  .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,var(--ink));border-bottom:3px solid var(--line)}
+  .risk[data-accent="red"]{--accent:var(--red)}
+  .risk[data-accent="blue"]{--accent:var(--blue)}
+  .risk[data-accent="dark"]{--accent:var(--ink)}
+  .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,var(--ink));color:var(--white);font-weight:950;font-size:16px}
+  .risk h4{font-size:16px;line-height:1.2;margin:0;padding-top:2px}
+  .risk p{margin:0;font-size:13.5px;line-height:1.7;color:var(--ink)}
+  .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.74}
+  .quote-block b{color:var(--quote-ink)}
+
+  /* ============ TABLES / CODE ============ */
+  .tbl-wrap{border:2px solid var(--line);background:var(--white);overflow-x:auto}
+  .tbl-wrap table{width:100%;border-collapse:collapse;font-size:12.8px;margin:0;min-width:640px}
+  .tbl-wrap th,.tbl-wrap td{padding:9px 12px;border:1.5px solid var(--line);text-align:left;vertical-align:top;line-height:1.62}
+  .tbl-wrap th{background:var(--soft-ink);font-size:11.2px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .tbl-wrap td code{background:var(--soft-ink);border:1px solid var(--line);padding:1px 4px;font-size:12px;overflow-wrap:anywhere}
+  .tbl-cap{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.6}
+  .code-panel{background:var(--code-bg);color:var(--code-fg);border:2px solid var(--line);padding:14px;overflow-x:auto}
+  .code-panel .cap{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--code-dim);margin-bottom:8px}
+  .code-panel pre{margin:0;font-size:12.5px;line-height:1.74;overflow-x:auto}
+  .code-panel pre code{background:none;border:0;padding:0;color:var(--code-fg);font-size:inherit;white-space:pre}
+  .k-key{color:var(--code-key)}
+  .k-str{color:var(--code-str)}
+  .k-bad{color:var(--code-bad)}
+  .k-dim{color:var(--code-dim)}
+
+  .verdict{border:3px solid var(--line);background:var(--white);padding:16px;display:grid;gap:10px}
+  .verdict h3{margin:0;font-size:18px;line-height:1.24;letter-spacing:-.02em}
+  .verdict ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.74}
+  .verdict li{margin:5px 0}
+  .verdict .foot{font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;line-height:1.66}
+
+  .rule{height:3px;background:var(--ink);margin:8px 0 0}
+  .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.66}
+
+  /* ============ Responsive ============ */
+  @media (max-width:1080px){
+    .hero{grid-template-columns:1fr}
+    .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+    .grid-4,.matrix,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+  @media (max-width:720px){
+    .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+    .hero{display:flex;flex-direction:column}
+    .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+    .grid-4,.grid-3,.grid-2,.matrix,.risk-grid{grid-template-columns:1fr}
+    .section-head{grid-template-columns:1fr;gap:10px}
+    .section-no{width:72px;height:72px;font-size:28px}
+    .card,.mini,.alert,.risk,.quote-block,.verdict{padding-left:12px;padding-right:12px}
+    .tbl-wrap{overflow-x:auto}
+    .tbl-wrap table{width:100%}
+    .tbl-wrap th,.tbl-wrap td{overflow-wrap:anywhere;word-break:break-word}
+    .code-panel pre{overflow-x:auto}
+  }
+</style>
+</head>
+<body>
+<main class="page">
+
+  <header class="hero">
+    <div class="hero-bar"></div>
+    <div class="hero-copy">
+      <div class="kicker">PuLID × ComfyUI · 源码核查</div>
+      <h1 class="demo-title">装之前先看清四道墙：许可、显存、依赖、参考图</h1>
+      <p class="subtitle">这篇从一篇公众号实测拆解体出发，逐条比对 PuLID 官方仓库、两个 ComfyUI 插件源码与 InsightFace 许可声明。目的是让读者在动手前先知道会卡在哪，而不是照抄安装步骤。</p>
+      <div class="badge-row">
+        <span class="badge red">核查型</span>
+        <span class="badge blue">progressive-doc</span>
+        <span class="badge">hardblue</span>
+        <span class="badge dark">未实机运行</span>
+        <span class="badge ink">证据截止 2026-10-15</span>
+      </div>
+      <div class="alert">
+        <strong>一句话结论</strong>
+        <p>能不能用，取决于两件事：你的显存落在哪一档，以及你能不能接受人脸识别权重只允许非商用研究。技术链路本身已经成熟，卡点多在许可与硬件，不在原理。</p>
+        <div class="mini-row">
+          <span class="mini-tag">代码 Apache-2.0</span>
+          <span class="mini-tag">权重仅限非商用研究</span>
+          <span class="mini-tag">插件停止维护</span>
+        </div>
+      </div>
+    </div>
+    <figure class="hero-visual">
+      <div class="panel-top">
+        <div class="eyebrow">FOUR WALLS</div>
+        <h3>四道墙，按顺序撞</h3>
+        <p>先撞许可，再撞显存，接着是依赖链，最后才是参考图质量。前三道墙决定能不能继续，第四道墙决定出图好不好看。</p>
+      </div>
+      <div class="panel-body">
+        <div class="quote"><b>零训练换脸的关键：</b>双分支并行，一条带身份条件、一条不带，用对比对齐把带条件分支的输出拉向不带条件的分布，让身份信息泄漏到基座模型里的量降到最低。</div>
+        <div class="flow">
+          <div class="flow-item red"><div class="t">Wall 1</div><div class="c">许可：InsightFace 权重仅限非商用</div></div>
+          <div class="flow-item blue"><div class="t">Wall 2</div><div class="c">显存：12GB 档能跑但很慢</div></div>
+          <div class="flow-item red"><div class="t">Wall 3</div><div class="c">依赖：PyTorch 版本被钉死</div></div>
+          <div class="flow-item blue"><div class="t">Wall 4</div><div class="c">参考图：糊了就直接废</div></div>
+        </div>
+      </div>
+    </figure>
+  </header>
+
+  <div class="overview">
+    <div class="overview-sentence">PuLID 是字节跳动的零训练身份保持方案，配 ComfyUI 插件能跑，但许可归属和显存档位是安装前必须确认的两件事。</div>
+    <div class="overview-body">
+      <p>PuLID 由 ByteDance Inc 团队开发，论文 arXiv:2404.16022，官方 README 记录 2024.09.26 被 NeurIPS 2024 录用。它的做法是把同一个扩散过程拆成两条并行分支：一条注入身份条件，一条不注入，再用对比对齐把带条件分支的输出拉向不带条件的输出分布，从而减少身份信息对基座模型的污染。这也是它能在不训练、不微调的前提下换脸的原因。</p>
+      <p>GitHub 上有两个常被推荐的 ComfyUI 插件：cubiq 的原生实现和 balazik 的 FLUX 版。本卡核对后发现两处关键差异：cubiq 仓库在 2025.04.14 自己宣布进入 maintenance only；而真正的许可限制来自 InsightFace 的人脸权重，不是 PuLID 的代码，也不是插件自己写的。公众号文章把这条限制的归属说错了，本卡逐条纠正。</p>
+    </div>
+  </div>
+
+  <!-- 01 版本 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">01</div>
+      <div class="section-meta">
+        <div class="label">MODEL ZOO</div>
+        <h2>四个官方权重，选错会白折腾</h2>
+        <p>版本不是越高越好。底模和权重版本必须配对，官方 Model Zoo 明确写了一条例外。</p>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>版本</th><th>底模</th><th>发布日期</th><th>官方原话要点</th><th>适合场景</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>PuLID-v1</b></td><td>SDXL</td><td>论文同期</td>
+            <td>Model Zoo 标注为 <code>Paper model</code></td>
+            <td>复现论文效果；用 SDXL-lightning-4step 底模时仍推荐它</td>
+          </tr>
+          <tr>
+            <td><b>PuLID-v1.1</b></td><td>SDXL</td><td>2024-10-31</td>
+            <td>兼容性、可编辑性、脸部自然度、相似度都更好；ID 相似度略升</td>
+            <td>社区底模（Juggernaut-XL、RealVisXL 等）上要跟提示词、要改表情视角</td>
+          </tr>
+          <tr>
+            <td><b>PuLID-FLUX-v0.9.0</b></td><td>FLUX</td><td>2024-09-12</td>
+            <td>提示词跟随与画质更好；官方注明<b>对部分男性输入 ID 保真度不够</b></td>
+            <td>追求画质与提示词跟随，且参考图不是男性正脸</td>
+          </tr>
+          <tr>
+            <td><b>PuLID-FLUX-v0.9.1</b></td><td>FLUX</td><td>2024-10-31</td>
+            <td>ID 相似度提升<b>约 5 个百分点</b>，编辑性保持相近</td>
+            <td>FLUX 底模的默认选择；只要 v0.9.1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tbl-cap">出处：PuLID 官方 README 的 Model Zoo 表格 + docs/pulid_v1.1.md。</p>
+
+    <div class="grid-2" style="margin-top:12px">
+      <div class="quote-block">
+        <b>官方写明的例外：</b>“The v1.1 model does not perform as well as v1 on the SDXL-lightning-4step base model, so if you want to use SDXL-lightning-4step as the base model, we still recommend using the v1 model.”<br>
+        也就是说：Lightning 4step 底模 + v1.1 是官方承认的降级组合。
+      </div>
+      <div class="quote-block" style="border-left-color:var(--red);background:var(--soft-red)">
+        <b>2025.08.01 起新增：</b>官方 app_flux.py 支持 FLUX.1-Krea-dev，加参数 <code>--name flux-krea-dev</code> 即可。公众号文章成文时还没有这条。
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 插件现状 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">02</div>
+      <div class="section-meta">
+        <div class="label b">COMFYUI PLUGINS</div>
+        <h2>两个插件的现状，其中一个已停止维护</h2>
+        <p>教程推的插件不一定是最新的那个。选型前先看仓库自己的声明和最后提交时间。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <div class="tagrow"><span class="tag red">maintenance only</span><span class="tag">Apache-2.0</span></div>
+        <h3>cubiq/PuLID_ComfyUI</h3>
+        <p>官方 README 推荐的原生实现，节点为 PulidModelLoader / PulidInsightFaceLoader / ApplyPulid / ApplyPulidAdvanced。</p>
+        <ul>
+          <li>Stars：911（GitHub API 快照，2026-10-15）</li>
+          <li>许可：Apache-2.0；最后 push 2025-04-14</li>
+          <li>README 顶部原文：“2025.04.14 - I do not use ComfyUI as my main way to interact with Gen AI anymore... setting the repository in ‘maintenance only’ mode... I do not plan any consistent work on this repo.”</li>
+          <li>README 自述代码状态为 beta</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">最后 push 2024-10-03</span><span class="tag dark">未核实</span></div>
+        <h3>balazik/ComfyUI-PuLID-Flux</h3>
+        <p>FLUX 方向的实现，常被教程当作 PuLID-FLUX 的入口。本轮未核到它的源码与 README。</p>
+        <ul>
+          <li>Stars：724（GitHub API 快照，2026-10-15）</li>
+          <li>许可：Apache-2.0；默认分支 master；最后 push 2024-10-03</li>
+          <li>它<b>没有</b>出现在 PuLID 官方 README 的第三方实现列表里（该列表在 ComfyUI 小节只列了 cubiq 与 ZHO-ZHO-ZHO 两个）</li>
+          <li>因此本卡不推荐安装，也不复述它的节点名</li>
+        </ul>
+      </article>
+    </div>
+
+    <div class="matrix" style="margin-top:12px">
+      <article class="mini">
+        <div class="lead">01 / 官方列表</div>
+        <h4>README 里的 ComfyUI 实现</h4>
+        <p class="quote-line">官方 README “third-party implementations” 小节，ComfyUI 下只列两个。</p>
+        <p>cubiq 的原生实现，和 ZHO-ZHO-ZHO 的 diffusers 实现。别只听教程推的那一个。</p>
+      </article>
+      <article class="mini">
+        <div class="lead blue">02 / 差异</div>
+        <h4>两种实现路线不同</h4>
+        <p class="quote-line">官方原文：cubiq 是 “native ComfyUI implementation”，ZHO 是 “diffusers-based implementation”。</p>
+        <p>原生实现走 ComfyUI 自己的模型加载，diffusers 实现走 diffusers 管线，行为不完全一致。</p>
+      </article>
+      <article class="mini">
+        <div class="lead red">03 / 时效</div>
+        <h4>停止维护意味着什么</h4>
+        <p class="quote-line">作者保留合并关键更新与 PR 的可能，但不承诺持续投入。</p>
+        <p>遇到 ComfyUI 版本升级导致的节点报错，不要指望上游快速修。ComfyUI-PuLID-ZHO 是另一个可评估的选项。</p>
+      </article>
+      <article class="mini">
+        <div class="lead">04 / 本卡边界</div>
+        <h4>哪些没核</h4>
+        <p class="quote-line">本轮未读 balazik 与 ZHO 的源码。</p>
+        <p>凡是引用这两个仓库节点名或参数的说法，一律标注未核实，不作为结论。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 03 许可 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">03</div>
+      <div class="section-meta">
+        <div class="label k">LICENSE WALL · 重点</div>
+        <h2>许可边界在 InsightFace，不在 PuLID</h2>
+        <p>这一节是全卡最需要纠正的部分。归属搞错，商用判断会整个反过来。</p>
+      </div>
+    </div>
+    <div class="risk-grid">
+      <article class="risk" data-accent="red">
+        <div class="n">A</div>
+        <h4>PuLID 代码：Apache-2.0</h4>
+        <p>仓库根目录 LICENSE 文件为 Apache License 2.0，GitHub API 的 license 字段也是 Apache-2.0。HuggingFace 上 guozinan/PuLID 模型页的 cardData 同样标 apache-2.0。</p>
+      </article>
+      <article class="risk" data-accent="blue">
+        <div class="n">B</div>
+        <h4>人脸后端：只有 InsightFace 一条路</h4>
+        <p>官方实现与 cubiq 插件都只走 InsightFace + AntelopeV2。文章所称“FaceNet + VGGFace2 商用路径”在代码里不存在。</p>
+      </article>
+      <article class="risk" data-accent="dark">
+        <div class="n">C</div>
+        <h4>InsightFace 权重：仅限非商用研究</h4>
+        <p>InsightFace README 原文：代码 MIT，学术与商用“无限制”；但紧接一句训练数据与由此训练的模型“available for non-commercial research purposes only”，手动下载与自动下载的模型都适用。</p>
+      </article>
+    </div>
+
+    <div class="code-panel" style="margin-top:12px">
+      <div class="cap">// 核对方法：对官方仓库做全文 grep</div>
+      <pre><code><span class="k-dim">$ git clone --depth 1 https://github.com/ToTheBeginning/PuLID</span>
+<span class="k-dim">$</span> <span class="k-key">grep</span> -rniE <span class="k-str">'facenet|vggface|buffalo'</span> . | wc -l
+<span class="k-bad">0</span>   <span class="k-dim">← 零命中，文章所说的第二条路径在代码里不存在</span>
+
+<span class="k-dim">$</span> <span class="k-key">grep</span> -n antelopev2 pulid/pipeline_flux.py
+<span class="k-bad">70</span>: snapshot_download(<span class="k-str">'DIAMONIK7777/antelopev2'</span>, local_dir=<span class="k-str">'models/antelopev2'</span>)
+<span class="k-bad">73</span>: self.app = FaceAnalysis(name=<span class="k-str">'antelopev2'</span>, root=<span class="k-str">'.'</span>, providers=providers)
+
+<span class="k-dim">$</span> <span class="k-key">grep</span> -c <span class="k-str">'non-commercial'</span> cubiq/README.md
+<span class="k-bad">0</span>   <span class="k-dim">← 插件 README 里没有非商用字样，别把 InsightFace 的政策说成插件自己的</span></code></pre>
+    </div>
+
+    <div class="grid-2" style="margin-top:12px">
+      <div class="quote-block" style="border-left-color:var(--red);background:var(--soft-red)">
+        <b>需要纠正的三种说法：</b>① 说“README 自己标注 For Non-Commercial / Research Use”——那是 InsightFace 的权重政策，不是 PuLID 的；② 说“存在 FaceNet + VGGFace2 商用路径”——代码零命中；③ 说“插件自己声明非商用”——cubiq README 里没有。
+      </div>
+      <div class="quote-block">
+        <b>需要同时避免的两个极端：</b>不要下“绝不可商用”的结论，也不要说“可以商用”。正确表述是：代码可商用；人脸权重受 InsightFace 的非商用研究限制。是否落在限制内，取决于你的具体用途和 InsightFace 当前的授权渠道，本卡不替读者定性。
+      </div>
+    </div>
+
+    <div class="verdict" style="margin-top:12px">
+      <h3>要做商用，先做这三步判断</h3>
+      <ul>
+        <li>去你要用的权重仓库看 license 字段（HF 模型页 cardData / 仓库 LICENSE），把代码许可与权重许可分开记录。</li>
+        <li>直接问权重提供方，包括 InsightFace 官方渠道：README 已写明 inswapper 系列需联系 contact@insightface.ai 获取授权与支持。</li>
+        <li>如果这条链路谈不下来，评估许可允许商用的其他身份保持方案，不要在“反正代码是 Apache”这条推论上继续。</li>
+      </ul>
+      <div class="foot">出处：PuLID 仓库 LICENSE、requirements.txt、pulid/pipeline_flux.py；InsightFace 仓库 README 的 License 小节；GitHub API 快照 2026-10-15。</div>
+    </div>
+  </section>
+
+  <!-- 04 显存 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">04</div>
+      <div class="section-meta">
+        <div class="label">VRAM WALL</div>
+        <h2>显存：按官方五档实测选参数</h2>
+        <p>这组数字来自官方 docs/pulid_for_flux.md 的实测峰值，不是文章，也不是本机实测。</p>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>显卡档位</th><th>命令</th><th>峰值显存</th><th>官方备注</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>不指定</td><td><code>python app_flux.py</code></td><td>under 45GB</td><td>naive bf16</td></tr>
+          <tr><td>常规卸载</td><td><code>--offload</code></td><td>under 30GB</td><td>bf16 + offload</td></tr>
+          <tr><td>16GB 卡</td><td><code>--offload --fp8 --onnx_provider cpu</code></td><td>under 15GB</td><td>官方指定给 16GB 显存卡的组合</td></tr>
+          <tr><td>24GB 卡</td><td><code>--offload --fp8</code></td><td>under 17GB</td><td>官方单独给出的一档</td></tr>
+          <tr><td>12GB 卡</td><td><code>--aggressive_offload --fp8 --onnx_provider cpu</code></td><td>约 11GB</td><td>官方警告：每个 timestep 都在 CPU/GPU 间搬内存，<b>速度会非常慢</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tbl-cap">出处：PuLID 官方 docs/pulid_for_flux.md，本轮逐行核对原文。另 2025.08.01 起加 <code>--name flux-krea-dev</code> 支持 FLUX.1-Krea-dev。</p>
+
+    <div class="grid-3" style="margin-top:12px">
+      <article class="card">
+        <div class="tagrow"><span class="tag red">文章口径</span></div>
+        <h3>文章给的两个数字</h3>
+        <p>“Flux + PuLID：FP8/8bit GGUF 版 ~12GB，32bit 原版 ~22GB”。这两个数字与官方文档的五档实测都不对应。</p>
+        <p>可能来自不同底模、不同量化方式或不同机器，不能直接套用。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">该怎么做</span></div>
+        <h3>先量自己的卡</h3>
+        <ul>
+          <li>查 nvidia-smi 或系统设置里的显存总量，按上表找最接近的一档。</li>
+          <li>留出系统和其它进程占用，不要按标称值卡线。</li>
+          <li>显存不够先加 <code>--offload</code>，还不行再 <code>--fp8</code>，最后才考虑 <code>--aggressive_offload</code>。</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag dark">不要忽略</span></div>
+        <h3>慢是真实代价</h3>
+        <p>aggressive offload 省的是显存，花的是时间。官方原话是“speed will be very slow”。</p>
+        <p>如果你要批量出图，12GB 档的可用性要按小时算，不是按“能跑起来”算。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 05 参数 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">05</div>
+      <div class="section-meta">
+        <div class="label b">PARAMETER WALL</div>
+        <h2>参数：两个节点不是一回事</h2>
+        <p>文章只讲了标准节点的 method，漏掉了 Advanced 节点的 projection + fidelity，而后者才是最容易踩坑的地方。</p>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>参数</th><th>ApplyPulid（标准）</th><th>ApplyPulidAdvanced</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>method</code> / <code>projection</code></td>
+            <td><code>(["fidelity","style","neutral"],)</code> 三选一</td>
+            <td><code>(["ortho_v2","ortho","none"],)</code> 三选一，<b>没有 method</b></td></tr>
+          <tr><td><code>weight</code></td>
+            <td>FLOAT 默认 1.0，范围 -1.0～5.0，<b>步长 0.05</b></td>
+            <td>同左：默认 1.0，范围 -1.0～5.0，步长 0.05</td></tr>
+          <tr><td><code>fidelity</code></td>
+            <td>无</td>
+            <td>INT 默认 8，范围 0～32，步长 1</td></tr>
+          <tr><td><code>noise</code></td>
+            <td>无</td>
+            <td>FLOAT 默认 0.0，范围 -1～1，步长 0.1</td></tr>
+          <tr><td><code>start_at</code></td>
+            <td>FLOAT 默认 0.0，范围 0～1，步长 0.001</td>
+            <td>同左</td></tr>
+          <tr><td><code>end_at</code></td>
+            <td>FLOAT 默认 1.0，范围 0～1，步长 0.001</td>
+            <td>同左</td></tr>
+          <tr><td><code>attn_mask</code></td>
+            <td>optional 的 MASK 输入</td>
+            <td>同左</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tbl-cap">出处：cubiq/PuLID_ComfyUI 的 pulid.py，两个类的 INPUT_TYPES 逐项读取，本轮核对源码。</p>
+
+    <div class="alert" style="margin-top:12px;background:var(--soft-red);border-color:var(--red);color:var(--red)">
+      <strong style="color:var(--red)">⚠ 与文章不一致：weight 步长是 0.05，不是 0.1</strong>
+      <p style="color:var(--warn-ink)">文章写“范围 -1～5，每次 0.1”。源码里两个节点的 weight 都是 <code>{"default":1.0,"min":-1.0,"max":5.0,"step":0.05}</code>。滑杆实际刻度是 0.05，文章差了一倍。</p>
+    </div>
+
+    <div class="grid-2" style="margin-top:12px">
+      <div class="quote-block" style="border-left-color:var(--red);background:var(--soft-red)">
+        <b>fidelity 数值越低越像参考图。</b><br>
+        cubiq README 加粗原文：“Lower <code>fidelity</code> values grant higher resemblance to the reference image.” 默认值是 8，往下调更像，往上调更松。
+      </div>
+      <div class="quote-block">
+        <b>两个节点的等价关系（README 原文）：</b><br>
+        · Advanced 的 <code>ortho_v2</code> + <code>fidelity: 8</code> = 标准节点的 <code>fidelity</code> method<br>
+        · <code>ortho</code> + <code>fidelity: 16</code> = 标准节点的 <code>style</code> method<br>
+        · <code>neutral</code> 在标准节点里不做归一化，README 建议同时把 weight 调低；换到 Advanced 就直接调高 <code>fidelity</code>
+      </div>
+    </div>
+
+    <div class="code-panel" style="margin-top:12px">
+      <div class="cap">// 源码里的分支等价（pulid.py）</div>
+      <pre><code><span class="k-dim"># method==fidelity 或 projection==ortho_v2 → 同一分支</span>
+<span class="k-dim"># method==style    或 projection==ortho   → 另一分支</span>
+<span class="k-dim"># 所以切换节点不会自动对齐观感，必须自己换算 fidelity 值</span></code></pre>
+    </div>
+  </section>
+
+  <!-- 06 依赖 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">06</div>
+      <div class="section-meta">
+        <div class="label k">DEPENDENCY CHAIN</div>
+        <h2>依赖链：版本被钉死，顺序不能乱</h2>
+        <p>PuLID 官方 requirements 把 PyTorch 钉在 2.0.1，这一行决定了你的 ComfyUI 环境能不能同时跑别的节点。</p>
+      </div>
+    </div>
+    <div class="code-panel">
+      <div class="cap">// requirements.txt 与 requirements_fp8.txt 的关键差异</div>
+      <pre><code><span class="k-dim"># requirements.txt（默认）</span>
+torch==<span class="k-bad">2.0.1</span>          torchvision==0.15.2
+diffusers==<span class="k-bad">0.25.0</span>       transformers==<span class="k-bad">4.43.3</span>
+facexlib / insightface / onnxruntime / onnxruntime-gpu / timm / einops ...
+
+<span class="k-dim"># requirements_fp8.txt（flux-fp8 用）</span>
+torch==<span class="k-str">2.4.1</span>          torchvision==0.19.1
+diffusers==<span class="k-str">0.30.0</span>       transformers==4.43.3
+<span class="k-key">optimum-quanto==0.2.4</span>   <span class="k-dim">← 只在 fp8 版本里出现</span></code></pre>
+    </div>
+
+    <div class="grid-3" style="margin-top:12px">
+      <article class="card">
+        <div class="tagrow"><span class="tag red">版本冲突点</span></div>
+        <h3>两套依赖不共存</h3>
+        <p>torch 2.0.1 与 2.4.1、diffusers 0.25.0 与 0.30.0 是两条路。要 fp8 就整套换 fp8 版本，别混装。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">自动下载</span></div>
+        <h3>EVA02-CLIP-L-14-336</h3>
+        <p>cubiq README：EVA CLIP 用的是 EVA02-CLIP-L-14-336，首次运行会自动下载，放在 huggingface 目录里。facexlib 的模型也是首次使用时下载。</p>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag dark">手动放置</span></div>
+        <h3>AntelopeV2</h3>
+        <p>README 要求解压后直接放到 <code>ComfyUI/models/insightface/models/antelopev2</code>。源码里 <code>FaceAnalysis(name="antelopev2", root=INSIGHTFACE_DIR, ...)</code>，root 指向 models/insightface。</p>
+      </article>
+    </div>
+
+    <div class="quote-block" style="margin-top:12px">
+      <b>顺序建议：</b>先在 ComfyUI Manager 里装插件 → 确认节点出现 → 放 PuLID 权重到 <code>ComfyUI/models/pulid/</code> → 放 AntelopeV2 到 <code>models/insightface/models/antelopev2</code> → 首次运行下载 EVA CLIP 与 facexlib 模型 → 再跑推理。反过来做，第 3 步的自动下载会失败，报错也更难读。
+    </div>
+    <p class="tbl-cap" style="margin-top:8px">关于“嵌套两层目录”导致 <code>'detection' not in self.models</code>：这是社区常见故障的说法，本轮在 cubiq README 里只看到放置路径要求，未找到官方文档明确写这条，因此标为社区经验。</p>
+  </section>
+
+  <!-- 07 故障 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">07</div>
+      <div class="section-meta">
+        <div class="label">TROUBLESHOOTING</div>
+        <h2>故障对照表：哪条有依据，哪条是经验</h2>
+        <p>保留文章列的六条症状，逐条标出处。三条能在 cubiq README 里找到原文，其余标为文章经验。</p>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>症状</th><th>通常原因</th><th>依据等级</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>'detection' not in self.models</code></td>
+            <td>AntelopeV2 目录层级不对，InsightFace 在预期路径下没找到模型文件</td>
+            <td><span class="tag dark">社区经验</span> cubiq README 只给了放置路径要求，未明写此报错</td>
+          </tr>
+          <tr>
+            <td>EVA-CLIP 未下载 / 首次运行卡住</td>
+            <td>EVA02-CLIP-L-14-336 需联网自动下载，网络不通就失败</td>
+            <td><span class="tag blue">README 原文</span>“The EVA CLIP is EVA02-CLIP-L-14-336, but should be downloaded automatically”</td>
+          </tr>
+          <tr>
+            <td>脸糊、不像本人</td>
+            <td>参考图质量不够；采样器与调度器需要试</td>
+            <td><span class="tag blue">README 原文</span>“The quality of the reference image is very important... Be sure to use a clean and sharp picture!” 以及 “You may need to experiment with CFG and various samplers/schedulers (try <code>sgm_uniform</code>)”</td>
+          </tr>
+          <tr>
+            <td>与 IPAdapter 一起用时报错或行为异常</td>
+            <td>IPAdapter 扩展版本过旧</td>
+            <td><span class="tag blue">README 原文</span>“For IPAdapter compatibility you need to update the IPAdapter extension!”</td>
+          </tr>
+          <tr>
+            <td>CUDA OOM</td>
+            <td>显存档位不够，需要 offload / fp8</td>
+            <td><span class="tag red">文章经验 + 官方旁证</span> 官方 docs/pulid_for_flux.md 给出五档峰值与对应参数，但未直接写这条报错</td>
+          </tr>
+          <tr>
+            <td>全黑图 / 提示词不听</td>
+            <td>方法与权重不匹配：weight 为 0、start_at 与 end_at 相等、method 与 projection 选错分支</td>
+            <td><span class="tag red">文章经验</span> 未在官方文档核到对应表述</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tbl-cap">“依据等级”列是本卡加的：README 原文 = 一手文档可查；社区经验 = 通行说法但官方文档未写；文章经验 = 仅见于该公众号文。</p>
+  </section>
+
+  <!-- 08 参考图 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no b">08</div>
+      <div class="section-meta">
+        <div class="label b">REFERENCE IMAGE</div>
+        <h2>参考图：这是唯一你完全能控制的变量</h2>
+        <p>显存和依赖是环境问题，参考图是输入问题。前两样解决不了，第三样能靠换图解决。</p>
+      </div>
+    </div>
+    <div class="matrix">
+      <article class="mini">
+        <div class="lead">01 / 姿态</div>
+        <h4>正面</h4>
+        <p class="quote-line">正脸是默认预期输入。</p>
+        <p>官方 README 只强调 clean and sharp，没有正面要求，这条属于通行做法。</p>
+      </article>
+      <article class="mini">
+        <div class="lead blue">02 / 清晰度</div>
+        <h4>五官清晰、无遮挡</h4>
+        <p class="quote-line">README 原话：clean and sharp picture。</p>
+        <p>口罩、墨镜、手挡脸、发丝大面积遮挡都会直接影响 Embedding 质量。</p>
+      </article>
+      <article class="mini">
+        <div class="lead red">03 / 光照</div>
+        <h4>均匀光照</h4>
+        <p class="quote-line">强侧光和硬阴影会在人脸解析阶段产生错误掩码。</p>
+        <p>这是根据 AntelopeV2 + BiSeNet 解析链路推断，未在官方文档见到明文。</p>
+      </article>
+      <article class="mini">
+        <div class="lead">04 / 分辨率</div>
+        <h4>≥512px 是文章口径</h4>
+        <p class="quote-line">官方没给具体像素数。</p>
+        <p>公众号文写“分辨率不低于 512px”。本轮核到的官方表述只有 clean and sharp，无像素门槛。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 09 核对表 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no k">09</div>
+      <div class="section-meta">
+        <div class="label k">RECONCILIATION</div>
+        <h2>文章核对表：教程与官方文档的差距</h2>
+        <p>左列是公众号文说法，右列是本轮核对到的依据。逐条对应，方便你自己复判。</p>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>项目</th><th>文章说</th><th>实际依据</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>许可归属</b></td>
+            <td>“PuLID 节点代码 Apache-2.0，人脸分析后端有两条互斥路径，路径 B 商用可走 FaceNet + VGGFace2”</td>
+            <td>官方仓库全文 grep <code>facenet|vggface|buffalo</code> 命中 <b>0</b>。实现只有 <code>insightface.app.FaceAnalysis(name='antelopev2')</code> 一条。非商用限制来自 InsightFace 权重，不是 PuLID 代码</td>
+          </tr>
+          <tr>
+            <td><b>显存</b></td>
+            <td>“Flux + PuLID：FP8/8bit GGUF 版 ~12GB，32bit 原版 ~22GB”</td>
+            <td>官方 docs 五档实测：&lt;45GB / &lt;30GB / &lt;15GB / &lt;17GB / 约 11GB。文章数字与之不对应，属文章口径</td>
+          </tr>
+          <tr>
+            <td><b>weight 步长</b></td>
+            <td>“范围 -1~5，每次 0.1”</td>
+            <td>源码 <code>step: 0.05</code>，两个节点都是。范围 -1.0～5.0 无误</td>
+          </tr>
+          <tr>
+            <td><b>Advanced 节点</b></td>
+            <td>只讲 method 三选一</td>
+            <td>Advanced 节点没有 method，是 <code>projection</code>（ortho_v2/ortho/none）+ <code>fidelity</code>（默认 8，0～32）+ <code>noise</code>（默认 0.0，-1～1）</td>
+          </tr>
+          <tr>
+            <td><b>fidelity 方向</b></td>
+            <td>“fidelity 最像参考图”（方向对，但没说清数值关系）</td>
+            <td>README 加粗：“Lower fidelity values grant higher resemblance to the reference image.” 数值越低越像。ortho_v2+8≈fidelity，ortho+16≈style</td>
+          </tr>
+          <tr>
+            <td><b>Flux 版节点名</b></td>
+            <td>“用 PulidFluxFaceNetLoader 或 PulidFluxInsightFaceLoader 替代 Apply 节点”</td>
+            <td>这两个名字与 cubiq 仓库无关，应属 balazik 插件。<b>本轮未核 balazik 源码，标未核实</b>，不作结论</td>
+          </tr>
+          <tr>
+            <td><b>Flux weight</b></td>
+            <td>“weight 必须拉满 1.0，否则脸会变形”</td>
+            <td>未见官方出处，<b>文章经验，未核实</b></td>
+          </tr>
+          <tr>
+            <td><b>采样参数</b></td>
+            <td>Flux：CFG 1.0 + euler + simple、25 步；SDXL：steps 30、CFG 7.0、dpmpp_2m_sde_gpu、1024×1024</td>
+            <td>官方无基准参数表。README 只说可试 <code>sgm_uniform</code>、可能要调 CFG。属<b>文章建议，未核实</b></td>
+          </tr>
+          <tr>
+            <td><b>插件状态</b></td>
+            <td>未提</td>
+            <td>cubiq README 顶部：2025.04.14 起 “maintenance only”，作者不再以 ComfyUI 为主要方式，不计划持续投入</td>
+          </tr>
+          <tr>
+            <td><b>原理归因</b></td>
+            <td>“对比对齐防泄漏是 PuLID 比 InstantID 强的根本原因”</td>
+            <td>论文与 README 未做与 InstantID 的直接强弱对比。标为<b>文章解读，未由论文直接证实</b></td>
+          </tr>
+          <tr>
+            <td><b>参考图分辨率</b></td>
+            <td>“不低于 512px”</td>
+            <td>官方只有 clean and sharp，无像素门槛。属文章口径</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10 来源与边界 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-no">10</div>
+      <div class="section-meta">
+        <div class="label">SOURCES &amp; BOUNDARY</div>
+        <h2>来源与本卡边界</h2>
+        <p>所有数字和判断都能追到下面这些一手来源。凡是没列进来的，就是本轮没核。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="card">
+        <div class="tagrow"><span class="tag blue">一手来源</span></div>
+        <h3>链接清单</h3>
+        <ul>
+          <li>公众号文章：<a href="https://mp.weixin.qq.com/s/uUbT4hT8iLUK_gNm29aAzQ" target="_blank" rel="noopener">mp.weixin.qq.com/s/uUbT4hT8iLUK_gNm29aAzQ</a>（姊妹篇《PuLID 在 ComfyUI 中的详细使用方法和壁垒》）</li>
+          <li>PuLID 仓库：<a href="https://github.com/ToTheBeginning/PuLID" target="_blank" rel="noopener">github.com/ToTheBeginning/PuLID</a>（Apache-2.0，最后 push 2025-07-31）</li>
+          <li>论文：<a href="https://arxiv.org/abs/2404.16022" target="_blank" rel="noopener">arXiv:2404.16022</a>（NeurIPS 2024）</li>
+          <li>权重：<a href="https://huggingface.co/guozinan/PuLID" target="_blank" rel="noopener">huggingface.co/guozinan/PuLID</a>（cardData: apache-2.0）</li>
+          <li>FLUX 显存文档：仓库内 <code>docs/pulid_for_flux.md</code></li>
+          <li>v1.1 文档：仓库内 <code>docs/pulid_v1.1.md</code></li>
+          <li>cubiq 插件：<a href="https://github.com/cubiq/PuLID_ComfyUI" target="_blank" rel="noopener">github.com/cubiq/PuLID_ComfyUI</a>（Apache-2.0，最后 push 2025-04-14）</li>
+          <li>balazik 插件：<a href="https://github.com/balazik/ComfyUI-PuLID-Flux" target="_blank" rel="noopener">github.com/balazik/ComfyUI-PuLID-Flux</a>（Apache-2.0，最后 push 2024-10-03）</li>
+          <li>InsightFace 许可：<a href="https://github.com/deepinsight/insightface" target="_blank" rel="noopener">github.com/deepinsight/insightface</a> README 的 License 小节</li>
+          <li>AntelopeV2：<a href="https://huggingface.co/MonsterMMORPG/tools/tree/main" target="_blank" rel="noopener">huggingface.co/MonsterMMORPG/tools</a>（cubiq README 指向）</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="tagrow"><span class="tag red">本卡边界</span></div>
+        <h3>必须说清的限制</h3>
+        <ul>
+          <li><b>本轮未安装 ComfyUI、未安装任何插件、未下载任何权重、未跑过一次推理。</b>文中所有性能与画质数字都来自官方文档，不是本机实测。</li>
+          <li>balazik 插件与 ZHO-ZHO-ZHO 插件的源码均未核；文中提到它们的节点名不作为已验证事实。</li>
+          <li>GitHub stars（3552 / 911 / 724）是 2026-10-15 的 API 快照，会随时间变化。</li>
+          <li>公众号文章链接本轮只做了可达性检查（返回 302），未逐句重取全文；引用的是既有核查记录。</li>
+          <li>许可部分只陈述各来源原文，不提供法律意见。商用前请自行向权重提供方确认。</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <div class="verdict" style="margin-top:22px">
+    <h3>收口：装之前确认三件事</h3>
+    <ul>
+      <li>你的显存落在官方哪一档，够不够换到 offload 或 fp8。</li>
+      <li>你的用途是否落在 InsightFace 权重的非商用研究限制内，或者是否已取得授权。</li>
+      <li>你接受 cubiq 插件已停止维护这件事，或者愿意评估官方 README 列出的另一个实现。</li>
+    </ul>
+    <div class="foot">本卡为核查型整理，不复述安装步骤。核对方法与未核实项清单见随卡 research.md。</div>
+  </div>
+
+  <div class="rule"></div>
+  <p class="source-note">AG雷达 · PuLID 在 ComfyUI · hardblue · 证据截止 2026-10-15 · 未实机运行</p>
+
+</main>
+</body>
+</html>
