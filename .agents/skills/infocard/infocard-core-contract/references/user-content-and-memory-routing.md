@@ -15,6 +15,6 @@
 
 ## 待决依赖
 
-当前architecture.json的reference_policy.root为`.agents/skills-cop`，但该目录不存在；引用修复及Author/Publish实际入口需独立核验，不能擅自重建流程。旧authoring Skill与router关于Major阻断/两轮视觉遗留存在不同口径，按架构兼容状态隔离旧流程，未知规则不自行放宽。
+architecture.json 的 reference_policy.root 已从不存在的 `.agents/skills-cop` 修正为实际根 `.agents/skills`（同步修正 compatibility-matrix.md 与 theme-contract adapters）。旧 authoring Skill 与 router 关于 Major 阻断/两轮视觉遗留存在不同口径，按架构兼容状态隔离旧流程，未知规则不自行放宽。
 
 旧全局infocard主文件的“语言由来源决定/英文来源英文优先”已被用户后续中文默认决定替代，不再作为活动规则。100K主文件无法patch不是业务规范，不能因此把规则无限追加到全局cookbook。

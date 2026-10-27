@@ -7,4 +7,4 @@ updated: 2026-08-31
 replacement: ../contracts/architecture.json
 ---
 
-All historical infocard skills remain callable under `.agents/skills-cop`. Their canonical replacement and status are machine-readable in `contracts/architecture.json`; deprecated entries must disclose the replacement to callers. No legacy entry is deleted or silently granted broader permissions.
+All historical infocard skills remain callable under `.agents/skills`. Their canonical replacement and status are machine-readable in `contracts/architecture.json`; deprecated entries must disclose the replacement to callers. No legacy entry is deleted or silently granted broader permissions.
