@@ -45,4 +45,8 @@ node scripts/check-info-leak.js <html>
 - 校验通过后检查精确 diff，只暂存当前任务产物及其必要生成文件。共享仓库的既有改动不清理、不顺带提交。
 - 远端拒绝不能直接推断为并发；先调查分叉、重叠路径、删除方向和内容丢失风险。按授权整合，不 force push。
 - 公网验证目标页内容指纹、索引入口与当前视觉。分开报告候选、当地验收、commit/push、公网验收；未完成项保留准确状态。
+- Author/校验器契约坑（2026-10-28 实测）：`bundle.slug` 不得带 `YYYYMMDD-` 前缀，校验器要求 `html_path == docs/YYYYMMDD-${slug}.html`，`asset_dir`/`manifest_path` 必须是 `assets/img/${slug}`；日期只进 target/path，sidecar slug 字段不受此限。
+- 主题 `required_selectors` 是字面匹配 `class="X`：必需类必须写在 class 首位（`class="col panel"` ✓，`class="panel col"` ✗）。
+- 移动视口含表格的卡：`@media` 下必须 `table{min-width:5xxpx}` + `.scroll{overflow-x:auto}`，否则列被挤成 3 字宽判 major；修复 HTML 后四图按新哈希重截。
+- agent-browser screenshot 相对路径可能打印成功但文件不存在：一律绝对路径 + 每张前 `/json/activate/<TID>`。
 - 历史事故文件只用于定位同类原因，其中的命令、放行和状态定义不自动生效。
