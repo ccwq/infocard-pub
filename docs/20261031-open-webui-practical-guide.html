@@ -1,0 +1,40 @@
+<!doctype html><html lang="zh-CN" data-theme="blue"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Open WebUI 实用指南：接模型、验知识库、查数据去向</title><style>*{box-sizing:border-box} :root{--black:#0a0a0a;--white:#f5f2ec;--red:#c8102e;--blue:#0036a3;--green:#006b3c;--yellow:#e8c200;--extra0:#e0e9f6;--extra1:#0036a3;--extra2:#101820;--extra3:#c2cbd9;--extra4:#e3e8f0;--extra5:#a9c4ff;--extra6:#e8edf5;--extra7:#f4f6fa;--extra8:#142033;--extra9:#e1eaff;--extra10:#ffedef;--extra11:#fff} html,body{margin:0;min-width:0}body{background:var(--extra6);color:var(--extra8);font:16px/1.8 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}.page{max-width:900px;margin:auto;background:var(--white);border:2px solid var(--blue)}header{background:var(--extra2);color:var(--extra11);padding:32px 26px;border-bottom:6px solid var(--red)}h1{font-size:clamp(26px,5vw,42px);line-height:1.25;margin:8px 0 15px}header p{color:var(--extra0);margin:0}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.chip{border:1px solid var(--extra5);padding:2px 9px;color:white}.blue-band{background:var(--blue);color:white;padding:10px 24px;font-weight:700}.section{padding:24px 26px;border-bottom:1px solid var(--extra3);min-width:0}.section h2{font-size:23px;line-height:1.35;border-bottom:2px solid var(--blue);padding-bottom:10px}.section-no{display:inline-block;background:var(--blue);color:white;padding:2px 9px;margin-right:8px;font-size:16px}.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.step{border:2px solid var(--blue);padding:10px;color:var(--blue);font-weight:700}.warning{background:var(--extra10);border-left:5px solid var(--red);padding:14px 16px;margin:16px 0}.flow{background:var(--extra2);color:white;padding:15px 18px;line-height:2}.flow strong{color:var(--extra5)}pre{max-width:100%;overflow-x:auto;background:var(--extra2);color:var(--extra7);padding:16px;border-left:4px solid var(--blue);font-size:14px;line-height:1.6}pre code{background:transparent;color:inherit;padding:0;white-space:pre}code{font-family:ui-monospace,monospace;background:var(--extra9);padding:1px 4px;overflow-wrap:anywhere}p,li{overflow-wrap:anywhere}li{margin-bottom:8px}a{color:var(--extra1)}footer{padding:20px 26px;background:var(--extra4);font-size:14px}@media(max-width:600px){.page{border:0}.section{padding:20px 16px}header{padding:25px 16px}.steps{grid-template-columns:repeat(2,minmax(0,1fr))}.blue-band{padding:10px 16px}h1{font-size:28px}}</style></head><body><main class="page"><header><div>实用教程 / 模型与知识库</div><h1>Open WebUI 实用指南：接模型、验知识库、查数据去向</h1><p>从单机启动到文档问答验证，再沿处理链检查数据去向。</p><div class="chips"><span class="chip">Docker</span><span class="chip">Ollama</span><span class="chip">RAG</span><span class="chip">数据路径</span></div></header><div class="blue-band">速览：先连通，再验知识库，最后检查数据路径</div><section class="section"><div class="steps"><div class="step">01 启动界面</div><div class="step">02 接通模型</div><div class="step">03 测试检索</div><div class="step">04 排查出口</div></div><p>Open WebUI 将本地与云端模型接到同一界面，并可加入文档检索；它是入口和管理层，不替代模型服务。</p><ul><li>Ollama 等运行本地模型；云端连接需要服务地址和密钥。</li><li>上传文件不等于检索成功，要用可核对的句子和引用验证。</li><li>本地卷不是备份，外部模型、抽取、搜索与插件仍可能收到数据。</li><li>插件可能在服务器执行代码，导入权限应限于可信管理员。</li></ul><div class="warning">单机试用先准备 Docker 和可访问的模型服务：创建管理员，连接模型，验证普通对话，再测试文档。需要离线时逐项检查处理服务和网络出口。</div><p>到这里可以决定是否试用；继续阅读可获得具体命令、对照测试和分层排障方法。</p><div class="flow"><strong>数据流：</strong>上传 → 抽取 → 切分 → embedding 与索引 → 检索片段 → 聊天模型</div></section><section class="section"><h2><span class="section-no">01</span> 先把界面接到一个模型</h2>
+<p>以下假设 Docker 已安装，Ollama 运行在同一台宿主机。先用 <code>openssl rand -hex 32</code> 生成一串随机密钥，安全保存，并把下方占位符替换为该值：</p>
+<pre><code class="language-bash">docker run -d -p 127.0.0.1:3000:8080 \
+  --add-host=host.docker.internal:host-gateway \
+  -v open-webui:/app/backend/data \
+  -e WEBUI_SECRET_KEY=your-secret-key \
+  --name open-webui --restart always \
+  ghcr.io/open-webui/open-webui:main
+</code></pre>
+<p>打开 <code>http://localhost:3000</code>，创建的第一个账号是管理员。<code>127.0.0.1:3000:8080</code> 只把端口绑定到宿主回环地址，避免默认向全网开放；<code>open-webui</code> 卷存放聊天、用户与设置。重建容器时继续使用同一个卷和密钥；删除卷会删除其中的数据，更新前另做备份。<code>:main</code> 会滚动更新，稳定部署应选定具体版本。</p>
+<p>进入头像 → Settings → Admin → Connections，在 Ollama 连接中检查 <code>http://host.docker.internal:11434</code>。容器内的 <code>localhost</code> 指容器自己，不是宿主机；上面的 <code>--add-host</code> 解决名称映射，但 Ollama 仍须监听容器可访问的地址。官方提示宿主 Ollama 在 Docker 场景需监听 <code>0.0.0.0</code>；这也可能扩大暴露范围；应只允许容器所需的来源访问，并通过防火墙限制其他访问。</p>
+<p>想接云端或其他兼容服务，在同一页面找到 <strong>Manage OpenAI API Connections</strong>，点击旁边的 <code>+</code>，填服务商提供的 Base URL 和 API Key，保存。OpenAI 的地址示例是 <code>https://api.openai.com/v1</code>；其他服务用自己的地址。若服务不提供模型列表，在连接设置里填写 Model IDs。然后新建聊天，选择模型，先问一个简单问题，确认能正常回复。</p>
+<p>不使用 Docker 时，官方 Python 安装是两条命令，不能粘成一条；官方当前支持 Python 3.11 和 3.12：</p>
+<pre><code class="language-bash">pip install open-webui
+open-webui serve
+</code></pre>
+<p>默认访问 <code>http://localhost:8080</code>。无论哪种安装方式，都要另行接入聊天模型。</p>
+</section><section class="section"><h2><span class="section-no">02</span> 文档问答：先证明它真的找到那句话</h2>
+<p>常见流程是：上传文件 → 抽取正文 → 切成小块 → embedding 模型把文本转成向量并建立索引 → 对问题检索相关片段 → 把片段连同问题交给聊天模型。聊天模型因此可以依据文档回答，但这既不是训练模型，也不能保证每次都检索正确。</p>
+<p><strong>教学示例：</strong></p>
+<ol>
+<li>新建 <code>test.txt</code>，写入：<code>设备巡检口令是：蓝鲸带着橘子散步。</code> 用不含真实敏感信息的句子测试。</li>
+<li>在 Workspace 的文档或知识库区域上传；在聊天中通过 <code>#</code> 选择该文件，确认输入框上方出现附件标识。界面名称可能随版本变化。</li>
+<li>选择已连接的聊天模型，问：“设备巡检口令是什么？请给出依据。”预期回答包含“蓝鲸带着橘子散步”，并检查界面中可用的来源或引用，确认指向测试文件。</li>
+<li>再开一个未附该文件的新对话问相同问题，作为对照；如果它也答对，不能仅凭答案证明检索成功。还要检查引用、实际送入的上下文或检索记录。</li>
+</ol>
+<p>结果不对，先确认附件选中且有访问权限，再检查文档抽取预览、索引状态和 embedding 配置；更换 embedding 模型后，在 Admin → Documents 重新索引。扫描件需要适合的 OCR/抽取方式；上下文过短也可能丢掉检索片段。对于绑定到模型的知识库，启用原生工具调用时，模型可能需要主动调用检索工具，不能假定每次都会自动查。</p>
+</section><section class="section"><h2><span class="section-no">03</span> 本地存储，不等于所有数据都留在本机</h2>
+<p>卷保存的是 Open WebUI 的应用数据。若使用云端 embedding，文档文本可能发送给 embedding 服务；若使用云端聊天模型，问题和检索到的片段可能发送给模型服务商。外部 OCR、向量库、搜索与插件也各有自己的数据路径。</p>
+<p>真正的离线部署需要预先准备模型和依赖，将聊天、抽取、embedding 与存储指向受控环境，关闭不需要的外部连接，并检查实际出口。官方还提示默认安装可能发起版本检查、OpenAI 模型列表请求以及 embedding 更新检查；不要把“装在内网”直接等同于“没有任何外联”。</p>
+</section><section class="section"><h2><span class="section-no">04</span> 连不上时，按层排查</h2>
+<ul>
+<li><strong>页面打不开</strong>：运行 <code>docker logs -f open-webui</code> 查看启动日志；若 3000 端口被占用，改映射左侧端口。</li>
+<li><strong>Ollama 没有模型</strong>：先在宿主执行 <code>curl http://localhost:11434/api/tags</code> 检查服务，再检查容器到 <code>host.docker.internal:11434</code> 的连通性、监听地址和防火墙；确认 Ollama 已有可用模型。</li>
+<li><strong>云端列表为空或认证失败</strong>：检查 Base URL、密钥、服务商权限和 Model IDs；不要把密钥贴到日志或公开截图。</li>
+<li><strong>回答没有依据</strong>：确认文件已附加、抽取内容不为空、索引完成，检查模型上下文与工具调用模式，而不是只换提示词。</li>
+</ul>
+<p>多人部署时，先限制新用户和知识库权限。更重要的是，Tools、Functions、Filters、Pipes 等插件可能在服务器执行任意 Python；只给可信管理员导入权限，先审代码，并隔离运行环境。社区展示不等于安全审计。</p>
+<p>主仓当前使用带品牌条件的 Open WebUI License，并非 MIT；具体部署、二次开发及分发应核对所用版本的许可。另有独立的桌面应用仓库：官方标为早期 Alpha，可选启用内置 llama.cpp，首次启动需要联网，不能把它等同于上述标准 Docker 镜像。</p>
+<p><strong>资料：</strong><a href="https://docs.openwebui.com/getting-started/quick-start/">官方快速入门</a> · <a href="https://docs.openwebui.com/features/chat-conversations/rag/">RAG 文档</a> · <a href="https://docs.openwebui.com/features/extensibility/plugin/">插件安全</a> · <a href="https://github.com/open-webui/open-webui/blob/main/LICENSE">许可证</a> · <a href="https://github.com/open-webui/desktop">桌面仓库</a> · <a href="https://mp.weixin.qq.com/s/funkB8RPaj-sPLvRb2NHAQ">原文</a></p></section><footer>资料核查日期：2026-10-31。界面和默认行为可能随版本变化。</footer></main></body></html>
