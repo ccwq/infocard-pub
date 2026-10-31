@@ -49,7 +49,7 @@
 - `npm run build`：补齐缺失的元数据日期，生成 `_index.yaml`，并向根目录 `index.html` 注入索引数据。
 - `npm run verify`：校验索引产物、卡片文件与元数据的一致性。
 - `npm test`：运行 `scripts/test/` 中的 Node 原生测试。
-- `npm run fix-taxonomy && npm run verify-taxonomy`：修改卡片后补全并校验 taxonomy。
+- `node scripts/verify-taxonomy.js <meta>`：定向校验当前卡 taxonomy。单卡收尾不使用 `npm run fix-taxonomy`（该命令重写全仓 meta 引号风格，产生越界差异）；确需全局补全须用户单独授权，执行后用 `git status` 核查并回退非本卡文件。
 - `npm run check-leak`：扫描敏感信息；出现 `CRITICAL` 或 `HIGH` 必须修复后才能发布。
 - `npm run preview:source`：在 `http://localhost:4173` 预览源码；需要检查 `dist/` 时运行 `npm run preview`。
 
