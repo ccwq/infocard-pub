@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="wood">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="slug" content="20261110-sag2-sagwiki">
+<title>SAG2 与 SAG Wiki：建库不调模型、不用向量的本地知识库，指标与边界都核过了</title>
+<meta name="description" content="Zleap AI 开源 SAG2 检索架构与桌面端 SAG Wiki：BM25+JEV 取代 Embedding 与大模型预处理，建库 11,656 段 2.36 秒；三测试集 R@5/R@10 全部第一。附上手步骤与隐私边界。">
+<style>
+  :root{
+    --bg:#f3eee7; --paper:#fffdf8; --ink:#101010; --muted:#5f584f; --line:#1b1713;
+    --blue:#2f5fb8; --blue-soft:#eaf1ff; --wood:#8a5a3c; --wood-soft:#f1e3d3; --wood-dark:#5a381f;
+    --shadow:6px 6px 0 rgba(16,16,16,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{margin:0;overflow-x:hidden}
+  body{
+    color:var(--ink);line-height:1.6;
+    font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    background:var(--bg);
+  }
+  img{display:block;max-width:100%;height:auto}
+  a{color:var(--blue)}
+  code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .page{width:min(1180px,calc(100% - 20px));margin:0 auto;padding:20px 0 90px}
+  section{margin-top:26px}
+
+  /* top meta row */
+  .meta-row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap;
+    border-bottom:3px solid var(--line);padding-bottom:8px;font-size:12px;color:var(--muted)}
+  .meta-row .src{font-weight:700;color:var(--ink)}
+  .meta-row a{font-weight:600}
+
+  /* contrast box */
+  .contrast{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;border:3px solid var(--line);background:var(--ink);color:#fff;box-shadow:var(--shadow)}
+  .contrast>div{padding:12px 14px}
+  .contrast .old{border-right:3px solid #fff;opacity:.82}
+  .contrast .new{background:var(--wood-dark)}
+  .contrast h4{font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px;color:#e8dcc9}
+  .contrast .new h4{color:#ffd9a8}
+  .contrast p{font-size:12.8px;line-height:1.55;margin:0}
+
+  /* hero */
+  .hero{margin-top:20px;padding:6px 2px}
+  .kicker{display:inline-block;border:2px solid var(--line);background:var(--paper);padding:4px 10px;font-size:11.2px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--wood-dark)}
+  h1{font-family:Georgia,"Times New Roman","Songti SC","SimSun",serif;font-weight:700;letter-spacing:-.01em;
+     font-size:clamp(26px,4.6vw,50px);line-height:1.12;margin-top:12px}
+  .hero .sub{margin-top:10px;font-size:13.5px;color:var(--muted);max-width:860px}
+
+  /* quote banner */
+  .quote{margin-top:18px;background:var(--wood-soft);border-left:8px solid var(--wood);padding:14px 16px;box-shadow:var(--shadow)}
+  .quote p{font-size:15.5px;line-height:1.62;font-weight:650;color:var(--wood-dark)}
+  .quote .note{margin-top:6px;font-size:12px;font-weight:500;color:var(--muted)}
+
+  /* process bar */
+  .process{margin-top:18px;display:grid;grid-template-columns:repeat(4,1fr);border:3px solid var(--line);background:var(--ink);color:#fff}
+  .process>div{padding:12px 12px;border-right:2px solid rgba(255,255,255,.28)}
+  .process>div:last-child{border-right:none}
+  .process .n{font-family:ui-monospace,Menlo,monospace;font-size:11.2px;color:#e0b78a;letter-spacing:.12em}
+  .process .t{margin-top:4px;font-size:13.5px;font-weight:800;line-height:1.35}
+  .process .d{margin-top:4px;font-size:11.8px;line-height:1.5;color:#cfc8bd}
+
+  /* takeaways */
+  .takeaways{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}
+  .tk{border:2px solid var(--line);background:var(--paper);padding:12px;box-shadow:var(--shadow)}
+  .tk h3{font-size:13px;letter-spacing:.06em;color:var(--wood-dark);border-bottom:2px solid var(--line);padding-bottom:6px;margin-bottom:8px}
+  .tk p{font-size:12.4px;line-height:1.58}
+  .tk b{color:var(--wood-dark)}
+
+  .divert{margin-top:24px;border:2px dashed var(--wood);background:var(--paper);padding:12px 14px;font-size:12.6px;color:var(--muted)}
+  .divert b{color:var(--ink)}
+
+  h2.sec{font-family:Georgia,"Times New Roman","Songti SC","SimSun",serif;font-size:clamp(20px,2.6vw,30px);line-height:1.2;
+    border-bottom:3px solid var(--line);padding-bottom:8px;margin-bottom:14px}
+  h2.sec .no{font-family:ui-monospace,Menlo,monospace;font-size:.62em;color:var(--wood);margin-right:10px;letter-spacing:.1em}
+  h3.sub{font-size:14.5px;margin:16px 0 8px;color:var(--wood-dark)}
+  .prose p{font-size:13px;line-height:1.68;margin:8px 0}
+  .prose li{font-size:12.8px;line-height:1.62;margin:5px 0 5px 20px}
+
+  /* columns */
+  .grid3{display:grid;grid-template-columns:1.05fr 1fr .95fr;gap:14px}
+  .card{border:2px solid var(--line);background:var(--paper);padding:14px;box-shadow:var(--shadow)}
+  .card h4{font-size:13px;color:var(--wood-dark);border-bottom:2px solid var(--line);padding-bottom:6px;margin-bottom:8px}
+  .card p{font-size:12.5px;line-height:1.6;margin:6px 0}
+  .card .lbl{display:inline-block;background:var(--blue-soft);color:var(--blue);font-size:10.8px;font-weight:800;padding:2px 7px;border:1px solid var(--blue);margin-right:6px;vertical-align:1px}
+  .card .lbl.wood{background:var(--wood-soft);color:var(--wood-dark);border-color:var(--wood)}
+
+  /* table */
+  .tbl-wrap{overflow-x:auto;border:2px solid var(--line);background:var(--paper)}
+  table{border-collapse:collapse;width:100%;min-width:640px}
+  th,td{border-bottom:1.5px solid var(--line);padding:8px 10px;font-size:12.4px;text-align:right}
+  th{background:var(--ink);color:#fff;font-size:11.6px;letter-spacing:.04em;text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  td.best{background:var(--wood-soft);font-weight:800;color:var(--wood-dark)}
+  td.note-cell{color:var(--muted);font-size:11.6px}
+  .tbl-note{margin:8px 2px 0;font-size:11.6px;line-height:1.5;color:var(--muted)}
+
+  /* figures */
+  figure{border:2px solid var(--line);background:var(--paper);padding:10px;margin:14px 0;box-shadow:var(--shadow)}
+  figure img{width:100%;border:1.5px solid var(--line);background:#fff}
+  figcaption{margin-top:8px;font-size:11.8px;line-height:1.55;color:var(--muted)}
+  figcaption b{color:var(--ink)}
+  .fig2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .fig2 figure{margin:0}
+
+  /* code */
+  pre{background:var(--ink);color:#e8e0d3;padding:12px 14px;font-size:12.2px;line-height:1.6;overflow-x:auto;border:2px solid var(--line)}
+  code.inline{background:var(--wood-soft);color:var(--wood-dark);padding:1px 5px;font-size:12px}
+
+  /* steps */
+  ol.steps{counter-reset:st;list-style:none;margin:10px 0}
+  ol.steps li{counter-increment:st;position:relative;padding:10px 12px 10px 46px;border:2px solid var(--line);background:var(--paper);margin:8px 0;font-size:12.8px;line-height:1.6}
+  ol.steps li::before{content:counter(st,decimal-leading-zero);position:absolute;left:10px;top:10px;width:26px;height:26px;background:var(--ink);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+
+  /* boundary panel */
+  .boundary{border:3px solid var(--wood-dark);background:var(--wood-soft);padding:16px;box-shadow:var(--shadow)}
+  .boundary h3{font-size:15px;color:var(--wood-dark);margin-bottom:10px}
+  .priv{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+  .priv>div{border:2px solid var(--line);background:var(--paper);padding:12px}
+  .priv h4{font-size:12.5px;margin-bottom:6px}
+  .priv .local h4{color:#2e6b34}
+  .priv .cloud h4{color:#9a3412}
+  .priv li{font-size:12.2px;line-height:1.58;margin:4px 0 4px 18px}
+
+  /* footer */
+  .foot{margin-top:30px;border-top:3px solid var(--line);padding-top:12px;display:grid;gap:6px;font-size:11.6px;color:var(--muted)}
+  .foot b{color:var(--ink)}
+  .refs{margin-top:4px;line-height:1.7}
+  .refs a{word-break:break-all}
+
+  /* mobile */
+  @media (max-width:720px){
+    .page{padding-bottom:70px}
+    .contrast,.process,.takeaways,.grid3,.fig2,.priv{grid-template-columns:1fr}
+    .contrast .old{border-right:none;border-bottom:3px solid #fff}
+    .process>div{border-right:none;border-bottom:2px solid rgba(255,255,255,.28)}
+    .process>div:last-child{border-bottom:none}
+    h1{font-size:clamp(24px,7vw,32px)}
+    .quote p{font-size:14px}
+    table{min-width:560px}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="meta-row">
+    <span class="src">来源：袋鼠帝 @aikangarooking · X 长文 · 2026-11-09</span>
+    <a href="https://x.com/aikangarooking/status/2119717912546304048">x.com/aikangarooking/status/2119…4048</a>
+    <span>信息卡 · 2026-11-10 · 数字已对照论文核验</span>
+  </div>
+
+  <div class="contrast">
+    <div class="old">
+      <h4>传统知识库建库</h4>
+      <p>切块 → Embedding 向量化 → 存向量库；图谱方案还要逐段调大模型抽实体。SAG 一代建 11,656 段：4.57 小时、2,826 万 tokens。</p>
+    </div>
+    <div class="new">
+      <h4>SAG2 建库</h4>
+      <p>分词后直接进 SQLite 全文索引。同样 11,656 段：2.36 秒、25.87 MiB、零模型调用。不用 GPU，不装向量库。</p>
+    </div>
+  </div>
+
+  <div class="hero">
+    <span class="kicker">SAG2 / SAG Wiki · 开源本地知识库</span>
+    <h1>SAG2 与 SAG Wiki：建库不调模型、不用向量的本地知识库，指标与边界都核过了</h1>
+    <p class="sub">Zleap AI（广州智跃深空）开源的检索架构 SAG2（arXiv:2610.22588）和落地它的桌面应用 SAG Wiki。本文关键数字已对照论文与官方仓库核验；作者实测部分单独标注。</p>
+  </div>
+
+  <div class="quote">
+    <p>把语义理解从建库阶段挪到提问那一刻：索引只存原文和词表，检索时 BM25 先找候选，JEV 判断哪段真有用，再从有用段落里取词接着搜。</p>
+    <p class="note">代价是：语义检索和问答并不是离线的——问题与文档片段会发送给你配置的模型服务。本地的是索引与文件，不是所有数据流。</p>
+  </div>
+
+  <div class="process">
+    <div><div class="n">STEP 01</div><div class="t">本地建索引</div><div class="d">分词写入 SQLite FTS5，存原文+词项，建库不调任何模型</div></div>
+    <div><div class="n">STEP 02</div><div class="t">BM25 召回候选</div><div class="d">按问题词项取最多 100 条候选段落</div></div>
+    <div><div class="n">STEP 03</div><div class="t">JEV 判断证据</div><div class="d">逐段评估是否提供回答必需的事实</div></div>
+    <div><div class="n">STEP 04</div><div class="t">扩词再搜</div><div class="d">从高分段落取 ≤10 个种子、≤20 个词项续搜，默认 1 次扩展、最多 2 轮，本地排序输出前 10</div></div>
+  </div>
+
+  <div class="takeaways">
+    <div class="tk"><h3>它是什么</h3><p>Zleap AI 的开源检索架构 SAG2 + 桌面端 SAG Wiki，MIT 许可。论文 2026-10-15 挂 arXiv，配套基准仓库可复现。</p></div>
+    <div class="tk"><h3>快</h3><p><b>2.36 秒</b>建完 11,656 段索引（vs SAG 一代 4.57 小时、2,826 万 tokens，量级差约 7,000 倍，两次测量条件不同）。</p></div>
+    <div class="tk"><h3>准</h3><p>三个多跳测试集各 1,000 题，<b>R@5 和 R@10 全部最高</b>：86.62% / 97.43% / 99.00%；企业基准 51.2 万文档 R@10 81.10%。</p></div>
+    <div class="tk"><h3>边界</h3><p>快速搜索纯本地可离线；深入检索调 Jev 云服务、问答调回答模型。论文用固定测试集，官方建议在自己的数据上自测。</p></div>
+  </div>
+
+  <div class="divert">
+    <b>读到这里你已经拿到结论。</b>下面四节是证据：检索机制怎么跑（含原文流程图）、benchmark 逐项数字（含一处对原文说法的纠错）、作者实测四个场景、上手步骤与隐私边界。
+  </div>
+
+  <section class="prose">
+    <h2 class="sec"><span class="no">01</span>机制：把语义理解推迟到查询时</h2>
+    <div class="grid3">
+      <div class="card">
+        <h4><span class="lbl wood">建库</span>离线：只做词法索引</h4>
+        <p>SAG2 建库阶段不调用任何模型。原文分词后连同词项统计一起写进单个 SQLite 文件（FTS5 全文索引），保留来源、标题与词频。没有 Embedding，没有实体抽取，没有向量库，也没有独立的数据库服务。</p>
+        <p>文件改动时增量更新索引，原始文件始终留在原处，不搬家也不改写。</p>
+      </div>
+      <div class="card">
+        <h4><span class="lbl">查询时</span>在线：检索—判断—扩展循环</h4>
+        <p>提问后，BM25 按词项取最多 100 条候选；JEV 逐段判断"这段是否提供了回答必需的事实"；从高分段落提取词项与完整名称继续检索，新候选结合已有证据重新打分；最后本地做多样性排序，输出带原文位置的 10 条结果。</p>
+        <p>SAG Wiki 应用默认首次召回 + 1 次扩展（最多 2 轮）；论文实验默认最多扩展 2 次。</p>
+      </div>
+      <div class="card">
+        <h4><span class="lbl wood">决策模型</span>JEV 是什么</h4>
+        <p>JEV 是 TypeSafe AI（创始人 Diogo Almeida，前 OpenAI）2026-09-15 发布的"System One Model"：不生成文本，只对给定问题返回判断和校准过的概率（Noul 接口）。官方定价输入 $0.042/百万 tokens、输出免费，时延 70–500ms。SAG2 论文经 OpenRouter 使用 <span class="mono">typesafe/jev-1.13-20260917</span>。</p>
+        <p>它回答"这段是不是证据"，但不产出最终回答——写答案的是你配置的问答模型。</p>
+      </div>
+    </div>
+    <figure>
+      <img src="../assets/img/sag2-sagwiki/06-sag2-pipeline.jpg" alt="SAG2 索引与检索流程图：上半部分为离线索引——语料分词后写入 SQLite FTS5，存原始文本与词项；下半部分为在线检索——问题经 BM25 取候选进入评分池，由上下文 JEV 结合共享上下文输出已排序段落，再从未扩展种子（最多 10 个）取加权词项（最多 20 个）按词项续搜，新候选回灌评分池，最多扩展 2 次，停止后经本地多样性排序输出前 10 条检索证据" width="1080" height="704" loading="lazy">
+      <figcaption><b>图 1（原文图）· SAG2 两阶段流程。</b>上半是离线索引：分词写 SQLite FTS5，零模型调用；下半是在线循环：BM25 召回 → JEV 结合共享上下文判断证据 → 从高分段落取词续搜（种子 ≤10、词项 ≤20、最多扩展 2 轮）→ 本地多样性排序输出前 10 条。</figcaption>
+    </figure>
+  </section>
+
+  <section class="prose">
+    <h2 class="sec"><span class="no">02</span>证据：benchmark 逐项核对</h2>
+    <p>论文在 MuSiQue、2WikiMultiHopQA、HotpotQA 各取 1,000 题评测。原文说"8 项指标全部第一"——对照主表，这个说法要修正：<b>成立的是 R@5 和 R@10 共 6 项全部最高</b>；MuSiQue 的 R@1（36.82 对 34.30）、R@2（63.62 对 62.18）和 2Wiki 的 R@1（43.81 对 43.55）仍由 SAG 一代领先。论文自己的表述也是"R@5 与 R@10 在全部对比方法中最高"。</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>数据集 · 指标</th><th>BM25</th><th>BGE-Large</th><th>HippoRAG 2</th><th>SAG 一代</th><th>SAG2</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>MuSiQue R@5</td><td>47.47</td><td>56.32</td><td>65.13</td><td>80.36</td><td class="best">80.68</td></tr>
+          <tr><td>MuSiQue R@10</td><td>54.41</td><td>64.08</td><td>73.76</td><td>83.37</td><td class="best">86.62</td></tr>
+          <tr><td>2WikiMultiHopQA R@5</td><td>67.05</td><td>69.83</td><td>90.35</td><td>93.34</td><td class="best">97.35</td></tr>
+          <tr><td>2WikiMultiHopQA R@10</td><td>71.50</td><td>73.75</td><td>93.40</td><td>93.57</td><td class="best">97.43</td></tr>
+          <tr><td>HotpotQA R@5</td><td>74.40</td><td>89.20</td><td>94.35</td><td>96.50</td><td class="best">98.45</td></tr>
+          <tr><td>HotpotQA R@10</td><td>86.90</td><td>93.35</td><td>97.15</td><td>97.70</td><td class="best">99.00</td></tr>
+          <tr><td>MuSiQue R@1</td><td>28.53</td><td>29.42</td><td>30.65</td><td class="best">36.82</td><td>34.30</td></tr>
+          <tr><td>MuSiQue R@2</td><td>37.32</td><td>41.68</td><td>49.52</td><td class="best">63.62</td><td>62.18</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tbl-note">数据来源：SAG2 论文主表（arXiv:2610.22588，各数据集 1,000 题固定子集，R@k 为证据召回率）。棕色为该行最优。后两行是原文"全部第一"说法不成立的三处：SAG 一代仍领先。</p>
+    <div class="fig2">
+      <figure>
+        <img src="../assets/img/sag2-sagwiki/03-bench-3sets-8metrics.jpg" alt="三张对比卡片：MuSiQue、2WikiMultiHopQA、HotpotQA 上的 Recall@10，SAG Wiki/SAG2 分别为 86.62%、97.43%、99.00%，均高于 SAG 的 83.37%、93.57%、97.70% 与 BM25 的 54.41%、71.50%、86.90%" width="1080" height="325" loading="lazy">
+        <figcaption><b>图 2（原文图）· 三测试集 R@10。</b>图内数字与论文主表逐项一致。</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/img/sag2-sagwiki/04-musique-recall.jpg" alt="MuSiQue 上各方法 Recall@5 对比图，SAG2 为 80.68%，高于 SAG 一代的 80.36% 与 HippoRAG 2 的 65.13%" width="1080" height="524" loading="lazy">
+        <figcaption><b>图 3（原文图）· MuSiQue Recall@5。</b>80.04%→80.68% 是作者对两版数字的对比口径，论文主表 SAG 一代为 80.36。</figcaption>
+      </figure>
+    </div>
+    <h3 class="sub">规模压力测试：EnterpriseRAG-Bench</h3>
+    <p>51.2 万份模拟企业邮件、工单与会议记录，470 个标注问题上 SAG2 文档 R@10 为 <b>81.10%</b>（BM25 68.4 / 向量 46.0 / Bash Agent 55.8）。原文提到部分图谱方案没有跑完这个量级；论文的建库数据点是 MuSiQue 的 2.36 秒，企业基准的建库耗时论文未在我们核对的主表中给出。</p>
+    <figure>
+      <img src="../assets/img/sag2-sagwiki/05-enterpriserag-bench.png" alt="EnterpriseRAG-Bench 按问题类型的结果表，共 470 题：SAG2 总体 81.10%，高于 BM25 的 68.4、Bash Agent 的 55.8 与向量检索的 46.0；语义问题 58.40、文档内推理 100.00" width="1080" height="267" loading="lazy">
+      <figcaption><b>图 4（原文图）· 企业基准分类型结果（n=470）。</b>总体 81.10% 与论文一致；优势最大的类别是语义问题与完整性。</figcaption>
+    </figure>
+    <h3 class="sub">建库成本：从 4.57 小时到 2.36 秒</h3>
+    <p>SAG 一代论文（arXiv:2606.15971）Table 8：同样 11,656 段，离线索引 4.57 小时、2,826 万 tokens（逐段调 LLM 抽事件与实体）。SAG2 同规模 2.36 秒、零 token。两者相除约 6,971 倍——原文"7000 倍"是成立的量级，但注意两次测量的硬件与实现不同，只作数量级参考。</p>
+    <figure>
+      <img src="../assets/img/sag2-sagwiki/02-sag1-vs-sag2-buildtime.jpg" alt="作者 2026 年 6 月发布的 SAG 一代公众号文章截图：《再见 RAG！AI知识库还得是 SAG，又快又准～》，阅读 56,573、点赞 1,114、分享 5,979" width="1080" height="526" loading="lazy">
+      <figcaption><b>图 5（原文材料）· 作者 6 月写 SAG 一代时的文章截图。</b>当时一代建库仍需逐段调大模型，这正是 SAG2 这次砍掉的部分。</figcaption>
+    </figure>
+  </section>
+
+  <section class="prose">
+    <h2 class="sec"><span class="no">03</span>作者实测：四个场景（非第一方数据）</h2>
+    <p>以下结果全部来自原文作者自述，发布时间 2026-11-09，未经我们独立复现；好处是能看出真实使用形态。</p>
+    <div class="grid3">
+      <div class="card">
+        <h4>383 篇自己的公众号文章</h4>
+        <p>问"之前蒸馏公众号文章处理了多少篇、多少字"——两次检索后给出 138 篇、79 万字；追问多模态工具接入案例，从多篇文章拼出 LibTV、拓、Remotion 的对照表，引用可点回原文。</p>
+      </div>
+      <div class="card">
+        <h4>十万维基词条 + 李白×爱因斯坦</h4>
+        <p>索引 100,461 个文件。让 Claude Code+DeepSeek 只凭两个名字连线：原生组在刘慈欣作品表里"同框"，接 SAG2 的组经林庚（清华物理系出身、著《诗人李白》）两步连上，每步有原文出处。</p>
+      </div>
+      <div class="card">
+        <h4>26 份半导体研报 + 代码排错</h4>
+        <p>查"谁独家供应 SK 海力士 HBM3 的 Underfill"：SAG2 组 3 次工具调用命中 Namics 原句，原生组第 11 次才命中；同一份 SAG Wiki v0.2.6 源码查 Jev 的 HTTP 499 重试逻辑，总耗时 144s → 95s。</p>
+      </div>
+    </div>
+    <div class="fig2">
+      <figure>
+        <img src="../assets/img/sag2-sagwiki/10-multihop-table.jpg" alt="作者历史公众号文章的多跳检索结果表：按工具（LibTV、拓、Remotion 等）列出接法、标题与日期，每行带原文引用" width="1080" height="724" loading="lazy">
+        <figcaption><b>图 6（作者实测截图）· 383 篇历史文章的多跳检索结果。</b>跨文章拼表，引用直达原文。</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/img/sag2-sagwiki/11-li-bai-einstein.jpg" alt="李白与爱因斯坦的连线示意：原生组经刘慈欣《朝闻道》《诗云》同框；SAG2 组经学者林庚（清华物理系痴迷相对论、著《诗人李白》）连接两端。作者说明此图按真实终端结果由 AI 重绘，非截图" width="1080" height="405" loading="lazy">
+        <figcaption><b>图 7（作者实测）· 李白×爱因斯坦连线。</b>注意：作者自述终端截图效果差，此图按真实结果让 AI 重绘，不是原始输出。</figcaption>
+      </figure>
+    </div>
+    <figure>
+      <img src="../assets/img/sag2-sagwiki/09-100k-files.jpg" alt="作者电脑上的文件索引界面截图，显示共索引 100,461 个文件" width="1080" height="486" loading="lazy">
+      <figcaption><b>图 8（作者实测截图）· 100,461 个文件的索引规模。</b>作者原话：建库时间"上个厕所回来的时间就搞定了"。</figcaption>
+    </figure>
+  </section>
+
+  <section class="prose">
+    <h2 class="sec"><span class="no">04</span>上手：三步建库，两处要配 Key</h2>
+    <ol class="steps">
+      <li><b>安装 SAG Wiki。</b>GitHub Releases 下载桌面版（macOS DMG / Windows 安装器）。体积很小：官方 v0.1.7 口径 Windows 10.2 MB、macOS 13.4 MB；作者在 v0.2.6 实测约 13 MB / 18 MB。无需另装数据库、Python 或 Node。当前更新日志最新为 0.2.7（新增文档折叠与后台处理）。</li>
+      <li><b>配置两个模型。</b>设置里分开配：回答模型负责写答案（可自选，作者用 DeepSeek V4.1 Flash）；决策模型负责判断证据，官方固定为 TypeSafe 的 Jev，填对应 Jev Key。快速搜索不需要任何 Key。</li>
+      <li><b>添加文件夹即建库。</b>侧栏"文件夹"→ 文件夹管理 → +。原文件留在原处，改动自动增量更新。文本型 PDF、Office、RTF、CSV、EPUB 内置转换默认纳入索引；音频视频等其他格式在 设置 → 文件设置 → 其他格式 开启。</li>
+      <li><b>让 Agent 也能查。</b>装 Node 18+ 后 <span class="mono">npm install -g @zleap-ai/sag</span>，用 <span class="mono">sag add</span> 加目录、<span class="mono">sag "查询" .</span> 检索；或把官方 Skill 链接发给 Claude Code / Codex / OpenCode。装了桌面端则 CLI 与桌面共用配置和知识库。</li>
+    </ol>
+    <div class="fig2">
+      <figure>
+        <img src="../assets/img/sag2-sagwiki/08-sagwiki-settings-models.jpg" alt="SAG Wiki 设置页截图：问答模型与决策模型两个配置项，决策模型官方为 TypeSafe Jev，需填入 Jev Key" width="1080" height="833" loading="lazy">
+        <figcaption><b>图 9（作者实测截图）· 双模型配置。</b>回答模型自选；决策模型官方固定 Jev，也可改用其他判断服务。</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/img/sag2-sagwiki/07-sagwiki-home.jpg" alt="SAG Wiki 首页截图：通过添加本地文件夹创建知识库，界面显示文件夹与文件列表" width="1080" height="829" loading="lazy">
+        <figcaption><b>图 10（作者实测截图）· 首页添加文件夹。</b>一个文件夹就是一个知识库，索引随文件变更自动更新。</figcaption>
+      </figure>
+    </div>
+    <figure>
+      <img src="../assets/img/sag2-sagwiki/01-cover.jpg" alt="原文封面题图：SAG2 —— 本地知识库相关的深色视觉" width="1200" height="510" loading="lazy">
+      <figcaption><b>图 11 · 原文封面。</b>袋鼠帝的评价是"又快又准又便宜"；本卡把其中可核验的部分（快、准的论文数据）与边界（隐私、测试集局限）分开呈现。</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="boundary">
+      <h3>边界与行动</h3>
+      <div class="priv">
+        <div class="local">
+          <h4>留在本机</h4>
+          <ul>
+            <li>原始文件：不移动、不改写，保留在你添加的目录</li>
+            <li>索引与检索准备数据：单机 SQLite（FTS5 用 content='' 不存正文副本）</li>
+            <li>快速搜索：本地 BM25，无网络模型，可离线</li>
+            <li>本机服务只监听 127.0.0.1，随机端口 + 令牌；凭据文件权限 0600</li>
+          </ul>
+        </div>
+        <div class="cloud">
+          <h4>会出本机</h4>
+          <ul>
+            <li>深入检索（SAG2 语义检索）：问题与候选片段发给配置的 Jev 判断服务</li>
+            <li>引用问答：资料片段 + 问题发给回答模型（如 DeepSeek）</li>
+            <li>搜索自动总结：调用回答模型</li>
+            <li>JEV 论文实现经 OpenRouter；SAG Wiki 可配 TypeSafe 或自定义 Jev 地址</li>
+          </ul>
+        </div>
+      </div>
+      <div class="prose" style="margin-top:12px">
+        <p><b>两条提醒：</b>①"本地知识库"说的是索引和文件在本地——只要用语义检索或问答，就有片段离开本机，敏感文档先想清楚再配 Key；②benchmark 来自固定测试集（各 1,000 题子集），论文和官方都建议在自己的文档与硬件上实测召回与速度。另外 R@1/R@2 场景 SAG 一代仍更强，追求"第一条就中"时别只看 R@10。</p>
+        <p><b>下一步：</b>想试可以先拿一个不敏感的文件夹（比如公开文档或自己的旧文章）建库，对比快速搜索与深入检索的差异，再决定是否接入生产数据。仓库：SAG-Wiki（桌面端）、SAG-Benchmark（复现）、SAG（一代与引擎），均 MIT。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div><b>事实与证据</b>：关键数字对照 arXiv:2610.22588（SAG2 论文）、arXiv:2606.15971（SAG 一代论文 Table 8）、Zleap-AI/SAG-Benchmark 主表、sag-wiki.zleap.com 官方文档核验；作者实测内容已逐条标注，含一处原文说法纠错（"8 项指标全部第一"→"R@5/R@10 共 6 项第一"）。</div>
+    <div class="refs">
+      <b>来源</b>：
+      <a href="https://x.com/aikangarooking/status/2119717912546304048">原文（袋鼠帝，2026-11-09）</a> ·
+      <a href="https://arxiv.org/abs/2610.22588">arXiv:2610.22588</a> ·
+      <a href="https://arxiv.org/abs/2606.15971">arXiv:2606.15971</a> ·
+      <a href="https://github.com/Zleap-AI/SAG-Wiki">Zleap-AI/SAG-Wiki</a> ·
+      <a href="https://github.com/Zleap-AI/SAG-Benchmark">Zleap-AI/SAG-Benchmark</a> ·
+      <a href="https://github.com/Zleap-AI/SAG">Zleap-AI/SAG</a> ·
+      <a href="https://sag-wiki.zleap.com/zh/docs/sag2">SAG2 技术文档</a> ·
+      <a href="https://sag-wiki.zleap.com/zh/docs/architecture">架构与数据存储说明</a> ·
+      <a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev">TypeSafe Jev 发布博文</a>
+    </div>
+    <div>原文 25 张配图中选取 11 张有解释价值者嵌入，均已下载核验；截图版权归袋鼠帝与原项目所有，仅作评论性引用。</div>
+  </div>
+
+</div>
+</body>
+</html>
