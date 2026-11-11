@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="bigwhite">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>能用 Codex 了，为什么还要自己的 Harness？astaxie 观点核实与选型边界</title>
+  <style>
+    :root{
+      --bg:#f7f8fa;
+      --paper:#ffffff;
+      --ink:#0b0d12;
+      --muted:#68717d;
+      --faint:#aeb6c2;
+      --line:#e3e7ed;
+      --line-strong:#cdd5df;
+      --blue:#001a72;
+      --blue-soft:#eef3fd;
+      --gray:#f6f8fb;
+      --gray-2:#f1f3f6;
+      --black:#05070a;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--ink)}
+    body{
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+      font-size:13px;
+      line-height:1.62;
+    }
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1180px,calc(100% - 24px));margin:0 auto;padding:18px 0 78px}
+    .sheet{
+      background:var(--paper);
+      box-shadow:0 18px 54px rgba(20,35,60,.08);
+      padding:18px;
+    }
+
+    .topline{display:flex;justify-content:space-between;gap:16px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:750}
+    .brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+    .brand::before{content:"";width:22px;height:6px;background:var(--blue);display:inline-block}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);gap:18px;align-items:stretch;margin-bottom:18px}
+    .hero-copy{display:grid;align-content:space-between;gap:24px;min-height:360px;padding:4px 0 0}
+    .kicker{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+    h1{font-size:clamp(42px,7.8vw,92px);line-height:.9;letter-spacing:-.075em;margin:0;color:var(--ink);font-weight:850}
+    .lead{max-width:62ch;color:var(--muted);font-size:16px;line-height:1.72;margin:16px 0 0}
+    .hero-pills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .hero-pill{padding:13px 14px;border-right:1px solid var(--line)}
+    .hero-pill:last-child{border-right:0}
+    .hero-pill .mini-bar{width:34px;height:5px;background:var(--blue);margin-bottom:12px}
+    .hero-pill b{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}
+    .hero-pill span{font-size:12.5px;color:var(--muted);line-height:1.45}
+
+    .blue-block{background:var(--blue);color:#fff;min-height:360px;padding:22px;display:grid;align-content:space-between}
+    .blue-block .big{font-size:clamp(76px,12vw,150px);line-height:.82;letter-spacing:-.085em;font-weight:900}
+    .blue-block .caption{max-width:32ch;font-size:15px;color:rgba(255,255,255,.82);line-height:1.55}
+    .blue-block .label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:850;color:rgba(255,255,255,.75)}
+
+    .panel-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .panel{background:var(--paper);padding:18px;min-width:0;display:grid;gap:14px;position:relative;align-content:start}
+    .panel.gray{background:var(--gray)}
+    .panel.black{background:var(--black);color:#fff;border-color:var(--black)}
+    .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px}
+    .panel.black .panel-head{border-color:rgba(255,255,255,.18)}
+    .label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:900;line-height:1.25}
+    .page-no{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:800;white-space:nowrap}
+    .panel h2{font-size:clamp(21px,2.5vw,34px);line-height:1.02;letter-spacing:-.055em;margin:0;font-weight:850}
+    .panel p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.7}
+    .panel.black p{color:rgba(255,255,255,.72)}
+    .panel .label.mut{color:var(--muted)}
+
+    .two-stack{display:grid;gap:12px}
+    .feature{background:var(--gray);padding:14px;border:1px solid var(--line);display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:start}
+    .feature.dark{background:var(--black);color:#fff;border-color:var(--black)}
+    .feature .num{font-size:30px;line-height:1;letter-spacing:-.04em;font-weight:900;color:var(--blue)}
+    .feature.dark .num{color:#fff}.feature.dark p{color:rgba(255,255,255,.72)}
+    .feature b{display:block;margin-bottom:4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+    .feature p{margin:0}
+
+    .quote{border-left:3px solid var(--blue);padding:10px 14px;background:var(--gray);color:var(--ink);font-size:14px;line-height:1.7;margin:0}
+    .quote cite{display:block;margin-top:8px;font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+
+    .list{display:grid;gap:10px}
+    .list-item{display:grid;grid-template-columns:56px 1fr 34px;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}
+    .list-item:last-child{border-bottom:0;padding-bottom:0}
+    .list-item strong{font-size:26px;line-height:1;letter-spacing:-.055em;color:var(--blue)}
+    .list-item b{display:block;font-size:14px;line-height:1.2}.list-item span{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.45}
+    .icon{width:30px;height:30px;border:1px solid var(--line-strong);display:grid;place-items:center;color:var(--blue);font-weight:900;font-size:14px}
+
+    .wide{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}
+    .chart-card{background:var(--paper);border:1px solid var(--line);padding:18px;display:grid;gap:14px;align-content:start;min-width:0}
+    .note-panel{background:var(--blue-soft);border:1px solid #d7e6ff;padding:18px;display:grid;align-content:space-between;gap:18px;min-width:0}
+    .note-panel .big{font-size:56px;line-height:.92;font-weight:900;letter-spacing:-.07em;color:var(--blue)}
+    .note-panel p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.7}
+
+    .figure{margin:0 0 14px;border:1px solid var(--line);background:var(--gray);padding:12px;display:grid;gap:10px}
+    .figure img{width:100%;height:auto;display:block;border:1px solid var(--line-strong)}
+    .figure figcaption{font-size:11px;color:var(--muted);letter-spacing:.04em;line-height:1.5}
+    .figure figcaption b{color:var(--ink);letter-spacing:.08em;text-transform:uppercase;font-size:10.5px}
+
+    .table-wrap{border:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--paper)}
+    .table-wrap::-webkit-scrollbar{height:8px}
+    .table-wrap::-webkit-scrollbar-thumb{background:var(--line-strong)}
+    .cmp-table{width:100%;min-width:600px;border-collapse:collapse;font-size:12.5px}
+    .cmp-table th{background:var(--blue);color:#fff;text-align:left;padding:10px 12px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:850;white-space:nowrap}
+    .cmp-table td{border-top:1px solid var(--line);padding:10px 12px;vertical-align:top;color:var(--muted);line-height:1.6}
+    .cmp-table td:first-child{color:var(--ink);font-weight:750;white-space:nowrap}
+    .cmp-table tr:nth-child(even) td{background:var(--gray)}
+    .table-cue{display:none;font-size:11px;color:var(--blue);font-weight:800;letter-spacing:.06em}
+
+    .codeblock{background:#1a1a2e;color:#e6e8f0;font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:.85rem;line-height:1.6;padding:14px 16px;overflow-x:auto;margin:0;white-space:pre}
+    .codeblock::-webkit-scrollbar{height:8px}
+    .codeblock::-webkit-scrollbar-thumb{background:#3a3a55}
+    .codeblock .k{color:#82aaff}.codeblock .s{color:#c3e88d}.codeblock .c{color:#697098}.codeblock .f{color:#ffcb6b}
+
+    .chain{display:grid;gap:0;counter-reset:step}
+    .chain-step{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start;padding:10px 0;border-bottom:1px dashed var(--line-strong)}
+    .chain-step:last-child{border-bottom:0}
+    .chain-step .n{counter-increment:step;width:30px;height:30px;display:grid;place-items:center;background:var(--black);color:#fff;font-weight:900;font-size:12px}
+    .chain-step .n::before{content:counter(step,decimal-leading-zero)}
+    .chain-step b{display:block;font-size:13.5px}
+    .chain-step span{display:block;color:var(--muted);font-size:12.5px;line-height:1.55;margin-top:2px}
+
+    .tier{display:inline-block;font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--line-strong);color:var(--muted);background:#fff}
+    .tier.t1{border-color:var(--blue);color:var(--blue)}
+    .tier.t2{border-color:#b98900;color:#8a6800}
+    .tier.t3{border-color:var(--line-strong);color:var(--faint)}
+
+    .footer{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:800}
+    .footer a{border-bottom:1px solid var(--line-strong)}
+
+    @media (max-width:980px){.hero,.wide{grid-template-columns:1fr}.panel-grid{grid-template-columns:1fr 1fr}.hero-copy{min-height:auto}.blue-block{min-height:260px}}
+    @media (max-width:720px){
+      .page{width:min(100%,calc(100% - 14px));padding:10px 0 60px}
+      .sheet{padding:12px}
+      .topline,.footer{align-items:flex-start;flex-direction:column}
+      .panel-grid,.metric-grid,.hero-pills{grid-template-columns:1fr}
+      .hero-pill{border-right:0;border-bottom:1px solid var(--line)}
+      .hero-pill:last-child{border-bottom:0}
+      h1{font-size:46px}
+      .lead{font-size:14px}
+      .blue-block .big{font-size:86px}
+      .panel{padding:14px}
+      .feature{grid-template-columns:1fr;gap:8px}
+      .list-item{grid-template-columns:48px 1fr 28px}
+      .figure{padding:8px}
+      .table-cue{display:block;margin-bottom:8px}
+      .table-wrap{min-width:0}
+      .cmp-table{min-width:600px;font-size:12px}
+      .cmp-table th,.cmp-table td{padding:8px 10px}
+      .codeblock{font-size:.76rem;padding:12px}
+      .chain-step{grid-template-columns:36px 1fr;gap:10px}
+      .chain-step .n{width:26px;height:26px;font-size:11px}
+      .note-panel .big{font-size:44px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="sheet">
+      <div class="topline">
+        <div class="brand">CODEX × DSH · 观点核实</div>
+        <div>X ARTICLE · astaxie · 2026.11.11</div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div>
+            <div class="kicker">X ARTICLE · 观点 + 一手材料分级核实</div>
+            <h1>能用 Codex 了，为什么还要自己的 Harness？</h1>
+            <p class="lead">astaxie 在 X 长文里回答了一个群里的实在问题：Skill 是往精装房里搬家具，Harness 是把房子的结构交给你。我们把他的观点逐条拆开：哪些能被官方材料证实，哪些只是他的判断，哪些根本没被验证。</p>
+          </div>
+          <div class="hero-pills">
+            <div class="hero-pill"><div class="mini-bar"></div><b>原文观点</b><span>精装房 vs 毛坯房的比喻与选型划分。</span></div>
+            <div class="hero-pill"><div class="mini-bar"></div><b>一手核实</b><span>DSH README/docs 与 Codex 官方 SDK 文档。</span></div>
+            <div class="hero-pill"><div class="mini-bar"></div><b>边界标注</b><span>作者存在利益关联；案例链路未独立验证。</span></div>
+          </div>
+        </div>
+        <aside class="blue-block">
+          <div class="label">HERO QUESTION</div>
+          <div class="big">Skill</div>
+          <div class="caption">往精装房里搬家具，还是自己砌承重墙？这是全文唯一的分岔口。</div>
+        </aside>
+      </section>
+
+      <figure class="figure">
+        <img src="../assets/img/codex-vs-dsh-astaxie/cover.jpg" alt="原文封面：能用 Codex 了，为什么还要自己的 Harness？">
+        <figcaption><b>原文封面</b> 来源：X @astaxie《能用 Codex 了，为什么还要自己的 Harness？》（2026-11-11），版权归作者所有，此处引用用于原文指认。</figcaption>
+      </figure>
+
+      <section class="panel-grid">
+        <article class="panel">
+          <div class="panel-head"><div class="label">SOURCE · 问题从哪来</div><div class="page-no">PAGE 01</div></div>
+          <h2>一句不是抬杠的提问</h2>
+          <blockquote class="quote">现在可以用 Codex app 的情况下，DSH 的优势在哪里呢？
+            <cite>引自原文，群友提问</cite>
+          </blockquote>
+          <p>作者第一反应是定制化，随即被追问：定制 Agent 是不是都能用 Codex skills 实现？他承认：如果目标只是跑通，答案是<b>可以</b>，且门槛比一年前低很多。分歧在下一句：能跑通，不等于有一个能交给客户、在生产里长期活着的 Agent。</p>
+          <p><span class="tier t2">作者背景</span> astaxie：beego / DeepChat / TokenHub 作者，ThinkInAI 创始人，自述聚焦 Agent Harness 与 AI infra。<b>其观点与 Harness 生态存在利益关联</b>，本卡不把他的判断当作已证实优势。</p>
+        </article>
+
+        <article class="panel gray">
+          <div class="panel-head"><div class="label">VIEW · 作者的比喻</div><div class="page-no">PAGE 02</div></div>
+          <h2>精装房 vs 毛坯房</h2>
+          <div class="two-stack">
+            <div class="feature"><div class="num">01</div><div><b>精装房 · Codex Skill</b><p>钥匙给你家具也有，skills 像再添两件自己的家具，当晚就能住。本质是在一个已定好的产品里加能力。</p></div></div>
+            <div class="feature dark"><div class="num">02</div><div><b>毛坯房 · DSH Harness</b><p>水电自己走、墙自己砌。预设、Profile、插件让你重新组合 Agent 本身：工具、权限、提示词、模型适配。</p></div></div>
+          </div>
+          <p><span class="tier t2">原文观点</span> 这组比喻解释的是定位差异，不是性能差异。作者没有、也无法在文内证明 DSH 交付效果更好。</p>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div class="label">VERIFY · Codex 侧</div><div class="page-no">PAGE 03</div></div>
+          <h2>Codex 不只是聊天窗口</h2>
+          <p><span class="tier t1">官方文档核实</span> 为避免虚假二元：Codex 同样能被程序调用和配置。</p>
+          <div class="list">
+            <div class="list-item"><strong>exec</strong><div><b>codex exec 无头运行</b><span>CI / 脚本里单次调用，正文案例正是这么接的。</span></div><div class="icon">&gt;_</div></div>
+            <div class="list-item"><strong>SDK</strong><div><b>TS / Python SDK + app-server</b><span>@openai/codex-sdk 线程续跑、流式事件；app-server 给自定义客户端。</span></div><div class="icon">⇄</div></div>
+            <div class="list-item"><strong>CFG</strong><div><b>逐线程可配置</b><span>sandbox、审批策略、模型、网络开关、outputSchema 都能按线程设置。</span></div><div class="icon">⚙</div></div>
+          </div>
+          <pre class="codeblock"><span class="k">const</span> thread = codex.startThread({
+  sandboxMode: <span class="s">"workspace-write"</span>,
+  approvalPolicy: <span class="s">"never"</span>
+});
+<span class="k">const</span> turn = <span class="k">await</span> thread.run(<span class="s">"修失败的测试"</span>);</pre>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="chart-card">
+          <div class="panel-head"><div class="label">VERIFY · DSH 侧</div><div class="page-no">PAGE 04</div></div>
+          <h2>DSH 官方材料能证实什么</h2>
+          <div class="list">
+            <div class="list-item"><strong>MIT</strong><div><b>开源 · everything is a plugin</b><span>DeepSeek AI 官方仓库，基于 Cordis 插件架构，MIT 协议。</span></div><div class="icon">§</div></div>
+            <div class="list-item"><strong>WEB</strong><div><b>npx @deepseek-ai/dsh web</b><span>Node.js 一条命令起 Web UI（默认 127.0.0.1:3080）；另有 cli / desktop 应用与 ACP 接口。</span></div><div class="icon">↗</div></div>
+            <div class="list-item"><strong>SDK</strong><div><b>Python SDK 可嵌入</b><span>pip 装 deepseek-harness-sdk（3.10+），从你自己的程序里 run 任务。</span></div><div class="icon">&lt;&gt;</div></div>
+            <div class="list-item"><strong>ADP</strong><div><b>模型适配可换</b><span>默认 DeepSeek，官方文档支持其他提供方与自定义 OpenAI 兼容端点；llm-adapter 是插件。</span></div><div class="icon">⌁</div></div>
+          </div>
+          <pre class="codeblock"><span class="k">from</span> deepseek_harness <span class="k">import</span> DeepSeekHarness
+<span class="k">with</span> DeepSeekHarness(profile=<span class="s">"sdk-minimal"</span>, cwd=workspace,
+                     dsh_home=home) <span class="k">as</span> harness:
+    r = harness.run(<span class="s">"检查仓库并修复失败测试"</span>,
+                    session_id=<span class="s">"example-001"</span>)
+<span class="k">print</span>(r.final_response)</pre>
+          <p><span class="tier t1">官方材料核实</span> 以上均为 README 与 docs/user/guide 原文内容。Star 数 278,977 为截至 2026-11-12 实时 API 复核的时效数据。</p>
+        </article>
+        <aside class="note-panel">
+          <div><div class="label">DEV PREVIEW · 官方原话</div><div class="big">!</div></div>
+          <p>README 原文警告：<b>“THERE WILL BE COMPATIBILITY-BREAKING CHANGES.”</b> 拿 DSH 当生产底座，先接受破坏性变更的预期。</p>
+          <p><span class="tier t1">安全边界</span> sdk-minimal profile 固定 danger-full-access，官方建议一次性 checkout 或容器运行；会话日志贡献器默认随请求上传日志事件（≤8 MiB/次），可配置关闭。给客户部署前这两条必须先读。</p>
+        </aside>
+      </section>
+
+      <section class="wide">
+        <article class="chart-card" style="grid-column:1 / -1">
+          <div class="panel-head"><div class="label">COMPARE · 官方事实对照</div><div class="page-no">PAGE 05</div></div>
+          <h2>同一张表看清两边，不判胜负</h2>
+          <div class="table-cue">↔ 横向滑动查看完整对比</div>
+          <div class="table-wrap">
+            <table class="cmp-table">
+              <thead><tr><th>维度</th><th>Codex（官方文档核实）</th><th>DSH（官方材料核实）</th></tr></thead>
+              <tbody>
+                <tr><td>定位</td><td>产品化 agent（CLI / IDE / 云），附可编程接口</td><td>开源 agent harness，口号 everything is a plugin</td></tr>
+                <tr><td>编程调用</td><td>codex exec 无头运行；TS / Python SDK；app-server 协议</td><td>Web / CLI / Desktop 运行形态；ACP；Python SDK 嵌入自有程序</td></tr>
+                <tr><td>定制层次</td><td>skills 加能力；逐线程 sandbox、审批、模型、输出 schema 配置</td><td>插件级替换 model adapter、工具、Agent 循环；profile + patch 重组</td></tr>
+                <tr><td>模型绑定</td><td>运行依赖 OpenAI 模型与账号体系</td><td>默认 DeepSeek；官方支持其他提供方与 OpenAI 兼容端点</td></tr>
+                <tr><td>协议</td><td>SDK 与 CLI 源码公开于 openai/codex 仓库</td><td>MIT，源码、示例与架构文档全公开</td></tr>
+                <tr><td>成熟度</td><td>产品级，官方文档完整</td><td>developer preview，官方警告会有破坏性变更</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><span class="tier t2">作者观点框架</span> 差异点是“结构性所有权”：要不要被单一供应方的 CLI 断供风险绑住。“更适合交付客户”是作者结论，本刊未验证。</p>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="chart-card" style="grid-column:1 / -1">
+          <div class="panel-head"><div class="label">CASE · 生产链路（作者叙述）</div><div class="page-no">PAGE 06</div></div>
+          <h2>一条已经在跑的告警处理链</h2>
+          <div class="chain">
+            <div class="chain-step"><div class="n"></div><div><b>线上 error 告警</b><span>进入飞书群。</span></div></div>
+            <div class="chain-step"><div class="n"></div><div><b>@AI 触发</b><span>程序直接调 Codex CLI，不在聊天窗口里点。</span></div></div>
+            <div class="chain-step"><div class="n"></div><div><b>查日志 · 拉 git · 分析代码</b><span>Agent 在工作区内定位问题。</span></div></div>
+            <div class="chain-step"><div class="n"></div><div><b>提交修复 MR</b><span>回群通知结果。</span></div></div>
+          </div>
+          <figure class="figure" style="margin:12px 0 0">
+            <img src="../assets/img/codex-vs-dsh-astaxie/inline-prod-chain.jpg" alt="原文内图：生产链路示意">
+            <figcaption><b>原文内图 1</b> 位于“一条已经能跑的生产链路”节后，来源同封面。</figcaption>
+          </figure>
+          <p><span class="tier t2">来源边界</span> 这是群友在群内自述的真实链路，作者转述。链路要的是“可靠地把活干完”，他用 Codex CLI 已达成，也称暂无替换理由。<b>本刊未独立验证该链路的生产效果</b>，不引用为任何工具的已证实优势。</p>
+        </article>
+      </section>
+
+      <section class="wide">
+        <article class="chart-card">
+          <div class="panel-head"><div class="label">GAP · demo 到生产</div><div class="page-no">PAGE 07</div></div>
+          <h2>跑通之后，作者列出的那截坎</h2>
+          <div class="list">
+            <div class="list-item"><strong>Q1</strong><div><b>告警来了谁被唤醒，权限有多大</b><span>审批、审计是不是你说了算。</span></div><div class="icon">?</div></div>
+            <div class="list-item"><strong>Q2</strong><div><b>失败怎么回滚，日志怎么留</b><span>可观测与恢复路径。</span></div><div class="icon">↺</div></div>
+            <div class="list-item"><strong>Q3</strong><div><b>模型换了谁来兜底</b><span>供应方断供（账号 / 网络 / 条款）时流水线是否一起停。</span></div><div class="icon">⌁</div></div>
+            <div class="list-item"><strong>Q4</strong><div><b>客户数据与密钥走哪条路径</b><span>交付型 Agent 绕不开的合规问题。</span></div><div class="icon">⚿</div></div>
+          </div>
+          <p><span class="tier t2">作者判断</span> 这些不是再写一条 Skill 就能自动齐的，要的是一个你能改、能嵌、能换的运行时。</p>
+        </article>
+        <article class="panel gray">
+          <div class="panel-head"><div class="label">IMAGES · 原文配图</div><div class="page-no">PAGE 08</div></div>
+          <figure class="figure" style="margin:0">
+            <img src="../assets/img/codex-vs-dsh-astaxie/inline-demo-gap.jpg" alt="原文内图：demo 到生产的坎">
+            <figcaption><b>原文内图 2</b> 位于“Demo 到生产，中间那截才是坎”节后。</figcaption>
+          </figure>
+        </article>
+      </section>
+
+      <section class="panel-grid">
+        <article class="panel black">
+          <div class="panel-head"><div class="label">VERDICT · 分级结论</div><div class="page-no">PAGE 09</div></div>
+          <h2>能证实的和不能证实的</h2>
+          <p><b>能证实</b>：两边都有编程接口与配置能力（官方文档）；DSH 开源 MIT、插件级重组、Python SDK 嵌入（官方仓库）；DSH 仍是 developer preview（官方原话）。</p>
+          <p><b>不能证实</b>：DSH 交付客户效果更好；那条飞书链路换成 DSH 会更好。作者自己也说：工具可以并存，不是站队。</p>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div class="label">DECIDE · 选型边界</div><div class="page-no">PAGE 10</div></div>
+          <h2>按作者框架，先问自己一个问题</h2>
+          <div class="list">
+            <div class="list-item"><strong>01</strong><div><b>给自己提效</b><span>按原文与群友实践，精装房更快：Codex / Claude Code 先跑起来。</span></div><div class="icon">→</div></div>
+            <div class="list-item"><strong>02</strong><div><b>给客户交付 / 嵌入自有产品</b><span>作者观点：需要自有运行时改“承重墙”，同时接受 DSH dev preview 风险。</span></div><div class="icon">§</div></div>
+            <div class="list-item"><strong>03</strong><div><b>想留备用地基</b><span>评估所有权：权限、审计、模型切换、失败恢复是否在你手里。</span></div><div class="icon">ϖ</div></div>
+          </div>
+        </article>
+        <article class="panel gray">
+          <div class="panel-head"><div class="label">START · 入口</div><div class="page-no">PAGE 11</div></div>
+          <h2>想动手先看一手材料</h2>
+          <div class="list">
+            <div class="list-item"><strong>D1</strong><div><b>DSH 仓库</b><span><a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noreferrer">github.com/deepseek-ai/deepseek-harness</a></span></div><div class="icon">↗</div></div>
+            <div class="list-item"><strong>D2</strong><div><b>原文 X Article</b><span><a href="https://x.com/astaxie/status/2120438946123633133" target="_blank" rel="noreferrer">x.com/astaxie/status/2120438946123633133</a></span></div><div class="icon">↗</div></div>
+            <div class="list-item"><strong>D3</strong><div><b>Codex SDK 文档</b><span><a href="https://learn.chatgpt.com/docs/codex-sdk" target="_blank" rel="noreferrer">learn.chatgpt.com/docs/codex-sdk</a></span></div><div class="icon">↗</div></div>
+          </div>
+          <p>配图 3 张均来自原 X Article，仅用于原文指认，版权归作者所有。</p>
+        </article>
+      </section>
+
+      <footer class="footer">
+        <div>SOURCES · X @astaxie ARTICLE / DEEPSEEK-HARNESS README+DOCS / OPENAI CODEX SDK DOCS</div>
+        <div>STYLE · infocard-bigwhite-style · 2026.11.12</div>
+      </footer>
+    </div>
+  </main>
+  <script>
+    (function(){
+      function send(){window.parent.postMessage({type:'theme-height',slug:'bigwhite',height:document.body.scrollHeight},'*')}
+      if(document.readyState==='complete') send(); else window.addEventListener('load',send);
+      setTimeout(send,500); setTimeout(send,1500);
+    })();
+  </script>
+</body>
+</html>
