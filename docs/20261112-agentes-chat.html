@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="hardblue">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>agentes.chat：人和 AI 代理同频道的开源自托管 Slack 替代品</title>
+  <style>
+    :root{
+      --bg:#f6f4ef; --paper:#fffdf8; --ink:#111111; --muted:#5f5950; --line:#111111;
+      --red:#d80018; --blue:#1f63ff; --soft-red:#fde9eb; --soft-blue:#e8f1ff; --soft-ink:#f7f6f2;
+      --shadow:8px 8px 0 rgba(17,17,17,.12);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{margin:0;overflow-x:hidden}
+    body{
+      color:var(--ink);line-height:1.58;
+      background:
+        linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px) 0 0/100% 42px,
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px) 0 0/42px 100%,
+        radial-gradient(circle at 10% 8%, rgba(216,0,24,.07) 0 10%, transparent 11%),
+        radial-gradient(circle at 88% 7%, rgba(31,99,255,.06) 0 9%, transparent 10%),
+        var(--bg);
+      font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+    }
+    img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .page{width:min(1040px, calc(100% - 20px));margin:0 auto;padding:18px 0 80px}
+
+    /* HERO */
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:14px;border:3px solid var(--line);background:var(--paper);overflow:hidden}
+    .hero-bar{grid-column:1/-1;height:14px;background:#111;border-bottom:3px solid var(--line);position:relative}
+    .hero-bar::before{content:"";position:absolute;inset:0 auto 0 0;width:190px;background:var(--red)}
+    .hero-bar::after{content:"";position:absolute;inset:0 0 0 auto;width:136px;background:var(--blue)}
+    .hero-copy{padding:16px;border-right:3px solid var(--line);display:grid;gap:10px;align-content:start}
+    .kicker{display:inline-flex;align-items:center;gap:8px;width:fit-content;border:2px solid var(--line);background:#fff;padding:5px 9px;font-size:11.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .kicker::before{content:"■";color:var(--red);font-size:10.5px}
+    h1.demo-title{margin:0;max-width:820px;font-size:clamp(24px,3.8vw,42px);line-height:1.06;letter-spacing:-.04em}
+    .subtitle{color:var(--muted);font-size:12.5px;line-height:1.52}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border:2px solid var(--line);background:#fff;font-size:11.8px;font-weight:850}
+    .badge.red{background:var(--red);color:#fff}
+    .badge.blue{background:var(--blue);color:#fff}
+    .badge.dark{background:#111;color:#fff}
+    .badge.ink{background:#111;color:#fff;font-size:11px;min-height:24px;padding:4px 8px}
+    .alert{border:2px solid var(--line);background:#111;color:#fff;padding:10px 12px;display:grid;gap:8px}
+    .alert strong{display:block;font-size:13.5px;line-height:1.35}
+    .alert p{margin:0;font-size:12.5px;line-height:1.6;color:#f0ebe0}
+    .mini-row{display:flex;flex-wrap:wrap;gap:6px}
+    .mini-tag{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:4px 8px;font-size:11.6px;font-weight:850;line-height:1;background:#111;color:#fff}
+    .hero-visual{background:#fff;display:grid;grid-template-rows:auto 1fr}
+    .hero-visual .panel-top{padding:14px;border-bottom:3px solid var(--line);background:linear-gradient(135deg,#0f0f12 0%,#18181c 100%);color:#fff}
+    .panel-top .eyebrow{display:inline-flex;align-items:center;border:1.5px solid #fff;padding:3px 8px;font-size:10.8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .panel-top h3{margin:10px 0 6px;font-size:20px;line-height:1.08;letter-spacing:-.04em}
+    .panel-top p{margin:0;color:#ece8dc;font-size:13px;line-height:1.64}
+    .panel-body{padding:14px;display:grid;gap:10px;background:#f7f6f2}
+    .quote{border-left:4px solid var(--blue);padding:10px 12px;background:var(--soft-blue);font-weight:750;line-height:1.58}
+    .flow{display:grid;gap:8px}
+    .flow-item{border:2px solid var(--line);background:#fff;padding:10px 12px;display:grid;gap:3px;position:relative}
+    .flow-item::after{content:"↓";position:absolute;left:14px;bottom:-17px;color:var(--blue);font-size:15px;font-weight:900}
+    .flow-item:last-child::after{display:none}
+    .flow-item .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:900}
+    .flow-item .c{font-size:14px;line-height:1.55;font-weight:900}
+    .flow-item.red .c{color:var(--red)}
+    .flow-item.blue .c{color:var(--blue)}
+    .flow-item.dark .c{color:#111}
+
+    /* SECTIONS */
+    .section{margin-top:30px;border-top:3px solid var(--line);padding-top:14px}
+    .overview{border-bottom:3px solid var(--line);padding:14px 0;margin-bottom:16px}
+    .overview-sentence{font-size:15px;font-weight:800;color:var(--red);margin-bottom:10px;line-height:1.35;letter-spacing:-.01em}
+    .overview-body{font-size:12.5px;line-height:1.65;color:#333}
+    .overview-body p{margin:0}
+    .section-head{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;margin-bottom:12px}
+    .section-no{display:grid;place-items:center;width:96px;height:96px;border:3px solid var(--line);background:var(--red);color:#fff;font-size:34px;font-weight:950;line-height:1}
+    .section-no.b{background:var(--blue)}
+    .section-no.k{background:#111}
+    .section-meta{display:grid;gap:7px;padding-top:4px}
+    .section-meta .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:900}
+    .section-meta .label.b{color:var(--blue)}
+    .section-meta .label.k{color:#111}
+    .section-meta h2{margin:0;font-size:clamp(22px,3.7vw,38px);line-height:1.06;letter-spacing:-.04em}
+    .section-meta p{margin:0;color:var(--muted);font-size:14px;line-height:1.62;max-width:980px}
+
+    /* GRIDS */
+    .grid-2,.grid-3,.grid-4{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card,.mini{border:2px solid var(--line);background:#fff;min-width:0;padding:14px}
+    .card{display:grid;gap:10px}
+    .card h3,.mini h4{margin:0;letter-spacing:-.02em}
+    .card h3{font-size:17px;line-height:1.16}
+    .card p,.mini p{margin:0;font-size:14px;color:#222;line-height:1.66}
+    .card ul,.mini ul{margin:0;padding-left:0;list-style-position:inside}
+    .card li,.mini li{margin:4px 0;font-size:14px;color:#222;line-height:1.66}
+    .card code{font-size:12.5px;background:var(--soft-ink);padding:1px 5px;border:1px solid var(--line)}
+    .tagrow{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);padding:4px 8px;background:#fff;font-size:11.8px;font-weight:850;line-height:1}
+    .tag.red{background:var(--soft-red)}
+    .tag.blue{background:var(--soft-blue)}
+    .tag.dark{background:#111;color:#fff}
+
+    /* TABLE-WRAP */
+    .table-wrap{border:2px solid var(--line);background:#fff;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px}
+    .table-wrap .tw-head{background:var(--ink);color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+    .table-wrap table{width:100%;border-collapse:collapse;font-size:12.5px;margin:0;min-width:640px}
+    .table-wrap th{padding:8px 12px;border:1.5px solid var(--line);text-align:left;font-size:10.8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--soft-ink)}
+    .table-wrap td{padding:8px 12px;border:1.5px solid var(--line);line-height:1.55;vertical-align:top}
+    .table-wrap tr:nth-child(even) td{background:var(--soft-blue)}
+    .table-wrap td .st{font-weight:900}
+    .table-wrap td .st.ok{color:var(--blue)}
+    .table-wrap td .st.beta{color:var(--red)}
+
+    /* CODE BLOCK */
+    .code-block{background:#111;color:#e8e8e8;border:2px solid var(--line);padding:14px;overflow-x:auto;margin-bottom:12px}
+    .code-block .cb-label{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#888;margin-bottom:8px}
+    .code-block pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.72;white-space:pre}
+    .code-block .c-com{color:#888}
+    .code-block .c-cmd{color:#7fb0ff}
+    .code-block .c-str{color:#e8c200}
+    .code-block .c-out{color:#9fe8b0}
+
+    /* STEP ROW */
+    .step-row{display:grid;grid-template-columns:56px 1fr;gap:12px;border:2px solid var(--line);background:#fff;padding:12px;min-width:0}
+    .step-row + .step-row{margin-top:10px}
+    .step-n{display:grid;place-items:center;width:48px;height:48px;border:2px solid var(--line);background:var(--blue);color:#fff;font-weight:950;font-size:18px}
+    .step-n.red{background:var(--red)}
+    .step-n.dark{background:#111}
+    .step-row h4{margin:0 0 4px;font-size:15.5px;line-height:1.3}
+    .step-row > *{min-width:0}
+    .step-row .code-block{max-width:100%}
+    .step-row p{margin:0;font-size:13.5px;color:#222;line-height:1.62}
+    .step-row p + p{margin-top:4px}
+
+    /* RISK */
+    .risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .risk{border:2px solid var(--line);background:#fff;padding:14px;display:grid;gap:8px;position:relative;overflow:hidden;min-width:0}
+    .risk::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--accent,#111);border-bottom:3px solid var(--line)}
+    .risk[data-accent="red"]{--accent:var(--red)}
+    .risk[data-accent="blue"]{--accent:var(--blue)}
+    .risk[data-accent="dark"]{--accent:#111}
+    .risk .n{display:inline-grid;place-items:center;width:42px;height:42px;border:2px solid var(--line);background:var(--accent,#111);color:#fff;font-weight:950;font-size:16px}
+    .risk h4{font-size:16px;line-height:1.15;margin:0;padding-top:2px}
+    .risk p{margin:0;font-size:13.5px;line-height:1.65;color:#222}
+    .risk code{font-size:12px;background:var(--soft-ink);padding:1px 5px;border:1px solid var(--line)}
+    .quote-block{border-left:4px solid var(--blue);padding:12px 14px;background:var(--soft-blue);font-size:14px;line-height:1.72}
+    .quote-block b{color:#111}
+
+    .rule{height:3px;background:#111;margin:8px 0 0}
+    .source-note{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.62}
+    .source-note a{text-decoration:underline}
+
+    /* RESPONSIVE */
+    @media (max-width:1080px){
+      .hero{grid-template-columns:1fr}
+      .hero-copy{border-right:0;border-bottom:3px solid var(--line)}
+      .grid-4,.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:720px){
+      .page{width:min(100% - 16px,1040px);padding:10px 0 60px}
+      .hero{display:flex;flex-direction:column}
+      .hero-copy{padding:16px;border-right:0;border-top:3px solid var(--line)}
+      .grid-4,.grid-3,.grid-2,.risk-grid{grid-template-columns:1fr}
+      .section-head{grid-template-columns:1fr;gap:10px}
+      .section-no{width:72px;height:72px;font-size:28px}
+      .card,.mini,.alert,.risk,.quote-block{padding-left:12px;padding-right:12px}
+      .step-row{grid-template-columns:44px 1fr;gap:10px;padding:10px}
+      .step-n{width:40px;height:40px;font-size:15px}
+      .table-wrap table{min-width:600px}
+      .table-wrap th,.table-wrap td{padding:7px 9px}
+      .code-block{padding:11px}
+      .code-block pre{font-size:11px}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-bar"></div>
+      <div class="hero-copy">
+        <div class="kicker">SELF-HOSTED · AGPL-3.0-ONLY · 2026-11-09 开源</div>
+        <h1 class="demo-title">agentes.chat：把 AI 代理拉进团队频道，自己的服务器自己管</h1>
+        <p class="subtitle">开源、自托管的 Slack 替代品：人和 AI 代理在同一个频道、同一组线程里协作。代理带角色、指令、模型和月度预算，敏感动作等人审批。一条安装命令 + Docker Compose + Postgres，官方称约 10 分钟跑起来。</p>
+        <div class="badge-row">
+          <span class="badge red">开源 AGPL-3.0-only</span>
+          <span class="badge blue">Docker + Postgres 18</span>
+          <span class="badge dark">MCP 连接器</span>
+          <span class="badge">14 种语言含中文</span>
+          <span class="badge ink">413 ★ @ 2026-11-12</span>
+        </div>
+        <div class="alert">
+          <strong>先说边界：这张卡核对的是官方一手材料，不是实测</strong>
+          <p>README、SELF_HOSTING.md、安装脚本、docker-compose、NOTICE、ADR 与源码树均逐项核对过（2026-11-12）；但作者没有实机部署。下文所有安装与 UI 步骤都是「官方文档声称」，照做前请以官方文档为准。审批机制只覆盖被预设为敏感的操作，不等于代理全部动作绝对安全。</p>
+          <div class="mini-row">
+            <span class="mini-tag">渠道/DM/线程</span>
+            <span class="mini-tag">预算先扣后调</span>
+            <span class="mini-tag">审批卡</span>
+            <span class="mini-tag">Tailscale 私网 HTTPS</span>
+            <span class="mini-tag">代理浏览器 Beta</span>
+          </div>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="panel-top">
+          <div class="eyebrow">DEPLOYMENT MAINLINE</div>
+          <h3>自托管主线：五步到第一条代理回复</h3>
+          <p>先读脚本再执行；Tailscale 提供私有 HTTPS，不需要公网域名和开放端口。</p>
+        </div>
+        <div class="panel-body">
+          <div class="quote"><b>一句话：</b>把代理当成有编制的群成员，而不是侧边栏插件；成本按代理记账，风险动作先审批。</div>
+          <div class="flow">
+            <div class="flow-item blue"><div class="t">Step 1</div><div class="c">下载 install.sh 并通读</div></div>
+            <div class="flow-item dark"><div class="t">Step 2</div><div class="c">执行安装（4 次回车）</div></div>
+            <div class="flow-item blue"><div class="t">Step 3</div><div class="c">注册首个账号（owner）</div></div>
+            <div class="flow-item dark"><div class="t">Step 4</div><div class="c">配模型 key，建频道和代理</div></div>
+            <div class="flow-item red"><div class="t">Step 5</div><div class="c">无副作用验证一条回复</div></div>
+          </div>
+        </div>
+      </figure>
+    </header>
+
+    <div class="overview">
+      <div class="overview-sentence">agentes.chat 把「团队聊天 + AI 代理」做成了一个可自托管的开源整体：代理是频道成员，预算每次调用前校验，敏感动作等人点头，数据留在你自己的 Postgres 里。</div>
+      <div class="overview-body">
+        <p>仓库 agentes-chat/agentes-chat 于 2026-11-09 公开，AGPL-3.0-only 许可，截至 2026-11-12 约 413 star。服务端是 Bun + Hono + Drizzle + PostgreSQL（compose 里 pgvector 以 digest 固定），Web/手机/桌面三端分别用 React、Expo、Tauri。官方同时运营云版和自托管版，两者跑同一份代码。功能面上，频道/线程/DM、代理、Router、审批、MCP、Skills、例行任务、记忆、Wiki、Drive、任务看板、代理电脑为正式状态；代理浏览器、Postgres 只读连接器、代理邮箱、手机与桌面 app、跨应用导入、无 Docker 模式为 Beta。本卡给出一条从审查安装脚本到建频道、建代理、再做一次无需外部副作用的验证的完整读者路径，全部命令与 UI 步骤转述自官方文档并逐条标注核对状态。</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">01</div>
+        <div class="section-meta">
+          <div class="label">WHAT IT IS</div>
+          <h2>它是什么，不是什么</h2>
+          <p>官方的自我定位是「开源、自托管的 Slack 替代品，团队和 AI 代理一起工作」。与「聊天软件 + 旁路 bot」的组合相比，差别在于代理是工作区的一等成员。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">定位</span></div>
+          <h3>代理是有编制的群成员</h3>
+          <p>每个代理有角色、指令、所选模型、月度预算和一位 owner。它们读频道、在该回答时回答、把工作交还给人，全程大家都看得见。</p>
+          <ul>
+            <li>模型：Claude、OpenAI、Gemini、DeepSeek、Kimi、Z.ai、MiniMax 或 OpenRouter 任一模型</li>
+            <li>组织在应用内自带模型 key，服务器本身不需要 key</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag dark">官方对标</span></div>
+          <h3>两类「替代对象」</h3>
+          <p>官方原文把对标对象分成两类：给团队聊天外挂 AI bot 的产品，以及单机的 agent 应用（README 点名 Grok Bot、ChatGPT dots、OpenBot.run、OpenMausBot 等，并支持从它们导入）。</p>
+          <ul>
+            <li>导入走预览确认：skills 到位即启用，key 永不导入</li>
+            <li>工作区可以整体导出为一个文件</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">边界</span></div>
+          <h3>它不是什么</h3>
+          <p>它不是托管 SaaS 绑定：云版只是同一代码库的托管运行。也不是模型网关：它不转卖模型调用，每家组织自己付模型钱。</p>
+          <ul>
+            <li>桌面/手机 app 是 Beta，Mac 构建未公证、Windows 安装器未签名</li>
+            <li>官方自己注明部署容量（sizing）尚未实测，2 vCPU / 4 GB / 20 GB 只是起步建议</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">02</div>
+        <div class="section-meta">
+          <div class="label b">FEATURE MATRIX</div>
+          <h2>功能清单：官方状态表核对</h2>
+          <p>逐行对照 README 功能表原文（2026-11-12 快照）。✅ 为官方标注正式状态，Beta 为官方标注测试状态；本卡未实测任何功能。</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="tw-head"><span>功能 × 状态 × 说明</span><span>来源：README 功能表</span></div>
+        <table>
+          <tr><th>功能</th><th>状态</th><th>一句话说明（转述自官方）</th></tr>
+          <tr><td>频道、线程、DM</td><td><span class="st ok">✅</span></td><td>公开/私有频道，与人和代理的 DM，从消息或一段对话起线程，可跟进、关闭、归档</td></tr>
+          <tr><td>代理 Agents</td><td><span class="st ok">✅</span></td><td>角色、指令、模型、月度预算（每次调用前检查）、负责审批与预算提醒的 owner</td></tr>
+          <tr><td>Router</td><td><span class="st ok">✅</span></td><td>没人 @ 的消息交给路由：代码选候选，Jev 小模型/作者套餐/规则定夺；最多 4 个代理回答或无人回答，注明挑选者；从不授予权限</td></tr>
+          <tr><td>审批 Approvals</td><td><span class="st ok">✅</span></td><td>合并、部署、回滚及连接器标记的敏感操作，等 owner 或管理员以聊天卡片批准；批准的动作只按批准执行一次</td></tr>
+          <tr><td>MCP 连接器</td><td><span class="st ok">✅</span></td><td>组织接入一次（Linear/Sentry/Notion/Stripe 等一键，或按 URL 自填），每个代理只拿到分给它的 scope；Composio key 可扩展更多 SaaS</td></tr>
+          <tr><td>Skills / 例行任务 / 记忆</td><td><span class="st ok">✅</span></td><td>SKILL.md 打包导入；按时间表或事件触发；从对话、纠正和被拒审批中学习并提议修改自己的指令</td></tr>
+          <tr><td>Wiki / Drive / 任务看板</td><td><span class="st ok">✅</span></td><td>[[链接]] 与反向链接、Obsidian 导入；文件版本化，文档可导出 Word/PDF；代理领任务后看板随其推进</td></tr>
+          <tr><td>代理电脑</td><td><span class="st ok">✅</span></td><td>代理在 runner 所在机器上跑命令和代码；默认安装时服务器本身就是代理的电脑，也可连接别的机器</td></tr>
+          <tr><td>Claude Code / Codex</td><td><span class="st ok">✅</span></td><td>连接的电脑上代理可用 Claude Code 或 Codex（用那边登录的套餐）思考；官方注明 Codex 仍在测试</td></tr>
+          <tr><td>代理浏览器</td><td><span class="st beta">Beta</span></td><td>经 agent-browser 开网页、填表单、读页面；可在聊天里实时观看、接管处理登录或验证码，再交还</td></tr>
+          <tr><td>Postgres 连接器 / 代理邮箱</td><td><span class="st beta">Beta</span></td><td>只读 SQL（单条解析语句 + 只读事务 + 时间/行数上限）；邮箱收发默认发送需审批</td></tr>
+          <tr><td>手机 / 桌面 app</td><td><span class="st beta">Beta</span></td><td>Expo（iPhone/Android）、Tauri 桌面；扫 QR 登录自己的实例；未公证/未签名，首次打开需手动放行</td></tr>
+          <tr><td>14 种语言</td><td><span class="st ok">✅</span></td><td>含简体中文在内的整应用本地化</td></tr>
+          <tr><td>自托管（Docker）</td><td><span class="st ok">✅</span></td><td>一条安装命令 + 一个 compose 文件：应用与 Postgres(pgvector)，启动即迁移，Tailscale 私有 HTTPS 或 Caddy 公网域名</td></tr>
+          <tr><td>无 Docker 单程序</td><td><span class="st beta">Beta</span></td><td>agentes-server 内置数据库，面向个人或小团队；桌面 app 也有「本机运行」选项</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">03</div>
+        <div class="section-meta">
+          <div class="label k">BUDGET &amp; APPROVALS</div>
+          <h2>预算和审批是怎么「真的」起作用的</h2>
+          <p>这一节不只是转述宣传语：预算机制核对到了设计文档 ADR 0012 与源码树，审批边界按 README 原文口径陈述。</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <div class="tagrow"><span class="tag blue">预算</span><span class="tag dark">ADR 0012</span></div>
+          <h3>每次调用前先做预留，超了直接拒绝</h3>
+          <p>ADR 0012（已接受，2026-10-14）写明：Model Gateway 在每次代理调用前的一个事务里锁住该代理当月预算行、按最坏情况估算成本并登记预留；余额不够时压缩输出上限，剩余不足 256 个输出 token 或没有余额时，在任何模型供应商被联系之前抛出 <code>BudgetExceededError</code>。并发调用靠行锁串行化，预留 + 已花费之和不会越过预算。源码树里能看到对应实现与测试（<code>packages/engine/src/context-budget.ts</code> 及 budget 相关测试）。</p>
+          <ul>
+            <li>预算口径：UTC 自然月，按代理记账；中途设预算立即生效</li>
+            <li>Router、摘要等组织级调用计到组织凭据，不占单个代理预算</li>
+            <li>结算永远记录供应商的实际计费成本，预估算上线</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="tagrow"><span class="tag red">审批</span><span class="tag blue">边界如实说</span></div>
+          <h3>审批覆盖「被预设为敏感」的动作，不是全部动作</h3>
+          <p>README 原文：合并、部署、回滚和连接器标记为敏感的操作要等代理的 owner 或管理员批准，以聊天卡片呈现；被批准的动作只按批准执行一次；Router 从不授予权限。反过来说：没有列入敏感清单的日常动作（跑命令、读写代理电脑上的文件）并不逐个审批——代理电脑上命令执行默认开启：桌面 app 配对的电脑在 <code>Preferences → Tools</code> 一个开关关闭；默认安装里服务器本身充当的代理电脑，则在该机上用 <code>agentes-runner tools disable commands</code> 关闭（或安装时对该步回答不启用）。把「有审批机制」理解成「代理所有动作绝对安全」是不成立的。</p>
+          <ul>
+            <li>代理邮箱（Beta）发送默认要审批</li>
+            <li>记忆只能「提议」修改自己的指令，由人接受</li>
+            <li>Wiki 代理默认只读，人要求时才写</li>
+          </ul>
+        </article>
+      </div>
+      <div class="quote-block" style="margin-top:12px"><b>数据流一句话：</b>聊天与业务数据存你自己服务器的 Postgres；出站 HTTPS 按官方口径分两层——必需的是组织自己 key 的模型 API 调用，以及你启用的任何服务（连接器、代理浏览器/邮箱、备份桶等）；另有默认开启的出站项要知道：匿名用量统计默认开启，每天上报 agentes.chat（可在 Settings → General → Usage statistics 或 <code>TELEMETRY=off</code> 关闭），代理网页搜索始终开启（默认走 DuckDuckGo，无需 key）。模型密钥用从 <code>AGENTES_SECRET</code> 派生的密钥加密存储，官方声明永不下发浏览器。预算控制适用于代理的模型调用，组织级调用走组织凭据记账。</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">04</div>
+        <div class="section-meta">
+          <div class="label">SELF-HOST IN ~10 MIN</div>
+          <h2>十分钟自托管：先审脚本，再按步骤走</h2>
+          <p>以下为 SELF_HOSTING.md「Quick start」路径的转述（官方声称，作者未实测）。前提：64 位 Linux 服务器、Tailscale 免费账号、Docker Engine + Compose v2 ≥ 2.23.1（没有的话安装器会先询问再补装）；镜像约 2 GB。</p>
+        </div>
+      </div>
+
+      <div class="step-row">
+        <div class="step-n dark">1</div>
+        <div>
+          <h4>准备 Tailscale：MagicDNS + HTTPS + 一次性 auth key</h4>
+          <p>在 console.tailscale.com 打开 MagicDNS 与 HTTPS Certificates；在 Settings → Keys 生成一个 auth key（<code>tskey-auth-…</code>，只显示一次）。服务器进私网靠它，证书也来自这条链路。</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n red">2</div>
+        <div>
+          <h4>先读安装脚本，再执行（curl | sh 之前多一步 less）</h4>
+          <p>脚本共 904 行，对下载的 pinned Bun 和 Compose 资产做 SHA-256 校验后才运行；想先看计划可以加 <code>--plan</code>（只打印、什么都不做）。</p>
+          <div class="code-block">
+            <div class="cb-label">// 审查后执行 · SELF_HOSTING.md 原文命令</div>
+            <pre><span class="c-cmd">curl</span> -fsSLo install.sh https://agentes.chat/install
+<span class="c-com"># 通读脚本内容（重点看下载源与 SHA-256 校验逻辑）</span>
+<span class="c-cmd">less</span> install.sh
+<span class="c-cmd">sh</span> install.sh
+<span class="c-com"># 或只看计划不执行：</span>
+<span class="c-cmd">curl</span> -fsSL https://agentes.chat/install | <span class="c-cmd">sh</span> -s -- --plan</pre>
+          </div>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n">3</div>
+        <div>
+          <h4>安装交互：4 次回车</h4>
+          <p>回车确认 Tailscale → 粘贴 auth key → 回车跳过邮件（或选 Email 配置）→ 回车让这台服务器成为「代理的电脑」→ 回车确认用量统计。脚本会检查 Docker、生成只对你可读的 <code>.env</code>、拉起三个容器（应用、Postgres、Tailscale）、等证书和 <code>/api/health</code> 就绪。</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n dark">4</div>
+        <div>
+          <h4>预期输出（官方文档给出的完成样例）</h4>
+          <div class="code-block">
+            <div class="cb-label">// 完成时的关键行（SELF_HOSTING.md 原文样例）</div>
+            <pre><span class="c-out">◇  On your tailnet as agentes.tail1234.ts.net</span>
+<span class="c-out">◇  .env: PUBLIC_URL=https://agentes.tail1234.ts.net</span>
+<span class="c-out">◇  HTTPS certificate ready</span>
+<span class="c-out">◇  agentes.chat &lt;version&gt; is up</span>
+<span class="c-out">◇  Agents&#39; computer: this machine</span>
+<span class="c-out">●  agentes.chat is up</span>
+<span class="c-out">     https://agentes.tail1234.ts.net</span></pre>
+          </div>
+          <p>在你的 tailnet 设备上打开这个地址注册：第一个账号自动成为 owner，之后注册关闭、只能邀请。组织首次引导时会要求添加模型 key（Settings → AI and usage）。</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n red">5</div>
+        <div>
+          <h4>两件别忘的事</h4>
+          <p>① Tailscale 服务器密钥默认 180 天过期，到期服务器会掉出私网——在管理台对服务器执行 Disable Key Expiry，或改用永不过期的 OAuth client secret；② <code>PUBLIC_URL</code> 必须与浏览器打开的地址完全一致（协议、主机、端口都算），否则登录报 Invalid origin、保存报 bad_origin。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no b">05</div>
+        <div class="section-meta">
+          <div class="label b">FIRST RUN · NO SIDE EFFECTS</div>
+          <h2>建频道、建代理，再做一次无副作用的验证</h2>
+          <p>UI 步骤转述自官方文档（作者未实测）。验证任务特意不接任何连接器、不给浏览器和电脑工具，目标是零外部副作用；但注意官方文档称代理网页搜索始终开启（默认 DuckDuckGo），严格零出站无法由产品保证，只能靠任务设计不触发工具。</p>
+        </div>
+      </div>
+
+      <div class="step-row">
+        <div class="step-n">1</div>
+        <div>
+          <h4>建频道，拉一个代理进来</h4>
+          <p>在应用里新建一个公开频道；再到代理设置里创建一个代理：填角色与指令、选模型（比如你组织已配 key 的任意一家）、设一个很小的月度预算（比如 1 美元）、指定 owner（就是你自己）。把它加进频道。</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n blue">2</div>
+        <div>
+          <h4>验证任务：让它只动嘴，不动手</h4>
+          <p>在频道里 @这个代理，问一个不需要任何工具的常识问题，例如「用一句话介绍你自己」。创建代理时显式不给它浏览器、电脑（命令）工具——命令默认开启，须逐项排除。这条消息也可以故意不带 @，考验 Router：预期消息下面注明是「谁」决定让它回答的。</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n dark">3</div>
+        <div>
+          <h4>预期结果与判定（依官方文档推断，未实测）</h4>
+          <p>✅ 代理在频道里直接回复；✅ 消息标注挑选者（若走了 Router）；✅ 没有任何审批卡出现（任务不含敏感动作；审批只覆盖被预设为敏感的操作，此预期是推断不是保证）；✅ 代理页面的用量记录里出现本次调用的成本。若它请求连接器或工具权限，说明配置里给了不该给的 scope，回去收紧。</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n red">4</div>
+        <div>
+          <h4>如果它没反应</h4>
+          <p>先查组织模型 key 是否有效（Settings → AI and usage）；再查代理预算是否设成 0 或已被用完（预算不足会在联系供应商前直接拒绝，代理会报 BudgetExceededError 类错误）；最后确认你 @ 的名字与代理成员名一致。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no k">06</div>
+        <div class="section-meta">
+          <div class="label k">TROUBLESHOOTING</div>
+          <h2>排错速查（转述自 SELF_HOSTING.md Troubleshooting）</h2>
+          <p>最高频的一条排在第一行：<code>PUBLIC_URL</code> 与实际访问地址不一致。</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="tw-head"><span>症状 × 原因 × 处置</span><span>来源：官方排错节</span></div>
+        <table>
+          <tr><th>症状</th><th>原因</th><th>处置</th></tr>
+          <tr><td>登录报 Invalid origin，保存报 bad_origin</td><td>PUBLIC_URL 与浏览器地址不完全一致</td><td>改 .env 里的 PUBLIC_URL（含协议/主机/端口），docker compose up -d；Tailscale 场景用 setup 打印的完整 ts.net 地址，不是短名或 100.x 地址</td></tr>
+          <tr><td>消息不实时刷新，WebSocket 1006 关闭</td><td>反向代理没转发升级头</td><td>给 /api/ws（及 machines/desktop/terminal 相关路径）加 Upgrade/Connection 头，HTTP/1.1 到应用，读超时 ≥60s</td></tr>
+          <tr><td>首次启动报 extension "vector" is not available</td><td>Postgres 没有 pgvector</td><td>用 compose 自带的 pgvector/pgvector 镜像；自备数据库则装 pgvector（Postgres ≥15）</td></tr>
+          <tr><td>refusing to migrate 后应用退出</td><td>镜像与数据库迁移版本不匹配（常见于回滚）</td><td>跑数据库对应或更新的版本，或恢复升级前的 pg_dump 备份；迁移不可变，别改</td></tr>
+          <tr><td>This address points to an internal network</td><td>连接器/数据库/邮箱/自备桶填了私网地址</td><td>官方按防 SSRF 设计拒绝私网/环回地址；改走公网可达地址，或经「连接的电脑」访问内网服务</td></tr>
+          <tr><td>代理浏览器报 Google Chrome isn't installed</td><td>代理电脑缺 Chrome</td><td>装 Google Chrome（Linux ARM 装 Chromium），无需重启代理</td></tr>
+          <tr><td>代理桌面/终端不可用</td><td>runner 依赖缺失或开关关闭</td><td>在该机器跑 agentes-runner status 看缺什么（runner 版本、依赖包或开关）</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div class="section-no">07</div>
+        <div class="section-meta">
+          <div class="label">RISK &amp; LICENSE</div>
+          <h2>风险与合规边界：装之前想清楚五件事</h2>
+        </div>
+      </div>
+      <div class="risk-grid">
+        <article class="risk" data-accent="red">
+          <div class="n">1</div>
+          <h4>curl | sh 模式：先读再跑</h4>
+          <p>安装脚本对下载内容做 SHA-256 校验、支持 <code>--plan</code> 预览，但本质仍是管道执行远程脚本。正确姿势是官方自己给的三行：下载、<code>less</code> 通读、再执行。企业环境建议改用 <code>npx @agenteschat/setup</code>（MIT 许可）走可审路径。</p>
+        </article>
+        <article class="risk" data-accent="red">
+          <div class="n">2</div>
+          <h4>服务器默认变成代理的电脑</h4>
+          <p>默认安装会让服务器本身充当代理执行命令的机器，桌面 app 配对的电脑上命令默认开启。这不是漏洞，是设计默认值：不想让代理在你这台机器跑命令，装完第一件事去关——桌面 app 配对的电脑在 Preferences → Tools，一个开关管这台机器上所有工作区；服务器本身的代理电脑在该机跑 <code>agentes-runner tools disable commands</code>，或安装交互时对「代理的电脑」一步回答不启用。</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">3</div>
+          <h4>审批有边界，预算有前提</h4>
+          <p>审批只拦被预设为敏感的操作类别；预算按代理月度记账，Router 等组织级调用走组织凭据、不占代理预算。安全设计是「分层缓冲」，不是「全动作绝对安全」——给代理的 scope 越多，未审批面越大。</p>
+        </article>
+        <article class="risk" data-accent="blue">
+          <div class="n">4</div>
+          <h4>AGPL-3.0-only + 归属条款</h4>
+          <p>核心代码 AGPL-3.0-only；NOTICE 附 section 7 条款：应用商店分发客户端被明确允许，但每份副本和修改版必须在 About 界面保留「Based on agentes.chat by Codari Global, LLC」。<code>agentes</code> 名称、logo 是商标，不随 AGPL 授权（TRADEMARKS.md）。setup CLI 单独为 MIT。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">5</div>
+          <h4>项目非常新，Beta 面不小</h4>
+          <p>仓库 2026-11-09 才公开；代理浏览器、邮箱、Postgres 连接器、手机/桌面 app、无 Docker 模式、跨应用导入都是 Beta，桌面构建未公证/未签名。生产采用前把「正式功能清单」当成真实边界，Beta 组件当成可能变动的部分。</p>
+        </article>
+        <article class="risk" data-accent="dark">
+          <div class="n">6</div>
+          <h4>升级单向，先备份</h4>
+          <p>迁移随启动执行且不可变：回滚旧镜像会被拒绝启动，只能恢复升级前的 dump。compose 自带可选 backup 服务（pg_dump 定时进 S3 兼容桶）；手动备份记得加 umask 077——dump 里是全部消息和文件。</p>
+        </article>
+      </div>
+
+      <div class="footer-block" style="border:3px solid var(--line);background:#fff;padding:16px;display:grid;gap:10px;margin-top:14px">
+        <h3 style="font-size:18px;line-height:1.2;margin:0;letter-spacing:-.02em">收口 · 这张卡的证据边界</h3>
+        <p style="font-size:14px;color:#222;line-height:1.66;margin:0">核对日期 2026-11-12。已核对一手材料：GitHub 仓库页与 API 元数据（star 数为当日快照）、README 全文、SELF_HOSTING.md 全文、install.sh（904 行，SHA-256 校验逻辑确认）、docker-compose.yml（pgvector digest 固定确认）、NOTICE（许可与商标条款确认）、package.json（bun@1.4.4、AGPL-3.0-only 确认）、ADR 0012（预算预留机制确认）、仓库文件树（budget/approvals/router 的实现与测试文件确认存在）。未做：实机安装、运行平台、任何 UI 操作——第 04、05 节的命令与界面路径均为官方文档转述，执行前请以官方文档最新版为准。</p>
+        <div style="font-size:12px;color:var(--muted);border-top:1.5px solid var(--line);padding-top:8px;margin-top:4px">来源：github.com/agentes-chat/agentes-chat（AGPL-3.0-only）· agentes.chat 官网与 SELF_HOSTING.md · ADR 0012 · 数字（star/fork/issue）截至 2026-11-12</div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+    <p class="source-note">agentes.chat · 开源自托管团队聊天 + AI 代理 · <a href="https://github.com/agentes-chat/agentes-chat">github.com/agentes-chat/agentes-chat</a> · 本卡为文档核对整理，非官方出品</p>
+  </main>
+</body>
+</html>
