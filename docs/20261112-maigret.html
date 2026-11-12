@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="graph-paper">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Maigret：按用户名跨站收集账号档案的开源命令行工具</title>
+  <style>
+    :root{
+      --bg:#f7f6f2;
+      --paper:#fffdf8;
+      --ink:#111111;
+      --muted:#6c6a63;
+      --line:#ddd7cb;
+      --accent:#3f6cff;
+      --accent-soft:rgba(63,108,255,.10);
+      --accent-2:#0f172a;
+      --warn:#8a5a00;
+      --warn-soft:rgba(178,120,20,.10);
+      --shadow:0 10px 28px rgba(17,17,17,.05);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+    body{
+      min-height:100vh;
+      background-image:
+        linear-gradient(rgba(17,17,17,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(17,17,17,.04) 1px, transparent 1px);
+      background-size:36px 36px, 36px 36px;
+    }
+    a{color:inherit}
+    code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .frame{max-width:1440px;margin:0 auto;border:1px solid var(--line);background:
+        linear-gradient(rgba(17,17,17,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(17,17,17,.06) 1px, transparent 1px),
+        linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.46));
+      background-size:28px 28px,28px 28px,auto;
+      box-shadow:0 24px 60px rgba(17,17,17,.06);}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:18px 30px;border-bottom:1px solid var(--line);background:rgba(255,253,248,.86);backdrop-filter:blur(6px)}
+    .wordmark{font-weight:800;font-size:1.25rem;letter-spacing:-.04em;text-decoration:none}
+    .nav-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-end}
+    .nav-links a{text-decoration:none;color:var(--muted);font-size:.95rem}
+    .nav-links a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:4px}
+    .star{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line);padding:.45rem .85rem;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.35);font-size:.85rem}
+    .hero{display:grid;grid-template-columns:1.08fr .92fr;border-bottom:1px solid var(--line)}
+    .hero-left{padding:64px 52px 54px;min-width:0}
+    .eyebrow{display:inline-flex;align-items:center;gap:.55rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+    .eyebrow:before{content:"";width:42px;height:1px;background:var(--line)}
+    h1{font-size:clamp(2.2rem,5vw,3.7rem);line-height:1.04;font-weight:800;letter-spacing:-.04em;margin:0 0 18px}
+    .lede{font-size:clamp(1rem,1.4vw,1.16rem);line-height:1.66;color:var(--muted);max-width:44ch;margin:0 0 26px}
+    .lede b{color:var(--ink);font-weight:700}
+    .cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;border:1px solid var(--line);text-decoration:none;font-weight:600;transition:background .14s ease,color .14s ease}
+    .btn-primary{background:var(--ink);color:var(--paper)}
+    .btn-primary:hover{background:transparent;color:var(--ink)}
+    .btn-ghost{background:transparent;color:var(--ink)}
+    .btn-ghost:hover{background:var(--paper)}
+    .install{display:inline-flex;align-items:center;gap:.5rem;border:1px solid var(--line);padding:10px 12px 10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:.93rem;background:rgba(255,255,255,.42);margin-bottom:18px}
+    .install code{font-family:inherit;background:none}
+    .micro{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:.92rem}
+    .hero-right{border-inline-start:1px solid var(--line);padding:28px;display:flex;align-items:center;justify-content:center;min-width:0}
+    .graph-shell{width:100%;max-width:620px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.7));box-shadow:var(--shadow);padding:22px}
+    .graph-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;font-size:.82rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+    .graph-title strong{color:var(--ink)}
+    svg{width:100%;height:auto;display:block}
+    .edges line{stroke:var(--line);stroke-width:1.2}
+    .edges .flow{stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4}
+    .edge-label{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:11px;fill:var(--muted)}
+    .node rect{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+    .node text{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:13px;fill:var(--ink)}
+    .node.hot rect{fill:var(--accent-soft);stroke:var(--accent)}
+    .node.dim rect{fill:#faf8f3;stroke:var(--muted)}
+    .node.dim text{fill:var(--muted)}
+    .section-label{display:flex;align-items:center;gap:.55rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+    .section-label:before{content:"";width:18px;height:1px;background:var(--line)}
+    .trio{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+    .card{padding:28px 28px 30px;border-inline-start:1px solid var(--line);min-width:0}
+    .card:first-child{border-inline-start:none}
+    .card h2{font-size:1.35rem;line-height:1.16;letter-spacing:-.03em;margin:0 0 12px}
+    .card p{margin:0;color:var(--muted);line-height:1.65;font-size:.96rem}
+    .card p b{color:var(--ink)}
+    .list{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px}
+    .list li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:10px;font-size:.93rem}
+    .list span{color:var(--muted);text-align:right}
+    .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+    .pill{border:1px solid var(--line);padding:7px 10px;font-size:.8rem;background:rgba(255,255,255,.48);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .panel{border-bottom:1px solid var(--line);padding:34px 40px 38px;min-width:0}
+    .panel > h2{font-size:1.7rem;letter-spacing:-.03em;margin:0 0 8px}
+    .panel > .sub{margin:0 0 22px;color:var(--muted);line-height:1.66;max-width:76ch}
+    .table-wrap{overflow-x:auto;border:1px solid var(--line);background:rgba(255,255,255,.5)}
+    table{border-collapse:collapse;width:100%;min-width:600px;font-size:.92rem}
+    th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.55}
+    th{font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:rgba(255,253,248,.85);border-bottom:1.5px solid var(--ink);white-space:nowrap}
+    tr:last-child td{border-bottom:none}
+    td b{color:var(--ink)}
+    td .mono{font-size:.87em}
+    .code-block{overflow-x:auto;background:#1a1a2e;color:#e6e6f0;padding:16px 18px;font-size:.85rem;line-height:1.6;border:1px solid var(--line)}
+    .code-block .c{color:#7f8ab3}
+    .code-block .g{color:#9ecf9e}
+    .code-block .y{color:#e5c07b}
+    .code-block .r{color:#e06c75}
+    .code-block .b{color:#61afef}
+    .duo{display:grid;grid-template-columns:1.02fr .98fr;gap:0;border-bottom:1px solid var(--line)}
+    .duo > div{padding:34px 40px 38px;min-width:0}
+    .duo > div + div{border-inline-start:1px solid var(--line)}
+    .duo h2{font-size:1.5rem;letter-spacing:-.03em;margin:0 0 14px}
+    .duo p{margin:0 0 14px;color:var(--muted);line-height:1.66}
+    .duo p b{color:var(--ink)}
+    .step{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:12px 0;border-top:1px dashed var(--line)}
+    .step:first-of-type{border-top:none;padding-top:0}
+    .step b{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;color:var(--accent-2)}
+    .step p{margin:0;color:var(--muted);line-height:1.6}
+    .step p b{color:var(--ink)}
+    .callout{border:1px solid var(--line);background:var(--paper);padding:16px 18px;box-shadow:var(--shadow);font-size:.94rem;line-height:1.66;color:var(--muted)}
+    .callout strong{display:block;margin-bottom:6px;color:var(--ink)}
+    .callout.risk{border-inline-start:3px solid var(--warn);background:var(--warn-soft)}
+    .callout.risk strong{color:var(--warn)}
+    .evidence{display:flex;gap:16px;align-items:flex-start;margin-top:18px;flex-wrap:wrap}
+    .evidence img{width:120px;height:120px;border:1px solid var(--line);background:#fff;padding:10px;image-rendering:auto}
+    .evidence figcaption{flex:1;min-width:200px;font-size:.84rem;color:var(--muted);line-height:1.6}
+    .notes{display:grid;grid-template-columns:1.1fr .9fr;border-bottom:1px solid var(--line)}
+    .notes-left,.notes-right{padding:30px 34px 34px;min-width:0}
+    .notes-right{border-inline-start:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.45))}
+    .notes h2{font-size:1.5rem;letter-spacing:-.03em;margin:0 0 12px}
+    .notes p{margin:0 0 14px;color:var(--muted);line-height:1.68;max-width:64ch}
+    .notes p b{color:var(--ink)}
+    .footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 28px;color:var(--muted);font-size:.88rem}
+    .footer a{text-decoration:none;border-bottom:1px solid transparent}
+    .footer a:hover{border-bottom-color:var(--muted)}
+    @media (max-width:980px){
+      .hero,.duo,.notes{grid-template-columns:1fr}
+      .hero-right,.duo > div + div,.notes-right{border-inline-start:none;border-top:1px solid var(--line)}
+      .trio{grid-template-columns:1fr}
+      .card{border-inline-start:none;border-top:1px solid var(--line)}
+      .card:first-child{border-top:none}
+      .hero-left{padding:48px 24px 36px}
+      .hero-right{padding:22px 18px 24px}
+      .panel{padding:26px 22px 30px}
+      .duo > div,.notes-left,.notes-right{padding:24px 20px 28px}
+      .nav{padding:14px 18px}
+    }
+    @media (max-width:720px){
+      .table-wrap{overflow-x:auto}
+      table{min-width:600px}
+      .code-block{font-size:.76rem;padding:12px 12px}
+      .duo,.notes,.trio{grid-template-columns:1fr}
+      h1{letter-spacing:-.02em}
+    }
+    @media (max-width:480px){
+      h1{font-size:1.9rem}
+      .lede{font-size:1rem}
+      .nav-links{gap:10px;font-size:.85rem}
+      .graph-shell{padding:12px}
+      .panel{padding:22px 14px 26px}
+      .duo > div,.notes-left,.notes-right{padding:20px 14px 24px}
+      .install{font-size:.84rem}
+      .evidence img{width:96px;height:96px}
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="nav">
+      <a class="wordmark" href="https://github.com/soxoj/maigret" target="_blank" rel="noreferrer">MAIGRET / 用户名档案收集</a>
+      <nav class="nav-links">
+        <a href="https://github.com/soxoj/maigret" target="_blank" rel="noreferrer">GitHub 仓库</a>
+        <a href="https://maigret.readthedocs.io/" target="_blank" rel="noreferrer">官方文档</a>
+        <span class="star">v0.6.6 · MIT · ★40,455（2026-11-12）</span>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-left">
+        <div class="eyebrow">OSINT CLI · username enumeration · Python 3.10+</div>
+        <h1>Maigret：按用户名跨站收集账号档案</h1>
+        <p class="lede">给一个用户名，它批量检查上千个站点，报告哪些站点存在该账号，并从命中页面提取资料。本文所有数字来自 2026-11-12 对 <b>maigret 0.6.6</b> 的实跑与 main 分支源码核对——包括工具自报的 <b>58.58% 弱信号检查占比</b>，它决定了输出该怎么读。</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/soxoj/maigret" target="_blank" rel="noreferrer">GitHub 仓库</a>
+          <a class="btn btn-ghost" href="https://maigret.readthedocs.io/" target="_blank" rel="noreferrer">文档与快速上手</a>
+        </div>
+        <div class="install"><code>pip3 install maigret</code></div>
+        <div class="micro">
+          <span>内置库 5,897 站 · 启用 5,203</span>
+          <span>默认扫 Alexa Top 500</span>
+          <span>实跑核验：2026-11-12</span>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="graph-shell">
+          <div class="graph-title"><span>检查管线 · 单站点判定路径</span><strong>v0.6.6</strong></div>
+          <svg viewBox="0 0 620 440" aria-label="maigret 判定管线图">
+            <g class="edges">
+              <line class="flow" x1="150" y1="70" x2="300" y2="70" />
+              <line class="flow" x1="300" y1="70" x2="300" y2="96" />
+              <line x1="300" y1="96" x2="150" y2="180" />
+              <line x1="300" y1="96" x2="310" y2="180" />
+              <line x1="300" y1="96" x2="470" y2="180" />
+              <line x1="150" y1="206" x2="150" y2="300" />
+              <line x1="310" y1="206" x2="310" y2="300" />
+              <line x1="470" y1="206" x2="470" y2="300" />
+              <line x1="150" y1="326" x2="300" y2="388" />
+              <line x1="310" y1="326" x2="308" y2="388" />
+              <line x1="470" y1="326" x2="316" y2="388" />
+            </g>
+            <text class="edge-label" x="80" y="34">username + site db</text>
+            <g class="node">
+              <rect x="80" y="44" width="140" height="52" />
+              <text x="150" y="74" text-anchor="middle">输入用户名</text>
+            </g>
+            <g class="node hot">
+              <rect x="225" y="96" width="150" height="52" />
+              <text x="300" y="120" text-anchor="middle">checkType 分派</text>
+              <text x="300" y="138" text-anchor="middle" style="font-size:11px">message·status·url</text>
+            </g>
+            <g class="node">
+              <rect x="80" y="180" width="140" height="52" />
+              <text x="150" y="202" text-anchor="middle">message</text>
+              <text x="150" y="220" text-anchor="middle" style="font-size:11px">页面字符串匹配</text>
+            </g>
+            <g class="node">
+              <rect x="240" y="180" width="140" height="52" />
+              <text x="310" y="202" text-anchor="middle">status_code</text>
+              <text x="310" y="220" text-anchor="middle" style="font-size:11px">仅看 HTTP 2xx</text>
+            </g>
+            <g class="node">
+              <rect x="400" y="180" width="140" height="52" />
+              <text x="470" y="202" text-anchor="middle">response_url</text>
+              <text x="470" y="220" text-anchor="middle" style="font-size:11px">2xx + presence</text>
+            </g>
+            <g class="node hot">
+              <rect x="80" y="300" width="140" height="52" />
+              <text x="150" y="322" text-anchor="middle">CLAIMED</text>
+              <text x="150" y="340" text-anchor="middle" style="font-size:11px">检测到账号</text>
+            </g>
+            <g class="node">
+              <rect x="240" y="300" width="140" height="52" />
+              <text x="310" y="322" text-anchor="middle">AVAILABLE</text>
+              <text x="310" y="340" text-anchor="middle" style="font-size:11px">未检出</text>
+            </g>
+            <g class="node dim">
+              <rect x="400" y="300" width="140" height="52" />
+              <text x="470" y="322" text-anchor="middle">UNKNOWN / ILLEGAL</text>
+              <text x="470" y="340" text-anchor="middle" style="font-size:11px">出错 / 用户名非法</text>
+            </g>
+            <g class="node">
+              <rect x="220" y="362" width="180" height="52" />
+              <text x="310" y="384" text-anchor="middle">控制台 + 9 种报告</text>
+              <text x="310" y="402" text-anchor="middle" style="font-size:11px">html·csv·json·pdf·md…</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="trio">
+      <article class="card">
+        <div class="section-label">数据库规模</div>
+        <h2>5,897 站，启用 5,203</h2>
+        <p>PyPI 0.6.6 内置库经 <span class="mono">--stats</span> 实测：启用 88.23%。main 分支 data.json（2026-11-11 快照）已积累 <b>9,345 条记录</b>（739 条 disabled），其中 6,219 条走 28 种论坛引擎模板。</p>
+        <ul class="list">
+          <li><span class="mono">DiscourseJson</span><span>1,232 站</span></li>
+          <li><span class="mono">XenForo / uCoz</span><span>792 / 709 站</span></li>
+          <li><span class="mono">反爬保护站点</span><span>244 站</span></li>
+          <li><span class="mono">ru 国家标签</span><span>1,398 站</span></li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="section-label">弱信号</div>
+        <h2>58.58% 检查是弱信号</h2>
+        <p>工具自报：状态码检查占 <b>51.3%</b>（仅凭 HTTP 2xx 判定账号存在），另有 7.28% 的 message 检查缺字符串。这类判定在站点改版、返回错误页或经过反代时容易翻车，见下方误报清单。</p>
+        <div class="pill-row">
+          <span class="pill">status_code 2,669</span><span class="pill">message 2,457</span><span class="pill">response_url 77</span>
+        </div>
+      </article>
+      <article class="card">
+        <div class="section-label">边界</div>
+        <h2>同名 ≠ 同一人</h2>
+        <p>CLAIMED 只说明<b>该站点存在这个用户名</b>。两个平台上的同名账号可能是完全不同的人；讨论同一性必须依赖页面资料提取（<span class="mono">--enrich</span>）等交叉证据。README 明确仅供合法用途，使用者自担合规责任。</p>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="section-label">站点数据库构成 · 2026-11-12 核对</div>
+      <h2>库里有什么：三个口径都要分清</h2>
+      <p class="sub">README 的宣传口径是 “5,900 sites”，页面描述写 “6K websites”；实际内置库 5,897 条（PyPI 0.6.6），main 分支已到 9,345 条。宣传数、内置数、开发分支数是三个不同口径。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>口径</th><th>数值</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><b>PyPI 0.6.6 内置库</b></td><td class="mono">5,897 站 / 启用 5,203（88.23%）</td><td>实跑 <span class="mono">--stats</span> 所见，是普通用户实际扫描的范围</td></tr>
+            <tr><td><b>main 分支 data.json</b></td><td class="mono">9,345 条 / 739 条 disabled</td><td>2026-11-11 快照；启动时自动更新数据库（24h 一次）后会跟进</td></tr>
+            <tr><td><b>引擎模板站点</b></td><td class="mono">6,219 条，28 种引擎</td><td>Discourse、XenForo、uCoz、phpBB、Gitea、MediaWiki 等论坛引擎批量覆盖</td></tr>
+            <tr><td><b>显式 checkType 分布</b></td><td class="mono">status_code 1,898 · message 1,138 · response_url 91</td><td>main 分支显式声明；引擎站点继承引擎默认检查方式</td></tr>
+            <tr><td><b>反爬保护标记</b></td><td class="mono">244 站</td><td>tls_fingerprint 104、cf_js_challenge 57、ip_reputation 45 等，检查更慢更易失败</td></tr>
+            <tr><td><b>需激活的站点</b></td><td class="mono">6 个</td><td>OnlyFans、ProtonMail、Twitter、Vimeo、Weibo、WikimapiaSearch</td></tr>
+            <tr><td><b>国家标签</b></td><td class="mono">77 个标签</td><td>ru 1,398 / de 131 / ua 126 / us 115；57.2% 站点无国家标签</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-label">弱信号与误报机制 · 源码核对</div>
+      <h2>CLAIMED 什么时候不可信</h2>
+      <p class="sub">判定逻辑在 <span class="mono">maigret/checking.py</span> 里逐条可查。四个已知假阳性来源都能定位到具体代码行，也就有对应的手工复核方法。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>机制</th><th>行为</th><th>误报风险与复核方法</th></tr></thead>
+          <tbody>
+            <tr><td><b>presence 默认真</b></td><td>message 检查且站点未配 presence 字符串时，任何返回页面都算命中（checking.py 默认真规则）</td><td>弱标记站点上任何 200 页面都可能报 CLAIMED；点开报告里的 URL 人工确认</td></tr>
+            <tr><td><b>仅凭状态码</b></td><td>status_code 检查：2xx 即 CLAIMED，不看页面内容</td><td>站点把“用户不存在”也返回 200 时误报；占启用站点 51.3%，是最大弱信号面</td></tr>
+            <tr><td><b>非 ASCII 防护</b></td><td>中文等非 ASCII 用户名若未出现在返回正文中，一律改判未检出（issue #2633 防护）</td><td>降低中文用户名的假阳性；但页面若 JS 渲染用户名，仍可能查不到</td></tr>
+            <tr><td><b>反代丢状态码</b></td><td>经 FlareSolverr/Webgate 的检查拿不到上游真实状态码，按 200 处理</td><td>源码自带告警：“弱标记站点可能因此误报 CLAIMED”；配合 --print-errors 观察</td></tr>
+            <tr><td><b>disabled 站点</b></td><td>739 条记录默认跳过；<span class="mono">--use-disabled-sites</span> 才启用</td><td>帮助原文警告 “may cause many false positives” ——这些记录正是因为不可靠才被停用</td></tr>
+            <tr><td><b>库自检回路</b></td><td><span class="mono">--self-check</span> 用库内已注册/未注册用户名回验每条记录，<span class="mono">--auto-disable</span> 自动停用失败站点</td><td>维护数据库时跑；发现 “Unclaimed user detected as claimed” 即该条记录有误报史</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="duo">
+      <div>
+        <div class="section-label">实测演示 · 2026-11-12 · venv 实跑</div>
+        <h2>一条只查合成用户名的复现命令</h2>
+        <p>演示用户名 <span class="mono">noonewouldeverusethis7</span> 来自 Maigret 数据库自带的“未注册用户名”字段——数据库维护者设计它就是为了保证几乎不可能有人注册。整个演示只请求 GitHub 一个站点，不涉及任何真实个人。</p>
+        <pre class="code-block"><span class="c"># 安装（Python 3.10+）</span>
+pip3 install maigret
+
+<span class="c"># 先看库况：规模、弱信号占比、反爬站点数</span>
+maigret --stats
+
+<span class="c"># 合成用户名单站演示（-fo 指定报告目录）</span>
+maigret noonewouldeverusethis7 --site GitHub \
+  --no-autoupdate --no-color --print-not-found
+
+<span class="c"># 控制台关键输出（实测）：</span>
+<span class="g">[-] GitHub: Not found!</span>
+<span class="y">[!] Too many errors of type "Connecting failure" (50.0%).
+    ... try `-n 10` to lower parallelism</span>
+[*] Short text report:
+Search by username noonewouldeverusethis7 returned <span class="b">0 accounts</span>.
+
+<span class="c"># --json simple 报告内容（0 命中时）：{}</span></pre>
+        <p style="margin-top:14px">0 命中时 JSON 报告是空对象——判读报告先看 <span class="mono">returned N accounts</span>，再看 CLAIMED 条目的 URL 是否真的打开。<span class="mono">--print-errors</span> 能展开每个失败站点的具体错误（连接、验证码、地区封锁等）。</p>
+      </div>
+      <div>
+        <div class="section-label">结果四态 · 判读规则</div>
+        <h2>四个状态各代表什么</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>状态</th><th>含义</th><th>判读动作</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono"><b>CLAIMED</b></span></td><td>按站点配置的检查方式检测到账号</td><td>点开 URL 人工确认；弱信号站点必查</td></tr>
+              <tr><td><span class="mono"><b>AVAILABLE</b></span></td><td>未检出（多数站点默认不打印，需 <span class="mono">--print-not-found</span>）</td><td>不代表用户名全局可用，只代表已扫站点</td></tr>
+              <tr><td><span class="mono"><b>UNKNOWN</b></span></td><td>检查出错：连接失败、验证码、地区封锁</td><td>换代理/降并发后重跑，<span class="mono">--print-errors</span> 看明细</td></tr>
+              <tr><td><span class="mono"><b>ILLEGAL</b></span></td><td>用户名不符合该站点的字符规则</td><td>正常现象，不是错误</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout risk" style="margin-top:18px">
+          <strong>连接失败过多怎么办</strong>
+          实跑中出现 “Too many errors of type Connecting failure (50.0%)” 时，官方提示是降低并发：<span class="mono">-n 10</span>（默认并发 100）。对慢站点加大 <span class="mono">--timeout</span>（默认 30 秒）、增加 <span class="mono">--retries</span>（默认 0）。
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-label">并发 · 代理 · 限速</div>
+      <h2>默认参数与流量控制</h2>
+      <p class="sub">默认值来自 0.6.6 的 <span class="mono">resources/settings.json</span>。Maigret 没有按站点限速的配置，流量压力靠并发数、超时和重试三个旋钮控制。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>参数</th><th>默认值</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono">-n / --max-connections</span></td><td class="mono">100</td><td>并发连接数；被目标站限流或大量连接失败时降到 10</td></tr>
+            <tr><td><span class="mono">--timeout</span></td><td class="mono">30 秒</td><td>单请求等待；调大能等来慢站点，也拉长总耗时</td></tr>
+            <tr><td><span class="mono">--retries</span></td><td class="mono">0</td><td>临时失败请求的重试次数</td></tr>
+            <tr><td><span class="mono">--top-sites N</span></td><td class="mono">500</td><td>默认按 Alexa 排名扫前 500 站；<span class="mono">-a</span> 全量</td></tr>
+            <tr><td><span class="mono">--proxy / -p</span></td><td class="mono">无</td><td>http/socks5 代理；socks5:// 与 socks5h:// 等价，均由代理解析 DNS（源码按传输层规范化写法，避免本地 DNS 泄漏，issue #2955）</td></tr>
+            <tr><td><span class="mono">--tor-proxy</span></td><td class="mono">socks5://127.0.0.1:9050</td><td>Tor 网关；另有 <span class="mono">--i2p-proxy</span>（默认 http://127.0.0.1:4444）</td></tr>
+            <tr><td><span class="mono">--dns-resolver</span></td><td class="mono">async</td><td>每个站点都报 DNS 错误时切 <span class="mono">threaded</span>（遵循系统 DNS，issue #2688）</td></tr>
+            <tr><td><span class="mono">--cloudflare-bypass</span></td><td class="mono">关闭</td><td>需本地自行运行 CloudflareBypassForScraping 实例</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pill-row">
+        <span class="pill">-T txt</span><span class="pill">-C csv</span><span class="pill">-H html</span><span class="pill">-X xmind</span><span class="pill">-P pdf*</span><span class="pill">-M md</span><span class="pill">-G graph</span><span class="pill">--neo4j</span><span class="pill">-J json</span><span class="pill">--ai†</span>
+      </div>
+      <p class="sub" style="margin-top:10px;font-size:.85rem">* PDF 需额外安装 <span class="mono">pip install 'maigret[pdf]'</span> 并装系统图形库。† <span class="mono">--ai</span> 调 OpenAI 兼容 API 生成结果分析，需自备 API key，默认模型名 gpt-5.4。</p>
+    </section>
+
+    <section class="notes">
+      <div class="notes-left">
+        <div class="section-label">边界与行动</div>
+        <h2>怎么用才算用对了</h2>
+        <p><b>适用条件：</b>核对自己（或获得授权）的用户名在各站点的暴露面；教学演示；数据库维护。README 原文 “For educational and lawful purposes only”，并提醒使用者自担 GDPR、CCPA 等合规责任。</p>
+        <p><b>假阳性复核三步：</b>① 只认带 URL 的 CLAIMED，逐条打开；② <span class="mono">--stats</span> 先看弱信号占比（本版 58.58%），占比越高越要人工复核；③ 弱信号站点命中后，用 <span class="mono">--enrich</span> 抓取页面资料，比对头像、简介、关联账号是否指向同一个人。</p>
+        <p><b>下一步验证：</b>在自己控制的用户名上复跑本文命令；如输出与本卡不符，先确认数据库版本（<span class="mono">maigret --version</span>）——站点数据库每天都在变。</p>
+        <div class="timeline" style="margin-top:18px">
+          <div class="step"><b>01</b><p><span class="mono">maigret --stats</span>：了解当前库的规模、弱信号占比与保护站点数。</p></div>
+          <div class="step"><b>02</b><p>小范围扫描：<span class="mono">--site</span> 或 <span class="mono">--tags</span> 限定站点，再按需 <span class="mono">-a</span> 全量。</p></div>
+          <div class="step"><b>03</b><p>报告判读：CLAIMED 逐条开 URL；UNKNOWN 用 <span class="mono">--print-errors</span> 定位原因。</p></div>
+        </div>
+      </div>
+      <div class="notes-right">
+        <figure class="evidence" style="margin:0 0 18px">
+          <img src="../assets/img/maigret/maigret-logo.png" alt="Maigret 官方标志：侦探形象 logo" loading="lazy" />
+          <figcaption>官方项目标志（来自仓库 static/maigret.png，随候选一并提升到 assets/img/maigret/）。</figcaption>
+        </figure>
+        <div class="callout">
+          <strong>核验口径</strong>
+          maigret 0.6.6（PyPI 实跑）+ main 分支 commit aeab19b（2026-11-11）。星标 40,455 为 2026-11-12 快照。版本、星标、数据库规模都是时效数据。
+        </div>
+        <div class="callout" style="margin-top:14px">
+          <strong>安装方式</strong>
+          <span class="mono">pip3 install maigret</span> · <span class="mono">snap install maigret</span>（amd64/arm64）· docker 镜像 <span class="mono">soxoj/maigret</span>（CLI）与 <span class="mono">soxoj/maigret:web</span>（Web UI，默认端口 5000）。
+        </div>
+        <div class="callout risk" style="margin-top:14px">
+          <strong>本卡的演示边界</strong>
+          演示只用了数据库自带的合成用户名和单站点请求。任何针对真实个人的搜索都需要合法依据；同名账号绝不能直接断言为同一人。
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>Maigret · MIT License · soxoj/maigret · 数据核验 2026-11-12</div>
+      <div><a href="https://github.com/soxoj/maigret" target="_blank" rel="noreferrer">仓库</a> · <a href="https://maigret.readthedocs.io/" target="_blank" rel="noreferrer">文档</a> · <a href="https://pypi.org/project/maigret/" target="_blank" rel="noreferrer">PyPI</a></div>
+    </footer>
+  </div>
+</body>
+</html>
