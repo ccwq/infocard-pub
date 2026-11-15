@@ -74,7 +74,7 @@ metadata:
 
 ## 边界与验收
 
-本 skill 只选择和验证主题契约，不读取具体 style skill 以外的发布权限，也不直接写 `docs/`、`assets/`、Git state、生成索引或执行 build/commit/push。禁止 worktree、clone、detached HEAD 和 `/tmp/infocard*`。不得维护第二套主题注册表、主题别名表或默认主题。
+本 skill 只选择和验证主题契约，不读取具体 style skill 以外的发布权限，也不直接写 `docs/`、`assets/`、Git state、生成索引或执行 build/commit/push。不自行创建或进入 Git worktree 或 clone；隔离手段与 stash/reset/clean 的边界以 `AGENTS.md` 为权威。禁止 detached HEAD 和 `/tmp/infocard*`。不得维护第二套主题注册表、主题别名表或默认主题。
 
 验收至少确认：决策记录完整且可解析；固定 seed 得到相同选择；不同获批 seed 只在过滤池内变化；用户主题优先但不绕过能力检查；authoring 和 publish 不包含第二套主题选择规则。
 

@@ -35,7 +35,7 @@ version: 2.2.0
 
 ## 硬边界
 
-- 所有工作只在主 checkout 进行；禁止 worktree、clone、detached HEAD 和 force-push。
+- 所有工作默认在主 checkout 进行；临时 clone/worktree 与 stash/reset/clean 按 `AGENTS.md` 的工作区边界执行。禁止 detached HEAD 和 force-push。
 - Author 只能写 `.docs/<run-id>/<slug>/`；不得直接写 `docs/`、`assets/`、生成索引或 Git 状态。
 - Publisher 是唯一的 promotion、build、commit、push 和公网复核角色。
 - 主 checkout 的 ambient dirty/untracked 状态必须保留并排除在 staged allowlist 外。

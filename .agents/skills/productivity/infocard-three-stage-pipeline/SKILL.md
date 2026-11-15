@@ -25,7 +25,7 @@ Author → .docs/<run-id>/<slug>/card.html + sidecar + manifest + visual evidenc
 Publisher → 主 checkout manifest promotion → visual gate → build/verify → commit/push → public recheck
 ```
 
-禁止为任何阶段创建/复用/进入 Git worktree、临时 clone、detached HEAD、发布分支、`/tmp/infocard*` 或 force-push。已有历史 worktree 的清理是独立维护任务，不属于本流程。
+各阶段默认在主 checkout 执行；确需隔离时按 `AGENTS.md` 使用临时 clone 或 worktree（创建、删除、清理前确认影响）。禁止 detached HEAD、发布分支、`/tmp/infocard*` 和 force-push。已有历史 worktree 的清理是独立维护任务，不属于本流程。
 
 ## 职责
 
@@ -87,4 +87,4 @@ Publisher → 主 checkout manifest promotion → visual gate → build/verify �
 - [ ] Publisher manifest promotion 精确且在主 checkout
 - [ ] 每卡 desktop/mobile visual gate 通过或明确 pending
 - [ ] build/static/index/public gates 已核验
-- [ ] 未使用 worktree、clone、temp repo、force push 或自动 cleanup
+- [ ] 未未经授权使用 worktree、clone 或 temp repo（边界见 `AGENTS.md`）；未 force push、未自动 cleanup

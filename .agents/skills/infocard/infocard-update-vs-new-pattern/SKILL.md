@@ -21,9 +21,9 @@ version: 2.0.0
 
 关键词相似不是重复。相同 canonical repository/source URL、项目身份或既有 slug 才是 exact match；相邻概念只可作为上下文。
 
-## 无 Worktree 运行边界
+## 工作区运行边界
 
-只读审计不得 reset、stash、clean、写 `docs/`、commit 或 push。信息卡不创建、不复用、不进入 Git worktree，也不使用 `/tmp/infocard*` 或临时 clone。
+只读审计不得 reset、stash、clean、写 `docs/`、commit 或 push。信息卡流程默认主 checkout；worktree、临时 clone 与 stash/reset/clean 的使用边界以 `AGENTS.md` 为权威，不使用 `/tmp/infocard*`。
 
 新卡和更新卡都遵循：
 

@@ -109,7 +109,7 @@ Use cache-busting and retry Pages propagation at 10s, 30s, and 60s. HTTP 200 alo
 
 ## Failure handling
 
-- Author timeout: inspect that Author's `.docs` directory and retain valid artifacts; do not search for or create a worktree.
+- Author timeout: inspect that Author's `.docs` directory and retain valid artifacts; do not search for or create a worktree on your own initiative (isolation follows `AGENTS.md`).
 - Missing/invalid theme decision: `THEME_BLOCKED`; stop that card before authoring.
 - Manifest or theme-contract failure: repair the candidate, regenerate hashes, and rerun promotion validation.
 - Visual failure: follow `visual-verification-gate`; any critical/major defect blocks release.
@@ -134,7 +134,7 @@ Use cache-busting and retry Pages propagation at 10s, 30s, and 60s. HTTP 200 alo
 - [ ] Build, verify, taxonomy, and leak gates passed.
 - [ ] Staged diff contains only the batch release scope and generated indexes.
 - [ ] Public detail/index/home fingerprints and visual evidence passed.
-- [ ] No worktree, clone, detached HEAD, force-push, cleanup, or automatic Wiki sync occurred.
+- [ ] No unauthorized worktree/clone (per `AGENTS.md`), no detached HEAD, force-push, cleanup, or automatic Wiki sync occurred.
 
 ## Ownership rule
 

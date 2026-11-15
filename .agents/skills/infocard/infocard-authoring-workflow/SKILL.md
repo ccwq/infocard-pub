@@ -164,7 +164,7 @@ grep -o 'table-wrap\|code-block\|analysis-block\|grid-template-columns:1fr' card
 
 At desktop and 390px mobile, inspect `scrollWidth`, `clientWidth`, body geometry, number/card center alignment, computed display, and relevant `grid-column`/flex values. Then capture fresh visual evidence. A structural or CSS change invalidates every prior screenshot and manifest.
 
-Never use a worktree, branch, clone, force-push, or `/tmp/infocard*` for a poster-shell rebuild.
+Poster-shell rebuilds stay in the primary checkout by default. Never force-push or use `/tmp/infocard*`; isolation (temp clone / worktree) and stash/reset/clean follow the workspace boundary in `AGENTS.md`.
 
 ## Repo-local skill placement
 
@@ -190,7 +190,7 @@ This keeps project-specific workflows separate from the global skill library and
 
 **Preflight:** record `git status --short` in the primary checkout before writing. Ambient changes are preserved and excluded from this run; a dirty checkout is not permission to create a worktree, reset, stash, clean, or stage unrelated files.
 
-**No worktree for authoring.** Use `write_file` only under `.docs/<run-id>/<slug>/`. The Publisher later verifies the manifest and promotes the declared public files. Authors never stage.
+**Authoring stays in the primary checkout by default.** Use `write_file` only under `.docs/<run-id>/<slug>/`. The Publisher later verifies the manifest and promotes the declared public files. Authors never stage. Isolation (temp clone / worktree) and stash/reset/clean follow `AGENTS.md`.
 
 ## Core workflow (6 steps)
 

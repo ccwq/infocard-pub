@@ -2,24 +2,27 @@
 
 ## 信息卡工作区硬边界（最高优先级）
 
-信息卡的创作、修复、主题迁移、视觉审查、构建与发布只使用这个主仓库 checkout；**禁止**为信息卡创建、复用、进入、合并、删除或清理 Git worktree，也禁止用临时 clone 作为信息卡仓库。
+信息卡工作默认使用主仓库 checkout。需要隔离任务或保护现有工作时，可以使用临时 clone；临时 clone 可以承担经用户授权的构建、提交和发布。worktree 不作为首选，确有需要时可以使用；创建、删除或清理已有 worktree 前须确认影响范围。
 
-唯一允许的生命周期：
+信息卡及其指定功能的创建、修改，以完成发布和公网验收为事务终点。仅调查、报告、本地预览，或用户明确禁止发布时，不进入发布流程。出现重大缺陷、门禁失败或其他真实阻塞时，停止受影响步骤并报告。具体发布操作仍须符合当前会话的授权边界。
+
+默认生命周期（经授权的隔离 checkout 同样遵循候选、提升、验收和发布顺序）：
 
 ```text
 .docs/<run-id>/<slug>/ 生成候选稿、事实、证据、截图与 promotion-manifest.json
 → Publisher 按 manifest 精确提升声明的 HTML / sidecar / assets 到 docs/ 与 assets/
-→ 主 checkout 本地视觉门禁、build、verify、commit、push
+→ Publisher 在当前授权 checkout 本地视觉门禁、build、verify、commit、push
 → 公网复核
 ```
 
 硬规则：
 
 - Author 只能写 `.docs/<run-id>/<slug>/`，不得直接写 `docs/`、`assets/`、`_index.yaml`、`index.html` 或 Git 状态。
-- Publisher 是唯一能 promotion、build、commit、push 的角色，且只在当前主 checkout 执行。
-- 禁止使用 `git worktree add/remove/prune`、`git clone`、detached HEAD、`git push --force`、`/tmp/infocard*`、`/tmp/infocard-worktree` 作为新信息卡流程的一部分。
+- Publisher 是唯一能 promotion、build、commit、push 的角色；默认使用主 checkout，也可使用用户授权的隔离 checkout。
+- 不得使用 `git push --force`、detached HEAD 或 `/tmp/infocard*` 作为信息卡发布流程的一部分。
 - 现有 `/tmp` worktree 的盘点、备份或清理是独立的破坏性任务，需要单独、目录级授权；普通信息卡发布不得触发这些操作。
-- 当前 checkout 的 ambient dirty/untracked 文件必须记录并排除在 staged allowlist 外；不得 reset、stash、clean、顺带提交或以 worktree 规避它们。
+- 当前 checkout 的 ambient dirty/untracked 文件必须记录；不得顺带提交其他任务改动。执行 `stash`、`reset`、`clean` 前，须核对作用范围、未提交与未跟踪文件、恢复方式和潜在数据丢失；涉及覆盖或丢弃现有工作时，须取得明确授权。
+- 发布前必须核对暂存文件清单，发布后验证目标页面和索引。
 
 该边界覆盖项目内、全局和历史 reference 中的任何冲突发布建议。
 

@@ -16,7 +16,7 @@ metadata:
 
 Use this skill **before any Research A subagent dispatch or `publish-bundle.json` write**, whenever the user provides a source URL that is NOT `https://x.com/i/status/...`.
 
-All infocard work stays in the current main checkout. This routing skill performs source classification only; it never creates, enters, removes, or recommends a Git worktree or clone. Authoring remains under `.docs/<run-id>/<slug>/`, and any promotion or publication is owned by `infocard-publish-sop` and its Publisher flow.
+Infocard work defaults to the current main checkout. This routing skill performs source classification only; it does not itself create, enter, remove, or recommend a Git worktree or clone — isolation decisions follow `AGENTS.md`. Authoring remains under `.docs/<run-id>/<slug>/`, and any promotion or publication is owned by `infocard-publish-sop` and its Publisher flow.
 
 The protocol's default entry path assumes an X post: status URL → author + timestamp + body extractable in one fetch. Non-X sources break that assumption in three places:
 

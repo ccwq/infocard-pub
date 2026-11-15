@@ -16,7 +16,7 @@ metadata:
 
 This skill closes the Protocol v3 business lifecycle after promotion, build, public verification, and audit. It keeps the authoring record at .docs/<card>/, separates deliverables from residue, and reports cleanup candidates as a dry-run. It does not delete authoring material or operate alternate checkouts.
 
-**No worktree is used.** All operations run directly in the primary repository checkout.
+**Operations run in the primary repository checkout by default.** Any isolation (temp clone / worktree) and stash/reset/clean follow `AGENTS.md`.
 
 Use this after an infocard has been built, verified, pushed, and checked on Pages. The Publisher handles promotion, build, push, and public verification; this skill handles evidence, retained authoring material, and the final report.
 
