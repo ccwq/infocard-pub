@@ -71,6 +71,32 @@ test('my-prompts card install entry handles prompt, iOS and standalone states', 
   assert.match(card, /display-mode: standalone/);
 });
 
+test('my-prompts install entries sit in first-screen hero and last-line footer', () => {
+  // 三个入口按钮：首屏 hero、中部 toolbar（原有）、最后一行 footer（不含 JS 选择器引用）
+  const triggers = card.match(/<button[^>]*data-install-trigger/g) || [];
+  assert.equal(triggers.length, 3, 'install trigger button count must be exactly 3');
+  const heroStart = card.indexOf('<section class="hero"');
+  const heroEnd = card.indexOf('</section>', heroStart);
+  const footStart = card.indexOf('<footer class="foot">');
+  const footEnd = card.indexOf('</footer>', footStart);
+  assert.ok(heroStart > -1 && footStart > -1);
+  assert.ok(card.slice(heroStart, heroEnd).includes('data-install-trigger'), 'hero must carry an install trigger');
+  assert.ok(card.slice(heroStart, heroEnd).includes('添加到主屏幕'), 'hero must carry the iOS manual hint');
+  assert.ok(card.slice(footStart, footEnd).includes('data-install-trigger'), 'footer must carry an install trigger');
+  assert.ok(card.slice(footStart, footEnd).includes('添加到主屏幕'), 'footer must carry the iOS manual hint');
+  // footer 是页面最后一个内容区块
+  const lastBlock = card.lastIndexOf('</footer>');
+  assert.ok(card.slice(lastBlock).indexOf('<footer') === -1);
+});
+
+test('my-prompts install buttons are hidden by default (no inert default button)', () => {
+  // 首屏与页尾按钮必须带 hidden 初始属性，仅在 beforeinstallprompt / iOS 说明时出现
+  assert.match(card, /<button[^>]*data-install-trigger hidden>/);
+  // JS 初始化即隐藏全部触发按钮，事件驱动显示
+  assert.match(card, /setInstallVisible\(false\)/);
+  assert.match(card, /function setInstallVisible/);
+});
+
 test('my-prompts card keeps existing localStorage copy-count import/export intact', () => {
   assert.match(card, /id="export-btn"/);
   assert.match(card, /id="import-btn"/);
