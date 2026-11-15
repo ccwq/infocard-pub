@@ -5,6 +5,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="slug" content="herdr-cookbook">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Herdr Cookbook">
+<link rel="manifest" href="herdr-cookbook.webmanifest">
+<link rel="icon" type="image/svg+xml" href="herdr-cookbook-icon.svg">
+<link rel="apple-touch-icon" href="herdr-cookbook-icon-512.png">
 <title>Herdr Cookbook：从入门到 Agent 协作</title>
 <style>
   :root{
@@ -135,6 +143,15 @@
   footer b{color:#e9e9e3;}
   footer a{color:#ff7a82;border-bottom-color:#5a2b2f;}
 
+  /* ---------- PWA install entry (shared state across hero + footer) ---------- */
+  .pwa-entry{margin-top:14px;}
+  .install-btn{font:inherit;font-size:13.5px;font-weight:700;color:#fff;background:var(--red);border:1px solid var(--red);border-radius:6px;padding:8px 16px;cursor:pointer;}
+  .install-btn:hover{background:#b81b24;border-color:#b81b24;}
+  .pwa-ios,.pwa-menuhint,.pwa-note{margin:10px 0 0;font-size:12.5px;line-height:1.6;color:var(--muted);max-width:62ch;}
+  footer .pwa-entry{margin-top:10px;}
+  footer .pwa-ios,footer .pwa-menuhint,footer .pwa-note{color:#9a9a94;}
+  footer .install-btn{font-size:12.5px;padding:7px 14px;}
+
   /* ---------- mobile ---------- */
   @media (max-width:720px){
     body{font-size:15px;}
@@ -166,6 +183,12 @@
     <span class="pill">herdr-core / hc</span>
     <span class="pill">Herdr TUI</span>
     <span class="pill teal">命令可复制 · 先验证再自动化</span>
+  </div>
+  <div class="pwa-entry">
+    <button type="button" class="install-btn" data-install-trigger hidden>安装本卡到桌面 / 主屏幕</button>
+    <p class="pwa-note" role="note" hidden>已以独立应用「Herdr Cookbook」运行，无需再次安装。</p>
+    <p class="pwa-ios" role="note" hidden>iOS / iPadOS 手动安装：在 Safari 打开本页，点底部「分享」图标，选择「添加到主屏幕」，即可名称「Herdr Cookbook」独立窗口打开。</p>
+    <p class="pwa-menuhint" role="note" hidden>当前浏览器不支持一键安装：请用浏览器菜单中的「安装应用 / 添加到主屏幕」手动添加。</p>
   </div>
 </header>
 <div class="prov">
@@ -344,6 +367,75 @@ herdr agent wait w1:p2</pre></div>
   </div>
 </section>
 
+<footer>
+  <b>Herdr Cookbook</b> · Herdr App / herdr-core / Herdr TUI 终端工作台手册 · 2026-11-09
+  <div class="pwa-entry">
+    <button type="button" class="install-btn" data-install-trigger hidden>安装本卡到桌面 / 主屏幕</button>
+    <p class="pwa-note" role="note" hidden>已以独立应用「Herdr Cookbook」运行，无需再次安装。</p>
+    <p class="pwa-ios" role="note" hidden>iOS 手动安装：在 Safari 点底部「分享」，选「添加到主屏幕」。</p>
+    <p class="pwa-menuhint" role="note" hidden>当前浏览器不支持一键安装：请用浏览器菜单中的「安装应用 / 添加到主屏幕」手动添加。</p>
+  </div>
+</footer>
+
 </div>
+<script>
+(function () {
+  'use strict';
+  /* ---- PWA install entry (hero + footer, shared state; independent manifest id, reuses site service worker) ---- */
+  var installTriggers = Array.prototype.slice.call(document.querySelectorAll('[data-install-trigger]'));
+  var pwaIosHints = Array.prototype.slice.call(document.querySelectorAll('.pwa-ios'));
+  var pwaMenuHints = Array.prototype.slice.call(document.querySelectorAll('.pwa-menuhint'));
+  var standaloneNotes = Array.prototype.slice.call(document.querySelectorAll('.pwa-note'));
+  var deferredInstallPrompt = null;
+  var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  function isIOS() {
+    return /iphone|ipad|ipod/i.test(window.navigator.userAgent) ||
+      (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+  }
+  function setInstallVisible(visible) {
+    installTriggers.forEach(function (btn) { btn.hidden = !visible; });
+  }
+  function showIosHints() {
+    pwaIosHints.forEach(function (hint) { hint.hidden = false; });
+  }
+  /* 默认不展示安装按钮：仅在支持一键安装（beforeinstallprompt）或 iOS 手动说明场景出现 */
+  setInstallVisible(false);
+  if (isStandalone) {
+    standaloneNotes.forEach(function (note) { note.hidden = false; });
+  } else if (isIOS()) {
+    showIosHints();
+  }
+  window.addEventListener('beforeinstallprompt', function (ev) {
+    ev.preventDefault();
+    deferredInstallPrompt = ev;
+    setInstallVisible(true);
+  });
+  installTriggers.forEach(function (trigger) {
+    trigger.addEventListener('click', function () {
+      if (isStandalone) { return; }
+      if (isIOS()) { showIosHints(); return; }
+      if (!deferredInstallPrompt) {
+        /* 不支持一键安装的非 iOS 浏览器：提示走浏览器菜单手动添加 */
+        pwaMenuHints.forEach(function (hint) { hint.hidden = false; });
+        return;
+      }
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(function (choice) {
+        deferredInstallPrompt = null;
+        setInstallVisible(false);
+      });
+    });
+  });
+  window.addEventListener('appinstalled', function () {
+    setInstallVisible(false);
+    standaloneNotes.forEach(function (note) { note.hidden = false; });
+  });
+
+  /* Reuse the site-wide service worker (no per-card worker, no extra offline logic). */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/infocard-pub/sw.js', { scope: '/infocard-pub/' }).catch(function () {});
+  }
+})();
+</script>
 </body>
 </html>
