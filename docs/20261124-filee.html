@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sage-swiss">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="slug" content="filee">
+<title>Filee：按住 Ctrl 拖到格式上，263 种格式离线互转</title>
+<style>
+/* ============================================================
+   SAGE SWISS — 骨白纸底 + 鼠尾草绿 + 深炭绿 + 无圆角 + 1px细线
+   ============================================================ */
+:root{
+  --bg:#F5F4EF;
+  --paper:#FAFAF7;
+  --ink:#1C1C1A;
+  --green:#5F7E62;
+  --green-deep:#3D5A42;
+  --green-soft:#E9EDE7;
+  --muted:#6B6B63;
+  --muted-2:#9E9E94;
+  --line:#D4D2C9;
+  --line-strong:#B8B6AB;
+  --fill:#ECEAE1;
+  --dark:#1E2620;
+  --warn:#8A5A2B;
+  --warn-soft:#F2EAD9;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{
+  font-family:Inter,"Helvetica Neue",Helvetica,system-ui,-apple-system,
+    "PingFang SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);
+  font-size:12.5px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+code,pre,.mono{
+  font-family:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+.page{width:min(1040px,calc(100% - 20px));margin:0 auto;padding:20px 0 0}
+
+/* 1. HEADER */
+.header{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:16px;
+  padding-bottom:11px;
+  border-bottom:1px solid var(--line);
+}
+.header-brand{
+  font:700 10.5px/1.3 "JetBrains Mono",monospace;
+  letter-spacing:.05em;color:var(--ink);
+  white-space:nowrap;
+}
+.header-center{
+  text-align:center;
+  font:600 10.5px/1.3 "JetBrains Mono",monospace;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+}
+.header-center .ref-id{
+  display:block;font-weight:400;color:var(--muted-2);margin-top:2px;letter-spacing:.04em;
+}
+.header-center .src-count{color:var(--ink);font-weight:700}
+.watch-badge{
+  display:flex;align-items:center;gap:5px;
+  font:700 11px/1 "JetBrains Mono",monospace;
+  letter-spacing:.08em;color:var(--green-deep);text-transform:uppercase;
+  border:1px solid var(--green-deep);padding:5px 12px;
+  cursor:default;white-space:nowrap;
+}
+.watch-badge svg{width:10px;height:10px}
+
+/* 2. HERO */
+.hero{
+  margin-top:18px;
+  border:1px solid var(--line);
+  background:var(--paper);
+}
+.hero-ref{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  border-bottom:1px solid var(--line-strong);
+}
+.hero-ref-cell{
+  padding:10px 14px;
+  font:500 10px/1.4 "JetBrains Mono",monospace;
+  color:var(--muted);
+}
+.hero-ref-cell:not(:last-child){border-right:1px solid var(--line)}
+.hero-ref-cell .lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);display:block}
+.hero-ref-cell .val{color:var(--ink);font-weight:600;margin-top:1px}
+
+.hero-body{
+  padding:14px 16px;
+  border-bottom:1px solid var(--line);
+}
+.hero-title{
+  font:800 20px/1.15 Inter,sans-serif;
+  letter-spacing:-.02em;color:var(--ink);margin-bottom:6px;
+}
+.hero-title em{font-style:normal;color:var(--green)}
+.hero-meta{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  font:500 10.5px/1 "JetBrains Mono",monospace;color:var(--muted);margin-bottom:10px;
+}
+.hero-meta .tag{
+  background:var(--green-soft);color:var(--green-deep);
+  padding:2px 7px;font-weight:600;letter-spacing:.04em;
+}
+.hero-summary{
+  font-size:12.5px;line-height:1.65;color:#333;
+  max-width:680px;
+}
+
+/* 3. STATS ROW */
+.stats-row{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--paper);
+}
+.stat-cell{
+  padding:11px 14px;
+  border-right:1px solid var(--line);
+  text-align:center;
+}
+.stat-cell:last-child{border-right:none}
+.stat-num{
+  display:block;
+  font:800 22px/.9 "JetBrains Mono",monospace;
+  color:var(--green-deep);
+}
+.stat-lbl{
+  display:block;
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted-2);margin-top:3px;
+  font-family:"JetBrains Mono",monospace;
+}
+
+/* 4. 速览层 */
+.speedread{
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--paper);
+  padding:13px 16px;
+}
+.layer-tag{
+  display:inline-block;
+  font:700 9px/1 "JetBrains Mono",monospace;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--green-deep);
+  border:1px solid var(--green-deep);
+  padding:3px 8px;margin-bottom:9px;
+}
+.layer-tag.deep{color:var(--muted);border-color:var(--line-strong)}
+.key-points{list-style:none;margin:0}
+.key-points li{
+  position:relative;
+  padding:5px 0 5px 16px;
+  font-size:11.5px;line-height:1.6;color:#2a2a28;
+  border-bottom:1px solid var(--line);
+}
+.key-points li:last-child{border-bottom:none}
+.key-points li::before{
+  content:'';position:absolute;left:2px;top:12px;
+  width:6px;height:6px;background:var(--green);
+}
+.key-points strong{color:var(--ink)}
+.verdict{
+  margin-top:10px;
+  border:1px solid var(--green);
+  background:var(--green-soft);
+  padding:9px 12px;
+  font-size:11.5px;line-height:1.6;color:#2a3a2e;
+}
+.verdict .v-lbl{font:700 9.5px "JetBrains Mono",monospace;color:var(--green-deep);letter-spacing:.06em;display:block;margin-bottom:3px}
+.read-split{
+  margin-top:10px;
+  border-top:1px dashed var(--line-strong);
+  padding-top:8px;
+  font-size:10.5px;line-height:1.6;color:var(--muted);
+}
+.read-split strong{color:var(--ink)}
+
+/* 5. 深度层骨架：main-grid 双栏（左：格式矩阵/用法主内容；右：分析与适用判断） */
+.main-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);
+  gap:0;
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--bg);
+}
+.main-left,.main-right{
+  border-right:1px solid var(--line);
+  min-width:0;
+}
+.main-right{border-right:none}
+.analysis-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+.analysis-item{
+  background:var(--green-soft);
+  padding:11px 13px;
+  min-width:0;
+}
+.analysis-item .ai-head{
+  font:700 9.5px "JetBrains Mono",monospace;
+  color:var(--green-deep);margin-bottom:5px;letter-spacing:.05em;
+}
+.analysis-item .ai-body{
+  font-size:11px;line-height:1.5;color:#2a3a2e;
+}
+.analysis-item .ai-body strong{color:var(--ink)}
+.analysis-item .ai-body code{font-size:10px;background:rgba(0,0,0,.05);padding:1px 4px}
+.sec{
+  border-bottom:1px solid var(--line);
+  background:var(--paper);
+  padding:14px 16px;
+}
+.sec:last-child{border-bottom:none}
+.sec-head{
+  display:flex;align-items:center;gap:10px;
+  padding-left:0;
+  margin-bottom:10px;
+}
+.sec-no{
+  width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--green-deep);color:#fff;
+  font:900 13px "JetBrains Mono",monospace;
+  border:1.5px solid var(--green-deep);
+  flex-shrink:0;
+}
+.sec-title{
+  font:800 14.5px/1.3 Inter,sans-serif;color:var(--ink);letter-spacing:-.01em;
+}
+.sec-title small{display:block;font:500 10px/1.4 "JetBrains Mono",monospace;color:var(--muted-2);letter-spacing:.04em;margin-top:2px}
+.sec p{font-size:11.5px;line-height:1.7;color:#333;margin-bottom:8px}
+.sec p:last-child{margin-bottom:0}
+.sec strong{color:var(--ink)}
+
+/* 步骤块 */
+.steps{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin:4px 0 10px}
+.step{
+  display:flex;gap:8px;align-items:flex-start;
+  background:var(--green-soft);
+  padding:9px 11px;
+}
+.step-n{
+  font:700 9.5px "JetBrains Mono",monospace;
+  color:#fff;background:var(--green-deep);
+  width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+}
+.step .st-body{font-size:11px;line-height:1.55;color:#2a3a2e}
+.step .st-body strong{color:var(--ink)}
+
+/* 格式矩阵表 */
+.scroll-cue{
+  font:600 10px "JetBrains Mono",monospace;color:var(--warn);
+  letter-spacing:.04em;margin-bottom:6px;display:none;
+}
+.table-wrap{
+  border:1px solid var(--line-strong);
+  overflow-x:auto;
+  background:var(--paper);
+}
+.fmt-table{border-collapse:collapse;width:100%}
+.fmt-table td{overflow-wrap:anywhere}
+.fmt-table th{
+  background:var(--fill);
+  font:700 9.5px/1.3 "JetBrains Mono",monospace;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  text-align:left;
+  padding:7px 10px;
+  border-bottom:1px solid var(--line-strong);
+  border-right:1px solid var(--line);
+  white-space:nowrap;
+}
+.fmt-table td{
+  font-size:11px;line-height:1.55;color:#222;
+  padding:8px 10px;
+  border-bottom:1px solid var(--line);
+  border-right:1px solid var(--line);
+  vertical-align:top;
+}
+.fmt-table tr:last-child td{border-bottom:none}
+.fmt-table td:last-child, .fmt-table th:last-child{border-right:none}
+.fmt-table .cat{font-weight:700;color:var(--ink);white-space:nowrap}
+.fmt-table .fn{
+  font:700 9px "JetBrains Mono",monospace;color:var(--warn);
+  white-space:nowrap;
+}
+.fmt-table .no-engine{color:var(--muted-2);font-weight:600}
+.fnote-list{
+  margin-top:8px;
+  font-size:10.5px;line-height:1.7;color:var(--muted);
+}
+.fnote-list .fn{color:var(--warn)}
+.fnote-list strong{color:var(--ink)}
+
+/* 代码块 */
+.code-block{
+  background:var(--dark);
+  color:#D8E4D8;
+  padding:11px 13px;
+  overflow-x:auto;
+  font-size:.85rem;
+  line-height:1.6;
+  white-space:pre;
+  margin:6px 0 10px;
+}
+.code-block .cm{color:#7d9180}
+.code-block .kw{color:#9CCFA9}
+.code-block .ar{color:#E4C87F}
+.code-block .st{color:#C9D8AC}
+.platform-tabs{
+  display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;
+}
+.plat{
+  font:700 9.5px/1 "JetBrains Mono",monospace;
+  letter-spacing:.05em;
+  color:var(--green-deep);
+  background:var(--green-soft);
+  padding:4px 9px;
+}
+
+/* 风险面板 */
+.risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.risk{
+  border-top:3px solid var(--green-deep);
+  background:var(--green-soft);
+  padding:10px 12px;
+}
+.risk.warn{border-top-color:var(--warn);background:var(--warn-soft)}
+.risk .r-head{
+  font:700 9.5px "JetBrains Mono",monospace;color:var(--green-deep);
+  letter-spacing:.05em;margin-bottom:5px;text-transform:uppercase;
+}
+.risk.warn .r-head{color:var(--warn)}
+.risk .r-body{font-size:11px;line-height:1.6;color:#3a3a34}
+.risk .r-body code{font-size:10px;background:rgba(0,0,0,.05);padding:1px 4px}
+
+/* 判定框 + 下一步 */
+.judgment-box{
+  border:1px solid var(--green);
+  background:var(--green-soft);
+  padding:10px 13px;
+}
+.judgment-box .jb-row{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  font-size:11px;padding:6px 0;border-bottom:1px solid var(--green-soft);
+}
+.judgment-box .jb-row:last-child{border-bottom:none;padding-bottom:0}
+.judgment-box .jb-lbl{font:600 9.5px "JetBrains Mono",monospace;color:var(--green-deep);letter-spacing:.05em;white-space:nowrap}
+.judgment-box .jb-val{font-weight:700;color:var(--dark);text-align:right}
+.judgment-box .jb-val.neg{color:var(--muted)}
+.next-steps{}
+.next-item{
+  display:flex;align-items:flex-start;gap:6px;
+  font-size:11.5px;line-height:1.5;color:#222;
+  margin-bottom:8px;
+}
+.next-item:last-child{margin-bottom:0}
+.next-num{
+  font:700 9.5px "JetBrains Mono",monospace;
+  color:#fff;background:var(--green-deep);
+  width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+}
+.next-text strong{color:var(--ink)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.two-col h4{font:700 9.5px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+
+/* SOURCE BAR + FOOTER */
+.source-bar{
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--fill);
+  padding:8px 14px;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  font:500 9.5px "JetBrains Mono",monospace;color:var(--muted);
+}
+.source-bar .sb-item{display:flex;align-items:center;gap:4px}
+.source-bar .sb-lbl{color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase}
+.source-bar .sb-val{color:var(--ink);font-weight:600}
+.source-bar .sb-link{color:var(--green-deep);font-weight:600}
+.source-bar .sb-link:hover{text-decoration:underline}
+.source-bar .sb-sep{flex:1}
+
+.footer{
+  margin-top:10px;
+  padding:8px 0;
+  border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+  font:500 9.5px "JetBrains Mono",monospace;color:var(--muted-2);
+}
+.footer-l{letter-spacing:.04em}
+.footer-r a{color:var(--green-deep);font-weight:600}
+.footer-r a:hover{text-decoration:underline}
+
+/* RESPONSIVE */
+@media(max-width:720px){
+  .hero-ref{grid-template-columns:1fr 1fr}
+  .hero-ref-cell:nth-child(2){display:none}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .stat-cell:nth-child(2n){border-right:none}
+  .stat-cell:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .main-grid{grid-template-columns:minmax(0,1fr)}
+  .main-right{border-right:none;border-top:1px solid var(--line)}
+  .analysis-grid{grid-template-columns:1fr}
+  .header{grid-template-columns:auto 1fr}
+  .header-center{display:none}
+  .steps{grid-template-columns:1fr}
+  .risk-grid{grid-template-columns:1fr}
+  .two-col{grid-template-columns:1fr}
+  .sec{padding:12px 10px}
+  .sec-head{padding-left:0}
+  .scroll-cue{display:block}
+  .table-wrap{border-left:none;border-right:none}
+  .fmt-table{min-width:600px}
+  .code-block{font-size:.76rem;padding:9px 10px}
+  .hero-title{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-brand">infocard-pub</div>
+  <div class="header-center">
+    FILEE · OFFLINE FILE CONVERTER
+    <span class="ref-id">REF <span class="src-count">FILEE-20261124</span></span>
+  </div>
+  <div class="watch-badge">
+    <svg viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/>
+      <path d="M5 2.5V5L6.5 6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>
+    OPEN SOURCE
+  </div>
+</div>
+
+<!-- HERO：一句话结论 -->
+<div class="hero">
+  <div class="hero-ref">
+    <div class="hero-ref-cell">
+      <span class="lbl">Source</span>
+      <span class="val">github.com/KnifeLemon/Filee</span>
+    </div>
+    <div class="hero-ref-cell">
+      <span class="lbl">Platform</span>
+      <span class="val">Windows / macOS 13+ / Linux</span>
+    </div>
+    <div class="hero-ref-cell">
+      <span class="lbl">Snapshot</span>
+      <span class="val">2026-11-24</span>
+    </div>
+  </div>
+  <div class="hero-body">
+    <div class="hero-title">Filee：按住 Ctrl 拖到格式上，<em>263 种格式</em>离线互转</div>
+    <div class="hero-meta">
+      <span class="tag">桌面工具</span>
+      <span class="tag">离线</span>
+      <span class="tag">MIT</span>
+      <span>@KnifeLemon</span>
+    </div>
+    <p class="hero-summary">
+      开源桌面文件转换器：按住 Ctrl（macOS 为 Option）拖文件，光标处弹出格式环，只列出对当前文件有意义的格式，松手即转，全程本机完成不上传。文档、表格、图片、HEIC、相机 RAW、HWP、电子书、音视频、字幕、压缩包、CAD、字体、3D、地理数据都在范围内；PDF→DOCX、HWP→DOCX 这类转换不要求预装 Office、Hancom 或 LibreOffice。数字口径：仓库自述 263 种格式（README 内文另有一处写 270，两处不一致，本卡取 description 口径的 263）。
+    </p>
+  </div>
+</div>
+
+<!-- STATS ROW -->
+<div class="stats-row">
+  <div class="stat-cell">
+    <span class="stat-num">30.5k</span>
+    <span class="stat-lbl">Stars · 11-24 快照</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">263</span>
+    <span class="stat-lbl">Formats · 仓库自述</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">5</span>
+    <span class="stat-lbl">可选引擎 · 按需下载</span>
+  </div>
+  <div class="stat-cell">
+    <span class="stat-num">MIT</span>
+    <span class="stat-lbl">License</span>
+  </div>
+</div>
+
+<!-- 速览层 -->
+<div class="speedread">
+  <span class="layer-tag">速览 · 到此可停</span>
+  <ul class="key-points">
+    <li><strong>格式环只给能用的选项。</strong>拖的是什么文件，环上就只出现对它有意义的格式；Tab 或滚轮翻到背面，才是小众格式和工具（裁剪、拆分、合并）。</li>
+    <li><strong>复杂转换不依赖 Office。</strong>PDF→DOCX/XLSX（表格）、HWP→PDF/DOCX/Markdown、Keynote/Numbers/Pages 读入，全都不需要 Office、Hancom 或 LibreOffice 预装；只有带脚注标记的 5 类格式按需下载 Ghostscript、LibreOffice、Pandoc、calibre 或 FFmpeg 之一。</li>
+    <li><strong>入口不止一个。</strong>除拖拽外还有右键菜单、快捷键、拖放区、filee 命令行和 watch 文件夹；也能直接从 Chrome/Edge/Firefox/Safari 把图片或文件链接拖出来转，链接下载不借用浏览器登录态。</li>
+    <li><strong>联网范围写得很窄。</strong>转换离线、无遥测；联网只发生在查新（api.github.com，设置里可关）、下载更新、下载你点名的引擎和 OCR 语言包这几件事上，且下载源固定在 engines.json / ocr-languages.json。</li>
+  </ul>
+  <div class="verdict">
+    <span class="v-lbl">速览结论</span>
+    常年在多格式文件间来回转、又不想把文件传给在线服务的人值得装：三端都有安装包，Windows 有 winget 一行命令，HWP 与 HEIC 这两个冷门刚需覆盖到位。要留意三个前提：macOS 版还是 preview 且未公证；Linux 拖拽手势只在 X11 可用（Wayland 走拖放区）；老款 Windows 10 加 CET 处理器有启动无窗口的已知问题，解法见下方风险节。
+  </div>
+  <div class="read-split">
+    <strong>快速阅读到此为止</strong>，上面四条加上速览结论已够做装不装的判断。往下是深度层，每节补充速览没有的内容：格式环的完整触发与翻面机制、18 类格式矩阵逐类明细、三端安装与命令行逐条命令、联网边界逐项、已知问题与修复命令、以及本卡证据分层。
+  </div>
+</div>
+
+<!-- 深度层：main-grid 双栏（左：格式矩阵/用法主内容；右：分析与适用判断） -->
+<div class="main-grid">
+
+  <div class="main-left">
+
+  <!-- 01 交互机制 -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">01</div>
+      <div class="sec-title">格式环怎么工作：触发、过滤、翻面<small>README「A donut at the cursor」一节与 Features 清单</small></div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="st-body"><strong>按住 Ctrl 拖文件</strong>（macOS 是 Option）。不需要先打开 Filee 窗口，操作发生在你原本的文件管理器或桌面里。</div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="st-body"><strong>光标处弹出格式环</strong>，环上只出现适用于所拖文件的格式；拖三张 PNG 和拖一个 DOCX，看到的选项不同。</div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="st-body"><strong>Tab 键或滚轮翻面</strong>。环有正反两面，背面放小众格式和工具（如 Crop 裁剪切片），常用的留在正面。</div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="st-body"><strong>松手落在目标格式上即转换</strong>，结果默认存原文件旁边。多文件并行处理；HWP→HWPX→DOCX 这类需要中转的路由由 Filee 自动补链。</div>
+      </div>
+    </div>
+    <p>
+      <strong>浏览器直拖</strong>：从 Chrome、Edge、Firefox 或 Safari 里把一张图片或一个文件链接拖出来放进环，Filee 先把它存进 Downloads（可设置为只保留转换结果）再转；下载链接不经过浏览器的登录态，所以需要登录才能拿的文件不适用这条路径。
+    </p>
+    <p>
+      <strong>批量排队模式</strong>：General 设置里打开「Collect dropped files in a list」后，拖到 Home 的文件不再弹环，而是先进清单；用 Alt+↑/Alt+↓ 调顺序、Delete 移除，再按「Choose action」按这个顺序一次性转完，清单随之清空。watch 文件夹则是反向：凡是落进该文件夹的文件自动按预设转换，命令行版对应 <span class="mono">filee watch</span>。
+    </p>
+  </div>
+
+  <!-- 02 格式矩阵 -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">02</div>
+      <div class="sec-title">18 类格式矩阵：谁免装引擎，谁要脚注<small>README「Formats」表格逐类摘录；ⁿ = 需按需下载可选引擎</small></div>
+    </div>
+    <div class="scroll-cue">← 横向滑动查看完整矩阵 →</div>
+    <div class="table-wrap">
+      <table class="fmt-table">
+        <thead>
+          <tr><th>类别</th><th>输入（代表）</th><th>输出（代表）</th><th>引擎</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="cat">图片</td><td>JPG/PNG/WEBP/AVIF/TIFF/HEIC/JPEG XL/PSD·PSB；相机 RAW（CR2/CR3/NEF/ARW/DNG）、DICOM、OpenEXR、iPhone Live Photo(LIVP)、EXE/DLL 图标、Valve VTF；XCF/PDN/PSD 互转保留图层</td><td>上述各格式、HEIC⁵、XCF、PDN、PDF、SVG(描摹)、缩放、灰度；Live Photo↔视频⁵</td><td class="fn">多数免装，HEIC⁵</td></tr>
+          <tr><td class="cat">矢量</td><td>SVG/SVGZ/EMF/WMF/AI/EPS/PS¹/CDR/VSD/CGM/Obsidian Canvas</td><td>PDF(矢量)/图片/SVG↔SVGZ/SVG→DXF·DWG/PDF→EPS·PS¹/Canvas→Markdown</td><td class="fn">PS¹ · ODG²</td></tr>
+          <tr><td class="cat">PDF</td><td>PDF</td><td>DOCX / XLSX(表格) / HWPX / TXT / PNG·JPG·TIFF / CBZ / PPTX(每页成图) / PDF/A¹；合并·拆分·页码范围·压缩</td><td class="fn">PDF/A¹</td></tr>
+          <tr><td class="cat">文档</td><td>DOCX/DOCM/EML/Outlook MSG；OFD(中国电子发票·公文)；DOC/ODT/RTF/WPS/WPD/Pages…²</td><td>PDF / DOCX / HWPX / EPUB / TXT / HTML；表格→XLSX·ODS·CSV；MSG→EML</td><td class="fn">旧格式²</td></tr>
+          <tr><td class="cat">表格</td><td>XLSX/XLSM/XLS/XLT/ODS/CSV/TSV/Numbers/ET²</td><td>PDF / XLSX / ODS / CSV / TSV / JSON / HWPX / HTML</td><td class="fn">ET²</td></tr>
+          <tr><td class="cat">演示</td><td>PPTX/PPTM/POTX/PPSX/PPT/ODP/Keynote²</td><td>PDF / PNG / JPG / DOCX / HWPX</td><td class="fn">PPT¹ · Keynote²</td></tr>
+          <tr><td class="cat">HWP</td><td>HWP / HWPX</td><td>PDF / PNG / DOCX / HWPX↔HWP / TXT / Markdown / HTML</td><td class="no-engine">免装</td></tr>
+          <tr><td class="cat">文本</td><td>TXT/MD/HTML；脚本源码只读不运行；RST/LaTeX/Org/AsciiDoc/Typst/Jupyter/man/OPML³；MHTML</td><td>UTF-8 TXT / PDF / DOCX / HWPX / EPUB / 互转 / PPTX 幻灯³</td><td class="fn">OPML³ 等</td></tr>
+          <tr><td class="cat">电子书</td><td>EPUB/KEPUB/MOBI/AZW3·AZW·AZW4/FB2/CBZ·CBR·CB7/CHM/LIT/LRF/PDB…⁴</td><td>PDF / EPUB / KEPUB(Kobo) / DOCX / TXT / HTML / HWPX / MOBI·AZW3⁴</td><td class="fn">AZW⁴</td></tr>
+          <tr><td class="cat">视频⁵</td><td>MP4/MOV/MKV/WEBM/AVI/WMV/FLV/MPEG/TS/3GP/VOB…；Wisenet NOV</td><td>MP4(H.264/HEVC/AV1)/WEBM/MOV/MKV/GIF/APNG/MP3/720p/分段；保留字幕轨</td><td class="fn">FFmpeg⁵</td></tr>
+          <tr><td class="cat">音频⁵</td><td>MP3/M4A/AAC/WAV/FLAC/OGG/OPUS/WMA/APE/DSD(DSF·DFF)/DTS/AC3…；XM/IT/S3M</td><td>MP3 / M4A(AAC·ALAC) / M4R(iphone 铃声) / WAV / FLAC / OGG / OPUS / AC3</td><td class="fn">FFmpeg⁵</td></tr>
+          <tr><td class="cat">字幕</td><td>SRT/ASS·SSA/WebVTT/SAMI/LRC/KRC/TTML/MicroDVD/SCC</td><td>互转 UTF-8；韩文 CP949 正确读取</td><td class="no-engine">免装</td></tr>
+          <tr><td class="cat">压缩包</td><td>ZIP/7Z/RAR/TAR·GZ·BZ2·XZ·ZST/ISO/CAB/DMG/ALZ/EGG/GMA/VPK/BSP；JAR/NUPKG/APKS·XAPK/AAB/ZXP 读取</td><td>解压 / ZIP / 7Z / TAR·GZ / GMA；多文件→一个 ZIP；文件夹→ZIP/ISO(Joliet 或 UDF 2.01)</td><td class="no-engine">免装</td></tr>
+          <tr><td class="cat">CAD</td><td>DWG / DXF；Gerber PCB 层(GBR/GTL/GBL…)；3D 打印与 CNC 的 G-code</td><td>PDF / SVG / PNG / DWG↔DXF；G-code→刀路(俯视或等轴)或切片器预览</td><td class="no-engine">免装</td></tr>
+          <tr><td class="cat">字体</td><td>TTF/OTF/WOFF/WOFF2/EOT；FON(位图字体) 读取</td><td>互转；FON 按字号逐一拆出</td><td class="no-engine">免装</td></tr>
+          <tr><td class="cat">数据</td><td>JSON/JSON Lines/YAML/TOML/XML；vCard/iCalendar</td><td>互转及 CSV/XLSX(表格)；vCard·iCalendar↔CSV</td><td class="no-engine">免装</td></tr>
+          <tr><td class="cat">3D</td><td>GLB/glTF/STL/OBJ(+MTL)/3MF/PLY/SMD；FBX/Source MDL(含 VTF 贴图) 读取</td><td>互转 + PNG 预览；MDL→QC+SMD(反编译含物理与动画)</td><td class="no-engine">免装</td></tr>
+          <tr><td class="cat">地理矢量</td><td>Shapefile/GeoJSON/KML/KMZ/GPX/含坐标 CSV；Garmin FIT、OSM</td><td>互转及 CSV/XLSX/JSON；投影数据(UTM/Web Mercator/Lambert/Albers)输出 WGS 84 经纬度</td><td class="no-engine">免装</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="fnote-list">
+      <span class="fn">¹</span> Ghostscript　<span class="fn">²</span> LibreOffice　<span class="fn">³</span> Pandoc　<span class="fn">⁴</span> calibre　<span class="fn">⁵</span> FFmpeg。<strong>规则</strong>：无脚注的格式开箱即用，不依赖 Office、Hancom 或 LibreOffice；带脚注的格式在实际用到时才下载对应引擎，下载源固定在 engines.json，不随安装包强制捆绑。
+    </div>
+  </div>
+
+  <!-- 03 安装与命令行 -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">03</div>
+      <div class="sec-title">三端安装与 filee 命令行<small>README「Install」「Command line」两节的原始命令</small></div>
+    </div>
+    <div class="platform-tabs"><span class="plat">Windows 10/11</span><span class="plat">macOS 13+ (preview)</span><span class="plat">Linux x64/ARM64</span></div>
+    <div class="code-block"><span class="cm"># Windows：winget 一行安装；ARM64 设备换装 win-arm64-Setup.exe（原生运行，不走 x64 模拟）</span>
+winget install KnifeLemon.Filee
+<span class="cm"># 静默安装用 Inno Setup 开关；Portable 版解压即用，数据存应用旁边</span></div>
+    <div class="code-block"><span class="cm"># macOS：解包后跑 install.sh（自带 filee 命令），或 .dmg 拖入 Applications</span>
+./install.sh
+<span class="cm"># 未公证：首次启动到 系统设置 → 隐私与安全性 → Open Anyway 放行</span></div>
+    <div class="code-block"><span class="cm"># Linux（Ubuntu 22.04+）：无需 root，依赖 Python 3；拖拽手势需 X11，Wayland 用拖放区/右键菜单</span>
+./install.sh</div>
+    <div class="code-block"><span class="cm"># 命令行与应用共用同一套引擎和预设（Setup 或 install.sh 会装上 filee 命令）</span>
+filee convert photo.heic --to jpg
+filee convert *.png --to webp <span class="ar">--quality</span> <span class="st">80</span> <span class="ar">-o</span> converted
+filee watch D:\Inbox --to pdf <span class="ar">--move-originals</span>
+<span class="cm"># 全部命令与选项：filee help 或 filee.sh/cli</span></div>
+    <p>
+      <strong>自行构建</strong>需要 .NET 10 SDK：clone 后用 <span class="mono">pwsh build/fetch-engines.ps1 -Only rhwp,pandoc</span> 拉指定可选引擎，然后 <span class="mono">dotnet run --project src/Filee.App</span>，测试是 <span class="mono">dotnet test</span>。README 还给了三条入口：Architecture、Engines、Adding a converter 三篇开发文档，接受 PR。
+    </p>
+  </div>
+
+  </div><!-- /main-left -->
+
+  <div class="main-right">
+
+  <!-- 04 联网边界 -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">04</div>
+      <div class="sec-title">联网边界：离线转换，四件事例外<small>README「Privacy policy」逐项</small></div>
+    </div>
+    <p>
+      转换在本机完成、不上传文件，不收集使用数据、无遥测。README 明确列出全部联网情形，逐条如下：
+    </p>
+    <div class="analysis-grid">
+      <div class="analysis-item">
+        <div class="ai-head">查新</div>
+        <div class="ai-body">启动后不久及之后每隔数小时访问 api.github.com 检查新版本；在 Settings → About 关闭「Check for updates automatically」即可停用。</div>
+      </div>
+      <div class="analysis-item">
+        <div class="ai-head">更新下载</div>
+        <div class="ai-body">只有你点 Update 时才下载，来源是 GitHub；Windows 上 GitHub 无响应时回退到 dl.filee.sh 的同一文件。</div>
+      </div>
+      <div class="analysis-item">
+        <div class="ai-head">引擎与 OCR 语言包</div>
+        <div class="ai-body">下载你选择安装的转换引擎（engines.json 固定官方源）和预设用到的 OCR 语言（ocr-languages.json 固定）。此为 README 所述，两个清单文件本体本卡未读取。</div>
+      </div>
+      <div class="analysis-item">
+        <div class="ai-head">点击链接</div>
+        <div class="ai-body">点击应用内链接时打开系统浏览器。除此之外 README 未列出任何其他联网行为。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 已知问题 -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">05</div>
+      <div class="sec-title">已知问题与签名状态<small>README 安装节与「Code signing policy」原文</small></div>
+    </div>
+    <div class="risk-grid">
+      <div class="risk warn">
+        <div class="r-head">Windows 10 启动无窗口（CET）</div>
+        <div class="r-body">长期未更新的 Windows 10 + 支持 CET 硬件栈保护的 CPU：系统开启了保护但缺少 .NET 需要的组件，Filee 和安装器直接停掉，无窗口无报错。推荐先装最新累积更新；装不了就以管理员 PowerShell 执行下面两行（Portable ZIP 只需这两行）：</div>
+      </div>
+      <div class="risk">
+        <div class="r-head">签名与 SmartScreen</div>
+        <div class="r-body">Windows 发行版现用签给作者 Myeonggu Kim 的 Certum 开源证书；2.0.0 及更早版本未签名。新版本下载量不够时 SmartScreen 仍会警告，走「More info → Run anyway」。macOS 包 ad-hoc 签名、未公证。只有 GitHub Actions release workflow 构建且人工签发的文件带签名。</div>
+      </div>
+    </div>
+    <div class="code-block"><span class="cm"># CET 问题的官方绕行（管理员 PowerShell）；撤销入口在 Windows 安全中心 Exploit protection 程序设置</span>
+Set-ProcessMitigation -Name Filee.exe <span class="ar">-Disable</span> UserShadowStack
+Set-ProcessMitigation -Name filee-cli.exe <span class="ar">-Disable</span> UserShadowStack</div>
+    <p>
+      <strong>平台边界汇总</strong>：macOS 版整体是 preview；Linux 拖拽手势仅 X11，Wayland 用户走拖放区和文件管理器右键菜单；浏览器直拖拿不到需要登录态的文件。这些是仓库自己写明的限制，不是本卡推断。
+    </p>
+  </div>
+
+  <!-- 06 边界与行动 -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">06</div>
+      <div class="sec-title">证据分层与验证路径<small>本卡哪些话有据可查，哪些只是文档宣称</small></div>
+    </div>
+    <div class="two-col">
+      <div>
+        <h4>证据分层</h4>
+        <div class="judgment-box">
+          <div class="jb-row"><span class="jb-lbl">仓库已证实</span><span class="jb-val">格式矩阵、安装命令、CLI 示例、隐私政策、CET 问题与解法、签名政策</span></div>
+          <div class="jb-row"><span class="jb-lbl">仅文档宣称</span><span class="jb-val neg">自更新保留设置、预设画廊服务、27 秒视频与交互演示</span></div>
+          <div class="jb-row"><span class="jb-lbl">时效数字</span><span class="jb-val">30.5k stars / 1.7k forks / 182 open issues（11-24 快照）</span></div>
+          <div class="jb-row"><span class="jb-lbl">字段推算</span><span class="jb-val neg">2026-09-29 建仓，约 8 周到 30.5k star</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>装完怎么验证</h4>
+        <div class="next-steps">
+          <div class="next-item">
+            <div class="next-num">1</div>
+            <div class="next-text">装好后跑 <strong>filee help</strong>，确认命令行入口在 PATH 里，再对照 filee.sh/cli 看参数是否与 README 一致</div>
+          </div>
+          <div class="next-item">
+            <div class="next-num">2</div>
+            <div class="next-text">拿一个 HEIC 和一个 HWP 实测两条链路：<strong>拖拽出环</strong>和 <strong>filee convert</strong>，核对输出是否落在原文件旁</div>
+          </div>
+          <div class="next-item">
+            <div class="next-num">3</div>
+            <div class="next-text">到 Settings → About <strong>关掉自动查新</strong>再抓包/看防火墙日志，验证「仅四类联网」的说法是否成立</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /main-right -->
+</div><!-- /main-grid -->
+
+<!-- SOURCE BAR -->
+<div class="source-bar">
+  <div class="sb-item">
+    <span class="sb-lbl">src</span>
+    <a class="sb-link" href="https://github.com/KnifeLemon/Filee">github.com/KnifeLemon/Filee</a>
+  </div>
+  <div class="sb-item">
+    <span class="sb-lbl">site</span>
+    <a class="sb-link" href="https://filee.sh">filee.sh</a>
+  </div>
+  <div class="sb-item">
+    <span class="sb-lbl">license</span>
+    <span class="sb-val">MIT</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-lbl">snapshot</span>
+    <span class="sb-val">2026-11-24</span>
+  </div>
+  <div class="sb-sep"></div>
+  <div class="sb-item">
+    <span class="sb-val">infocard-pub</span>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-l">Generated by infocard-pub · sage-swiss-style</div>
+  <div class="footer-r">
+    <a href="https://github.com/KnifeLemon/Filee">View Source →</a>
+  </div>
+</div>
+
+</div><!-- /page -->
+</body>
+</html>
