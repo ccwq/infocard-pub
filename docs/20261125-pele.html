@@ -1,0 +1,137 @@
+<!doctype html><html lang="zh-CN" data-theme="codex-notebook"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pele：Obsidian 官方 Mermaid→SVG 渲染库，零依赖同步渲染</title><meta name="slug" content="pele"><style>
+    :root{
+      /* 主题令牌：codex-notebook（source: theme/codex-notebook.html，selected_theme 绑定） */
+      --bg:#f5f1e8;--paper:#fffaf0;--paper-2:#fff2d6;--ink:#1f1a16;--muted:#6d645a;--line:#2a241f;
+      --red:#e24b3b;--green:#77bf52;--yellow:#f4d35e;--blue:#9fc7ef;--pink:#f5b7cd;--orange:#f2a65a;
+      --shadow:5px 5px 0 rgba(36,31,26,.95);
+      --max:1180px;
+      /* 组件级派生令牌（同样只在此处出现一次） */
+      --sticker-red-bg:#ffe1dc;--sticker-green-bg:#e5f6d8;--sticker-yellow-bg:#fff0a8;--sticker-blue-bg:#d8ecff;--sticker-pink-bg:#f8d6e7;
+      --note-yellow-bg:#fff0a8;--note-green-bg:#e8f5cc;--note-pink-bg:#f9d9e6;--note-blue-bg:#d8ecff;--note-orange-bg:#ffe1c3;
+      --hero-grad-a:#fff7e7;--hero-grad-b:#fff0d8;--benefits-bg:#fff8ea;--quote-bg:#fffef7;--mini-grad-b:#fff7ea;
+      --code-bg:#f1f3f5;--code-border:#d5d8df;--body-text:#463f36;--pin-yellow-bg:#fff0a8;--footer-bg:#de3a31;--spiral-rail:#d9d2c6;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.72;text-rendering:optimizeLegibility}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.22;background-image:repeating-linear-gradient(0deg, rgba(42,36,31,.08) 0 1px, transparent 1px 28px),repeating-linear-gradient(90deg, rgba(42,36,31,.05) 0 1px, transparent 1px 28px);mix-blend-mode:multiply}
+    a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+    code,kbd,pre{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .page{width:min(var(--max),calc(100% - 24px));margin:0 auto;padding:18px 0 54px;position:relative;z-index:1}
+    .card{background:var(--paper);border:2.5px solid var(--line);box-shadow:var(--shadow)}
+
+    /* hero */
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:14px;padding:16px;margin-bottom:14px;background:linear-gradient(180deg,var(--hero-grad-a) 0%, var(--hero-grad-b) 100%)}
+    .banner{display:inline-block;padding:6px 10px;background:var(--line);color:var(--paper);box-shadow:4px 4px 0 var(--line);font:800 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;margin:4px 0 10px}
+    .title{font:900 clamp(26px,4vw,52px)/.98 Georgia,"PingFang SC","Microsoft YaHei",serif;margin:0 0 8px;letter-spacing:-.03em}
+    .title .red{color:var(--red)}
+    .lead{margin:0 0 12px;font-size:14px;line-height:1.8;color:var(--muted);max-width:60ch}
+    .sticker-row{display:flex;flex-wrap:wrap;gap:8px}
+    .sticker{padding:5px 9px;border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--paper);white-space:nowrap}
+    .sticker.red{background:var(--sticker-red-bg)}.sticker.green{background:var(--sticker-green-bg)}.sticker.yellow{background:var(--sticker-yellow-bg)}.sticker.blue{background:var(--sticker-blue-bg)}.sticker.pink{background:var(--sticker-pink-bg)}
+    .hero-side{display:grid;gap:10px;align-content:start}
+    .pin{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);background:var(--paper);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+    .pin::before{content:"📌"}
+    .quote{padding:10px 12px;border:2px solid var(--line);background:var(--quote-bg);box-shadow:3px 3px 0 var(--line);font:700 13px/1.65 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .quote em{font-style:normal;color:var(--red)}
+    .chips-row{display:flex;flex-wrap:wrap;gap:8px}
+    .chips-row span{padding:5px 8px;border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--paper)}
+
+    /* section grid + notes */
+    .section-grid{display:grid;grid-template-columns:1fr 1.12fr;gap:14px;margin-bottom:14px}
+    .spiral{position:relative;padding:14px 14px 16px;overflow:hidden}
+    .spiral::before{content:"";position:absolute;left:-1px;top:-1px;bottom:-1px;width:20px;background:var(--spiral-rail);border-right:2px solid var(--line)}
+    .spiral-content{margin-left:30px}
+    .stack{display:grid;gap:10px}
+    .note{position:relative;padding:12px 12px 12px 13px;border:2px solid var(--line);box-shadow:4px 4px 0 var(--line)}
+    .note h3{margin:0 0 6px;font:900 14px/1.18 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .note p{margin:0;font-size:12.8px;line-height:1.6;color:var(--body-text)}
+    .note code{padding:1px 5px;background:var(--code-bg);border:1px solid var(--code-border);font-size:11.5px}
+    .note .ico{font-size:18px;line-height:1;margin-bottom:6px}
+    .note.yellow{background:var(--note-yellow-bg)}.note.green{background:var(--note-green-bg)}.note.pink{background:var(--note-pink-bg)}.note.blue{background:var(--note-blue-bg)}.note.orange{background:var(--note-orange-bg)}
+
+    /* preview / 速览 */
+    .preview{display:grid;gap:10px;padding:14px}
+    .preview-head{display:flex;justify-content:space-between;align-items:center}
+    .preview-head b{font:900 18px/1.1 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .preview-head span{padding:5px 8px;border:2px solid var(--line);background:var(--paper);box-shadow:3px 3px 0 var(--line);font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase}
+    .preview-box{padding:12px;border:2px solid var(--line);background:var(--paper);box-shadow:3px 3px 0 var(--line)}
+    .preview-box h4{margin:0 0 8px;font-size:13.5px;line-height:1.3}
+    .preview-box p,.preview-box li{margin:0;font-size:12.8px;line-height:1.7;color:var(--body-text)}
+    .preview-box ul{margin:0;padding-left:18px}
+    .preview-box li+li{margin-top:4px}
+    .preview-box code{padding:1px 5px;background:var(--code-bg);border:1px solid var(--code-border);font-size:11.5px}
+    .divert{border-left:6px solid var(--yellow)}
+
+    /* 深度论证正文 */
+    .deep{display:grid;gap:14px;margin-bottom:14px}
+    .deep-card{padding:16px;min-width:0}
+    .deep-card h2{margin:0 0 6px;font:900 clamp(18px,2.4vw,24px)/1.2 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .deep-card h2 .red{color:var(--red)}
+    .deep-card p{margin:0 0 10px;font-size:13.2px;line-height:1.8;color:var(--body-text)}
+    .deep-card p code,.deep-card li code,td code{padding:1px 5px;background:var(--code-bg);border:1px solid var(--code-border);font-size:11.5px}
+    .deep-card ul{margin:0 0 10px;padding-left:20px}
+    .deep-card li{font-size:13px;line-height:1.75;color:var(--body-text);margin-bottom:4px}
+    .caveat{border:2px dashed var(--line);background:var(--note-yellow-bg);padding:10px 12px;font-size:12.6px;line-height:1.7;color:var(--body-text);margin:10px 0}
+    .caveat b{color:var(--ink)}
+    .src{font-size:11.5px;color:var(--muted);margin-top:6px}
+    pre{margin:0 0 10px;padding:12px 14px;background:var(--code-bg);border:2px solid var(--line);box-shadow:3px 3px 0 var(--line);overflow-x:auto;max-width:100%;font-size:12.6px;line-height:1.65}
+    pre code{background:none;border:none;padding:0}
+    .cmd{display:block;margin:0 0 8px;padding:8px 12px;background:var(--line);color:var(--paper-2);font:700 12.6px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-x:auto}
+    .cmd::before{content:"$ ";opacity:.7}
+
+    /* 表格 */
+    .table-wrap{overflow-x:auto;margin:0 0 10px}
+    table{border-collapse:collapse;width:100%;background:var(--paper);border:2px solid var(--line);font-size:12.6px}
+    th,td{border:1.5px solid var(--line);padding:7px 10px;text-align:left;line-height:1.5}
+    th{background:var(--note-blue-bg);font:800 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace}
+    td b{color:var(--red)}
+    .tbl-cap{font-size:11.5px;color:var(--muted);margin:-4px 0 10px}
+
+    /* 边界与行动三栏 */
+    .bounds{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 10px}
+    .bound{padding:10px 11px;border:2px dashed var(--line);background:var(--paper)}
+    .bound b{display:block;margin-bottom:5px;font-size:13px}
+    .bound.go b{color:var(--green)}.bound.stop b{color:var(--red)}.bound.how b{color:var(--muted)}
+    .bound p,.bound li{margin:0;font-size:12.4px;line-height:1.65;color:var(--body-text)}
+    .bound ul{margin:0;padding-left:16px}
+
+    /* 来源 */
+    .sources{padding:14px 16px;margin-bottom:14px}
+    .sources h2{margin:0 0 8px;font:900 18px/1.2 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .sources ol{margin:0;padding-left:20px}
+    .sources li{font-size:12.8px;line-height:1.8;color:var(--body-text);margin-bottom:3px}
+    .sources li code{padding:1px 5px;background:var(--code-bg);border:1px solid var(--code-border);font-size:11px}
+
+    .footer{padding:12px 14px;background:var(--footer-bg);color:var(--paper);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;box-shadow:var(--shadow)}
+    .footer strong{font:900 17px/1.2 Georgia,"PingFang SC","Microsoft YaHei",serif}
+    .footer .tag{padding:4px 8px;border:2px solid rgba(255,255,255,.9);font:800 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
+    .doodles{position:absolute;inset:auto 14px 14px auto;font-size:26px;opacity:.9}
+
+    @media (max-width:1080px){.hero,.section-grid,.bounds{grid-template-columns:1fr}}
+    @media (max-width:720px){.page{width:min(100% - 14px,var(--max));padding:10px 0 28px}.hero{padding:12px}.spiral-content{margin-left:24px}.spiral::before{width:16px}.note,.preview-box,.deep-card{box-shadow:3px 3px 0 var(--line)}.footer{flex-direction:column;align-items:flex-start}}
+  </style><style>pre{max-width:100%;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere} .title{line-height:1.2} .preview{margin-bottom:14px}.preview-box p{font-size:15px;line-height:1.8;margin:0 0 10px}.preview-box pre{font-size:14px;line-height:1.7}.benefit p,.note p{font-size:14px}</style></head><body><main class="page"><section class="hero card" id="hero"><div><div class="banner">PELE · 开源项目</div><h1 class="title">Pele：把 Mermaid <span class="red" style="white-space:nowrap">同步渲染成 SVG</span>，<span style="white-space:nowrap">零依赖、230 kB</span></h1><p class="lead">Obsidian 官方出品的 Mermaid 渲染库：<code>render()</code> 一步返回 SVG、无运行时依赖，颜色字体走 CSS 变量、改主题不重渲染；性能对比数字来自官方自测，选型前建议自己跑 bench。</p><div class="sticker-row"><span class="sticker green">MIT · 4,675 star</span><span class="sticker blue">Mermaid 12.1.0 全图型</span><span class="sticker yellow">kepano 主导开发</span><span class="sticker red">对比数字是官方自测</span></div></div><div class="hero-side"><div class="pin chip">先看结论</div><div class="quote">要把 Mermaid 嵌进自己的文档或产品，<em>它值得排在候选第一梯队</em>；重度依赖 Mermaid.js 插件生态的，先算迁移成本。</div><div class="chips-row"><span>建库 2026-10-05</span><span>v1.13.0 · 2026-10-31</span></div></div></section>
+<section class="section-grid"><aside class="spiral card"><div class="spiral-content"><div class="pin">核心要点</div><div class="stack"><article class="note yellow"><h3>同步 + 零依赖</h3><p><code>render()</code> 传入 Mermaid 文本直接返回 SVG，无异步管线；官方口径直接依赖 0 个，Mermaid.js 是 23 个。</p></article><article class="note green"><h3>主题即 CSS 变量</h3><p><code>--pele-bg/fg/line/accent</code> 等变量加 <code>--pele-series-1..8</code> 系列色，换主题不重渲染。</p></article><article class="note blue"><h3>包体可控</h3><p>全量 gzip 230 kB（官方口径）；<code>pele/core</code> 逐图型 <code>register()</code> 或 <code>pele/lazy</code> 按需加载。</p></article><article class="note pink"><h3>数字是自测口径</h3><p>0.05–0.3 ms、最高 500× 均出自官网与 <code>bench:mermaid</code> 脚本，本卡未独立复现。</p></article></div></div></aside><div class="preview card"><div class="preview-head"><b>速览：选不选它</b><span>snapshot 2026-11-25</span></div><div class="preview-box"><p>给文档站、知识库或产品嵌入 Mermaid 图——尤其在意暗色主题即时切换、移动端布局自适应、渲染不可信输入——pele 直接进候选：MIT 协议、解析器按 Mermaid 官方规格测试并做差分模糊测试、两周内发了 10 个版本修细节。反过来，需要逐像素复刻 Mermaid 现有输出、依赖 Mermaid.js 插件生态、或要开箱即用公式排版的，先看边界再决定。</p><p class="divert" style="padding-left:10px">到这里已足够判断去留；下面展开 API 三种入口的真实形态、官方对比表、主题变量清单与升级风险。</p></div></div></section>
+<section class="preview card"><div class="preview-head"><b>01 · API 三入口：同步、浏览器、减包</b></div><div class="preview-box"><p><strong>render() 同步出图：</strong>拿到的是字符串，插进页面就完事，结果里带 <code>mermaidType</code>（1.7.0 起，如 <code>flowchart-v2</code>）。</p><pre><code>import { render } from 'pele';
+const { svg } = render(`flowchart LR
+  A[Mermaid text] --> B[SVG]`);
+document.querySelector('#diagram').innerHTML = svg;</code></pre><p><strong>mount() 浏览器形态：</strong>渲入元素、从 CSS 读字体、随容器宽度自适应布局（小屏是重排而非缩放整图）；解析/渲染错误就地显示在容器里并保留上一次成功图形的暗态，SVG ID 自动唯一化避免多图冲突。</p><pre><code>import { mount } from 'pele';
+mount(document.querySelector('#diagram'), text);
+// 失败走 onError / Mounted.error，不再 throw</code></pre><p><strong>减包两条路：</strong>主入口包含全部图型；只要几种图就逐个注册，或用懒加载入口。</p><pre><code>import { register, render } from 'pele/core';
+import flowchart from 'pele/diagrams/flowchart';
+register(flowchart);
+
+import { renderAsync } from 'pele/lazy';
+const { svg } = await renderAsync(text);</code></pre></div></section>
+<section class="preview card"><div class="preview-head"><b>02 · 对比表与兼容边界</b></div><div class="preview-box"><div class="table-wrap"><table><thead><tr><th>维度</th><th>Pele</th><th>Mermaid.js</th></tr></thead><tbody><tr><td>包体（gzip）</td><td><b>230 kB</b></td><td>1.6 MB</td></tr><tr><td>渲染耗时</td><td><b>0.05–0.3 ms</b></td><td>6–82 ms（官网称最高 500× 差距）</td></tr><tr><td>直接依赖</td><td><b>0</b></td><td>23</td></tr><tr><td>小屏幕</td><td>自适应重排布局</td><td>缩放整张图</td></tr><tr><td>主题化</td><td>CSS 变量</td><td>主题配置对象</td></tr></tbody></table></div><p class="tbl-cap">移动端表格可左右滑动查看完整对比 · 数据源：pele.run 与仓库 <code>bench:mermaid</code>（headless Chrome 对拍 Mermaid 12.1.0），官方自测口径，本卡未独立复现。</p><p><strong>兼容到什么程度：</strong>目标是 Mermaid 12.1.0 语法全集，解析器按 Mermaid 官方解析器规格测试、再做差分模糊测试；但布局与视觉风格是 Pele 自己的实现——图能画对，不代表和 Mermaid.js 长得一样。</p><div class="caveat"><b>溯源：</b>该项目最初在 X 上以不存在的仓库地址 SaulMASTROPINQUE/pele 传播，正确仓库为 obsidianmd/pele，本卡以官方仓库为唯一一手源。</div></div></section>
+<section class="preview card"><div class="preview-head"><b>03 · 主题化：改颜色不重渲染</b></div><div class="preview-box"><p>在 <code>.pele</code> 或任意父元素上设变量，颜色即时生效、不触发重渲染；图表系列色有 8 个槽位。</p><pre><code>.pele {
+  --pele-bg: #fffcf0;   --pele-fg: #100f0f;
+  --pele-muted: #6f6e69; --pele-line: #100f0f;
+  --pele-surface: #f2f0e5; --pele-surface-alt: #e6e4d9;
+  --pele-border: #cecdc3; --pele-accent: #205ea6;
+  --pele-font: sans-serif; --pele-radius: 4px;
+  /* 图表系列色：--pele-series-1 … --pele-series-8 */
+}</code></pre><p>1.12.0/1.13.0 补齐了深浅色细节：自定义填充上的标签自动在 <code>--pele-fg-on-light/dark</code> 里挑对比度高的；饼图、git graph、时间线等系列色改为跟随 Mermaid 的 <code>pie1–8</code>、<code>git0–7</code>、<code>cScale0–7</code> 等主题变量，迁移来的主题配色不再走样。</p></div></section>
+<section class="preview card"><div class="preview-head"><b>04 · 安全模型与版本节奏</b></div><div class="preview-box"><p><strong>面向不可信输入的三层防护：</strong>转义图内文本、过滤链接与样式、限制输入与输出尺寸；1.9.1 起保证输出恒为合法 XML（清除 U+FFFE/U+FFFF 与未配对代理区）。</p><p><strong>迭代速度：</strong>2026-10-17 至 10-31 两周发了 10 个版本（1.6.0→1.13.0），kepano 一个人的提交占 384 次，是第二名的 19 倍。细节修到很细：1.7.0 中文/日文长标签按字符换行（不再把图撑宽）；1.6.0 起 <code>mount()</code> 把错误画在容器里而不是抛异常。</p><div class="caveat"><b>升级风险：</b>1.10.0 收紧了两处语法——<code>%%</code> 注释不再吞掉前一个字符、空 <code>title</code> 不再吞下一行；以前「碰巧能画」的图升级后可能直接报语法错误。公式支持（1.8.0 的 <code>math</code> 选项）不含排版器，宿主必须自己提供返回 SVG/MathML 的 resolver，否则标签里显示 TeX 源码。</div></div></section>
+<section class="preview card"><div class="preview-head"><b>05 · 边界与行动</b></div><div class="preview-box"><div class="bounds"><div class="bound go"><b>适合</b><ul><li>文档站/知识库/产品内嵌 Mermaid</li><li>暗色主题切换不想重渲染</li><li>渲染用户提交的图（有防护）</li><li>移动端要重排而非缩放糊图</li></ul></div><div class="bound stop"><b>暂缓</b><ul><li>要逐像素复刻 Mermaid 现有输出</li><li>依赖 Mermaid.js 插件与指令生态</li><li>要开箱即用的公式排版</li><li>用了 1.10.0 收紧前的取巧语法</li></ul></div><div class="bound how"><b>怎么验证</b><ul><li><code>npm install pele</code> 拿真实图试</li><li>仓库跑 <code>npm run bench:mermaid</code>（Node 22+）</li><li>pele.run 有 playground 与 Security 集成文档</li></ul></div></div></div></section>
+<section class="sources card"><h2>来源与快照</h2><ol><li><code>github.com/obsidianmd/pele</code> — README 全文与仓库元数据（stars/forks/license/contributors），2026-11-25 快照</li><li><code>github.com/obsidianmd/pele/releases</code> — 1.6.0–1.13.0 逐版本变更说明，2026-11-25 快照</li><li><code>pele.run</code> — 官网产品口径与对比表（自测基准），2026-11-25 快照</li><li>许可：README 声明 MIT；<code>tests/compat</code> 规格与语法文件来自 Mermaid（同为 MIT），仓库页 License 字段因此显示 Other</li></ol></section><footer class="footer"><strong>先跑 bench，再决定换不换</strong><span class="tag">github.com/obsidianmd/pele</span></footer></main></body></html>
