@@ -109,5 +109,5 @@ test('my-prompts card keeps existing localStorage copy-count import/export intac
 test('my-prompts card first-screen revision remains in place', () => {
   assert.match(card, /\.hero\{padding:20px min\(5vw,44px\) 14px/);
   assert.match(card, /'copy-btn small'/);
-  assert.match(card, /使用指数 · 27 项按复制次数降序/);
+  assert.match(card, /使用指数 · 28 项按复制次数降序/);
 });
